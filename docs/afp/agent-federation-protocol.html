@@ -279,11 +279,11 @@
 
 <div class="page">
   <header class="hero">
-    <p class="eyebrow">Architecture Spec &middot; Multi-Operator Agent Federation &middot; Revision 3.4</p>
+    <p class="eyebrow">Architecture Spec &middot; Multi-Operator Agent Federation &middot; Revision 3.5</p>
     <h1>Agent Federation Protocol</h1>
     <p class="dek">Multiple operators, each running their own instance of agents, join forces on a common problem — federating through problem-scoped hubs over ActivityPub, the W3C protocol behind Mastodon. No central broker, consortium trust, no token economics.</p>
     <div class="callout">
-      <strong>Revision 3.4 —</strong> the multi-operator model is the organizing principle: the operator <strong>instance</strong> is a first-class trust boundary, <strong>hubs</strong> are problem-scoped rendezvous points, <code>afp:Bid</code> handles cross-operator allocation, and contribution accounting replaces any notion of currency. This revision folds in nine findings from the first <strong>scenario-test campaign</strong> — a visibility model, an artifact layer, hub lifecycle, and several conventions that closed real gaps.
+      <strong>Revision 3.5 —</strong> the multi-operator model is the organizing principle: the operator <strong>instance</strong> is a first-class trust boundary, <strong>hubs</strong> are problem-scoped rendezvous points, <code>afp:Bid</code> handles cross-operator allocation, and contribution accounting replaces any notion of currency. Revisions 3.4 and 3.5 fold in fifteen findings from an ongoing <strong>scenario-test campaign</strong> — a visibility model, an artifact layer, hub lifecycle, coalition allocation, and synthesized answers that keep their uncertainty and dissent intact.
     </div>
   </header>
 
@@ -322,7 +322,7 @@
 
     <main>
       <section id="changelog">
-        <div class="sec-head"><span class="num">&Delta;</span><h2>What changed in v3 &amp; v3.4</h2></div>
+        <div class="sec-head"><span class="num">&Delta;</span><h2>What changed in v3, v3.4 &amp; v3.5</h2></div>
         <div class="table-wrap">
           <table>
             <thead><tr><th>#</th><th>Change</th><th>Why</th></tr></thead>
@@ -346,6 +346,12 @@
               <tr><td>16</td><td>Co-work pattern (&sect;07): the ping-pong thread, plus <code>afp:contributionSplit</code> when <code>attributedTo</code> names several actors</td><td>Offer/Accept/Result assumes one performer; joint work needed a blessed pattern that keeps attribution — and therefore billing — exact</td></tr>
               <tr><td>17</td><td>External-system rules (&sect;07): firehose stays behind the port; port agents MUST reconcile external outcomes back into the thread</td><td>Without reconciliation an audit trail ends at &ldquo;we proposed&rdquo;; without the anti-pattern stated, someone pipes a log stream into an inbox</td></tr>
               <tr><td>18</td><td>L1 guarantee table by operator count (&sect;10); application-defined CRDT stores blessed (&sect;11)</td><td>&ldquo;Byzantine-hardened&rdquo; means accountability at n=2 and tolerance only at n&ge;4 — worth stating before it is over-read; and app stores worked but were never permitted in text</td></tr>
+              <tr><td colspan="3" style="background:var(--surface-2); font-weight:700;">v3.5 — six findings from scenario 04 (a question pushed to the hub: federated estimation)</td></tr>
+              <tr><td>19</td><td>Selection rules generalized (&sect;9.1): ranking (one winner) <em>or</em> set selection over <code>afp:coverage</code> claims, with arity emergent from the bid pool and a deterministically-named synthesizer</td><td>Some questions cannot be answered by any single agent; how many answerers are needed is a property of the question, discovered from the bids, not declarable up front</td></tr>
+              <tr><td>20</td><td><code>afp:Synthesis</code> (&sect;16): combined answer bound to contributing Results, with method, confidence, assumptions, superseded inputs, and <strong>dissent as a first-class field</strong></td><td>DecisionRecord records discrete choices; estimates need &ldquo;what do we know and how sure are we.&rdquo; Collapsing a spread to a point figure destroys what the requester most needs — including objections no number can express</td></tr>
+              <tr><td>21</td><td><code>afp:Settlement</code> + an explicit <em>unsettled</em> state (&sect;16)</td><td>Estimate accuracy can only be scored when actuals arrive — months later, or never. The prior reputation loop silently assumed prompt verification</td></tr>
+              <tr><td>22</td><td>Estimator/bidder separation of duties, and explicit declines on announced tasks (&sect;9.2, &sect;9.3)</td><td>Whoever answers &ldquo;what does this cost&rdquo; frames a budget they may later bid to earn; and silence can't distinguish &ldquo;not my domain&rdquo; from &ldquo;never saw it&rdquo; when an audit asks who was consulted</td></tr>
+              <tr><td>23</td><td>Answer sufficiency distinguished from voting quorum (&sect;9.1); <code>afp:estimatedCost</code> precision note (&sect;9.3)</td><td>&ldquo;How many independent answers suffice&rdquo; is not &sect;13's voting math; and a Bid's cost-to-perform must not be confused with a costing question's answer</td></tr>
             </tbody>
           </table>
         </div>
@@ -616,6 +622,9 @@
               <tr><td><code>afp:digest</code>, <code>afp:size</code></td><td>Properties (Link)</td><td>Hash-addressing for artifacts; <code>afp:digest</code> mandatory on attachments (&sect;17)</td></tr>
               <tr><td><code>afp:sourceUrl</code>, <code>afp:fetchedAt</code></td><td>Properties (Link)</td><td>Provenance for externally-fetched evidence (&sect;17)</td></tr>
               <tr><td><code>afp:Freeze</code> / <code>afp:Archive</code></td><td>Activity</td><td>Hub lifecycle: suspend new work / terminal read-only close with canonical state hashes (&sect;17)</td></tr>
+              <tr><td><code>afp:coverage</code></td><td>Property (Bid)</td><td>Declared sub-domains this bidder claims, with per-domain confidence — input to set-selection rules (&sect;9.1)</td></tr>
+              <tr><td><code>afp:Synthesis</code></td><td>Object (in <code>Create</code>)</td><td>Combined answer bound to contributing Results: method, range, confidence, assumptions, dissent, superseded inputs (&sect;16)</td></tr>
+              <tr><td><code>afp:Settlement</code></td><td>Activity</td><td>Links prior estimates to observed actuals, releasing deferred reputation adjustment (&sect;16)</td></tr>
             </tbody>
           </table>
         </div>
@@ -654,9 +663,9 @@ timeout without quorum --> Undo{Vote} / abandon round</pre>
         <div class="sec-head"><span class="num">09</span><h2>Bidding &amp; allocation</h2><span class="rev-chip">New in v3</span></div>
         <p>Cross-operator allocation — the case where the announcer <em>doesn't</em> know who should do the task. When the target is known (single candidate, pre-arranged assignment), skip all of this and use the direct <code>Offer</code> flow; <code>Bid</code> sits alongside v1's flow, it doesn't replace it.</p>
         <ol class="plain">
-          <li><strong>Announce</strong> — <code>afp:Announce{Task}</code> broadcast to the hub: task spec, required capabilities, deadline, <code>afp:hub</code>, and — published up front, not decided after the fact — the scoring function that will select the winner.</li>
+          <li><strong>Announce</strong> — <code>afp:Announce{Task}</code> broadcast to the hub: task spec, required capabilities, deadline, <code>afp:hub</code>, and — published up front, not decided after the fact — the <strong>selection rule</strong> that will pick the performer(s).</li>
           <li><strong>Bid, sealed</strong> — during the bid window, bidders submit only a commitment hash (<code>afp:bidCommit</code>); after it closes they submit <code>afp:BidReveal</code> with values matching the hash. Commit-reveal exists specifically to deter last-moment undercutting off visible bids — open bidding on a hub (needed for auditability) would invite exactly that.</li>
-          <li><strong>Award</strong> — the announcer (or the pre-published deterministic rule) emits <code>afp:Award</code> referencing the winning bid. Anyone can recompute the published scoring function over the revealed bids and verify the award — selection is checkable even when a human made the call.</li>
+          <li><strong>Award</strong> — the announcer (or the pre-published deterministic rule) emits <code>afp:Award</code> referencing the winning bid(s). Anyone can recompute the published rule over the revealed bids and verify the award — selection is checkable even when a human made the call.</li>
           <li><strong>Accept / Result</strong> — exactly the v1 flow keyed by <code>correlationId</code>, seeded by a Bid instead of a direct Offer.</li>
         </ol>
         <div class="snippet">
@@ -683,6 +692,28 @@ timeout without quorum --> Undo{Vote} / abandon round</pre>
           <li><strong>Tie-breaking</strong> — deterministic and discretion-free: <code>hash(taskId || bidderId)</code> as the secondary sort key, a protocol constant, never a per-task choice.</li>
           <li><strong>Re-auction</strong> — on award-timeout (no <code>Accept</code>) or deadline miss, <code>afp:Reauction{taskId, priorAward}</code>. Fast path: next-ranked bidder from the same pool if the window hasn't gone stale; slow path: full re-<code>Announce</code>. The failed winner takes the reputation hit either way.</li>
         </ul>
+
+        <h3>9.1 &middot; Selection rules: one performer, or several</h3>
+        <p>A selection rule is any <strong>published, deterministic function from the revealed bid set to a performer set</strong>. Two families cover the useful cases:</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Family</th><th>Rule</th><th>Arity</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Ranking</strong></td><td>Score each bid, take the top one</td><td>Exactly 1 — the default</td></tr>
+              <tr><td><strong>Set selection</strong></td><td>Choose the minimal bid set satisfying a stated predicate</td><td>Emergent from the bid pool</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>Set selection exists because some tasks cannot be answered by any single agent: a question spanning four constraint domains, where each bidder covers one or two, needs a <em>coalition</em> — and how many is a property of the question discovered from the bids, not something the announcer can declare up front. Bids therefore carry <code>afp:coverage</code>: the sub-domains this bidder claims, with per-domain confidence. A typical rule reads <em>&ldquo;minimal set covering all declared domains at confidence &ge; 0.6, ties broken by the protocol constant.&rdquo;</em></p>
+        <p>When a rule awards several performers it MUST also name, by the same deterministic rule, a <strong>synthesizer</strong> — the agent responsible for reconciling partial answers into one (&sect;16). Synthesizing carries real discretion, so who holds it is never an ad-hoc choice, and hub policy MAY require the resulting synthesis to be ratified by a vote.</p>
+        <div class="note"><strong>Answer sufficiency is not voting quorum.</strong> &sect;13's quorum math governs <em>voting</em> participation. &ldquo;How many independent answers make an acceptable answer&rdquo; is a separate threshold — a hub may express it as coverage (all domains spanned), as a count (at least 3 independent estimates), or both. State it in the announce, not after.</div>
+
+        <h3>9.2 &middot; Declining is a record; silence is not</h3>
+        <p>On an announced task, not bidding is ambiguous — &ldquo;not my domain,&rdquo; &ldquo;saturated,&rdquo; &ldquo;offline,&rdquo; and &ldquo;never saw it&rdquo; are indistinguishable. Agents that cannot contribute SHOULD <code>Reject</code> explicitly within the bid window with a reason. That converts the enrolled population's coverage of a question from an inference into a record — which is what an audit asking <em>&ldquo;were the right agents consulted?&rdquo;</em> actually needs.</p>
+
+        <h3>9.3 &middot; Estimating what you may later be paid to do</h3>
+        <p>Where a task's <em>answer</em> is a cost or effort figure, whoever answers frames a budget they may later bid to earn — an incentive to shade in either direction. Commit-reveal addresses bid sniping, not this. Hub policy MUST take a position, and SHOULD either exclude agents (or their whole instance) from bidding on execution of work they estimated, or permit it while recording bid-vs-own-estimate divergence as a reputation signal visible to every hub member.</p>
+        <div class="note"><strong>Precision:</strong> <code>afp:estimatedCost</code> on a Bid means <em>what performing this task costs the bidder</em> — bid metadata. When the task is itself a costing question, the answer's figure lives in the <code>Result</code>/<code>afp:Synthesis</code>, never in the Bid. Do not conflate them.</div>
       </section>
 
       <section id="consensus">
@@ -914,6 +945,8 @@ sequenceDiagram
               <tr><td>Who voted, and what?</td><td>Signed <code>Create{Vote}</code> per voter outbox, correlated by round id; <code>afp:actingAs</code> attributes instance-custody votes to the specific agent</td></tr>
               <tr><td>Is the vote set preserved?</td><td><code>G-Set</code> of signed vote receipts in the hub CRDT, replicated to every participant</td></tr>
               <tr><td>What was decided?</td><td><code>afp:DecisionRecord</code> (below)</td></tr>
+              <tr><td>What was answered, and how sure were we?</td><td><code>afp:Synthesis</code> — answer, method, contributing Results, assumptions, dissent</td></tr>
+              <tr><td>Did the estimate prove right?</td><td><code>afp:Settlement</code>, if and when actuals exist</td></tr>
               <tr><td>Human-readable trail?</td><td>Dual-publish shadow Notes, followable from Mastodon (&sect;22)</td></tr>
             </tbody>
           </table>
@@ -936,6 +969,43 @@ sequenceDiagram
 }</code></pre>
         </div>
         <p>At L1 the DecisionRecord embeds or references the 2f+1 commit certificate; at L0 it <em>is</em> the closing artifact. Either way, <code>afp:countedVotes</code> — hashes of every counted signed vote — binds the outcome to its exact evidence set.</p>
+        <h3>Synthesis: answers that are not decisions</h3>
+        <p><code>afp:DecisionRecord</code> answers <em>&ldquo;what did we decide&rdquo;</em> — a discrete outcome selected by votes. Some tasks instead produce <em>&ldquo;what do we know, and how sure are we&rdquo;</em>: an estimate, a forecast, an assessment, assembled from several agents' partial answers. Collapsing that into a single figure destroys the uncertainty and disagreement a requester most needs.</p>
+        <p><code>afp:Synthesis</code> is the artifact for those. It is emitted by the synthesizer named in the Award (&sect;9.1) and binds the answer to its inputs:</p>
+        <div class="snippet">
+          <pre><code>{
+  "type": "afp:Synthesis",
+  "context": "urn:afp:question:q-88",
+  "afp:method": "sum-of-disjoint-ranges",
+  "afp:answer": { "unit": "MDKK", "low": 9.0, "high": 11.7 },
+  "afp:confidence": 0.72,
+  "afp:contributingResults": ["sha256:res-a-infra-rev2...", "sha256:res-a-data...",
+                              "sha256:res-b-compliance...", "sha256:res-b-licensing..."],
+  "afp:assumptions": ["dual-run parallel period", "network segmentation contains PCI scope"],
+  "afp:dissent": [{ "actor": "https://bravo.example/agents/b-licensing",
+                    "summary": "Q3 deadline unachievable at any cost: 14-week licensing lead time",
+                    "result": "sha256:res-b-licensing-feasibility..." }],
+  "afp:supersededInputs": ["sha256:res-a-infra-rev1..."]
+}</code></pre>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Property</th><th>Purpose</th></tr></thead>
+            <tbody>
+              <tr><td><code>afp:method</code></td><td>Names the combination performed (sum of disjoint parts, median, weighted mean, negotiated) so the arithmetic is independently checkable</td></tr>
+              <tr><td><code>afp:contributingResults</code></td><td>Hashes of every input Result — binds the answer to its exact evidence, as <code>countedVotes</code> does for decisions</td></tr>
+              <tr><td><code>afp:assumptions</code></td><td>The premises the answer rests on; two partial answers built on contradictory assumptions must be reconciled before combination, not summed</td></tr>
+              <tr><td><code>afp:dissent</code></td><td><strong>First-class, never a footnote.</strong> An objection that cannot be expressed numerically — &ldquo;infeasible at any price&rdquo; — survives to the reader intact</td></tr>
+              <tr><td><code>afp:supersededInputs</code></td><td>Revisions made during reconciliation stay in the record rather than vanishing</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>Synthesis and DecisionRecord are complementary, not alternatives. Because a synthesizer exercises discretion — choosing a method, adjudicating conflicting assumptions — hub policy MAY require a ratification round whose <code>DecisionRecord</code> references the Synthesis and records the split. Dissent recorded in the Synthesis SHOULD travel with the answer all the way to any human notification (&sect;22), not be summarized away en route.</p>
+
+        <h3>Settlement: scoring answers that cannot be verified yet</h3>
+        <p>&sect;09's reputation feedback compares a bidder's estimates against actuals — which assumes actuals arrive promptly. For estimation and forecasting they arrive months later, or never. Estimates therefore enter an explicit <strong>unsettled</strong> state: they neither credit nor penalize reputation until evidence exists.</p>
+        <p><code>afp:Settlement</code> closes the loop when it does: it references the original estimate(s) or Synthesis, records the observed actuals with their evidence, and releases the reputation adjustment. Where a recorded dissent proves correct, settlement SHOULD raise the dissenter's standing — a swarm that penalizes accurate minority objections will stop producing them, which is the failure mode the <code>afp:dissent</code> field exists to prevent. Unsettled forever is a legitimate terminal state: work never commissioned yields no evidence, and inventing a score for it would be worse than leaving it open.</p>
+
         <h3>Outbox integrity: hash-chained logs (<code>afp:prevActivity</code>)</h3>
         <p>Individually signed activities prove <em>authorship</em>, not <em>completeness</em> — omission of an inconvenient activity from an outbox is silent. Optional, RECOMMENDED for audit-grade deployments: a per-actor hash chain — each activity carries <code>afp:prevActivity</code>, the hash of that actor's previous activity — making every outbox append-only-verifiable; a gap or fork is detectable from the chain alone. (L1's <code>afp:observedVotes</code> already cross-references votes within a round; the chain generalizes that protection to the whole log.)</p>
         <div class="note"><strong>Solo-profile caveat, stated plainly:</strong> one operator holds every key and every store. Chained logs protect against bugs and accidental corruption, not against the operator rewriting their own history. Audit-grade solo deployments should periodically <strong>anchor chain heads outside the trust domain</strong>: write-once storage, a timestamping service, or simply federating the shadow Notes (each carrying the current chain-head hash) to an external Mastodon server (&sect;22).</div>

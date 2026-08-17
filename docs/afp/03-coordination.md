@@ -120,6 +120,9 @@ happened.
 | `afp:digest`, `afp:size` | Properties (Link) | Hash-addressing for artifacts; `afp:digest` is mandatory on attachments (07) |
 | `afp:sourceUrl`, `afp:fetchedAt` | Properties (Link) | Provenance for externally-fetched evidence (07) |
 | `afp:Freeze` / `afp:Archive` | Activity | Hub lifecycle: suspend new work / terminal read-only close with canonical state hashes (07) |
+| `afp:coverage` | Property (Bid) | Declared sub-domains this bidder claims, with per-domain confidence — input to set-selection rules |
+| `afp:Synthesis` | Object (in `Create`) | Combined answer bound to contributing Results: method, range, confidence, assumptions, dissent, superseded inputs (04) |
+| `afp:Settlement` | Activity | Links prior estimates to observed actuals, releasing deferred reputation adjustment (04) |
 
 ## Coordination patterns
 
@@ -175,14 +178,14 @@ alongside v1's flow, it doesn't replace it.
 
 1. **Announce** — `afp:Announce{Task}` broadcast to the hub: task spec, required
    capabilities, deadline, `afp:hub`, and — published up front, not decided after the
-   fact — the scoring function that will select the winner.
+   fact — the **selection rule** that will pick the performer(s).
 2. **Bid, sealed** — during the bid window, bidders submit only a commitment hash
    (`afp:bidCommit`); after it closes they submit `afp:BidReveal` with values matching the
    hash. Commit-reveal deters last-moment undercutting off visible bids — open bidding on a
    hub (needed for auditability) would invite exactly that.
 3. **Award** — the announcer (or the pre-published deterministic rule) emits `afp:Award`
-   referencing the winning bid. Anyone can recompute the published scoring function over
-   the revealed bids and verify the award — selection is checkable even when a human made
+   referencing the winning bid(s). Anyone can recompute the published rule over the
+   revealed bids and verify the award — selection is checkable even when a human made
    the call.
 4. **Accept / Result** — exactly the v1 flow keyed by `correlationId`, seeded by a Bid
    instead of a direct Offer.
@@ -219,6 +222,58 @@ A statistical guarantee, not a hard one.
   `afp:Reauction{taskId, priorAward}`. Fast path: next-ranked bidder from the same pool if
   the window hasn't gone stale; slow path: full re-`Announce`. The failed winner takes the
   reputation hit either way.
+
+### Selection rules: one performer, or several
+
+A selection rule is any **published, deterministic function from the revealed bid set to a
+performer set**. Two families cover the useful cases:
+
+| Family | Rule | Arity |
+|---|---|---|
+| **Ranking** | Score each bid, take the top one | Exactly 1 — the default |
+| **Set selection** | Choose the minimal bid set satisfying a stated predicate | Emergent from the bid pool |
+
+Set selection exists because some tasks cannot be answered by any single agent: a question
+spanning four constraint domains, where each bidder covers one or two, needs a *coalition*,
+and how many is a property of the question discovered from the bids — not something the
+announcer can declare up front. Bids therefore carry `afp:coverage`: the declared
+sub-domains this bidder claims, with per-domain confidence. A typical rule reads *"minimal
+set covering all declared domains at confidence ≥ 0.6, ties broken by the protocol
+constant."*
+
+When a rule awards several performers it MUST also name, by the same deterministic rule, a
+**synthesizer** — the agent responsible for reconciling partial answers into one
+(see [04 — Synthesis](04-operations.md#synthesis-answers-that-are-not-decisions)).
+Synthesizing carries real discretion, so who holds it is never an ad-hoc choice, and hub
+policy MAY require the resulting synthesis to be ratified by a vote.
+
+**Answer sufficiency is not voting quorum.** [02](02-hubs-and-state.md)'s quorum math
+governs *voting* participation. "How many independent answers make an acceptable answer"
+is a separate threshold, and a hub may express it as coverage (all domains spanned), as a
+count (at least 3 independent estimates), or both. State it in the announce, not after.
+
+### Declining is a record; silence is not
+
+On an announced task, not bidding is ambiguous — "not my domain," "saturated," "offline,"
+and "never saw it" are indistinguishable. Agents that cannot contribute SHOULD `Reject`
+explicitly within the bid window with a reason. That converts the enrolled population's
+coverage of a question from an inference into a record, which is what an audit asking
+*"were the right agents consulted?"* actually needs.
+
+### Estimating what you may later be paid to do
+
+Where a task's *answer* is a cost or effort figure, whoever answers frames a budget they
+may later bid to earn — an incentive to shade in either direction. Commit-reveal addresses
+bid sniping, not this. Hub policy MUST take a position, and SHOULD do one of:
+
+- exclude agents (or their whole instance) from bidding on execution of work they
+  estimated; or
+- permit it, and record bid-vs-own-estimate divergence as a reputation signal, visible to
+  every hub member.
+
+> **Precision:** `afp:estimatedCost` on a Bid means *what performing this task costs the
+> bidder* — bid metadata. When the task is itself a costing question, the answer's figure
+> lives in the `Result`/`afp:Synthesis`, never in the Bid. Do not conflate them.
 
 ## Consensus hardening — Level 1
 

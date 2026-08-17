@@ -9,10 +9,13 @@ Findings feed back into the spec — this directory is the reason v3.4 exists.
 | [01](01-client-due-diligence.md) | Agentic due diligence on a new client | Solo profile, hub-per-case, direct delegation, HITL, audit replay | 3 |
 | [02](02-observability-fix-pipeline.md) | Observability-to-fix pipeline | Standing hubs, ports vs. external providers, bidding as routing, risk gates | 3 |
 | [03](03-co-staffed-project.md) | Two consultancies co-staffing a project | Federation, cross-operator governance, shared state, co-work, billing evidence | 4 + 2 recurring |
+| [04](04-federated-estimation.md) | A question pushed to the hub: federated estimation | Unknown-arity allocation, partial answers, reconciliation, unverifiable deliverables | 6 |
 
 ## Findings ledger
 
-All nine distinct findings from the first campaign, and where each landed in v3.4:
+### Campaign 1 → v3.4
+
+The nine distinct findings from scenarios 01–03, and where each landed:
 
 | # | Finding | Resolution |
 |---|---|---|
@@ -26,12 +29,26 @@ All nine distinct findings from the first campaign, and where each landed in v3.
 | 8 | Blob/artifact layer assumed shared storage | [07 — Artifacts](../07-visibility-and-artifacts.md#artifacts--attachments): each instance serves its own, hash-addressed |
 | 9 | "Byzantine-hardened" overclaimed at small n | [03 — L1 guarantees table](../03-coordination.md#consensus-hardening--level-1): accountability (n=2) vs. tolerance (n≥4) |
 
+### Campaign 2 → v3.5
+
+Six findings from scenario 04. Two are protocol additions, not conventions:
+
+| # | Finding | Resolution |
+|---|---|---|
+| 10 | `afp:Award` was single-winner; some questions need a coalition | [03 — Selection rules](../03-coordination.md#selection-rules-one-performer-or-several): ranking **or** set selection over `afp:coverage`, arity emergent, synthesizer deterministically named |
+| 11 | No primitive for answers that aren't decisions | [04 — Synthesis](../04-operations.md#synthesis-answers-that-are-not-decisions): `afp:Synthesis` with method, contributing Results, assumptions, superseded inputs, and dissent as a first-class field |
+| 12 | Estimate accuracy unscoreable at answer time | [04 — Settlement](../04-operations.md#settlement-scoring-answers-that-cannot-be-verified-yet): `afp:Settlement` + explicit *unsettled* state; correct dissent raises standing |
+| 13 | Estimator/bidder conflict of interest | [03 — Estimating what you may later be paid to do](../03-coordination.md#estimating-what-you-may-later-be-paid-to-do): hub policy MUST take a position |
+| 14 | Silence on announced tasks is ambiguous | [03 — Declining is a record](../03-coordination.md#declining-is-a-record-silence-is-not): explicit Reject within the bid window |
+| 15 | Answer sufficiency conflated with voting quorum; `estimatedCost` ambiguity | Same section: sufficiency stated in the announce (coverage and/or count); Bid cost-to-perform distinguished from a costing answer |
+
 ## Writing another
 
 Useful scenarios stress an axis the existing ones don't. Untested so far: three or more
-operators (real Byzantine tolerance, coalition dynamics), long-lived hubs with heavy
+operators (real Byzantine tolerance, coalition dynamics at n≥4), long-lived hubs with heavy
 membership churn, sneakernet/airgapped federation, an adversarial operator rather than a
-merely buggy one, and client/observer participation with read-only scope.
+merely buggy one, client/observer participation with read-only scope, and a task whose
+answer must be revised after the fact (retraction/supersession of a published Synthesis).
 
 Keep the format: user story → cast → walkthrough → acceptance criteria mapped to spec
 mechanisms → verdict with findings. Be willing to conclude that something strained; a

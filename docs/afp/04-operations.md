@@ -57,6 +57,8 @@ reaching a decision. What an auditor asks, and the record that answers it:
 | Who voted, and what? | Signed `Create{Vote}` per voter outbox, correlated by round id; `afp:actingAs` attributes instance-custody votes to the specific agent |
 | Is the vote set preserved? | `G-Set` of signed vote receipts in the hub CRDT, replicated to every participant |
 | What was decided? | `afp:DecisionRecord` (below) |
+| What was answered, and how sure were we? | `afp:Synthesis` — answer, method, contributing Results, assumptions, dissent |
+| Did the estimate prove right? | `afp:Settlement`, if and when actuals exist |
 | Human-readable trail? | Dual-publish shadow Notes, followable from Mastodon |
 
 ### Decision records (`afp:DecisionRecord`)
@@ -85,6 +87,65 @@ check it by recomputing the tally over the referenced votes:
 At L1 the DecisionRecord embeds or references the 2f+1 commit certificate; at L0 it *is*
 the closing artifact. Either way, `afp:countedVotes` (hashes of every counted signed vote)
 binds the outcome to its exact evidence set.
+
+### Synthesis: answers that are not decisions
+
+`afp:DecisionRecord` answers *"what did we decide"* — a discrete outcome selected by
+votes. Some tasks instead produce *"what do we know, and how sure are we"*: an estimate, a
+forecast, an assessment, assembled from several agents' partial answers. Collapsing that
+into a single figure destroys the uncertainty and disagreement a requester most needs.
+
+`afp:Synthesis` is the artifact for those. It is emitted by the synthesizer named in the
+Award (03 — Selection rules) and binds the answer to its inputs:
+
+```json
+{
+  "type": "afp:Synthesis",
+  "context": "urn:afp:question:q-88",
+  "afp:method": "sum-of-disjoint-ranges",
+  "afp:answer": { "unit": "MDKK", "low": 9.0, "high": 11.7 },
+  "afp:confidence": 0.72,
+  "afp:contributingResults": ["sha256:res-a-infra-rev2...", "sha256:res-a-data...",
+                              "sha256:res-b-compliance...", "sha256:res-b-licensing..."],
+  "afp:assumptions": ["dual-run parallel period", "network segmentation contains PCI scope"],
+  "afp:dissent": [{ "actor": "https://bravo.example/agents/b-licensing",
+                    "summary": "Q3 deadline unachievable at any cost: 14-week licensing lead time",
+                    "result": "sha256:res-b-licensing-feasibility..." }],
+  "afp:supersededInputs": ["sha256:res-a-infra-rev1..."]
+}
+```
+
+Required properties and why each exists:
+
+| Property | Purpose |
+|---|---|
+| `afp:method` | Names the combination performed (sum of disjoint parts, median, weighted mean, negotiated) so the arithmetic is independently checkable |
+| `afp:contributingResults` | Hashes of every input Result — binds the answer to its exact evidence, as `countedVotes` does for decisions |
+| `afp:assumptions` | The premises the answer rests on; two partial answers built on contradictory assumptions must be reconciled before combination, not summed |
+| `afp:dissent` | **First-class, never a footnote.** An objection that cannot be expressed numerically — "infeasible at any price" — survives to the reader intact |
+| `afp:supersededInputs` | Revisions made during reconciliation stay in the record rather than vanishing |
+
+Synthesis and DecisionRecord are complementary, not alternatives. Because a synthesizer
+exercises discretion — choosing a method, adjudicating conflicting assumptions — hub
+policy MAY require a ratification round whose `DecisionRecord` references the Synthesis
+and records the split. Dissent recorded in the Synthesis SHOULD travel with the answer all
+the way to any human notification (07/Mastodon), not be summarized away en route.
+
+### Settlement: scoring answers that cannot be verified yet
+
+§09's reputation feedback compares a bidder's estimates against actuals — which assumes
+actuals arrive promptly. For estimation and forecasting they arrive months later, or
+never. Estimates therefore enter an explicit **unsettled** state: they neither credit nor
+penalize reputation until evidence exists.
+
+`afp:Settlement` closes the loop when it does: it references the original estimate(s) or
+Synthesis, records the observed actuals with their evidence, and releases the reputation
+adjustment. Where a recorded dissent proves correct, settlement SHOULD raise the
+dissenter's standing — a swarm that penalizes accurate minority objections will stop
+producing them, which is the failure mode the `afp:dissent` field exists to prevent.
+
+Unsettled forever is a legitimate terminal state: work that was never commissioned yields
+no evidence, and inventing a score for it would be worse than leaving it open.
 
 ### Outbox integrity: hash-chained logs (`afp:prevActivity`)
 
