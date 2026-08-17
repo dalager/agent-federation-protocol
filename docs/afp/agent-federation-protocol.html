@@ -418,6 +418,30 @@
         <p><code>afp:Vouch</code> (instance &rarr; agent: adds/confirms a roster entry, republishes the signed roster) and <code>afp:Disown</code> (removes it, republishes). Both are ordinary signed activities in the instance's outbox — auditable, never side-channel admin actions.</p>
         <h3>Key custody</h3>
         <p>Declared per agent via <code>afp:keyCustody</code> on the roster entry: <code>self</code> (agent holds its own keypair, as in v1/v2) or <code>instance</code> (the instance signs on the agent's behalf, tagging <code>afp:actingAs</code>). Rationale: many operators will run large, low-autonomy fleets where individually rotating N keys is pure overhead. Trade-off stated honestly: instance-custodied signatures push misbehavior attribution more directly onto the instance, since the instance's key is doing the signing — this is <em>intentional</em> and feeds &sect;04's rollup rule.</p>
+        <h3>The agent&ndash;instance boundary (ports &amp; adapters)</h3>
+        <p>Agent &ldquo;brains&rdquo; (LLM loop, planner, business logic — whatever the runtime is) are modeled <strong>entirely separately</strong> from the instance. In hexagonal terms, the agent core defines the ports — <em>receive task, emit result, advertise capability, cast vote, observe state</em> — and the instance is the adapter stack that implements them: signing, delivery queue/retries, the two-tier trust gate, dedupe, CRDT merging. Nothing in a brain knows ActivityPub exists.</p>
+        <p>There are <strong>two boundaries with different strictness</strong>:</p>
+        <ul>
+          <li><strong>Outer boundary</strong> (instance &harr; peer instances, hubs, Mastodon): plain ActivityPub <em>on the wire</em>, mandatorily — AS2 + the <code>afp:</code> <code>@context</code>, HTTP Signatures, inbox/outbox semantics. This is what makes any conformant implementation interoperate.</li>
+          <li><strong>Inner boundary</strong> (agent &harr; its own instance — &ldquo;checking in&rdquo;): the contract is <em>defined in</em> ActivityPub terms — the agent is an Actor, its inbox/outbox semantics and activity shapes are the AP ones — but the <em>wiring</em> is a deployment detail: literal signed HTTP, or in-process dispatch. The invariant that keeps this honest: <strong>the federation must not be able to tell the difference.</strong> The agent's actor document, observable behavior, and every activity attributed to it are identical either way.</li>
+        </ul>
+        <p><code>afp:keyCustody</code> is the declared wiring knob:</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th><code>keyCustody</code></th><th>What the agent is</th><th>Inner wiring &amp; check-in</th></tr></thead>
+            <tbody>
+              <tr><td><code>self</code></td><td>A full AP actor holding its own key</td><td>May be fully remote from the instance host and still <code>operatedBy</code> it. Check-in is a genuine AP handshake: present actor doc + proof of key possession &rarr; instance issues <code>afp:Vouch</code> &rarr; roster entry</td></tr>
+              <tr><td><code>instance</code></td><td>A local worker behind the instance's signature</td><td>In-process or local-queue dispatch; check-in is local provisioning that <em>results in</em> the public roster entry</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>Consequence: <strong>the instance is an administrative boundary, not necessarily a process boundary.</strong> A <code>self</code>-custody agent can live anywhere and still check into your instance — the instance provides the trust umbrella (vouching, policy, agreements), not necessarily the hosting. Because the port is AP-defined rather than instance-implementation-defined, agents are portable across instance implementations, and brains can be written in any runtime.</p>
+        <p><strong>Why the boundary must stay this cheap — two canonical workload shapes:</strong></p>
+        <ol class="plain">
+          <li><strong>The 2-agent workflow</strong> (<em>writer + reviewer</em>): two <code>instance</code>-custody agents, in-process dispatch, plain <code>Offer{Task}</code> &rarr; <code>Accept</code> &rarr; <code>Create{Result}</code> between them. No hub, no agreements, no HTTP — total ceremony is a roster with two entries. Yet every exchange is still a recorded, signed outbox activity: the workflow is auditable and replayable for free.</li>
+          <li><strong>The local swarm</strong> (<em>&ldquo;30 agents must agree on the best policy for ensuring integrity in my codebase&rdquo;</em>): a local hub + L0 weighted-quorum voting. In-process wiring means a voting round is function dispatch, not 30&times;29 signed HTTP POSTs — but each vote is still an AP activity in an outbox, so the deliberation is inspectable after the fact. And because the protocol is identical at both wirings, the same swarm becomes cross-operator later by re-pointing enrollment at a shared hub — zero agent-code changes.</li>
+        </ol>
+        <p>The scaling knob between these shapes is <strong>wiring, not protocol</strong>.</p>
       </section>
 
       <section id="trust">

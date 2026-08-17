@@ -103,6 +103,57 @@ is pure overhead. Trade-off stated honestly: instance-custodied signatures push 
 attribution more directly onto the instance (its key did the signing) — this is
 *intentional* and feeds the trust rollup rule below.
 
+### The agent–instance boundary (ports & adapters)
+
+Agent "brains" (LLM loop, planner, business logic — whatever the runtime is) are modeled
+**entirely separately** from the instance. In hexagonal terms, the agent core defines the
+ports — *receive task, emit result, advertise capability, cast vote, observe state* — and
+the instance is the adapter stack that implements them: signing, delivery queue/retries,
+the two-tier trust gate, dedupe, CRDT merging. Nothing in a brain knows ActivityPub exists.
+
+There are **two boundaries with different strictness**:
+
+- **Outer boundary** (instance ↔ peer instances, hubs, Mastodon): plain ActivityPub *on
+  the wire*, mandatorily — AS2 + the `afp:` `@context`, HTTP Signatures, inbox/outbox
+  semantics. This is what makes any conformant implementation interoperate.
+- **Inner boundary** (agent ↔ its own instance — "checking in"): the contract is *defined
+  in* ActivityPub terms — the agent is an Actor, its inbox/outbox semantics and activity
+  shapes are the AP ones — but the *wiring* is a deployment detail: literal signed HTTP,
+  or in-process dispatch. The invariant that keeps this honest: **the federation must not
+  be able to tell the difference.** The agent's actor document, observable behavior, and
+  every activity attributed to it are identical either way.
+
+`afp:keyCustody` is the declared wiring knob:
+
+| `keyCustody` | What the agent is | Inner wiring & check-in |
+|---|---|---|
+| `self` | A full AP actor holding its own key | May be fully remote from the instance host and still `operatedBy` it. Check-in is a genuine AP handshake: present actor doc + proof of key possession → instance issues `afp:Vouch` → roster entry |
+| `instance` | A local worker behind the instance's signature | In-process or local-queue dispatch; check-in is local provisioning that *results in* the public roster entry |
+
+Consequence: **the instance is an administrative boundary, not necessarily a process
+boundary.** A `self`-custody agent can live anywhere and still check into your instance —
+the instance provides the trust umbrella (vouching, policy, agreements), not necessarily
+the hosting. Because the port is AP-defined rather than instance-implementation-defined,
+agents are portable across instance implementations, and brains can be written in any
+runtime.
+
+**Why the boundary must stay this cheap — two canonical workload shapes:**
+
+1. **The 2-agent workflow** (*writer + reviewer*): two `instance`-custody agents,
+   in-process dispatch, plain `Offer{Task}` → `Accept` → `Create{Result}` between them.
+   No hub, no agreements, no HTTP — total ceremony is a roster with two entries. Yet every
+   exchange is still a recorded, signed outbox activity: the workflow is auditable and
+   replayable for free.
+2. **The local swarm** (*"30 agents must agree on the best policy for ensuring integrity
+   in my codebase"*): a local hub + L0 weighted-quorum voting. In-process wiring means a
+   voting round is function dispatch, not 30×29 signed HTTP POSTs — but each vote is still
+   an AP activity in an outbox, so the deliberation is inspectable after the fact. And
+   because the protocol is identical at both wirings, the same swarm becomes
+   cross-operator later by re-pointing enrollment at a shared hub — zero agent-code
+   changes.
+
+The scaling knob between these shapes is **wiring, not protocol**.
+
 ## Two-tier trust
 
 ### Instance level: the federation agreement
