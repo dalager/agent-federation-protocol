@@ -5,9 +5,10 @@
  */
 
 import { loadConfig } from "./config.ts";
-import { runDemo } from "./demo.ts";
+import { endpointOf, runDemo } from "./demo.ts";
 import { AfpInstance } from "./instance.ts";
 import { agentRegistrations } from "./demo.ts";
+import { checkEndpoint } from "./brains/openai.ts";
 import { createHttpServer } from "./ap/server.ts";
 import { exportBundle } from "./export.ts";
 
@@ -16,6 +17,21 @@ const command = process.argv[2] ?? "demo";
 async function main(): Promise<void> {
   switch (command) {
     case "demo": {
+      const config = loadConfig();
+      if (config.brain === "llm") {
+        // Fail early with something actionable rather than after two dead tasks.
+        const problem = await checkEndpoint(endpointOf(config));
+        if (problem) {
+          console.error(`\nbrain endpoint unavailable: ${problem}`);
+          console.error("start the server, pick another with AFP_LLM_BASE_URL / AFP_LLM_MODEL,");
+          console.error("or run offline with AFP_BRAIN=stub\n");
+          process.exit(1);
+        }
+        console.log(`brains: ${config.llmModel} @ ${config.llmBaseUrl}`);
+      } else {
+        console.log("brains: deterministic stubs (offline)");
+      }
+
       const { instance, thread, exported } = await runDemo({ fresh: true });
       const entries = instance.outbox.byThread(thread);
 

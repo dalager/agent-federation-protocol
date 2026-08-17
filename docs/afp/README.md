@@ -38,7 +38,7 @@ sharing code with the writer would only be attesting to its own bugs.
 
 | | |
 |---|---|
-| [`src/instance/`](../../src/instance/) | The instance — zero runtime dependencies, no build step. `npm run demo`, `npm run gate` |
+| [`src/instance/`](../../src/instance/) | The instance — no dependencies, no build step. `npm run demo`, `npm run gate`. Brains run on any OpenAI-compatible endpoint (a local Qwen by default) |
 | [`src/verifier/`](../../src/verifier/) | `afp_verify.py` — replays an export with no access to the instance |
 
 All eleven [acceptance-gate](05-roadmap.md#acceptance-gate) checks pass, including the two

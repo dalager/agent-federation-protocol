@@ -28,7 +28,19 @@ export interface TaskRequest {
 }
 
 export type TaskOutcome =
-  | { ok: true; content: string; attachments?: BrainArtifact[]; summary?: string }
+  | {
+      ok: true;
+      content: string;
+      attachments?: BrainArtifact[];
+      summary?: string;
+      /**
+       * What produced this — a model id, a rule-engine version, anything the
+       * brain wants on the record. The adapter copies it onto the Result as
+       * `afp:producedBy`, so an auditor asking "what made this claim" does not
+       * have to take the agent's word for it.
+       */
+      producedBy?: string;
+    }
   | { ok: false; reason: string };
 
 export interface Brain {

@@ -1,18 +1,21 @@
 /**
  * The P1 demo: a draft, a critique, a revision — and an export a stranger can check.
  *
- * Two agents in one process, four activities per outbox, one thread, no network.
- * Runs offline against deterministic brains by default; set `AFP_BRAIN=anthropic`
- * to put a real model behind the same port.
+ * Two agents in one process, one thread, no network between them. Brains run
+ * against an OpenAI-compatible endpoint by default (a local Lemonade server);
+ * `AFP_BRAIN=stub` swaps in deterministic brains so the gate stays reproducible
+ * and offline. The record is identical in shape either way — that is the port
+ * doing its job.
  */
 
 import { rmSync } from "node:fs";
 import { loadConfig, type Config } from "./config.ts";
 import { AfpInstance, type AgentRegistration, type Clock } from "./instance.ts";
 import { makeReviewer, makeWriter } from "./brains/stub.ts";
-import { makeAnthropicBrain, REVIEWER_PROMPT, WRITER_PROMPT } from "./brains/anthropic.ts";
+import { makeLlmBrain, REVIEWER_PROMPT, WRITER_PROMPT } from "./brains/openai.ts";
 import { exportBundle, type ExportSummary } from "./export.ts";
 import type { Brain } from "./brains/port.ts";
+import type { LlmEndpoint } from "./brains/openai.ts";
 
 const encoder = new TextEncoder();
 
@@ -32,11 +35,23 @@ export function fixedClock(start = "2026-08-17T09:00:00.000Z", stepMs = 1000): C
   };
 }
 
+/** Endpoint settings assembled from config; the API key never leaves this call. */
+export function endpointOf(config: Config): LlmEndpoint {
+  return {
+    baseUrl: config.llmBaseUrl,
+    model: config.llmModel,
+    maxTokens: config.llmMaxTokens,
+    timeoutMs: config.llmTimeoutMs,
+    apiKey: process.env.AFP_LLM_API_KEY,
+  };
+}
+
 function brains(config: Config): { writer: Brain; reviewer: Brain } {
-  if (config.brain === "anthropic") {
+  if (config.brain === "llm") {
+    const endpoint = endpointOf(config);
     return {
-      writer: makeAnthropicBrain("writer", ["afp:cap:draft"], WRITER_PROMPT, config.anthropicModel),
-      reviewer: makeAnthropicBrain("reviewer", ["afp:cap:review"], REVIEWER_PROMPT, config.anthropicModel),
+      writer: makeLlmBrain("writer", ["afp:cap:draft"], WRITER_PROMPT, endpoint),
+      reviewer: makeLlmBrain("reviewer", ["afp:cap:review"], REVIEWER_PROMPT, endpoint),
     };
   }
   return { writer: makeWriter(), reviewer: makeReviewer() };

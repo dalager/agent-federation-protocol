@@ -200,13 +200,30 @@ with nothing installed. A Go port stays open and is a small job — the algorith
 is now written down in `src/verifier/README.md` precisely so a third
 implementation is cheap.
 
-### Decision 2 (runtime) — **better than assumed: zero runtime dependencies**
+### Decision 2 (runtime) — **better than assumed: no dependencies at all**
 
 Node 22.5+ ships `node:sqlite`, and Node 23+ strips TypeScript types natively.
 With Fedify dropped and `node:crypto` covering Ed25519, the P1 instance has **no
-runtime dependencies and no build step** — `npm run demo` on a clean checkout.
-The Anthropic SDK is optional and loaded dynamically, so the acceptance gate runs
-offline against deterministic brains.
+dependencies and no build step** — `npm run demo` on a clean checkout.
+
+### Decision 2b (brains) — Anthropic SDK replaced by an OpenAI-compatible endpoint
+
+The reference deployment now runs a **local Lemonade server** (Qwen3.6-35B-A3B-NoThinking
+at `http://localhost:13305/api/v1`), reached with plain `fetch` against the
+chat-completions wire protocol rather than a vendor SDK. That keeps the
+dependency count at zero, makes any compatible endpoint — local or hosted — a
+two-variable change, and means model inference costs nothing during development.
+
+This is the ports-and-adapters boundary paying out earlier than expected:
+swapping the model provider touched `brains/` and `config.ts` and **changed
+nothing about the record**. The acceptance gate pins `AFP_BRAIN=stub` and still
+passes with a dead endpoint configured, because a model in the loop would make
+"did the record verify" depend on sampling.
+
+One addition it motivated: `afp:producedBy` on a `Result`, naming what generated
+the content. Provenance otherwise stops at the agent–instance port (04 §
+Rationale externalization) — an auditor can see that an agent made a claim but
+not what made it.
 
 One sharp edge worth recording: Node's strip-only TypeScript mode rejects
 *parameter properties* (`constructor(private readonly db: Db)`). Declare the

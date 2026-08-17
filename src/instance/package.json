@@ -3,16 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "AFP P1 reference instance — one instance, two agents, one verifiable record",
-  "engines": { "node": ">=22.5" },
+  "description": "AFP P1 reference instance - one instance, two agents, one verifiable record",
+  "engines": {
+    "node": ">=22.5"
+  },
   "scripts": {
     "demo": "node --experimental-sqlite src/cli.ts demo",
     "export": "node --experimental-sqlite src/cli.ts export",
     "serve": "node --experimental-sqlite src/cli.ts serve",
     "gate": "node --experimental-sqlite --test test/gate.test.ts",
-    "test": "npm run gate"
-  },
-  "optionalDependencies": {
-    "@anthropic-ai/sdk": "^0.72.0"
+    "test": "npm run gate",
+    "demo:offline": "AFP_BRAIN=stub node --experimental-sqlite src/cli.ts demo"
   }
 }

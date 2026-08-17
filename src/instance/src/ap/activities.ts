@@ -96,6 +96,8 @@ export interface ResultSpec {
   correlationId: string;
   content: string;
   summary?: string;
+  /** What produced the content — a model id, a rule-engine version. */
+  producedBy?: string;
   attachments?: JsonValue[];
 }
 
@@ -108,6 +110,10 @@ export function createResult(envelope: Envelope, result: ResultSpec): { [key: st
     attributedTo: envelope.actor,
   };
   if (result.summary) object.summary = result.summary;
+  // Provenance stops at the agent-instance port unless the workflow externalizes
+  // it (04 § Rationale externalization). Naming the producer is the cheapest
+  // useful externalization there is.
+  if (result.producedBy) object["afp:producedBy"] = result.producedBy;
   if (result.attachments?.length) object.attachment = result.attachments;
 
   return { ...base(envelope, "Create"), object };

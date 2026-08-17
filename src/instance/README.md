@@ -5,15 +5,16 @@ bidding, no voting, no network — see
 [05-roadmap.md § P1](../../docs/afp/05-roadmap.md#p1--one-instance-two-agents-one-verifiable-record).
 
 ```bash
-npm run demo    # writer drafts, reviewer critiques, bundle exported
-npm run gate    # the 11-point acceptance gate
-npm run serve   # the public HTTP surface
+npm run demo          # writer drafts, reviewer critiques, bundle exported
+npm run demo:offline  # the same, against deterministic brains
+npm run gate          # the 11-point acceptance gate
+npm run serve         # the public HTTP surface
 ```
 
 Requires **Node 22.5+** (24+ recommended). No build step — Node runs the
-TypeScript directly — and no runtime dependencies: `node:crypto` covers Ed25519
-and `node:sqlite` covers the store. The Anthropic SDK is optional and only
-needed to put a real model behind the agent port.
+TypeScript directly — and **no dependencies at all**: `node:crypto` covers
+Ed25519, `node:sqlite` covers the store, and the model endpoint is plain
+`fetch` against an OpenAI-compatible API rather than a vendor SDK.
 
 ## The demo
 
@@ -63,7 +64,7 @@ src/
   brains/
     port.ts          the entire agent contract — mentions no protocol at all
     stub.ts          deterministic brains, so the gate is reproducible offline
-    anthropic.ts     the same port with a real model behind it
+    openai.ts        the same port, an OpenAI-compatible endpoint behind it
   instance.ts        the adapter stack: signing, chain, gate, dedupe, dispatch
   export.ts          the bundle you hand to a third party
   demo.ts, cli.ts
@@ -80,8 +81,11 @@ portable across instance implementations.
 
 Two consequences worth keeping:
 
-- Brains are swappable by configuration. `AFP_BRAIN=anthropic` puts a real model
-  behind the same port; the record is identical in shape either way.
+- Brains are swappable by configuration. The default runs a real model against
+  an OpenAI-compatible endpoint; `AFP_BRAIN=stub` swaps in deterministic ones.
+  **The record is identical in shape either way** — which is the port earning
+  its keep, and why the acceptance gate can stay reproducible and offline while
+  the demo talks to a model.
 - Attachments are digest-verified by the adapter *before* a brain sees them. A
   brain never handles unverified evidence.
 
@@ -94,13 +98,30 @@ Environment variables, all optional (see `src/config.ts`):
 | `AFP_ORIGIN` | `https://alpha.operator.local` | The origin the instance publishes itself under |
 | `AFP_DATA_DIR` | `./data` | SQLite file, keys, artifacts |
 | `AFP_EXPORT_DIR` | `./export` | Where the bundle is written |
-| `AFP_BRAIN` | `stub` | `stub` or `anthropic` |
-| `AFP_ANTHROPIC_MODEL` | `claude-sonnet-5` | |
+| `AFP_BRAIN` | `llm` | `llm` or `stub` |
+| `AFP_LLM_BASE_URL` | `http://localhost:13305/api/v1` | Any OpenAI-compatible endpoint |
+| `AFP_LLM_MODEL` | `Qwen3.6-35B-A3B-NoThinking` | |
+| `AFP_LLM_MAX_TOKENS` | `900` | |
+| `AFP_LLM_TIMEOUT_MS` | `120000` | |
 | `AFP_MAX_DELIVERY_ATTEMPTS` | `5` | Before dead-lettering |
 | `AFP_PORT` | `8787` | `npm run serve` |
 
-`ANTHROPIC_API_KEY` is read at the point of use and never stored, logged, or
-written into the record.
+`AFP_LLM_API_KEY` is read at the point of use and never stored, logged, or
+written into the record. A local endpoint generally needs none.
+
+## Model provenance
+
+A `Result` produced by a model carries `afp:producedBy`:
+
+```json
+"afp:producedBy": "Qwen3.6-35B-A3B-NoThinking @ http://localhost:13305/api/v1"
+```
+
+Provenance otherwise stops at the agent–instance port (04 § Rationale
+externalization) — an auditor can see *that* an agent made a claim but not what
+made it. Naming the producer is the cheapest useful externalization available,
+and it costs one field. A brain that is a rule engine or a human queue puts its
+own identifier there.
 
 ## What P1 deliberately does not do
 

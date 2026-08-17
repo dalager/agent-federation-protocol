@@ -27,10 +27,17 @@ import type { JsonValue } from "../src/crypto/jcs.ts";
 
 const workspaces: string[] = [];
 
-function workspace(): { dataDir: string; exportDir: string } {
+/**
+ * An isolated workspace pinned to the deterministic brains.
+ *
+ * The gate must be reproducible and runnable offline: a model in the loop would
+ * make "did the record verify" depend on sampling, and gate check 10 shells out
+ * to a second implementation that has to agree byte for byte.
+ */
+function workspace(): { dataDir: string; exportDir: string; brain: "stub" } {
   const root = mkdtempSync(join(tmpdir(), "afp-gate-"));
   workspaces.push(root);
-  return { dataDir: join(root, "data"), exportDir: join(root, "export") };
+  return { dataDir: join(root, "data"), exportDir: join(root, "export"), brain: "stub" };
 }
 
 after(() => {

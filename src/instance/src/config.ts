@@ -18,8 +18,12 @@ export interface Config {
   readonly exportDir: string;
   readonly httpPort: number;
   /** Which brain implementation the agents run behind their port. */
-  readonly brain: "stub" | "anthropic";
-  readonly anthropicModel: string;
+  readonly brain: "stub" | "llm";
+  /** OpenAI-compatible endpoint, including the version segment. */
+  readonly llmBaseUrl: string;
+  readonly llmModel: string;
+  readonly llmMaxTokens: number;
+  readonly llmTimeoutMs: number;
   /** Delivery attempts before an activity is dead-lettered. */
   readonly maxDeliveryAttempts: number;
   /** Base backoff in ms; attempt N waits base * 2^(N-1). */
@@ -43,9 +47,9 @@ function envInt(name: string, fallback: number): number {
 
 export function loadConfig(overrides: Partial<Config> = {}): Config {
   const dataDir = resolve(overrides.dataDir ?? env("AFP_DATA_DIR", "./data"));
-  const brain = env("AFP_BRAIN", "stub");
-  if (brain !== "stub" && brain !== "anthropic") {
-    throw new Error(`AFP_BRAIN must be "stub" or "anthropic", got ${brain}`);
+  const brain = env("AFP_BRAIN", "llm");
+  if (brain !== "stub" && brain !== "llm") {
+    throw new Error(`AFP_BRAIN must be "stub" or "llm", got ${brain}`);
   }
 
   const base: Config = {
@@ -59,7 +63,10 @@ export function loadConfig(overrides: Partial<Config> = {}): Config {
     exportDir: resolve(overrides.exportDir ?? env("AFP_EXPORT_DIR", "./export")),
     httpPort: envInt("AFP_PORT", 8787),
     brain,
-    anthropicModel: env("AFP_ANTHROPIC_MODEL", "claude-sonnet-5"),
+    llmBaseUrl: env("AFP_LLM_BASE_URL", "http://localhost:13305/api/v1"),
+    llmModel: env("AFP_LLM_MODEL", "Qwen3.6-35B-A3B-NoThinking"),
+    llmMaxTokens: envInt("AFP_LLM_MAX_TOKENS", 900),
+    llmTimeoutMs: envInt("AFP_LLM_TIMEOUT_MS", 120000),
     maxDeliveryAttempts: envInt("AFP_MAX_DELIVERY_ATTEMPTS", 5),
     backoffBaseMs: envInt("AFP_BACKOFF_BASE_MS", 50),
     seenIdTtlMs: envInt("AFP_SEEN_ID_TTL_MS", 24 * 60 * 60 * 1000),

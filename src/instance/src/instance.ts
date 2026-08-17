@@ -388,6 +388,7 @@ export class AfpInstance {
         correlationId,
         content: outcome.content,
         summary: outcome.summary,
+        producedBy: outcome.producedBy,
         attachments: produced,
       }),
     );
