@@ -1,0 +1,173 @@
+# 02 — Hubs, shared state, gossip, membership
+
+## Problem-scoped hubs
+
+**`afp:Hub` extends AS2 `Group`** — precedent: federated community actors (e.g. Lemmy
+communities), an actor that many others address and that owns shared, member-visible state.
+One hub per common problem; an operator can enroll different subsets of their workforce in
+different hubs.
+
+### Enrollment is two-level, deliberately
+
+1. **Instance level** — `Follow`/`Accept` between instance and hub establishes the
+   instance's seat in hub governance (voting eligibility, visibility). No agents enrolled
+   yet.
+2. **Agent level** — the instance issues a signed `afp:Enroll` per agent, carrying that
+   agent's hub-scoped capability declarations:
+
+```json
+{
+  "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+  "id": "https://alpha.operator.example/activities/en1",
+  "type": "afp:Enroll",
+  "actor": "https://alpha.operator.example/actor",
+  "object": "https://alpha.operator.example/agents/a1",
+  "target": "https://hub.consortium.example/actor",
+  "afp:hub": "https://hub.consortium.example/actor",
+  "afp:capabilities": ["afp:cap:image-classification"],
+  "afp:hubKey": "https://alpha.operator.example/agents/a1#hub-key-1"
+}
+```
+
+`afp:Unenroll` removes one agent from the hub's membership OR-Set; `Undo{Follow}` at
+instance level mass-unenrolls everything that instance put into the hub.
+
+### Hub-scoped state
+
+v2's capability registry and membership set stop being global: every
+`Update{afp:CRDTDelta}` carries a required `afp:hub` field, and stores are keyed
+`(hubId, crdtType)`. The alternative — namespacing `crdtId` itself — was rejected: deltas
+already travel as discrete signed activities, a field is trivially filterable/routable, and
+it lets one gossip batch carry deltas for several hubs a peer shares without ambiguity.
+
+### Governance concentration, kept accountable
+
+Member admission and dispute adjudication inevitably concentrate at the hub. Mitigation:
+the hub's governance activities (`afp:GovernanceDecision`, `afp:MemberAdmit`,
+`afp:MemberExpel`) require a **weighted quorum vote among current instance members**,
+reusing the L1 machinery — *never* a signature from the hub's own key. The hub key signs
+only transport-level things (message forwarding, state storage attestation).
+
+Practical consequence: whoever operates the physical hub server has no unilateral power
+beyond availability — a malicious or compromised hub can censor or go dark, but cannot
+forge governance outcomes or corrupt history, because everything of consequence is
+independently signed by members and gossip-replicable. Recovery from a bad hub operator:
+stand up a replacement hub actor, replay CRDT deltas from surviving members' outboxes —
+costly, but a liveness failure, not a correctness one.
+
+## Shared state as CRDTs
+
+Explicit state types with defined merge rules. In v3 **every store is keyed
+`(hubId, crdtType)`** — there is no global registry.
+
+| State (per hub) | CRDT | Merge rule |
+|---|---|---|
+| Capability registry | `OR-Map<agentId, OR-Set<capability>>` | add/remove-wins via unique tags + tombstones |
+| Agent liveness / load | `LWW-Register` of `{status, load, lastSeen}` | highest timestamp wins, nodeId tiebreak |
+| Membership | `OR-Set<AgentRef>` (+ join epoch) | set union; suspected-flag, not removal, on staleness |
+| Vote tallies (L0) / vote receipts (L1) | `G-Counter` / `G-Set` of signed receipts | monotonic sum / set union |
+| Reputation inputs | `G-Set` of signed events (completions, strikes) | set union; score derived locally |
+
+Every mutation travels as `Update{afp:CRDTDelta}` with a required `afp:hub` field. CRDT
+merges are commutative, associative, idempotent — receivers apply deltas on arrival with no
+ordering requirement, and duplicates are free. This eliminates reordering as a concern for
+this entire state class; task execution, which has real side effects, uses causal ordering
+instead (below).
+
+```json
+{
+  "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+  "id": "https://alpha.operator.example/activities/delta-33ab",
+  "type": "Update",
+  "actor": "https://alpha.operator.example/agents/a1",
+  "to": ["https://hub.consortium.example/actor"],
+  "object": {
+    "type": "afp:CRDTDelta",
+    "afp:hub": "https://hub.consortium.example/actor",
+    "afp:crdtId": "capability-registry",
+    "afp:crdtType": "OR_MAP",
+    "afp:delta": {
+      "key": "https://alpha.operator.example/agents/a1",
+      "fieldType": "OR_SET",
+      "adds": [{ "element": "afp:cap:image-classification", "tag": "a1-1737000242-14" }],
+      "removes": [{ "element": "afp:cap:translation-en-da", "tombstoneTags": ["a1-1736990001-9"] }]
+    }
+  },
+  "published": "2026-08-16T10:04:05Z"
+}
+```
+
+## Gossip & anti-entropy
+
+Anti-entropy keeps hub-scoped CRDT state converged: periodically exchange a digest — a
+Merkle root over local state (large/many-key state) or a version vector of per-actor delta
+counts (small state) — via `Offer{afp:Digest}`; the receiver pulls only what it's missing
+via `Accept{afp:StateDeltas}`. Urgent changes (an agent going offline) push immediately
+with decaying-fanout rumor spreading instead of waiting for the next pull cycle.
+
+> **v3 reality check: NAT and firewalls.** v2's "pick k random peers and gossip directly"
+> assumed same-operator reachability. Cross-operator instances typically sit behind their
+> own NAT/firewall with no open inbound path to each other. Across instance boundaries the
+> **default is hub-relayed delta exchange** — the hub is always-reachable by construction —
+> with direct instance-to-instance gossip as an opt-in fallback once a
+> `FederationAgreement` confirms mutual reachability. Within one operator's own fleet,
+> direct gossip remains the default.
+
+```json
+{
+  "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+  "id": "https://alpha.operator.example/activities/digest-77e1",
+  "type": "Offer",
+  "actor": "https://alpha.operator.example/actor",
+  "to": ["https://hub.consortium.example/actor"],
+  "object": {
+    "type": "afp:Digest",
+    "afp:hub": "https://hub.consortium.example/actor",
+    "afp:merkleRoot": "sha256:c1a9...774e",
+    "afp:versionVector": {
+      "https://alpha.operator.example/agents/a1": 41,
+      "https://beta.operator.example/agents/b1": 19
+    }
+  },
+  "published": "2026-08-16T10:05:00Z"
+}
+```
+
+Reply: an `Accept` referencing the `Offer` id, whose object is an `afp:StateDeltas` array
+of the missing `CRDTDelta`s — empty if already converged.
+
+## Membership & dynamic quorum
+
+Hub membership is an explicit `OR-Set<AgentRef>` (join-epoch tagged), fed by enrollment:
+
+- **Join** = instance `Follow` + `afp:Enroll`
+- **Leave** = `afp:Unenroll` / `Undo{Follow}`
+- **Failure** = gossip heartbeat staleness marks an agent *suspected* without removing it —
+  excluded from live-weight calculations, retained for accountability. Avoids thrashing on
+  transient network blips.
+
+Quorum size is computed, not configured, over live (non-suspected) weighted membership `n`:
+
+- **Byzantine minimum** — `floor(2n/3) + 1`, for L1 rounds
+- **Partition-aware minimum** — `floor((n − maxExpectedPartitionSize)/2) + 1` for L0,
+  from recent connectivity/staleness observations
+- **Weight, not headcount** — vote weight derives from liveness plus hub-scoped reputation;
+  quorum is a weight-sum threshold
+
+**Snapshot-pinning.** At round start the proposer hashes the merged membership CRDT and
+embeds it (`afp:quorumSnapshot`) plus the explicit voter list in the proposal. Votes are
+validated against the pinned set: an agent enrolled *after* round start simply isn't in it.
+This closes late-join tally skew and the mid-round Sybil attack — in the multi-operator
+setting, it's what stops an operator from bulk-enrolling agents mid-vote to swing a
+governance decision.
+
+## Causal ordering
+
+For multi-step workflows whose intermediate updates mutate side-effecting state (unlike
+CRDT state), `correlationId` alone can't express "step 3 depends on step 2." Opt-in causal
+metadata: `afp:seq` (monotonic per-actor) and/or `afp:vclock` (map of `actorId → seq`).
+
+Receivers run a causal tracker: an activity is deliverable when the origin's `seq` is
+exactly last-seen + 1 and no vclock entry exceeds what's been seen; gapped activities
+buffer (bounded, with timeout) until the predecessor arrives or is pulled explicitly via
+the gossip mechanism. Plain two-hop delegation never pays this cost.

@@ -1,0 +1,282 @@
+# 03 — Vocabulary, patterns, bidding, consensus
+
+## Coordination vocabulary
+
+Standard AS2 types — `Follow`, `Accept`, `Reject`, `Announce`, `Create`, `Update`, `Undo`,
+`Offer` — are reused wherever their semantics fit. The `afp` extension adds what AS2 has no
+vocabulary for. Core object types from v1: `Task`, `Capability`, `Result`, `Error`, `Vote`
+— delivered via standard activities, correlated by `correlationId`.
+
+### Task delegation — the v1 baseline flow, unchanged
+
+```json
+{
+  "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+  "id": "https://alpha.operator.example/agents/a1/activities/8f2a",
+  "type": "Offer",
+  "actor": "https://alpha.operator.example/agents/a1",
+  "to": ["https://beta.operator.example/agents/b1"],
+  "object": {
+    "id": "https://alpha.operator.example/agents/a1/tasks/task-9931",
+    "type": "afp:Task",
+    "afp:capability": "afp:cap:image-classification",
+    "afp:deadline": "2026-08-16T14:30:00Z",
+    "afp:correlationId": "task-9931",
+    "afp:hub": "https://hub.consortium.example/actor",
+    "content": "Classify the attached image set",
+    "attachment": [{ "type": "Link", "href": "s3://bucket/batch-12/", "mediaType": "application/x-directory" }]
+  }
+}
+```
+
+`Accept`/`Reject` answer the Offer (a `summary` carries the reject reason); the worker
+returns `Create{afp:Result}` with the same `correlationId`, or `Create{afp:Error}` on
+failure — the typed-outcome objects AS2 lacks.
+
+### v2 terms (consensus, state, ordering)
+
+| Term | Attached to | Purpose |
+|---|---|---|
+| `afp:round`, `afp:phase`, `afp:seqNo`, `afp:proposalHash`, `afp:observedVotes`, `afp:quorumSnapshot` | `afp:Vote` | L1 chained voting / equivocation detection |
+| `afp:EquivocationProof` | `Announce` object | Pair of conflicting signed votes as verifiable proof |
+| `afp:crdtId`, `afp:crdtType`, `afp:delta` | `afp:CRDTDelta` in `Update` | CRDT delta-state sync |
+| `afp:merkleRoot`, `afp:versionVector` | `afp:Digest` in `Offer` | Gossip anti-entropy digest exchange |
+| `afp:StateDeltas` | `Accept` object | Response to a digest pull |
+| `afp:seq`, `afp:vclock` | any causal-workflow activity | Causal ordering / gap detection |
+
+### v3 terms (federation, hubs, bidding, accounting)
+
+| Term | Kind | Meaning |
+|---|---|---|
+| `afp:Instance` | Actor type | Operator's server; administrative/trust boundary hosting agent actors |
+| `afp:operatedBy` | Property (agent actor) | Which instance administers / is accountable for this agent |
+| `afp:roster` | Collection (on Instance) | Signed list of vouched-for agents, with status |
+| `afp:MembershipProof` | Credential | Short-lived signed attestation of instance membership, cacheable |
+| `afp:Vouch` / `afp:Disown` | Activity | Instance adds / removes an agent from its roster |
+| `afp:keyCustody` | Property (roster entry) | `"instance"` \| `"self"` — who signs for this agent |
+| `afp:FederationAgreement` | Object | Bilateral, co-signed, scoped, expiring trust anchor between instances |
+| `afp:Defederate` | Activity | Unilateral withdrawal from a FederationAgreement |
+| `afp:Hub` | Actor type (Group-like) | Problem-scoped rendezvous/relay owning hub-scoped CRDT state |
+| `afp:Enroll` / `afp:Unenroll` | Activity | Adds/removes one agent to/from a hub's membership CRDT |
+| `afp:hub` | Property | Scopes a CRDTDelta, Task, Bid, etc. to one hub's namespace |
+| `afp:GovernanceDecision` | Activity | Signed, quorum-voted hub-level decision (admission, expulsion, disputes) |
+| `afp:MemberAdmit` / `afp:MemberExpel` | Activity | Specific governance decisions on hub membership |
+| `afp:Bid` | Activity (reserved in v1, now live) | Signed offer to perform an announced Task, with estimates |
+| `afp:Award` | Activity | Signed, independently-verifiable selection of a winning bid |
+| `afp:Reauction` | Activity | Restarts allocation after award timeout/failure |
+| `afp:capabilityMatch`, `afp:estimatedCost`, `afp:estimatedLatency` | Properties (Bid) | Self-declared fit and estimates, later checked against actuals |
+| `afp:bidCommit` / `afp:BidReveal` | Activity pair | Commit-reveal sealed bidding, deters sniping |
+| `afp:reputation` | Property (hub-scoped, per agent) | Running score from completions, estimate accuracy, voting integrity |
+| `afp:ContributionSummary` | Object | Periodic, independently-recomputable per-operator contribution roll-up |
+| `afp:ContributionDispute` | Activity | Challenge to a ContributionSummary, with evidence |
+
+## Coordination patterns
+
+### 8a — Direct task delegation (v1 baseline, still the workhorse)
+
+```
+agent-a1 (Alpha)                              agent-b1 (Beta)
+    |--Offer{Task task-9931}------------------->|  signed POST; two-tier trust gate
+    |<--Accept{task-9931}------------------------|  (or Reject w/ reason)
+    |               ... work happens locally ... |
+    |<--Create{Result, correlationId=task-9931}--|
+    |  match by correlationId to pending task    |
+```
+
+The delegator keeps a pending-task table keyed by `correlationId` with a deadline; the HTTP
+response to the `Offer` POST only means "delivered," never "accepted." Used whenever the
+target agent is already known — bidding exists for when it isn't.
+
+### 8b — Capability discovery inside a hub
+
+```
+alpha-instance --afp:Enroll{agent-a1, caps}--> hub H   (after instance Follow/Accept)
+hub H --Announce / gossip--> members' inboxes
+members merge the delta into their (hubId)-scoped CRDT capability registry
+```
+
+### 8c — Consensus Level 0: cooperative broadcast quorum
+
+```
+proposer --Offer{Proposal}--> pinned voter set (membership snapshot)
+each voter --Create{Vote}--> all peers (mesh)
+each participant tallies locally; weighted quorum --> proceed
+timeout without quorum --> Undo{Vote} / abandon round
+```
+
+Default consensus level — eventually-consistent, reorder-tolerant, not linearizable;
+adequate *within* one operator's trust boundary. Any round whose voters span two or more
+operators should run Level 1 — a concrete policy trigger, not a maybe.
+
+### 8d — Hub fan-out broadcast
+
+The hub doubles as the channel actor: `Create` to the hub, hub `Announce`s to every
+enrolled member. Join/leave is enrollment, so senders never track subscriber lists.
+
+## Bidding & allocation
+
+Cross-operator allocation — for when the announcer *doesn't* know who should do the task.
+When the target is known, skip all of this and use the direct `Offer` flow; `Bid` sits
+alongside v1's flow, it doesn't replace it.
+
+1. **Announce** — `afp:Announce{Task}` broadcast to the hub: task spec, required
+   capabilities, deadline, `afp:hub`, and — published up front, not decided after the
+   fact — the scoring function that will select the winner.
+2. **Bid, sealed** — during the bid window, bidders submit only a commitment hash
+   (`afp:bidCommit`); after it closes they submit `afp:BidReveal` with values matching the
+   hash. Commit-reveal deters last-moment undercutting off visible bids — open bidding on a
+   hub (needed for auditability) would invite exactly that.
+3. **Award** — the announcer (or the pre-published deterministic rule) emits `afp:Award`
+   referencing the winning bid. Anyone can recompute the published scoring function over
+   the revealed bids and verify the award — selection is checkable even when a human made
+   the call.
+4. **Accept / Result** — exactly the v1 flow keyed by `correlationId`, seeded by a Bid
+   instead of a direct Offer.
+
+```json
+{
+  "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+  "id": "https://beta.operator.example/activities/bid-77",
+  "type": "afp:Bid",
+  "actor": "https://beta.operator.example/agents/b1",
+  "afp:instanceEndorsement": "https://beta.operator.example/actor",
+  "object": "https://hub.consortium.example/tasks/task-42",
+  "afp:hub": "https://hub.consortium.example/actor",
+  "afp:capabilityMatch": 0.93,
+  "afp:estimatedCost": { "unit": "afp:compute-unit", "value": 120 },
+  "afp:estimatedLatency": "PT4M",
+  "afp:bidWindow": { "opens": "2026-08-16T10:00:00Z", "closes": "2026-08-16T10:05:00Z" },
+  "published": "2026-08-16T10:00:12Z",
+  "signature": { "type": "Ed25519Signature2020", "proofValue": "..." }
+}
+```
+
+*(Shown post-reveal; the commit phase sends only `afp:commitment`, a hash of this payload.)*
+
+**Sniping and lying, honestly bounded.** Signatures give non-repudiation of what was
+*claimed*, not truth of the claim. The real deterrent is reputational: declared
+`estimatedCost`/`estimatedLatency` are checked against the Result's actual telemetry, and
+chronic over-promising drags hub-scoped reputation down, which feeds future selection odds.
+A statistical guarantee, not a hard one.
+
+- **Tie-breaking** — deterministic and discretion-free: `hash(taskId || bidderId)` as the
+  secondary sort key, a protocol constant, never a per-task choice.
+- **Re-auction** — on award-timeout (no `Accept`) or deadline miss,
+  `afp:Reauction{taskId, priorAward}`. Fast path: next-ranked bidder from the same pool if
+  the window hasn't gone stale; slow path: full re-`Announce`. The failed winner takes the
+  reputation hit either way.
+
+## Consensus hardening — Level 1
+
+**Problem.** In L0, votes are point-to-point `Create`s — agent A has no way to prove to B
+what it told C. A Byzantine actor can equivocate: "accept" to B, "reject" to C, same round,
+and neither can prove it happened.
+
+### Signed vote chains
+
+Every L1 `Vote` embeds:
+
+- `afp:proposalHash` — hash of the thing being voted on
+- `afp:seqNo` — monotonic per (voter, round) sequence number (replay prevention)
+- `afp:observedVotes` — hashes of every signed vote this voter saw before casting its own
+- a detached signature over the whole vote object
+
+Two peers each holding one of a Byzantine voter's conflicting signed votes can produce a
+self-contained `Announce{afp:EquivocationProof}` — same (voter, round, seqNo), different
+value — cryptographic, third-party-verifiable proof, not an accusation. Receivers zero that
+voter's weight immediately (agent-level, automatic); instance-level consequences go through
+hub governance.
+
+```json
+{
+  "@context": ["https://www.w3.org/ns/activitystreams", { "afp": "https://afp.example/ns/v3#" }],
+  "id": "https://agent-a.example/activities/vote-91a3",
+  "type": "Create",
+  "actor": "https://agent-a.example/actor",
+  "to": ["https://agent-b.example/actor", "https://agent-c.example/actor", "https://agent-d.example/actor"],
+  "object": {
+    "id": "https://agent-a.example/votes/round-7f2c9e/agent-a/2",
+    "type": "afp:Vote",
+    "afp:round": "urn:afp:round:7f2c9e",
+    "afp:phase": "commit",
+    "afp:seqNo": 2,
+    "afp:proposalHash": "sha256:9d3b1c...e21f",
+    "afp:quorumSnapshot": "sha256:mem-4a71c9...",
+    "value": "accept",
+    "afp:observedVotes": [
+      "sha256:vote-agent-b-round7f2c9e-seq1",
+      "sha256:vote-agent-c-round7f2c9e-seq1"
+    ],
+    "signature": {
+      "type": "Ed25519Signature2020",
+      "created": "2026-08-16T10:04:02Z",
+      "verificationMethod": "https://agent-a.example/actor#key-1",
+      "proofValue": "z4o9c..."
+    }
+  },
+  "published": "2026-08-16T10:04:02Z"
+}
+```
+
+### Mapping PBFT's phases — and where synchrony breaks
+
+| PBFT phase | ActivityPub mapping | Where assumptions break |
+|---|---|---|
+| pre-prepare | Proposer `Offer{Proposal}` to the snapshot-pinned voter set | Maps cleanly — already a fire-and-forget broadcast |
+| prepare | Each replica `Create`s a signed `Vote{phase: prepare}` to *every other replica* | PBFT waits for 2f+1 *matching* prepares — a wait that assumes bounded delay. Over async inboxes, "not yet" and "never" are indistinguishable |
+| commit | `Vote{phase: commit}`, same 2f+1 bar | Same problem, compounded — a stalled prepare blocks commit indefinitely without timeouts |
+
+**What's achievable, honestly:** L1 keeps PBFT's **safety** — equivocation is provable, so
+two conflicting proposals can never both collect a valid quorum certificate — but
+downgrades **liveness** to best-effort: soft rounds under generous timeouts riding the
+outbox retry queue; a stalled round triggers a simplified view change (the
+highest-reputation live replica issues a fresh round referencing the stalled one). No
+formal termination bound, but no silent inconsistency either.
+
+Raft was rejected: its leader must detect its own unreachability via missed acks in bounded
+time, and this transport has no delivery acks at all.
+
+**Threshold signatures (optional):** 2f+1 commit votes can be aggregated into one compact
+commit certificate — worth adding only once L1 is load-bearing; start with the bundle of n
+signed votes. These certificates are also the evidence backbone for contribution accounting
+and governance decisions.
+
+### A Byzantine-hardened voting round
+
+```mermaid
+sequenceDiagram
+    participant P as Proposer
+    participant B as agent-b
+    participant C as agent-c
+    participant D as agent-d (Byzantine)
+
+    Note over P,D: n=4, f=1 - need 2f+1=3 matching votes per phase
+
+    P->>B: Offer{Proposal} (pre-prepare)
+    P->>C: Offer{Proposal}
+    P->>D: Offer{Proposal}
+
+    par prepare (all-to-all broadcast)
+        B->>C: Create{Vote phase=prepare seq=1}
+        C->>B: Create{Vote phase=prepare seq=1}
+        D->>B: Create{Vote phase=prepare seq=1, value=X}
+        D->>C: Create{Vote phase=prepare seq=1, value=Y}
+    end
+
+    Note over B,C: D told B 'X' and C 'Y' for the same (round, seq=1) - equivocation
+
+    B->>C: anti-entropy exchange of observedVotes sets
+    Note over B,C: cross-check finds two signed D-votes, same seqNo, different hash
+
+    B-->>D: Announce{afp:EquivocationProof}
+    C-->>D: Announce{afp:EquivocationProof}
+    Note over B,C: D's weight zeroed; instance-level consequence goes to hub governance
+
+    par commit (honest replicas only)
+        B->>C: Create{Vote phase=commit seq=2}
+        C->>B: Create{Vote phase=commit seq=2}
+    end
+
+    Note over P,D: only 2 honest votes, 3 needed - round times out
+    Note over P,D: fallback: highest-reputation live replica issues a fresh round
+```

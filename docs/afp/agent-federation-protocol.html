@@ -1,0 +1,1045 @@
+<title>Agent Federation Protocol</title>
+<style>
+  :root {
+    --bg: #eef2f4;
+    --surface: #ffffff;
+    --surface-2: #e4eaee;
+    --border: #ccd6db;
+    --text: #14212b;
+    --text-muted: #56646d;
+    --accent: #0f7a82;
+    --accent-strong: #0a5a60;
+    --accent-soft: #d7eef0;
+    --accent-contrast: #ffffff;
+    --shadow: 0 1px 2px rgba(20, 33, 43, 0.06), 0 8px 24px rgba(20, 33, 43, 0.05);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f151b;
+      --surface: #141c23;
+      --surface-2: #1b242c;
+      --border: #2a343d;
+      --text: #dde6ea;
+      --text-muted: #93a2ac;
+      --accent: #4cc9cc;
+      --accent-strong: #7ee0e2;
+      --accent-soft: #16323a;
+      --accent-contrast: #06181a;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #0f151b;
+    --surface: #141c23;
+    --surface-2: #1b242c;
+    --border: #2a343d;
+    --text: #dde6ea;
+    --text-muted: #93a2ac;
+    --accent: #4cc9cc;
+    --accent-strong: #7ee0e2;
+    --accent-soft: #16323a;
+    --accent-contrast: #06181a;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: Charter, "Iowan Old Style", "Palatino Linotype", "Georgia", serif;
+    font-size: 17px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .mono, pre, code { font-family: ui-monospace, "Cascadia Code", "SF Mono", Consolas, "Roboto Mono", monospace; }
+
+  a { color: var(--accent-strong); }
+  a:focus-visible, .toc a:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  h1, h2, h3 { text-wrap: balance; color: var(--text); }
+
+  .page { max-width: 1240px; margin: 0 auto; padding: 3.5rem 1.5rem 6rem; }
+
+  /* ---------- Hero ---------- */
+  .hero { max-width: 74ch; margin: 0 0 3.5rem; }
+  .eyebrow {
+    font-family: "Avenir Next Condensed", "Roboto Condensed", sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--accent-strong);
+    margin: 0 0 0.9rem;
+  }
+  .hero h1 {
+    font-size: clamp(2.1rem, 4.4vw, 3.1rem);
+    line-height: 1.08;
+    letter-spacing: -0.01em;
+    margin: 0 0 0.9rem;
+    font-weight: 700;
+  }
+  .hero .dek {
+    font-size: 1.15rem;
+    color: var(--text-muted);
+    margin: 0;
+    max-width: 62ch;
+  }
+
+  .callout {
+    margin: 1.75rem 0 0;
+    padding: 0.95rem 1.15rem;
+    background: var(--accent-soft);
+    border-left: 3px solid var(--accent);
+    border-radius: 0.25rem;
+    font-size: 0.95rem;
+    color: var(--text);
+  }
+  .callout strong { color: var(--accent-strong); }
+  .note {
+    margin: 1.4rem 0;
+    padding: 0.9rem 1.1rem;
+    background: var(--surface-2);
+    border-left: 3px solid var(--text-muted);
+    border-radius: 0.25rem;
+    font-size: 0.95rem;
+    color: var(--text-muted);
+  }
+  .note strong { color: var(--text); }
+
+  /* ---------- Layout ---------- */
+  .layout {
+    display: grid;
+    grid-template-columns: 258px minmax(0, 1fr);
+    gap: 3rem;
+    align-items: start;
+  }
+  @media (max-width: 880px) {
+    .layout { grid-template-columns: 1fr; }
+    .toc { position: static; margin-bottom: 2rem; max-height: none; }
+  }
+
+  .toc {
+    position: sticky;
+    top: 1.25rem;
+    max-height: calc(100vh - 2.5rem);
+    overflow-y: auto;
+    font-family: "Avenir Next Condensed", "Roboto Condensed", sans-serif;
+  }
+  .toc-label {
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin: 0 0 0.75rem;
+    font-weight: 600;
+  }
+  .toc ol { list-style: none; margin: 0; padding: 0; border-left: 1px solid var(--border); }
+  .toc li { margin: 0; }
+  .toc a {
+    display: flex;
+    gap: 0.6rem;
+    padding: 0.26rem 0 0.26rem 0.9rem;
+    margin-left: -1px;
+    border-left: 2px solid transparent;
+    text-decoration: none;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+  }
+  .toc a:hover { color: var(--text); border-left-color: var(--border); }
+  .toc a .num { color: var(--accent-strong); font-variant-numeric: tabular-nums; min-width: 1.2em; }
+
+  main { min-width: 0; }
+
+  section { padding-top: 3.2rem; margin-top: -1.5rem; scroll-margin-top: 1.5rem; }
+  section:first-of-type { padding-top: 0; margin-top: 0; }
+  section + section { border-top: 1px solid var(--border); }
+
+  .sec-head { display: flex; align-items: baseline; gap: 0.85rem; margin-bottom: 1rem; flex-wrap: wrap; }
+  .sec-head .num {
+    font-family: "Avenir Next Condensed", "Roboto Condensed", sans-serif;
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+  }
+  .sec-head h2 { font-size: 1.55rem; margin: 0; font-weight: 700; }
+  .rev-chip {
+    font-family: "Avenir Next Condensed", "Roboto Condensed", sans-serif;
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent-contrast);
+    background: var(--accent);
+    border-radius: 0.7rem;
+    padding: 0.12rem 0.55rem;
+    align-self: center;
+    white-space: nowrap;
+  }
+
+  h3 { font-size: 1.12rem; margin: 1.8rem 0 0.6rem; font-weight: 700; }
+  p { margin: 0 0 1rem; max-width: 72ch; }
+  ul, ol.plain { margin: 0 0 1rem; padding-left: 1.3rem; max-width: 72ch; }
+  li { margin-bottom: 0.4rem; }
+
+  /* ---------- Snippets / code ---------- */
+  .snippet { margin: 1.2rem 0 1.6rem; }
+  .snippet figcaption {
+    font-family: "Avenir Next Condensed", "Roboto Condensed", sans-serif;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    margin-bottom: 0.4rem;
+  }
+  pre {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 0.4rem;
+    padding: 0.95rem 1.1rem;
+    overflow-x: auto;
+    font-size: 0.86rem;
+    line-height: 1.55;
+    margin: 0;
+  }
+  pre code { background: none; padding: 0; }
+  code { background: var(--surface-2); padding: 0.1em 0.35em; border-radius: 0.25rem; font-size: 0.88em; }
+  pre.diagram { border-left-color: var(--text-muted); color: var(--text); }
+  .mermaid-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    padding: 1.2rem;
+    margin: 1.4rem 0;
+    overflow-x: auto;
+    box-shadow: var(--shadow);
+  }
+
+  /* ---------- Tables ---------- */
+  .table-wrap { overflow-x: auto; margin: 1.2rem 0 1.6rem; border: 1px solid var(--border); border-radius: 0.5rem; }
+  table { border-collapse: collapse; width: 100%; min-width: 560px; font-size: 0.92rem; background: var(--surface); }
+  th, td { text-align: left; padding: 0.65rem 0.9rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  thead th {
+    background: var(--surface-2);
+    font-family: "Avenir Next Condensed", "Roboto Condensed", sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-size: 0.72rem;
+    color: var(--text-muted);
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td code { white-space: nowrap; }
+
+  /* ---------- Phase timeline ---------- */
+  .phases { list-style: none; margin: 1.5rem 0; padding: 0; border-left: 2px solid var(--border); }
+  .phase { position: relative; padding: 0 0 2rem 1.6rem; }
+  .phase:last-child { padding-bottom: 0; }
+  .phase::before {
+    content: "";
+    position: absolute;
+    left: -0.4675rem;
+    top: 0.3rem;
+    width: 0.75rem;
+    height: 0.75rem;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 2px solid var(--bg);
+  }
+  .phase .tag {
+    font-family: "Avenir Next Condensed", "Roboto Condensed", sans-serif;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 0.75rem;
+    color: var(--accent-strong);
+  }
+  .phase h3 { margin: 0.25rem 0 0.5rem; }
+  .phase .deliverable { color: var(--text-muted); font-size: 0.95rem; }
+  .phase .deliverable strong { color: var(--text); }
+
+  footer.colophon {
+    margin-top: 4rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 0.88rem;
+  }
+</style>
+
+<div class="page">
+  <header class="hero">
+    <p class="eyebrow">Architecture Spec &middot; Multi-Operator Agent Federation &middot; Revision 3</p>
+    <h1>Agent Federation Protocol</h1>
+    <p class="dek">Multiple operators, each running their own instance of agents, join forces on a common problem — federating through problem-scoped hubs over ActivityPub, the W3C protocol behind Mastodon. No central broker, consortium trust, no token economics.</p>
+    <div class="callout">
+      <strong>Revision 3 —</strong> the multi-operator model is now the organizing principle: the operator <strong>instance</strong> becomes a first-class trust boundary, <strong>hubs</strong> become problem-scoped rendezvous points, <code>afp:Bid</code> is activated for cross-operator allocation, and contribution accounting replaces any notion of currency. Revision 2's consensus/CRDT/gossip hardening remains in force and is integrated throughout.
+    </div>
+  </header>
+
+  <div class="layout">
+    <nav class="toc" aria-label="Table of contents">
+      <p class="toc-label">Contents</p>
+      <ol>
+        <li><a href="#changelog"><span class="num">&Delta;</span><span>What changed in v3</span></a></li>
+        <li><a href="#model"><span class="num">01</span><span>The multi-operator model</span></a></li>
+        <li><a href="#core-model"><span class="num">02</span><span>Agents as actors</span></a></li>
+        <li><a href="#instance"><span class="num">03</span><span>The operator instance</span></a></li>
+        <li><a href="#trust"><span class="num">04</span><span>Two-tier trust</span></a></li>
+        <li><a href="#hubs"><span class="num">05</span><span>Problem-scoped hubs</span></a></li>
+        <li><a href="#discovery"><span class="num">06</span><span>Discovery &amp; identity</span></a></li>
+        <li><a href="#vocabulary"><span class="num">07</span><span>Coordination vocabulary</span></a></li>
+        <li><a href="#patterns"><span class="num">08</span><span>Coordination patterns</span></a></li>
+        <li><a href="#bidding"><span class="num">09</span><span>Bidding &amp; allocation</span></a></li>
+        <li><a href="#consensus"><span class="num">10</span><span>Consensus hardening</span></a></li>
+        <li><a href="#crdt"><span class="num">11</span><span>Shared state as CRDTs</span></a></li>
+        <li><a href="#gossip"><span class="num">12</span><span>Gossip &amp; anti-entropy</span></a></li>
+        <li><a href="#membership"><span class="num">13</span><span>Membership &amp; quorum</span></a></li>
+        <li><a href="#causal"><span class="num">14</span><span>Causal ordering</span></a></li>
+        <li><a href="#contribution"><span class="num">15</span><span>Contribution accounting</span></a></li>
+        <li><a href="#reliability"><span class="num">16</span><span>Reliability &amp; failure</span></a></li>
+        <li><a href="#security"><span class="num">17</span><span>Security &amp; trust</span></a></li>
+        <li><a href="#topology"><span class="num">18</span><span>Deployment topology</span></a></li>
+        <li><a href="#profiles"><span class="num">19</span><span>Deployment profiles</span></a></li>
+        <li><a href="#mastodon"><span class="num">20</span><span>Mastodon interop</span></a></li>
+        <li><a href="#stack"><span class="num">21</span><span>Tech stack</span></a></li>
+        <li><a href="#roadmap"><span class="num">22</span><span>Phased roadmap</span></a></li>
+        <li><a href="#open"><span class="num">23</span><span>Open questions</span></a></li>
+      </ol>
+    </nav>
+
+    <main>
+      <section id="changelog">
+        <div class="sec-head"><span class="num">&Delta;</span><h2>What changed in v3</h2></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>#</th><th>Change</th><th>Why</th></tr></thead>
+            <tbody>
+              <tr><td>1</td><td>New <code>afp:Instance</code> actor, <code>afp:operatedBy</code> link, signed roster collection, <code>afp:MembershipProof</code> credential</td><td>Multi-operator topology needs a first-class administrative/trust boundary above individual agents — v1/v2 only had bare agent actors</td></tr>
+              <tr><td>2</td><td>Two-tier trust: instance&harr;instance <code>afp:FederationAgreement</code> + per-agent, per-hub <code>afp:reputation</code></td><td>Consortium admission needs a coarse gate composed with fine-grained per-agent standing</td></tr>
+              <tr><td>3</td><td>CRDT registry and membership rescoped from global to per-hub via a required <code>afp:hub</code> field on every <code>afp:CRDTDelta</code></td><td>v2 assumed one shared state space; multiple concurrent problem-hubs mean state must be scoped</td></tr>
+              <tr><td>4</td><td>New <code>afp:Hub</code> actor (Group-like), instance-level Follow/Accept + agent-level <code>afp:Enroll</code>/<code>afp:Unenroll</code></td><td>&ldquo;Join a bigger mesh for a common problem&rdquo; needs an explicit, accountable rendezvous entity</td></tr>
+              <tr><td>5</td><td><code>afp:Bid</code> activated: signed bid schema, commit-reveal window, <code>afp:Award</code>, <code>afp:Reauction</code></td><td>Cross-operator allocation needs real negotiation among mutually-untrusting parties, not just a direct Offer</td></tr>
+              <tr><td>6</td><td><code>afp:ContributionSummary</code> + <code>afp:ContributionDispute</code>, independently recomputable from outboxes + L1 certificates</td><td>Contribution accounting without currency, per explicit constraint</td></tr>
+              <tr><td>7</td><td>Roadmap re-sequenced (now P1&ndash;P6): instance identity, two-tier trust, LD-Signatures, snapshot-pinned membership move to P2/P3; L1 Byzantine voting triggers at &ldquo;&ge;2 operators live&rdquo;</td><td>Cross-trust-boundary operation is now the central case, not edge hardening</td></tr>
+              <tr><td>8</td><td>Directory actor narrowed further: per-hub discovery is the hub's own roster; only a thin directory-of-hubs bootstrap remains (open)</td><td>Multi-hub topology changes what &ldquo;directory&rdquo; even means</td></tr>
+              <tr><td>9</td><td><code>afp:keyCustody: "instance" | "self"</code> on each roster entry</td><td>Large fleets shouldn't have to rotate N keys; instance-custodied signing must stay individually accountable</td></tr>
+              <tr><td>10</td><td>Deployment profiles (&sect;19): solo/airgapped = local instance + co-located local hub — &ldquo;the consortium of one&rdquo; — with degenerate simplifications and sneakernet federation</td><td>AFP must bring value to a solo operator hosting an airgapped instance, as a degenerate case of the same architecture, never a fork</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="model">
+        <div class="sec-head"><span class="num">01</span><h2>The multi-operator model</h2><span class="rev-chip">New in v3</span></div>
+        <p>The point of this architecture is <strong>multi-operator collaboration on a common problem</strong>: an operator deploys their own instance where a set of their agents live, then joins that instance to a larger hub of many operators, enrolling their workforce in a bigger mesh. This is the Fediverse topology transplanted onto agent coordination:</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Fediverse</th><th>Agent Federation Protocol</th></tr></thead>
+            <tbody>
+              <tr><td>Mastodon instance (one server, many user actors)</td><td><code>afp:Instance</code> — one operator's server, many agent actors</td></tr>
+              <tr><td>Federation between instances</td><td>Instance peering via co-signed <code>afp:FederationAgreement</code></td></tr>
+              <tr><td>Relay / community (Lemmy-style Group)</td><td><code>afp:Hub</code> — problem-scoped rendezvous, relay, and shared state</td></tr>
+              <tr><td>Server moderation / defederation</td><td>Two-tier trust: instance gates + per-agent, per-hub reputation</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="note"><strong>Trust model —</strong> this is a <strong>consortium</strong>: operators who have agreed to collaborate on a problem, admitted explicitly. It is <em>not</em> an open permissionless market, and there is deliberately no token or crypto economics anywhere in this document — contribution accounting only (&sect;15).</div>
+      </section>
+
+      <section id="core-model">
+        <div class="sec-head"><span class="num">02</span><h2>Agents as ActivityPub actors</h2></div>
+        <p>Each autonomous agent <em>is</em> an ActivityPub Actor: a dereferenceable actor document (<code>application/activity+json</code>) with an <code>inbox</code> — the agent's entire externally-reachable API surface — an <code>outbox</code> as its independently auditable activity log, and a keypair for HTTP Signatures so every activity it sends can be verified without a shared secret or central auth service.</p>
+        <p>Reusing ActivityPub means no message broker to operate, no required central registry, per-message (not per-connection) authentication so agents can be hosted anywhere, and a decade of federation tooling — WebFinger, HTTP Signatures, Linked Data Signatures, retry semantics, and interop with generic ActivityPub clients, including a human watching an agent's outbox from Mastodon. In v3 each agent additionally declares which instance administers it (<code>afp:operatedBy</code>, &sect;03).</p>
+      </section>
+
+      <section id="instance">
+        <div class="sec-head"><span class="num">03</span><h2>The operator instance</h2><span class="rev-chip">New in v3</span></div>
+        <p><strong>Design choice: extend AS2 <code>Application</code>, don't invent a new base type.</strong> This mirrors Mastodon's per-server instance actor (an <code>Application</code> actor that signs server-level activities) and NodeInfo's separation of server metadata from user actors. The instance owns the shared infrastructure v1/v2 implicitly assumed per-agent — delivery/retry queue, key custody, outbound rate limits, allow/deny policy — and is the <strong>administrative and trust boundary</strong>: the thing a peer instance actually forms an agreement with.</p>
+        <div class="snippet">
+          <figcaption>Instance actor document</figcaption>
+          <pre><code>{
+  "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+  "id": "https://alpha.operator.example/actor",
+  "type": ["Application", "afp:Instance"],
+  "name": "Alpha Operator Instance",
+  "afp:operator": "Alpha Robotics Collective",
+  "inbox": "https://alpha.operator.example/inbox",
+  "outbox": "https://alpha.operator.example/outbox",
+  "publicKey": {
+    "id": "https://alpha.operator.example/actor#main-key",
+    "owner": "https://alpha.operator.example/actor",
+    "publicKeyPem": "-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----"
+  },
+  "afp:roster": "https://alpha.operator.example/roster",
+  "afp:policy": "https://alpha.operator.example/.well-known/afp-policy"
+}</code></pre>
+        </div>
+        <p><strong>Agent &rarr; instance link.</strong> Every agent actor document carries <code>afp:operatedBy</code>:</p>
+        <div class="snippet">
+          <pre><code>{
+  "id": "https://alpha.operator.example/agents/a1",
+  "type": "Service",
+  "afp:operatedBy": "https://alpha.operator.example/actor",
+  "afp:capabilities": ["afp:cap:image-classification", "afp:cap:translation-en-da"]
+}</code></pre>
+        </div>
+        <p><strong>The signed roster</strong> — an <code>OrderedCollection</code> signed as a whole by the instance key, so membership is verifiable from a cached copy without a live roundtrip:</p>
+        <div class="snippet">
+          <pre><code>{
+  "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+  "id": "https://alpha.operator.example/roster",
+  "type": "OrderedCollection",
+  "attributedTo": "https://alpha.operator.example/actor",
+  "totalItems": 2,
+  "orderedItems": [
+    { "type": "afp:RosterEntry", "agent": "https://alpha.operator.example/agents/a1",
+      "status": "active", "afp:keyCustody": "self", "since": "2026-06-01T00:00:00Z" },
+    { "type": "afp:RosterEntry", "agent": "https://alpha.operator.example/agents/a2",
+      "status": "active", "afp:keyCustody": "instance", "since": "2026-07-15T00:00:00Z" }
+  ],
+  "signature": { "type": "Ed25519Signature2020", "created": "2026-08-16T09:00:00Z",
+    "verificationMethod": "https://alpha.operator.example/actor#main-key", "proofValue": "z3Fh9..." }
+}</code></pre>
+        </div>
+        <h3>Proving membership</h3>
+        <p>Two complementary mechanisms: <strong>(a)</strong> live roster lookup — same trust model as WebFinger; <strong>(b)</strong> a short-lived <code>afp:MembershipProof</code> — a signed attestation <code>{agentId, instanceId, issuedAt, expiresAt, signature}</code> an agent presents at handshake time, so verification survives the instance being briefly unreachable. Treat it like a certificate, not a query.</p>
+        <h3>Vouch / disown</h3>
+        <p><code>afp:Vouch</code> (instance &rarr; agent: adds/confirms a roster entry, republishes the signed roster) and <code>afp:Disown</code> (removes it, republishes). Both are ordinary signed activities in the instance's outbox — auditable, never side-channel admin actions.</p>
+        <h3>Key custody</h3>
+        <p>Declared per agent via <code>afp:keyCustody</code> on the roster entry: <code>self</code> (agent holds its own keypair, as in v1/v2) or <code>instance</code> (the instance signs on the agent's behalf, tagging <code>afp:actingAs</code>). Rationale: many operators will run large, low-autonomy fleets where individually rotating N keys is pure overhead. Trade-off stated honestly: instance-custodied signatures push misbehavior attribution more directly onto the instance, since the instance's key is doing the signing — this is <em>intentional</em> and feeds &sect;04's rollup rule.</p>
+      </section>
+
+      <section id="trust">
+        <div class="sec-head"><span class="num">04</span><h2>Two-tier trust</h2><span class="rev-chip">New in v3</span></div>
+        <h3>Instance level: the federation agreement</h3>
+        <p><strong>Opt-in bilateral, not Fediverse-style unilateral blocking.</strong> Because this is a consortium of invited collaborators, the default is <strong>deny</strong>, and peering requires an explicit co-signed agreement — trust must be established before anything flows, the inverse of Mastodon's open-by-default-then-defederate model:</p>
+        <pre class="diagram mono">Offer{afp:FederationAgreement}   Alpha &rarr; Beta   (terms + scope + expiry)
+        &rarr; CounterSign            Beta
+        &rarr; Create{afp:FederationAgreement}   published to both outboxes — the trust anchor</pre>
+        <p><code>afp:Defederate</code> is unilateral and immediate at the sender's own inbox policy — either party can exit an agreement at will; the hub treats it as advisory and cannot force reinstatement.</p>
+        <h3>Agent level: hub-scoped reputation</h3>
+        <p><code>afp:reputation</code> lives in the hub's CRDT state (&sect;05), computed from signed Result completions, bid-estimate accuracy (&sect;09), and voting integrity (&sect;10). Deliberately <strong>not global</strong> — standing on hub A doesn't transfer to hub B, so gaming one context doesn't buy trust in another. Instances may publish a cross-hub aggregate for informational use, but the protocol treats it as authoritative nowhere.</p>
+        <h3>How the tiers compose</h3>
+        <p>Inbox / vote / bid acceptance policy, evaluated in order:</p>
+        <ol class="plain">
+          <li>Sender's instance holds an active, unexpired <code>FederationAgreement</code> scoped to this hub &rarr; else <strong>hard reject</strong> (instance gate)</li>
+          <li>Sender's instance is not explicitly deny-listed &rarr; else <strong>hard reject</strong> (a blocklist overrides an agreement, e.g. after <code>Defederate</code>)</li>
+          <li>Sender agent's roster membership / <code>MembershipProof</code> is valid and unexpired &rarr; else <strong>hard reject</strong></li>
+          <li>Sender agent's hub-scoped reputation &ge; policy floor &rarr; else <strong>soft degrade</strong>: accept, but discount vote/bid weight. Unset reputation defaults neutral.</li>
+        </ol>
+        <p>Instance and roster checks are hard gates; reputation is a soft weight. This applies uniformly to task activities <em>and</em> to L1 votes — a vote from a barely-federated, low-reputation agent still counts, just lighter.</p>
+        <h3>Equivocation rollup: automatic fact, governed consequence</h3>
+        <p>v2's rule — an <code>afp:EquivocationProof</code> zeroes the offending agent's voting weight — stays <strong>automatic and local</strong>: it's cryptographically self-evident, so every verifier applies it immediately, and it lands as a strike on the agent's hub-scoped reputation. What is <strong>not</strong> automatic is any instance-level consequence: suspending a whole roster or defederating requires the hub membership to ratify a signed <code>afp:GovernanceDecision</code> via the same weighted-quorum voting v2 built for L1, with the proof attached as evidence. One bad agent shouldn't get its operator delisted without the other members agreeing. An instance can preempt governance by self-issuing <code>afp:Disown</code> on the offender — voluntary remediation heads off forced action.</p>
+      </section>
+
+      <section id="hubs">
+        <div class="sec-head"><span class="num">05</span><h2>Problem-scoped hubs</h2><span class="rev-chip">New in v3</span></div>
+        <p><strong><code>afp:Hub</code> extends AS2 <code>Group</code></strong> — precedent: federated community actors (e.g. Lemmy communities), an actor that many others address and that owns shared, member-visible state. One hub per common problem; an operator can enroll different subsets of their workforce in different hubs.</p>
+        <h3>Enrollment is two-level, deliberately</h3>
+        <ol class="plain">
+          <li><strong>Instance level</strong> — <code>Follow</code>/<code>Accept</code> between instance and hub establishes the instance's seat in hub governance (voting eligibility, visibility). No agents are enrolled yet.</li>
+          <li><strong>Agent level</strong> — the instance issues a signed <code>afp:Enroll</code> per agent, carrying that agent's hub-scoped capability declarations:</li>
+        </ol>
+        <div class="snippet">
+          <pre><code>{
+  "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+  "id": "https://alpha.operator.example/activities/en1",
+  "type": "afp:Enroll",
+  "actor": "https://alpha.operator.example/actor",
+  "object": "https://alpha.operator.example/agents/a1",
+  "target": "https://hub.consortium.example/actor",
+  "afp:hub": "https://hub.consortium.example/actor",
+  "afp:capabilities": ["afp:cap:image-classification"],
+  "afp:hubKey": "https://alpha.operator.example/agents/a1#hub-key-1"
+}</code></pre>
+        </div>
+        <p><code>afp:Unenroll</code> removes one agent from the hub's membership OR-Set; <code>Undo{Follow}</code> at instance level mass-unenrolls everything that instance put into the hub.</p>
+        <h3>Hub-scoped state</h3>
+        <p>v2's capability registry and membership set stop being global: every <code>Update{afp:CRDTDelta}</code> carries a required <code>afp:hub</code> field, and stores are keyed <code>(hubId, crdtType)</code>. The alternative — namespacing the <code>crdtId</code> itself — was considered and rejected: deltas already travel as discrete signed activities, a field is trivially filterable and routable, and it lets one gossip batch carry deltas for several hubs a peer shares without ambiguity.</p>
+        <h3>Governance concentration, kept accountable</h3>
+        <p>Member admission and dispute adjudication inevitably concentrate at the hub — unavoidable for a rendezvous point. The mitigation: the hub's governance activities (<code>afp:GovernanceDecision</code>, <code>afp:MemberAdmit</code>, <code>afp:MemberExpel</code>) require a <strong>weighted quorum vote among current instance members</strong>, reusing the L1 machinery — <em>never</em> a signature from the hub's own key. The hub key signs only transport-level things: message forwarding, state storage attestation. Practical consequence: whoever operates the physical hub server has no unilateral power beyond availability — a malicious or compromised hub can censor or go dark, but cannot forge governance outcomes or corrupt history, because everything of consequence is independently signed by members and gossip-replicable. Recovery from a bad hub operator is &ldquo;stand up a replacement hub actor, replay CRDT deltas from surviving members' outboxes&rdquo; — costly, but a liveness failure, not a correctness one.</p>
+      </section>
+
+      <section id="discovery">
+        <div class="sec-head"><span class="num">06</span><h2>Discovery &amp; identity</h2></div>
+        <p><strong>Identity.</strong> An agent's identity is its actor URL; an instance's identity is its instance-actor URL. Trust attaches to the URL plus the key currently published on the actor document — and, in v3, to the instance standing behind it via <code>afp:operatedBy</code>.</p>
+        <ul>
+          <li><strong>Direct URL</strong> — already-known actor URLs are simply fetched.</li>
+          <li><strong>WebFinger</strong> — resolve <code>@billing-agent@alpha.operator.example</code> to an actor URL via <code>/.well-known/webfinger</code>.</li>
+          <li><strong>Within a hub</strong> — the hub's own roster and capability registry <em>are</em> the discovery mechanism; a separate directory actor per hub is redundant and dropped.</li>
+          <li><strong>Discovering hubs themselves</strong> — a thin, out-of-band consortium-published list at a well-known URL (NodeInfo-style convention). Flagged open in &sect;23: revisit only if concurrent hub count outgrows a hand-maintained list.</li>
+        </ul>
+        <h3>Authentication</h3>
+        <p>Every inbox delivery carries an <strong>HTTP Signature</strong> over method, path, <code>Date</code>, <code>Digest</code>, <code>Host</code>, verified against the sender's published key (with caching), rejected on failure with an audit-logged drop. For payloads that survive relaying — everything routed through a hub — <strong>Linked Data Signatures / Object Integrity Proofs</strong> on the JSON-LD body prove authorship independent of the delivering hop; in v3 these are required as soon as anything crosses an instance boundary (roadmap P3).</p>
+        <div class="note"><strong>Key rotation —</strong> publish the new key with a short overlap window; on compromise, rotate immediately, push an <code>Update</code> of the actor document, and treat the old <code>keyId</code> as revoked. Instance-custodied agents (&sect;03) rotate centrally — one of the main operational arguments for that custody mode.</div>
+      </section>
+
+      <section id="vocabulary">
+        <div class="sec-head"><span class="num">07</span><h2>Coordination vocabulary</h2><span class="rev-chip">Extended</span></div>
+        <p>Standard AS2 types — <code>Follow</code>, <code>Accept</code>, <code>Reject</code>, <code>Announce</code>, <code>Create</code>, <code>Update</code>, <code>Undo</code>, <code>Offer</code> — are reused wherever their semantics fit. The <code>afp</code> extension adds what AS2 has no vocabulary for. Core object types from v1: <code>Task</code>, <code>Capability</code>, <code>Result</code>, <code>Error</code>, <code>Vote</code> — delivered via standard activities (<code>Offer{Task}</code>, <code>Create{Result}</code>, &hellip;), correlated by <code>correlationId</code>.</p>
+        <div class="snippet">
+          <figcaption>Task delegation — the v1 baseline flow, unchanged</figcaption>
+          <pre><code>{
+  "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+  "id": "https://alpha.operator.example/agents/a1/activities/8f2a",
+  "type": "Offer",
+  "actor": "https://alpha.operator.example/agents/a1",
+  "to": ["https://beta.operator.example/agents/b1"],
+  "object": {
+    "id": "https://alpha.operator.example/agents/a1/tasks/task-9931",
+    "type": "afp:Task",
+    "afp:capability": "afp:cap:image-classification",
+    "afp:deadline": "2026-08-16T14:30:00Z",
+    "afp:correlationId": "task-9931",
+    "afp:hub": "https://hub.consortium.example/actor",
+    "content": "Classify the attached image set",
+    "attachment": [{ "type": "Link", "href": "s3://bucket/batch-12/", "mediaType": "application/x-directory" }]
+  }
+}</code></pre>
+        </div>
+        <p><code>Accept</code>/<code>Reject</code> answer the Offer (a <code>summary</code> carries the reject reason); the worker returns <code>Create{afp:Result}</code> with the same <code>correlationId</code>, or <code>Create{afp:Error}</code> on failure — the typed-outcome objects AS2 lacks.</p>
+
+        <h3>v2 terms (consensus, state, ordering)</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Term</th><th>Attached to</th><th>Purpose</th></tr></thead>
+            <tbody>
+              <tr><td><code>afp:round</code>, <code>afp:phase</code>, <code>afp:seqNo</code>, <code>afp:proposalHash</code>, <code>afp:observedVotes</code>, <code>afp:quorumSnapshot</code></td><td><code>afp:Vote</code></td><td>L1 chained voting / equivocation detection (&sect;10)</td></tr>
+              <tr><td><code>afp:EquivocationProof</code></td><td><code>Announce</code> object</td><td>Pair of conflicting signed votes as verifiable proof (&sect;10)</td></tr>
+              <tr><td><code>afp:crdtId</code>, <code>afp:crdtType</code>, <code>afp:delta</code></td><td><code>afp:CRDTDelta</code> in <code>Update</code></td><td>CRDT delta-state sync (&sect;11)</td></tr>
+              <tr><td><code>afp:merkleRoot</code>, <code>afp:versionVector</code></td><td><code>afp:Digest</code> in <code>Offer</code></td><td>Gossip anti-entropy digest exchange (&sect;12)</td></tr>
+              <tr><td><code>afp:StateDeltas</code></td><td><code>Accept</code> object</td><td>Response to a digest pull (&sect;12)</td></tr>
+              <tr><td><code>afp:seq</code>, <code>afp:vclock</code></td><td>any causal-workflow activity</td><td>Causal ordering / gap detection (&sect;14)</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3>v3 terms (federation, hubs, bidding, accounting)</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Term</th><th>Kind</th><th>Meaning</th></tr></thead>
+            <tbody>
+              <tr><td><code>afp:Instance</code></td><td>Actor type</td><td>Operator's server; administrative/trust boundary hosting agent actors</td></tr>
+              <tr><td><code>afp:operatedBy</code></td><td>Property (agent actor)</td><td>Which instance administers / is accountable for this agent</td></tr>
+              <tr><td><code>afp:roster</code></td><td>Collection (on Instance)</td><td>Signed list of vouched-for agents, with status</td></tr>
+              <tr><td><code>afp:MembershipProof</code></td><td>Credential</td><td>Short-lived signed attestation of instance membership, cacheable</td></tr>
+              <tr><td><code>afp:Vouch</code> / <code>afp:Disown</code></td><td>Activity</td><td>Instance adds / removes an agent from its roster</td></tr>
+              <tr><td><code>afp:keyCustody</code></td><td>Property (roster entry)</td><td><code>"instance"</code> | <code>"self"</code> — who signs for this agent</td></tr>
+              <tr><td><code>afp:FederationAgreement</code></td><td>Object</td><td>Bilateral, co-signed, scoped, expiring trust anchor between instances</td></tr>
+              <tr><td><code>afp:Defederate</code></td><td>Activity</td><td>Unilateral withdrawal from a FederationAgreement</td></tr>
+              <tr><td><code>afp:Hub</code></td><td>Actor type (Group-like)</td><td>Problem-scoped rendezvous/relay owning hub-scoped CRDT state</td></tr>
+              <tr><td><code>afp:Enroll</code> / <code>afp:Unenroll</code></td><td>Activity</td><td>Adds/removes one agent to/from a hub's membership CRDT</td></tr>
+              <tr><td><code>afp:hub</code></td><td>Property</td><td>Scopes a CRDTDelta, Task, Bid, etc. to one hub's namespace</td></tr>
+              <tr><td><code>afp:GovernanceDecision</code></td><td>Activity</td><td>Signed, quorum-voted hub-level decision (admission, expulsion, disputes)</td></tr>
+              <tr><td><code>afp:MemberAdmit</code> / <code>afp:MemberExpel</code></td><td>Activity</td><td>Specific governance decisions on hub membership</td></tr>
+              <tr><td><code>afp:Bid</code></td><td>Activity (reserved in v1, now live)</td><td>Signed offer to perform an announced Task, with estimates</td></tr>
+              <tr><td><code>afp:Award</code></td><td>Activity</td><td>Signed, independently-verifiable selection of a winning bid</td></tr>
+              <tr><td><code>afp:Reauction</code></td><td>Activity</td><td>Restarts allocation after award timeout/failure</td></tr>
+              <tr><td><code>afp:capabilityMatch</code>, <code>afp:estimatedCost</code>, <code>afp:estimatedLatency</code></td><td>Properties (Bid)</td><td>Self-declared fit and estimates, later checked against actuals</td></tr>
+              <tr><td><code>afp:bidCommit</code> / <code>afp:BidReveal</code></td><td>Activity pair</td><td>Commit-reveal sealed bidding, deters sniping</td></tr>
+              <tr><td><code>afp:reputation</code></td><td>Property (hub-scoped, per agent)</td><td>Running score from completions, estimate accuracy, voting integrity</td></tr>
+              <tr><td><code>afp:ContributionSummary</code></td><td>Object</td><td>Periodic, independently-recomputable per-operator contribution roll-up</td></tr>
+              <tr><td><code>afp:ContributionDispute</code></td><td>Activity</td><td>Challenge to a ContributionSummary, with evidence</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="patterns">
+        <div class="sec-head"><span class="num">08</span><h2>Coordination patterns</h2></div>
+
+        <h3>8a &middot; Direct task delegation (v1 baseline — still the workhorse)</h3>
+        <pre class="diagram mono">agent-a1 (Alpha)                              agent-b1 (Beta)
+    |--Offer{Task task-9931}------------------->|  signed POST; inbox policy &sect;04 checks
+    |&lt;--Accept{task-9931}------------------------|  (or Reject w/ reason)
+    |               ... work happens locally ... |
+    |&lt;--Create{Result, correlationId=task-9931}--|
+    |  match by correlationId to pending task    |</pre>
+        <p>The delegator keeps a pending-task table keyed by <code>correlationId</code> with a deadline; the HTTP response to the <code>Offer</code> POST only means &ldquo;delivered,&rdquo; never &ldquo;accepted.&rdquo; Used whenever the target agent is already known — bidding (&sect;09) exists for when it isn't.</p>
+
+        <h3>8b &middot; Capability discovery inside a hub</h3>
+        <pre class="diagram mono">alpha-instance --afp:Enroll{agent-a1, caps}--> hub H   (after instance Follow/Accept)
+hub H --Announce / gossip--> members' inboxes
+members merge the delta into their (hubId)-scoped CRDT capability registry</pre>
+
+        <h3>8c &middot; Consensus — Level 0, cooperative broadcast quorum</h3>
+        <pre class="diagram mono">proposer --Offer{Proposal}--> pinned voter set (snapshot, &sect;13)
+each voter --Create{Vote}--> all peers (mesh)
+each participant tallies locally; weighted quorum (&sect;13) --> proceed
+timeout without quorum --> Undo{Vote} / abandon round</pre>
+        <div class="note"><strong>Default consensus level</strong> — eventually-consistent, reorder-tolerant, not linearizable; adequate <em>within</em> one operator's trust boundary. Any round whose voters span two or more operators should run Level 1 (&sect;10) — that's now a concrete policy trigger, not a maybe.</div>
+
+        <h3>8d &middot; Hub fan-out broadcast</h3>
+        <p>The hub doubles as the channel actor: <code>Create</code> to the hub, hub <code>Announce</code>s to every enrolled member. Join/leave is enrollment (&sect;05), so senders never track subscriber lists.</p>
+      </section>
+
+      <section id="bidding">
+        <div class="sec-head"><span class="num">09</span><h2>Bidding &amp; allocation</h2><span class="rev-chip">New in v3</span></div>
+        <p>Cross-operator allocation — the case where the announcer <em>doesn't</em> know who should do the task. When the target is known (single candidate, pre-arranged assignment), skip all of this and use the direct <code>Offer</code> flow; <code>Bid</code> sits alongside v1's flow, it doesn't replace it.</p>
+        <ol class="plain">
+          <li><strong>Announce</strong> — <code>afp:Announce{Task}</code> broadcast to the hub: task spec, required capabilities, deadline, <code>afp:hub</code>, and — published up front, not decided after the fact — the scoring function that will select the winner.</li>
+          <li><strong>Bid, sealed</strong> — during the bid window, bidders submit only a commitment hash (<code>afp:bidCommit</code>); after it closes they submit <code>afp:BidReveal</code> with values matching the hash. Commit-reveal exists specifically to deter last-moment undercutting off visible bids — open bidding on a hub (needed for auditability) would invite exactly that.</li>
+          <li><strong>Award</strong> — the announcer (or the pre-published deterministic rule) emits <code>afp:Award</code> referencing the winning bid. Anyone can recompute the published scoring function over the revealed bids and verify the award — selection is checkable even when a human made the call.</li>
+          <li><strong>Accept / Result</strong> — exactly the v1 flow keyed by <code>correlationId</code>, seeded by a Bid instead of a direct Offer.</li>
+        </ol>
+        <div class="snippet">
+          <figcaption>A revealed bid (the commit phase sends only afp:commitment, a hash of this payload)</figcaption>
+          <pre><code>{
+  "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+  "id": "https://beta.operator.example/activities/bid-77",
+  "type": "afp:Bid",
+  "actor": "https://beta.operator.example/agents/b1",
+  "afp:instanceEndorsement": "https://beta.operator.example/actor",
+  "object": "https://hub.consortium.example/tasks/task-42",
+  "afp:hub": "https://hub.consortium.example/actor",
+  "afp:capabilityMatch": 0.93,
+  "afp:estimatedCost": { "unit": "afp:compute-unit", "value": 120 },
+  "afp:estimatedLatency": "PT4M",
+  "afp:bidWindow": { "opens": "2026-08-16T10:00:00Z", "closes": "2026-08-16T10:05:00Z" },
+  "published": "2026-08-16T10:00:12Z",
+  "signature": { "type": "Ed25519Signature2020", "proofValue": "..." }
+}</code></pre>
+        </div>
+        <h3>Sniping and lying, honestly bounded</h3>
+        <p>Signatures give non-repudiation of what was <em>claimed</em>, not truth of the claim — nothing cryptographic proves a capability or cost estimate accurate. The real deterrent is reputational: declared <code>estimatedCost</code>/<code>estimatedLatency</code> are checked against the Result's actual telemetry, and chronic over-promising drags hub-scoped reputation (&sect;04) down, which feeds future selection odds. A statistical guarantee, not a hard one — stated plainly rather than oversold.</p>
+        <ul>
+          <li><strong>Tie-breaking</strong> — deterministic and discretion-free: <code>hash(taskId || bidderId)</code> as the secondary sort key, a protocol constant, never a per-task choice.</li>
+          <li><strong>Re-auction</strong> — on award-timeout (no <code>Accept</code>) or deadline miss, <code>afp:Reauction{taskId, priorAward}</code>. Fast path: next-ranked bidder from the same pool if the window hasn't gone stale; slow path: full re-<code>Announce</code>. The failed winner takes the reputation hit either way.</li>
+        </ul>
+      </section>
+
+      <section id="consensus">
+        <div class="sec-head"><span class="num">10</span><h2>Consensus hardening — Level 1</h2></div>
+        <p><strong>Problem.</strong> In L0, votes are point-to-point <code>Create</code>s — agent A has no way to prove to B what it told C. A Byzantine actor can equivocate: &ldquo;accept&rdquo; to B, &ldquo;reject&rdquo; to C, same round, and neither can prove it happened.</p>
+        <h3>Signed vote chains</h3>
+        <p>Every L1 <code>Vote</code> embeds <code>afp:proposalHash</code>; a monotonic per-(voter, round) <code>afp:seqNo</code> for replay prevention; <code>afp:observedVotes</code> — hashes of every signed vote this voter saw before casting its own; and a detached signature over the whole object. Two peers each holding one of a Byzantine voter's conflicting signed votes can produce a self-contained <code>Announce{afp:EquivocationProof}</code> — same (voter, round, seqNo), different value — cryptographic, third-party-verifiable proof, not an accusation. Receivers zero that voter's weight immediately (agent-level, automatic); instance-level consequences go through hub governance (&sect;04).</p>
+        <h3>Mapping PBFT's phases — and where synchrony breaks</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>PBFT phase</th><th>ActivityPub mapping</th><th>Where assumptions break</th></tr></thead>
+            <tbody>
+              <tr><td>pre-prepare</td><td>Proposer <code>Offer{Proposal}</code> to the snapshot-pinned voter set (&sect;13)</td><td>Maps cleanly — already a fire-and-forget broadcast</td></tr>
+              <tr><td>prepare</td><td>Each replica <code>Create</code>s a signed <code>Vote{phase: prepare}</code> to <em>every other replica</em></td><td>PBFT waits for 2f+1 <em>matching</em> prepares — a wait that assumes bounded delay. Over async inboxes, &ldquo;not yet&rdquo; and &ldquo;never&rdquo; are indistinguishable</td></tr>
+              <tr><td>commit</td><td><code>Vote{phase: commit}</code>, same 2f+1 bar</td><td>Same problem, compounded — a stalled prepare blocks commit indefinitely without timeouts</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p><strong>What's achievable, honestly:</strong> L1 keeps PBFT's <strong>safety</strong> — equivocation is provable, so two conflicting proposals can never both collect a valid quorum certificate — but downgrades <strong>liveness</strong> to best-effort: soft rounds under generous timeouts riding the outbox retry queue, and a stalled round triggers a simplified view change (the highest-reputation live replica issues a fresh round referencing the stalled one). No formal termination bound, but no silent inconsistency either. Raft was rejected: its leader must detect its own unreachability via missed acks in bounded time, and this transport has no delivery acks at all.</p>
+        <p><strong>Threshold signatures (optional):</strong> 2f+1 commit votes can be aggregated into one compact commit certificate — worth adding only once L1 is load-bearing; start with the bundle of n signed votes. These certificates are also the evidence backbone for contribution accounting (&sect;15) and governance decisions (&sect;04, &sect;05).</p>
+        <div class="snippet">
+          <figcaption>Signed vote chain entry</figcaption>
+          <pre><code>{
+  "@context": ["https://www.w3.org/ns/activitystreams", { "afp": "https://afp.example/ns/v3#" }],
+  "id": "https://agent-a.example/activities/vote-91a3",
+  "type": "Create",
+  "actor": "https://agent-a.example/actor",
+  "to": ["https://agent-b.example/actor", "https://agent-c.example/actor", "https://agent-d.example/actor"],
+  "object": {
+    "id": "https://agent-a.example/votes/round-7f2c9e/agent-a/2",
+    "type": "afp:Vote",
+    "afp:round": "urn:afp:round:7f2c9e",
+    "afp:phase": "commit",
+    "afp:seqNo": 2,
+    "afp:proposalHash": "sha256:9d3b1c...e21f",
+    "afp:quorumSnapshot": "sha256:mem-4a71c9...",
+    "value": "accept",
+    "afp:observedVotes": [
+      "sha256:vote-agent-b-round7f2c9e-seq1",
+      "sha256:vote-agent-c-round7f2c9e-seq1"
+    ],
+    "signature": {
+      "type": "Ed25519Signature2020",
+      "created": "2026-08-16T10:04:02Z",
+      "verificationMethod": "https://agent-a.example/actor#key-1",
+      "proofValue": "z4o9c..."
+    }
+  },
+  "published": "2026-08-16T10:04:02Z"
+}</code></pre>
+        </div>
+        <h3>A Byzantine-hardened voting round</h3>
+        <div class="mermaid-wrap">
+          <pre class="mermaid">
+sequenceDiagram
+    participant P as Proposer
+    participant B as agent-b
+    participant C as agent-c
+    participant D as agent-d (Byzantine)
+
+    Note over P,D: n=4, f=1 - need 2f+1=3 matching votes per phase
+
+    P->>B: Offer{Proposal} (pre-prepare)
+    P->>C: Offer{Proposal}
+    P->>D: Offer{Proposal}
+
+    par prepare (all-to-all broadcast)
+        B->>C: Create{Vote phase=prepare seq=1}
+        C->>B: Create{Vote phase=prepare seq=1}
+        D->>B: Create{Vote phase=prepare seq=1, value=X}
+        D->>C: Create{Vote phase=prepare seq=1, value=Y}
+    end
+
+    Note over B,C: D told B 'X' and C 'Y' for the same (round, seq=1) - equivocation
+
+    B->>C: anti-entropy exchange of observedVotes sets
+    Note over B,C: cross-check finds two signed D-votes, same seqNo, different hash
+
+    B-->>D: Announce{afp:EquivocationProof}
+    C-->>D: Announce{afp:EquivocationProof}
+    Note over B,C: D's weight zeroed; instance-level consequence goes to hub governance
+
+    par commit (honest replicas only)
+        B->>C: Create{Vote phase=commit seq=2}
+        C->>B: Create{Vote phase=commit seq=2}
+    end
+
+    Note over P,D: only 2 honest votes, 3 needed - round times out
+    Note over P,D: fallback: highest-reputation live replica issues a fresh round
+          </pre>
+        </div>
+      </section>
+
+      <section id="crdt">
+        <div class="sec-head"><span class="num">11</span><h2>Shared state as CRDTs</h2><span class="rev-chip">Hub-scoped in v3</span></div>
+        <p>Explicit state types with defined merge rules. In v3 <strong>every store is keyed <code>(hubId, crdtType)</code></strong> — there is no global registry.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>State (per hub)</th><th>CRDT</th><th>Merge rule</th></tr></thead>
+            <tbody>
+              <tr><td>Capability registry</td><td><code>OR-Map&lt;agentId, OR-Set&lt;capability&gt;&gt;</code></td><td>add/remove-wins via unique tags + tombstones</td></tr>
+              <tr><td>Agent liveness / load</td><td><code>LWW-Register</code> of <code>{status, load, lastSeen}</code></td><td>highest timestamp wins, nodeId tiebreak</td></tr>
+              <tr><td>Membership</td><td><code>OR-Set&lt;AgentRef&gt;</code> (+ join epoch)</td><td>set union; suspected-flag, not removal, on staleness (&sect;13)</td></tr>
+              <tr><td>Vote tallies (L0) / vote receipts (L1)</td><td><code>G-Counter</code> / <code>G-Set</code> of signed receipts</td><td>monotonic sum / set union</td></tr>
+              <tr><td>Reputation inputs</td><td><code>G-Set</code> of signed events (completions, strikes)</td><td>set union; score derived locally</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>Every mutation travels as <code>Update{afp:CRDTDelta}</code> with a required <code>afp:hub</code> field. CRDT merges are commutative, associative, idempotent — receivers apply deltas on arrival with no ordering requirement, and duplicates are free. This eliminates reordering as a concern for this entire state class; task execution, which has real side effects, uses causal ordering (&sect;14) instead.</p>
+        <div class="snippet">
+          <figcaption>Capability-registry delta, hub-scoped</figcaption>
+          <pre><code>{
+  "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+  "id": "https://alpha.operator.example/activities/delta-33ab",
+  "type": "Update",
+  "actor": "https://alpha.operator.example/agents/a1",
+  "to": ["https://hub.consortium.example/actor"],
+  "object": {
+    "type": "afp:CRDTDelta",
+    "afp:hub": "https://hub.consortium.example/actor",
+    "afp:crdtId": "capability-registry",
+    "afp:crdtType": "OR_MAP",
+    "afp:delta": {
+      "key": "https://alpha.operator.example/agents/a1",
+      "fieldType": "OR_SET",
+      "adds": [{ "element": "afp:cap:image-classification", "tag": "a1-1737000242-14" }],
+      "removes": [{ "element": "afp:cap:translation-en-da", "tombstoneTags": ["a1-1736990001-9"] }]
+    }
+  },
+  "published": "2026-08-16T10:04:05Z"
+}</code></pre>
+        </div>
+      </section>
+
+      <section id="gossip">
+        <div class="sec-head"><span class="num">12</span><h2>Gossip &amp; anti-entropy</h2><span class="rev-chip">Hub-relayed in v3</span></div>
+        <p>Anti-entropy keeps hub-scoped CRDT state converged: periodically exchange a digest — a Merkle root over local state (large/many-key state) or a version vector of per-actor delta counts (small state) — via <code>Offer{afp:Digest}</code>; the receiver pulls only what it's missing via <code>Accept{afp:StateDeltas}</code>. Urgent changes (an agent going offline) push immediately with decaying-fanout rumor spreading instead of waiting for the next pull cycle.</p>
+        <div class="note"><strong>v3 reality check: NAT and firewalls.</strong> v2's &ldquo;pick k random peers and gossip directly&rdquo; assumed same-operator reachability. Cross-operator instances typically sit behind their own NAT/firewall with no open inbound path to each other. So across instance boundaries the <strong>default is hub-relayed delta exchange</strong> — the hub is always-reachable by construction — with direct instance-to-instance gossip as an opt-in fallback once a <code>FederationAgreement</code> confirms mutual reachability. Within one operator's own fleet, direct gossip remains the default.</div>
+        <div class="snippet">
+          <figcaption>Digest exchange (reply: Accept with afp:StateDeltas — empty if converged)</figcaption>
+          <pre><code>{
+  "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+  "id": "https://alpha.operator.example/activities/digest-77e1",
+  "type": "Offer",
+  "actor": "https://alpha.operator.example/actor",
+  "to": ["https://hub.consortium.example/actor"],
+  "object": {
+    "type": "afp:Digest",
+    "afp:hub": "https://hub.consortium.example/actor",
+    "afp:merkleRoot": "sha256:c1a9...774e",
+    "afp:versionVector": {
+      "https://alpha.operator.example/agents/a1": 41,
+      "https://beta.operator.example/agents/b1": 19
+    }
+  },
+  "published": "2026-08-16T10:05:00Z"
+}</code></pre>
+        </div>
+      </section>
+
+      <section id="membership">
+        <div class="sec-head"><span class="num">13</span><h2>Membership &amp; dynamic quorum</h2></div>
+        <p>Hub membership is an explicit <code>OR-Set&lt;AgentRef&gt;</code> (join-epoch tagged), fed by enrollment (&sect;05): <strong>join</strong> = instance <code>Follow</code> + <code>afp:Enroll</code>; <strong>leave</strong> = <code>afp:Unenroll</code> / <code>Undo{Follow}</code>; <strong>failure</strong> = gossip heartbeat staleness marks an agent <em>suspected</em> without removing it — excluded from live-weight calculations, retained for accountability.</p>
+        <ul>
+          <li><strong>Byzantine minimum</strong> — <code>floor(2n/3) + 1</code> over live weighted membership, for L1 rounds.</li>
+          <li><strong>Partition-aware minimum</strong> — <code>floor((n &minus; maxExpectedPartitionSize)/2) + 1</code> for L0, from recent connectivity/staleness observations.</li>
+          <li><strong>Weight, not headcount</strong> — vote weight derives from liveness plus hub-scoped reputation (&sect;04); quorum is a weight-sum threshold.</li>
+        </ul>
+        <p><strong>Snapshot-pinning.</strong> At round start the proposer hashes the merged membership CRDT and embeds it (<code>afp:quorumSnapshot</code>) plus the explicit voter list in the proposal. Votes are validated against the pinned set: an agent enrolled <em>after</em> round start simply isn't in it. This closes late-join tally skew and the mid-round Sybil attack — and in the multi-operator setting it's what stops an operator from bulk-enrolling agents mid-vote to swing a governance decision, which is why it moves forward to P3/P4 in the roadmap.</p>
+      </section>
+
+      <section id="causal">
+        <div class="sec-head"><span class="num">14</span><h2>Causal ordering</h2></div>
+        <p>For multi-step workflows whose intermediate updates mutate side-effecting state (unlike CRDT state), <code>correlationId</code> alone can't express &ldquo;step 3 depends on step 2.&rdquo; Opt-in causal metadata: <code>afp:seq</code> (monotonic per-actor) and/or <code>afp:vclock</code> (map of <code>actorId &rarr; seq</code>). Receivers run a causal tracker: deliverable when the origin's <code>seq</code> is exactly last-seen + 1 and no vclock entry exceeds what's been seen; gapped activities buffer (bounded, with timeout) until the predecessor arrives or is pulled explicitly via the &sect;12 mechanism. Plain two-hop delegation never pays this cost.</p>
+      </section>
+
+      <section id="contribution">
+        <div class="sec-head"><span class="num">15</span><h2>Contribution accounting</h2><span class="rev-chip">New in v3</span></div>
+        <p>The ledger is what already exists: signed <code>Result</code> activities in operator outboxes, plus L1 commit certificates (&sect;10) proving a Result was <em>accepted by quorum</em>, not merely claimed. Together: tamper-evident evidence of &ldquo;did the work, and it was accepted&rdquo; — per operator, per hub, per capability — with no token anywhere.</p>
+        <p><strong><code>afp:ContributionSummary</code></strong> is a periodic, hub-scoped roll-up — deliberately <em>not</em> hub-computed-and-authoritative. It's fully derived from public signed data, so any member can recompute it independently; <code>afp:computedBy</code> is a field, not a privileged role:</p>
+        <div class="snippet">
+          <pre><code>{
+  "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+  "id": "https://hub.consortium.example/summaries/2026-w33",
+  "type": "afp:ContributionSummary",
+  "afp:hub": "https://hub.consortium.example/actor",
+  "afp:period": { "start": "2026-08-10T00:00:00Z", "end": "2026-08-16T00:00:00Z" },
+  "afp:computedBy": "https://gamma.operator.example/actor",
+  "afp:entries": [
+    { "afp:operator": "https://alpha.operator.example/actor", "afp:tasksCompleted": 14,
+      "afp:byCapability": { "afp:cap:image-classification": 9, "afp:cap:translation-en-da": 5 },
+      "afp:evidence": ["https://alpha.operator.example/outbox/result-101#l1-cert",
+                        "https://alpha.operator.example/outbox/result-108#l1-cert"] },
+    { "afp:operator": "https://beta.operator.example/actor", "afp:tasksCompleted": 9,
+      "afp:byCapability": { "afp:cap:image-classification": 9 },
+      "afp:evidence": ["https://beta.operator.example/outbox/result-77#l1-cert"] }
+  ],
+  "afp:inputHash": "sha256-4b2e...",
+  "signature": { "type": "Ed25519Signature2020", "proofValue": "..." }
+}</code></pre>
+        </div>
+        <p><strong>Disputes.</strong> <code>afp:ContributionDispute{summaryId, evidence}</code> is usually mechanical — &ldquo;you omitted this outbox entry&rdquo; is re-checkable by anyone recomputing over the same public inputs, resolved by republishing a corrected summary. Genuinely contested cases (did a Result meet the quality bar?) escalate to an <code>afp:GovernanceDecision</code> vote, the same path as equivocation.</p>
+        <div class="note"><strong>Explicitly out of scope:</strong> pricing, payment, settlement, exchange rates, any transferable token or credit. The summary is a reputation/accounting artifact; what operators do with it off-protocol — billing arrangements, business terms — sits outside the protocol boundary by design.</div>
+      </section>
+
+      <section id="reliability">
+        <div class="sec-head"><span class="num">16</span><h2>Reliability &amp; failure handling</h2></div>
+        <p>ActivityPub delivery is fire-and-forget HTTP POST: a 2xx means &ldquo;I accepted the bytes,&rdquo; nothing more. Every gap is compensated explicitly:</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Concern</th><th>What ActivityPub gives you</th><th>Compensation</th></tr></thead>
+            <tbody>
+              <tr><td>Delivery retries</td><td>Nothing built-in</td><td>Per-instance outbox queue: exponential backoff, dead-letter after N attempts, failures surface as local <code>Error</code>s — never silently dropped</td></tr>
+              <tr><td>Idempotency</td><td>Stable activity <code>id</code></td><td>Inbox dedupe on <code>id</code> (short-TTL store); CRDT deltas idempotent by construction</td></tr>
+              <tr><td>Out-of-order delivery</td><td>None</td><td>Three tiers by state class: CRDT state merges in any order (&sect;11); simple workflows key by <code>correlationId</code>; causal workflows buffer via <code>afp:seq</code>/<code>afp:vclock</code> (&sect;14)</td></tr>
+              <tr><td>Timeouts / no response</td><td>&ldquo;Thinking&rdquo; and &ldquo;dead&rdquo; look identical</td><td><code>Task</code> deadlines + delegator-side timers; liveness suspicion via heartbeat staleness (&sect;13); bid re-auction (&sect;09)</td></tr>
+              <tr><td>Backpressure</td><td>None</td><td>Capacity advertised in capability registry; free <code>Reject</code> when saturated; senders back off on <code>429</code>/<code>503</code>; instance-level outbound rate limits (&sect;03)</td></tr>
+              <tr><td>Duplicate execution</td><td>None</td><td>Globally-unique <code>correlationId</code>; an agent already holding it replays its cached <code>Result</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>Overarching principle: treat every inbox POST as a <strong>hint</strong>, and build every coordination state machine idempotent, order-tolerant, and timeout-driven.</p>
+      </section>
+
+      <section id="security">
+        <div class="sec-head"><span class="num">17</span><h2>Security &amp; trust</h2></div>
+        <ul>
+          <li><strong>HTTP Signature verification is mandatory</strong> on every inbox POST — unsigned or invalid activities are audit-logged and dropped, never processed.</li>
+          <li><strong>The two-tier gate</strong> (&sect;04) runs on every task-relevant activity: FederationAgreement &rarr; deny-list &rarr; roster/MembershipProof as hard gates, reputation as a soft weight.</li>
+          <li><strong>Payload integrity across relays</strong> — everything routed through a hub needs Linked Data Signatures / Object Integrity Proofs on the object itself; the HTTP-layer signature only authenticates the relaying hop. Required from roadmap P3 onward.</li>
+          <li><strong>Byzantine accountability</strong> — equivocation is cryptographically provable (&sect;10); agent-level weight-zeroing is automatic, instance-level consequences are governance decisions (&sect;04); snapshot-pinned membership blocks mid-round Sybil enrollment (&sect;13).</li>
+          <li><strong>Rate limiting</strong> per sending instance and per agent at the inbox, independent of application-level backpressure — abuse control, not congestion control.</li>
+          <li><strong>Sandboxing untrusted results</strong> — a task done by another operator's agent ran attacker-controllable instructions in <em>their</em> environment; sandbox the <em>result</em>: checksum verification, content-type sniffing, size limits, isolated execution of anything fetched, before trusting a <code>Result.attachment</code>.</li>
+          <li><strong>Key compromise</strong> — immediate rotation + <code>Update</code> of the actor document; stale cached keys beyond a short TTL are re-fetched before high-value operations. Instance-custodied fleets rotate centrally (&sect;03).</li>
+        </ul>
+      </section>
+
+      <section id="topology">
+        <div class="sec-head"><span class="num">18</span><h2>Deployment topology</h2><span class="rev-chip">Revised</span></div>
+        <p>Three operator instances, one problem hub. Dotted edges are the trust boundary — <code>FederationAgreement</code>s established once, out of band from any task. Solid numbered edges are the message path of one competitively-allocated task.</p>
+        <div class="mermaid-wrap">
+          <pre class="mermaid">
+flowchart TB
+    subgraph InstA["Instance A — Operator Alpha (afp:Instance)"]
+        A1[Agent A1]
+        A2[Agent A2]
+    end
+    subgraph InstB["Instance B — Operator Beta (afp:Instance)"]
+        B1[Agent B1]
+        B2[Agent B2]
+    end
+    subgraph InstC["Instance C — Operator Gamma (afp:Instance)"]
+        C1[Agent C1]
+    end
+
+    Hub{{"Hub H (afp:Hub) - problem-scoped CRDT + relay"}}
+
+    InstA -. FederationAgreement .- Hub
+    InstB -. FederationAgreement .- Hub
+    InstC -. FederationAgreement .- Hub
+
+    A1 -->|"1: Announce(Task)"| Hub
+    Hub -->|"1: relay"| B1
+    Hub -->|"1: relay"| C1
+    B1 -->|"2: BidCommit / BidReveal"| Hub
+    C1 -->|"2: BidCommit / BidReveal"| Hub
+    Hub -->|"3: Award to B1"| A1
+    Hub -->|"3: Award to B1"| B1
+    B1 -->|"4: Accept"| A1
+    B1 -->|"5: Create(Result)"| A1
+          </pre>
+        </div>
+        <p>Note steps 4&ndash;5: once awarded, the actual work exchange is <em>direct</em> instance-to-instance — the hub brokered discovery and allocation but sits on neither the task payload path nor the result path. Hub downtime stalls new allocation, never in-flight work.</p>
+      </section>
+
+      <section id="profiles">
+        <div class="sec-head"><span class="num">19</span><h2>Deployment profiles</h2><span class="rev-chip">New in v3</span></div>
+        <p>Two supported profiles, one architecture. The protocol is designed so that the solo profile is a <em>degenerate case</em> of the federated one — never a fork.</p>
+        <h3>Federated consortium (the default story)</h3>
+        <p>Multiple operator instances, bilateral <code>FederationAgreement</code>s, shared problem-scoped hubs — everything in this spec, phases P1&ndash;P6.</p>
+        <h3>Solo / airgapped: the consortium of one</h3>
+        <p>A solo operator hosting an airgapped deployment runs <strong>a local <code>afp:Instance</code> and one or more local <code>afp:Hub</code>s, co-located</strong> — same server, typically the same process: the hub is a route (<code>/hub/*</code>) mounted next to the agent actors (<code>/agents/*</code>), not a second system.</p>
+        <ul>
+          <li><strong>The hub is nearly free</strong> — just another actor (inbox, outbox, CRDT store) sharing the deployment's existing delivery queue and state store.</li>
+          <li><strong>Uniform code paths — the real payoff.</strong> Agents discover via the hub roster, publish capabilities into hub-scoped CRDTs, optionally allocate via announce/bid/award — <em>identically</em> to the federated case. Joining a consortium later is purely additive: sign a <code>FederationAgreement</code>, enroll a subset of agents in a remote hub alongside the local one. No federation refactor, ever.</li>
+          <li><strong>Problem-scoping is useful solo.</strong> Three concurrent problems &rarr; three local hubs: separated state, per-problem enrollment, per-problem contribution summaries. Hubs are an <em>organizational</em> unit that happens to also be the federation unit.</li>
+          <li><strong>Local bidding is real load balancing.</strong> When several local agents share a capability, announce/bid/award against the local hub is a scheduler — estimate-vs-actual feedback tunes selection over time.</li>
+        </ul>
+        <h3>Degenerate simplifications (dropped, not forked)</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Mechanism</th><th>Federated</th><th>Solo / airgapped</th></tr></thead>
+            <tbody>
+              <tr><td><code>FederationAgreement</code></td><td>Required, bilateral, deny-by-default</td><td>None — the trust gate short-circuits on <code>operatedBy == self</code>; do <strong>not</strong> model a self-agreement</td></tr>
+              <tr><td>L1 Byzantine voting</td><td>Triggered at &ge;2 operators in a hub</td><td>Skipped — one trust domain means equivocation defense defends against yourself. Stay at L0; governance quorum-of-one auto-passes</td></tr>
+              <tr><td>LD-Signatures on relayed payloads</td><td>Required from P3</td><td>Skipped — the relay is you</td></tr>
+              <tr><td>DNS / TLS</td><td>Public DNS, public CA</td><td>Internal DNS, private CA — or plain HTTP inside the gap</td></tr>
+              <tr><td>HTTP Signatures + signed outboxes</td><td>Required</td><td><strong>Keep</strong> — the one thing an airgapped deployment must not drop (below)</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>Keep signing everything — the sneakernet property</h3>
+        <p>AFP's data model is signed, immutable, self-contained activities: nothing in the verification path requires the network that delivered the bytes. Keeping HTTP Signatures and signed outboxes inside the airgap buys two things:</p>
+        <ul>
+          <li><strong>Reconnection with evidence intact</strong> — an airgapped instance that later joins a consortium presents its signed outbox history and certificates; contribution evidence survives the gap.</li>
+          <li><strong>Sneakernet federation</strong> — two airgapped sites can federate <em>offline</em>: periodically export signed outbox bundles + CRDT deltas to removable media, import and verify on the other side. CRDT merges are order-tolerant and idempotent, so batch import just works; direct task delegation across the gap degrades to the physical exchange cadence, with <code>Task</code> deadlines sized accordingly.</li>
+        </ul>
+        <h3>Profile &rarr; phase mapping</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Profile</th><th>Phases</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Solo / airgapped</strong></td><td>P1 + the hub machinery from P3 (local-only — no LD-Sigs, no hub-relay concerns) + optionally P5 bidding. Skip P2 and P4 entirely.</td></tr>
+              <tr><td><strong>Federated consortium</strong></td><td>P1 &rarr; P6 in order.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>The hub machinery has <strong>no federation dependency</strong> — a solo deployment can adopt it immediately after P1. Only P3's cross-boundary parts (LD-Signatures, hub-relayed state sync) and P2/P4 are federation-specific.</p>
+      </section>
+
+      <section id="mastodon">
+        <div class="sec-head"><span class="num">20</span><h2>Mastodon interop</h2><span class="rev-chip">New in v3</span></div>
+        <p><strong>Operator requirement:</strong> operators want to partake and watch what is happening using <em>standard Mastodon</em> — their normal account, their normal client. That's exactly the payoff of building on ActivityPub, and it works — with one honest constraint up front.</p>
+        <div class="note"><strong>Constraint —</strong> a stock Mastodon server cannot <em>be</em> an <code>afp:Instance</code>. Mastodon's inbox pipeline recognizes a fixed set of activity/object types (<code>Create{Note}</code>, <code>Announce</code>, <code>Follow</code>, &hellip;) and silently drops everything else: <code>afp:Task</code>, <code>afp:Bid</code>, <code>afp:CRDTDelta</code>, signed rosters — none of it would survive transit through vanilla Mastodon. So Mastodon is the <strong>window onto</strong> the mesh, not the machine endpoint.</div>
+        <h3>Dual-publish: the shadow timeline</h3>
+        <p>The AFP instance already speaks real ActivityPub — actor documents, WebFinger, HTTP-Signed delivery. That means <strong>any Mastodon user can <code>Follow</code> an AFP agent directly</strong>, no Mastodon server on the operator side required. To make that worth following, every agent dual-publishes:</p>
+        <ul>
+          <li><strong>Machine path (unchanged):</strong> the typed <code>afp:*</code> activities to peer agents, hubs, and instances.</li>
+          <li><strong>Human path:</strong> for each significant event, an accompanying standard <code>Create{Note}</code> to the agent's <code>followers</code> — a human-readable summary (&ldquo;&#127881; Won bid for task-42 (image-classification) — est. 4m&rdquo;), a hashtag per hub (<code>#hub-consortium</code>), and a <code>Link</code> attachment pointing at the machine-readable activity for anyone who wants to drill down.</li>
+        </ul>
+        <p>Mastodon renders these Notes natively: an operator follows their own agents (and, federation agreements permitting, other operators' agents), and their home timeline becomes a live view of the mesh. The hub actor dual-publishes too — announcements, awards, governance outcomes — so following the hub is following the <em>problem</em>.</p>
+        <h3>Participation inbound</h3>
+        <p>Mentions and replies from a Mastodon account arrive in the agent's AFP inbox as ordinary <code>Create{Note}</code> — which the instance <em>can</em> parse. Map a small command grammar onto it: <code>@agent-a1 pause</code>, <code>@agent-a1 status</code>, a reply of &ldquo;approve&rdquo; on a governance Note. Authorization is explicit, not inferred: the instance's <code>afp:policy</code> document lists which Mastodon accounts are authorized controllers (verified via the Note's HTTP-Signed origin, optionally bound bidirectionally with <code>alsoKnownAs</code> links between the operator's Mastodon account and the instance actor). Unauthorized mentions get at most a polite read-only reply — command parsing from arbitrary fediverse strangers is an injection surface, treated as such.</p>
+        <h3>What maps neatly, what doesn't</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Mastodon concept</th><th>AFP concept</th><th>Fit</th></tr></thead>
+            <tbody>
+              <tr><td>Bot account, server holds the keys</td><td><code>afp:keyCustody: "instance"</code></td><td>Same custody model — the roster entry mode was designed to mirror it</td></tr>
+              <tr><td>Boost (<code>Announce</code>)</td><td>Hub fan-out relay</td><td>Identical mechanism, reused as-is</td></tr>
+              <tr><td>Domain block / defederation</td><td><code>afp:Defederate</code> + deny-list</td><td>Same shape; AFP inverts the default (deny until agreement)</td></tr>
+              <tr><td>Following a hashtag / account</td><td>Watching a hub or agent</td><td>Direct — the shadow timeline exists for this</td></tr>
+              <tr><td>Posting a status</td><td>Delegating a task, casting a vote</td><td><strong>Doesn't map</strong> — typed activities can't be expressed as Notes without lossy encoding; commands are the deliberate, narrow exception</td></tr>
+              <tr><td>Running agents <em>as</em> Mastodon accounts</td><td>Being an <code>afp:Instance</code></td><td><strong>Doesn't work</strong> — custom types dropped, no roster, no CRDT state, no commit-reveal. A sidecar bridging Mastodon's streaming API could fake it, but at that point the sidecar <em>is</em> an AFP instance with extra steps</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="note"><strong>Roadmap placement —</strong> dual-publish Notes are cheap (a formatting layer over the existing outbox) and deliver operator visibility from the first federated phase: emit them from <strong>P2</strong> onward. Inbound command mapping is a small, security-sensitive addition — schedule it with P3's hub work, where governance Notes first appear.</div>
+      </section>
+
+      <section id="stack">
+        <div class="sec-head"><span class="num">21</span><h2>Tech stack suggestion</h2></div>
+        <p>Any HTTP framework works — the protocol is signed JSON-LD over HTTPS. Keep the actor/inbox/outbox layer a thin shim independent of each agent's actual &ldquo;brain&rdquo;; the instance is naturally one deployable unit (server + delivery queue + key store) hosting many agent actor paths.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Concern</th><th>Node / TS</th><th>Python</th><th>Notes</th></tr></thead>
+            <tbody>
+              <tr><td>HTTP server</td><td>Fastify or Hono</td><td>FastAPI</td><td>Actor <code>GET</code>s, inbox <code>POST</code>s, outbox <code>GET</code>s, WebFinger, roster, policy doc</td></tr>
+              <tr><td>HTTP Signatures</td><td><code>http-signature</code> or a thin RFC&nbsp;9421 signer</td><td><code>http-message-signatures</code></td><td>Small enough to hand-roll if needed</td></tr>
+              <tr><td>Object integrity / LD-Sig</td><td>Ed25519Signature2020 suite</td><td>same</td><td>Required from P3 (anything hub-relayed)</td></tr>
+              <tr><td>JSON-LD</td><td><code>jsonld.js</code> if needed</td><td><code>pyld</code></td><td>Fixed-shape JSON in practice, like most Fediverse implementations</td></tr>
+              <tr><td>CRDT library</td><td>Automerge / Yjs, or hand-rolled OR-Set/LWW</td><td><code>py-crdt</code> or hand-rolled</td><td>Delta shapes in &sect;11 are library-agnostic</td></tr>
+              <tr><td>Delivery queue</td><td>BullMQ or a Postgres job table</td><td>Celery or RQ</td><td>Per instance, not per agent; must survive restarts</td></tr>
+              <tr><td>State store</td><td>Postgres / SQLite</td><td>same</td><td><code>(hubId, crdtType)</code>-keyed CRDT snapshots, correlation tables, dedupe, roster</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="roadmap">
+        <div class="sec-head"><span class="num">22</span><h2>Phased roadmap</h2><span class="rev-chip">Re-sequenced</span></div>
+        <p>Cross-trust-boundary operation is the point, so what v2 deferred moves forward — while P1 preserves a cheap single-operator on-ramp: one instance must be useful alone, or nobody deploys the first one. The phases assume the federated profile; the solo/airgapped profile cherry-picks P1 + P3's hub machinery (which has no federation dependency and may be pulled forward) + optionally P5, skipping P2 and P4 entirely (&sect;19).</p>
+        <ol class="phases">
+          <li class="phase">
+            <p class="tag">Phase 1</p>
+            <h3>Single instance, solo tasks</h3>
+            <p>v1 core unchanged: actor docs, <code>Offer/Accept/Result</code>, HTTP-Sig, outbox retry/dedupe. A single instance skips federation entirely — static config, no agreements needed.</p>
+            <p class="deliverable"><strong>Demo —</strong> one instance completing tasks solo.</p>
+          </li>
+          <li class="phase">
+            <p class="tag">Phase 2</p>
+            <h3>Instance identity &amp; federation handshake</h3>
+            <p><code>afp:Instance</code>, <code>afp:operatedBy</code>, signed roster, <code>MembershipProof</code>, the <code>FederationAgreement</code> offer/countersign flow — plus dual-publish shadow Notes (&sect;20), so operator visibility via Mastodon exists from the first federated phase.</p>
+            <p class="deliverable"><strong>Demo —</strong> two instances mutually recognizing each other; an operator follows an agent from a standard Mastodon account and sees its activity Notes.</p>
+          </li>
+          <li class="phase">
+            <p class="tag">Phase 3</p>
+            <h3>Hubs, enrollment &amp; hub-scoped state</h3>
+            <p><code>afp:Hub</code>, two-level enrollment, hub-scoped CRDTs (<code>afp:hub</code> field), and LD-Signatures on relayed payloads — moved up, needed the moment anything crosses a trust boundary. Cross-instance state sync defaults to hub-relayed digest exchange (NAT reality, &sect;12). Inbound Mastodon command mapping lands here too.</p>
+            <p class="deliverable"><strong>Demo —</strong> two instances' agents seeing each other's capabilities via a shared hub.</p>
+          </li>
+          <li class="phase">
+            <p class="tag">Phase 4</p>
+            <h3>L1 Byzantine voting</h3>
+            <p>Chained signed votes, equivocation proofs, snapshot-pinned membership — activated by the concrete policy trigger <strong>&ldquo;&ge;2 operators live in a hub,&rdquo;</strong> not &ldquo;maybe someday.&rdquo; Single-operator fleets may still stop before P4, as v2 allowed.</p>
+            <p class="deliverable"><strong>Demo —</strong> a 3-instance hub surviving a deliberately equivocating agent.</p>
+          </li>
+          <li class="phase">
+            <p class="tag">Phase 5</p>
+            <h3>Competitive bidding</h3>
+            <p><code>afp:Bid</code> activation: commit-reveal windows, <code>Award</code>, <code>Reauction</code>, estimate-vs-actual reputation feedback.</p>
+            <p class="deliverable"><strong>Demo —</strong> an announced task competitively bid and awarded across instances.</p>
+          </li>
+          <li class="phase">
+            <p class="tag">Phase 6</p>
+            <h3>Contribution accounting</h3>
+            <p><code>afp:ContributionSummary</code> + dispute flow — naturally last, since it depends on P4's L1 certificates and P1's Result flow.</p>
+            <p class="deliverable"><strong>Demo —</strong> an independently recomputed, agreeing <code>ContributionSummary</code>.</p>
+          </li>
+        </ol>
+      </section>
+
+      <section id="open">
+        <div class="sec-head"><span class="num">23</span><h2>Open questions</h2></div>
+        <ul>
+          <li><strong>Directory-of-hubs bootstrap.</strong> Left as an out-of-band, consortium-published list at a well-known URL. Hubs churn far less than agents, so a hand-maintained list suffices; revisit (a lightweight meta-hub?) only if concurrent hub count grows past a handful. Don't design it before there's evidence of the need.</li>
+          <li><strong>Cross-instance bid collusion.</strong> Commit-reveal stops a single dishonest bidder from sniping off visible bids, but cannot detect two instances coordinating bids out-of-band before submission. That's a consortium-terms/policy matter — who you agree to federate with in the first place — not something the protocol can enforce cryptographically. Stated here rather than glossed over.</li>
+        </ul>
+      </section>
+
+      <footer class="colophon">
+        Revision 3 — multi-operator federation: operator instances, two-tier trust, problem-scoped hubs, competitive bidding, contribution accounting, deployment profiles, and Mastodon interop. Consensus/state/gossip hardening carried from Revision 2, drawn from this repo's coordination designs (<code>.claude/agents/consensus/</code>: <code>byzantine-coordinator.md</code>, <code>crdt-synchronizer.md</code>, <code>gossip-coordinator.md</code>, <code>quorum-manager.md</code>). ActivityPub types per the W3C ActivityStreams 2.0 vocabulary; all <code>afp:</code> terms are this design's own <code>@context</code> extension, not part of the standard.
+      </footer>
+    </main>
+  </div>
+</div>
