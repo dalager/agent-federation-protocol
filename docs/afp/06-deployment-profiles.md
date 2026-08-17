@@ -54,6 +54,12 @@ and signed outboxes inside the airgap therefore buys two things:
    other side. CRDT merges are order-tolerant and idempotent, so batch import "just works";
    direct task delegation across the gap degrades to whatever the physical exchange cadence
    allows, with `Task` deadlines sized accordingly.
+3. **Audit-grade anchoring.** Chained outbox logs (`afp:prevActivity`, see
+   [04 — Audit & provenance](04-operations.md#audit--provenance)) protect against bugs and
+   accidental corruption — but a solo operator holds every key and store, so history is
+   not tamper-evident *against yourself*. For audit-grade deployments, periodically anchor
+   chain heads outside the trust domain: write-once media, a timestamping service, or
+   shadow Notes (carrying the chain-head hash) federated to an external Mastodon server.
 
 ### Profile → phase mapping
 

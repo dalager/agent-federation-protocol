@@ -69,6 +69,8 @@ failure — the typed-outcome objects AS2 lacks.
 | `afp:reputation` | Property (hub-scoped, per agent) | Running score from completions, estimate accuracy, voting integrity |
 | `afp:ContributionSummary` | Object | Periodic, independently-recomputable per-operator contribution roll-up |
 | `afp:ContributionDispute` | Activity | Challenge to a ContributionSummary, with evidence |
+| `afp:DecisionRecord` | Object (in `Create`) | First-class outcome record closing every voting round: outcome, snapshot hash, counted-vote hashes, weight tally |
+| `afp:prevActivity` | Property (any activity) | Optional per-actor outbox hash chain — makes logs append-only-verifiable |
 
 ## Coordination patterns
 
@@ -101,12 +103,15 @@ members merge the delta into their (hubId)-scoped CRDT capability registry
 proposer --Offer{Proposal}--> pinned voter set (membership snapshot)
 each voter --Create{Vote}--> all peers (mesh)
 each participant tallies locally; weighted quorum --> proceed
+quorum reached --> proposer emits Create{afp:DecisionRecord}   (see 04 — Audit & provenance)
 timeout without quorum --> Undo{Vote} / abandon round
 ```
 
 Default consensus level — eventually-consistent, reorder-tolerant, not linearizable;
 adequate *within* one operator's trust boundary. Any round whose voters span two or more
-operators should run Level 1 — a concrete policy trigger, not a maybe.
+operators should run Level 1 — a concrete policy trigger, not a maybe. **Every round —
+either level — closes with an `afp:DecisionRecord`** so the outcome is a recorded,
+verifiable artifact, not merely a derivable one (see 04 — Audit & provenance).
 
 ### 8d — Hub fan-out broadcast
 
@@ -239,7 +244,8 @@ time, and this transport has no delivery acks at all.
 **Threshold signatures (optional):** 2f+1 commit votes can be aggregated into one compact
 commit certificate — worth adding only once L1 is load-bearing; start with the bundle of n
 signed votes. These certificates are also the evidence backbone for contribution accounting
-and governance decisions.
+and governance decisions. Either way, the round closes with an `afp:DecisionRecord` that
+embeds or references the certificate (see 04 — Audit & provenance).
 
 ### A Byzantine-hardened voting round
 

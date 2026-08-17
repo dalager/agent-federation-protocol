@@ -307,14 +307,15 @@
         <li><a href="#membership"><span class="num">13</span><span>Membership &amp; quorum</span></a></li>
         <li><a href="#causal"><span class="num">14</span><span>Causal ordering</span></a></li>
         <li><a href="#contribution"><span class="num">15</span><span>Contribution accounting</span></a></li>
-        <li><a href="#reliability"><span class="num">16</span><span>Reliability &amp; failure</span></a></li>
-        <li><a href="#security"><span class="num">17</span><span>Security &amp; trust</span></a></li>
-        <li><a href="#topology"><span class="num">18</span><span>Deployment topology</span></a></li>
-        <li><a href="#profiles"><span class="num">19</span><span>Deployment profiles</span></a></li>
-        <li><a href="#mastodon"><span class="num">20</span><span>Mastodon interop</span></a></li>
-        <li><a href="#stack"><span class="num">21</span><span>Tech stack</span></a></li>
-        <li><a href="#roadmap"><span class="num">22</span><span>Phased roadmap</span></a></li>
-        <li><a href="#open"><span class="num">23</span><span>Open questions</span></a></li>
+        <li><a href="#audit"><span class="num">16</span><span>Audit &amp; provenance</span></a></li>
+        <li><a href="#reliability"><span class="num">17</span><span>Reliability &amp; failure</span></a></li>
+        <li><a href="#security"><span class="num">18</span><span>Security &amp; trust</span></a></li>
+        <li><a href="#topology"><span class="num">19</span><span>Deployment topology</span></a></li>
+        <li><a href="#profiles"><span class="num">20</span><span>Deployment profiles</span></a></li>
+        <li><a href="#mastodon"><span class="num">21</span><span>Mastodon interop</span></a></li>
+        <li><a href="#stack"><span class="num">22</span><span>Tech stack</span></a></li>
+        <li><a href="#roadmap"><span class="num">23</span><span>Phased roadmap</span></a></li>
+        <li><a href="#open"><span class="num">24</span><span>Open questions</span></a></li>
       </ol>
     </nav>
 
@@ -334,7 +335,8 @@
               <tr><td>7</td><td>Roadmap re-sequenced (now P1&ndash;P6): instance identity, two-tier trust, LD-Signatures, snapshot-pinned membership move to P2/P3; L1 Byzantine voting triggers at &ldquo;&ge;2 operators live&rdquo;</td><td>Cross-trust-boundary operation is now the central case, not edge hardening</td></tr>
               <tr><td>8</td><td>Directory actor narrowed further: per-hub discovery is the hub's own roster; only a thin directory-of-hubs bootstrap remains (open)</td><td>Multi-hub topology changes what &ldquo;directory&rdquo; even means</td></tr>
               <tr><td>9</td><td><code>afp:keyCustody: "instance" | "self"</code> on each roster entry</td><td>Large fleets shouldn't have to rotate N keys; instance-custodied signing must stay individually accountable</td></tr>
-              <tr><td>10</td><td>Deployment profiles (&sect;19): solo/airgapped = local instance + co-located local hub — &ldquo;the consortium of one&rdquo; — with degenerate simplifications and sneakernet federation</td><td>AFP must bring value to a solo operator hosting an airgapped instance, as a degenerate case of the same architecture, never a fork</td></tr>
+              <tr><td>10</td><td>Deployment profiles (&sect;20): solo/airgapped = local instance + co-located local hub — &ldquo;the consortium of one&rdquo; — with degenerate simplifications and sneakernet federation</td><td>AFP must bring value to a solo operator hosting an airgapped instance, as a degenerate case of the same architecture, never a fork</td></tr>
+              <tr><td>11</td><td>Audit &amp; provenance (&sect;16): <code>afp:DecisionRecord</code> closes every voting round, optional <code>afp:prevActivity</code> outbox hash chain + external anchoring, rationale-externalization convention</td><td>Spec-testing the 30-agent policy scenario showed the outcome was derivable but never recorded, and log completeness wasn't tamper-evident</td></tr>
             </tbody>
           </table>
         </div>
@@ -502,7 +504,7 @@
           <li><strong>Direct URL</strong> — already-known actor URLs are simply fetched.</li>
           <li><strong>WebFinger</strong> — resolve <code>@billing-agent@alpha.operator.example</code> to an actor URL via <code>/.well-known/webfinger</code>.</li>
           <li><strong>Within a hub</strong> — the hub's own roster and capability registry <em>are</em> the discovery mechanism; a separate directory actor per hub is redundant and dropped.</li>
-          <li><strong>Discovering hubs themselves</strong> — a thin, out-of-band consortium-published list at a well-known URL (NodeInfo-style convention). Flagged open in &sect;23: revisit only if concurrent hub count outgrows a hand-maintained list.</li>
+          <li><strong>Discovering hubs themselves</strong> — a thin, out-of-band consortium-published list at a well-known URL (NodeInfo-style convention). Flagged open in &sect;24: revisit only if concurrent hub count outgrows a hand-maintained list.</li>
         </ul>
         <h3>Authentication</h3>
         <p>Every inbox delivery carries an <strong>HTTP Signature</strong> over method, path, <code>Date</code>, <code>Digest</code>, <code>Host</code>, verified against the sender's published key (with caching), rejected on failure with an audit-logged drop. For payloads that survive relaying — everything routed through a hub — <strong>Linked Data Signatures / Object Integrity Proofs</strong> on the JSON-LD body prove authorship independent of the delivering hop; in v3 these are required as soon as anything crosses an instance boundary (roadmap P3).</p>
@@ -575,6 +577,8 @@
               <tr><td><code>afp:reputation</code></td><td>Property (hub-scoped, per agent)</td><td>Running score from completions, estimate accuracy, voting integrity</td></tr>
               <tr><td><code>afp:ContributionSummary</code></td><td>Object</td><td>Periodic, independently-recomputable per-operator contribution roll-up</td></tr>
               <tr><td><code>afp:ContributionDispute</code></td><td>Activity</td><td>Challenge to a ContributionSummary, with evidence</td></tr>
+              <tr><td><code>afp:DecisionRecord</code></td><td>Object (in <code>Create</code>)</td><td>First-class outcome record closing every voting round: outcome, snapshot hash, counted-vote hashes, weight tally (&sect;16)</td></tr>
+              <tr><td><code>afp:prevActivity</code></td><td>Property (any activity)</td><td>Optional per-actor outbox hash chain — makes logs append-only-verifiable (&sect;16)</td></tr>
             </tbody>
           </table>
         </div>
@@ -601,8 +605,9 @@ members merge the delta into their (hubId)-scoped CRDT capability registry</pre>
         <pre class="diagram mono">proposer --Offer{Proposal}--> pinned voter set (snapshot, &sect;13)
 each voter --Create{Vote}--> all peers (mesh)
 each participant tallies locally; weighted quorum (&sect;13) --> proceed
+quorum reached --> proposer emits Create{afp:DecisionRecord}   (&sect;16)
 timeout without quorum --> Undo{Vote} / abandon round</pre>
-        <div class="note"><strong>Default consensus level</strong> — eventually-consistent, reorder-tolerant, not linearizable; adequate <em>within</em> one operator's trust boundary. Any round whose voters span two or more operators should run Level 1 (&sect;10) — that's now a concrete policy trigger, not a maybe.</div>
+        <div class="note"><strong>Default consensus level</strong> — eventually-consistent, reorder-tolerant, not linearizable; adequate <em>within</em> one operator's trust boundary. Any round whose voters span two or more operators should run Level 1 (&sect;10) — that's now a concrete policy trigger, not a maybe. <strong>Every round — either level — closes with an <code>afp:DecisionRecord</code></strong> so the outcome is a recorded, verifiable artifact, not merely a derivable one (&sect;16).</div>
 
         <h3>8d &middot; Hub fan-out broadcast</h3>
         <p>The hub doubles as the channel actor: <code>Create</code> to the hub, hub <code>Announce</code>s to every enrolled member. Join/leave is enrollment (&sect;05), so senders never track subscriber lists.</p>
@@ -660,7 +665,7 @@ timeout without quorum --> Undo{Vote} / abandon round</pre>
           </table>
         </div>
         <p><strong>What's achievable, honestly:</strong> L1 keeps PBFT's <strong>safety</strong> — equivocation is provable, so two conflicting proposals can never both collect a valid quorum certificate — but downgrades <strong>liveness</strong> to best-effort: soft rounds under generous timeouts riding the outbox retry queue, and a stalled round triggers a simplified view change (the highest-reputation live replica issues a fresh round referencing the stalled one). No formal termination bound, but no silent inconsistency either. Raft was rejected: its leader must detect its own unreachability via missed acks in bounded time, and this transport has no delivery acks at all.</p>
-        <p><strong>Threshold signatures (optional):</strong> 2f+1 commit votes can be aggregated into one compact commit certificate — worth adding only once L1 is load-bearing; start with the bundle of n signed votes. These certificates are also the evidence backbone for contribution accounting (&sect;15) and governance decisions (&sect;04, &sect;05).</p>
+        <p><strong>Threshold signatures (optional):</strong> 2f+1 commit votes can be aggregated into one compact commit certificate — worth adding only once L1 is load-bearing; start with the bundle of n signed votes. These certificates are also the evidence backbone for contribution accounting (&sect;15) and governance decisions (&sect;04, &sect;05). Either way, the round closes with an <code>afp:DecisionRecord</code> that embeds or references the certificate (&sect;16).</p>
         <div class="snippet">
           <figcaption>Signed vote chain entry</figcaption>
           <pre><code>{
@@ -846,8 +851,53 @@ sequenceDiagram
         <div class="note"><strong>Explicitly out of scope:</strong> pricing, payment, settlement, exchange rates, any transferable token or credit. The summary is a reputation/accounting artifact; what operators do with it off-protocol — billing arrangements, business terms — sits outside the protocol boundary by design.</div>
       </section>
 
+      <section id="audit">
+        <div class="sec-head"><span class="num">16</span><h2>Audit &amp; provenance</h2><span class="rev-chip">New in v3</span></div>
+        <p>Every coordination flow leaves a chain of evidence by construction — signed, immutable, independently fetchable activities. Worked example: the 30-agent local policy swarm reaching a decision. What an auditor asks, and the record that answers it:</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Audit question</th><th>Record</th></tr></thead>
+            <tbody>
+              <tr><td>Who was eligible to vote, at what weight?</td><td><code>afp:quorumSnapshot</code> + explicit voter list in the signed proposal; weights recomputable from liveness registers + the reputation <code>G-Set</code> of signed events</td></tr>
+              <tr><td>How did each voter join?</td><td><code>afp:Enroll</code> activities, join-epoch-tagged in the membership OR-Set</td></tr>
+              <tr><td>Who voted, and what?</td><td>Signed <code>Create{Vote}</code> per voter outbox, correlated by round id; <code>afp:actingAs</code> attributes instance-custody votes to the specific agent</td></tr>
+              <tr><td>Is the vote set preserved?</td><td><code>G-Set</code> of signed vote receipts in the hub CRDT, replicated to every participant</td></tr>
+              <tr><td>What was decided?</td><td><code>afp:DecisionRecord</code> (below)</td></tr>
+              <tr><td>Human-readable trail?</td><td>Dual-publish shadow Notes, followable from Mastodon (&sect;21)</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>Decision records (<code>afp:DecisionRecord</code>)</h3>
+        <p>Every voting round — L0 or L1 — closes with a first-class outcome artifact. Without it, an L0 outcome is <em>derivable</em> (recompute the tally from the vote set) but never <em>recorded</em>. The proposer emits it; participants MAY co-sign by <code>Accept</code>-ing it, and any verifier can check it by recomputing the tally over the referenced votes:</p>
+        <div class="snippet">
+          <pre><code>{
+  "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+  "id": "https://hub.local/rounds/round-42/decision",
+  "type": "afp:DecisionRecord",
+  "afp:hub": "https://hub.local/actor",
+  "afp:round": "urn:afp:round:42",
+  "afp:outcome": "policy-candidate-7",
+  "afp:quorumSnapshot": "sha256:mem-4a71c9...",
+  "afp:countedVotes": ["sha256:vote-a01...", "sha256:vote-a02...", "..."],
+  "afp:weightTally": { "policy-candidate-7": 21.5, "policy-candidate-2": 6.0, "abstain": 2.5 },
+  "attributedTo": "https://hub.local/agents/proposer",
+  "signature": { "type": "Ed25519Signature2020", "proofValue": "..." }
+}</code></pre>
+        </div>
+        <p>At L1 the DecisionRecord embeds or references the 2f+1 commit certificate; at L0 it <em>is</em> the closing artifact. Either way, <code>afp:countedVotes</code> — hashes of every counted signed vote — binds the outcome to its exact evidence set.</p>
+        <h3>Outbox integrity: hash-chained logs (<code>afp:prevActivity</code>)</h3>
+        <p>Individually signed activities prove <em>authorship</em>, not <em>completeness</em> — omission of an inconvenient activity from an outbox is silent. Optional, RECOMMENDED for audit-grade deployments: a per-actor hash chain — each activity carries <code>afp:prevActivity</code>, the hash of that actor's previous activity — making every outbox append-only-verifiable; a gap or fork is detectable from the chain alone. (L1's <code>afp:observedVotes</code> already cross-references votes within a round; the chain generalizes that protection to the whole log.)</p>
+        <div class="note"><strong>Solo-profile caveat, stated plainly:</strong> one operator holds every key and every store. Chained logs protect against bugs and accidental corruption, not against the operator rewriting their own history. Audit-grade solo deployments should periodically <strong>anchor chain heads outside the trust domain</strong>: write-once storage, a timestamping service, or simply federating the shadow Notes (each carrying the current chain-head hash) to an external Mastodon server (&sect;20).</div>
+        <h3>Rationale externalization (workflow convention)</h3>
+        <p>Provenance stops at the agent&ndash;instance port (&sect;03): internal reasoning that led to a vote is not captured. Where the audit requirement includes <em>why</em>, the workflow must externalize it — convention, not machinery:</p>
+        <ul>
+          <li>Votes SHOULD carry a rationale in <code>content</code>.</li>
+          <li>Policy evaluation SHOULD run as <code>Task</code>/<code>Result</code> pairs per candidate, so each agent's assessment becomes a signed <code>Result</code> entered into evidence <em>before</em> the vote.</li>
+        </ul>
+      </section>
+
       <section id="reliability">
-        <div class="sec-head"><span class="num">16</span><h2>Reliability &amp; failure handling</h2></div>
+        <div class="sec-head"><span class="num">17</span><h2>Reliability &amp; failure handling</h2></div>
         <p>ActivityPub delivery is fire-and-forget HTTP POST: a 2xx means &ldquo;I accepted the bytes,&rdquo; nothing more. Every gap is compensated explicitly:</p>
         <div class="table-wrap">
           <table>
@@ -866,7 +916,7 @@ sequenceDiagram
       </section>
 
       <section id="security">
-        <div class="sec-head"><span class="num">17</span><h2>Security &amp; trust</h2></div>
+        <div class="sec-head"><span class="num">18</span><h2>Security &amp; trust</h2></div>
         <ul>
           <li><strong>HTTP Signature verification is mandatory</strong> on every inbox POST — unsigned or invalid activities are audit-logged and dropped, never processed.</li>
           <li><strong>The two-tier gate</strong> (&sect;04) runs on every task-relevant activity: FederationAgreement &rarr; deny-list &rarr; roster/MembershipProof as hard gates, reputation as a soft weight.</li>
@@ -879,7 +929,7 @@ sequenceDiagram
       </section>
 
       <section id="topology">
-        <div class="sec-head"><span class="num">18</span><h2>Deployment topology</h2><span class="rev-chip">Revised</span></div>
+        <div class="sec-head"><span class="num">19</span><h2>Deployment topology</h2><span class="rev-chip">Revised</span></div>
         <p>Three operator instances, one problem hub. Dotted edges are the trust boundary — <code>FederationAgreement</code>s established once, out of band from any task. Solid numbered edges are the message path of one competitively-allocated task.</p>
         <div class="mermaid-wrap">
           <pre class="mermaid">
@@ -917,7 +967,7 @@ flowchart TB
       </section>
 
       <section id="profiles">
-        <div class="sec-head"><span class="num">19</span><h2>Deployment profiles</h2><span class="rev-chip">New in v3</span></div>
+        <div class="sec-head"><span class="num">20</span><h2>Deployment profiles</h2><span class="rev-chip">New in v3</span></div>
         <p>Two supported profiles, one architecture. The protocol is designed so that the solo profile is a <em>degenerate case</em> of the federated one — never a fork.</p>
         <h3>Federated consortium (the default story)</h3>
         <p>Multiple operator instances, bilateral <code>FederationAgreement</code>s, shared problem-scoped hubs — everything in this spec, phases P1&ndash;P6.</p>
@@ -947,6 +997,7 @@ flowchart TB
         <ul>
           <li><strong>Reconnection with evidence intact</strong> — an airgapped instance that later joins a consortium presents its signed outbox history and certificates; contribution evidence survives the gap.</li>
           <li><strong>Sneakernet federation</strong> — two airgapped sites can federate <em>offline</em>: periodically export signed outbox bundles + CRDT deltas to removable media, import and verify on the other side. CRDT merges are order-tolerant and idempotent, so batch import just works; direct task delegation across the gap degrades to the physical exchange cadence, with <code>Task</code> deadlines sized accordingly.</li>
+          <li><strong>Audit-grade anchoring</strong> — chained outbox logs (<code>afp:prevActivity</code>, &sect;16) protect against bugs and accidental corruption, but a solo operator holds every key and store, so history is not tamper-evident <em>against yourself</em>. Periodically anchor chain heads outside the trust domain: write-once media, a timestamping service, or shadow Notes (carrying the chain-head hash) federated to an external Mastodon server.</li>
         </ul>
         <h3>Profile &rarr; phase mapping</h3>
         <div class="table-wrap">
@@ -962,7 +1013,7 @@ flowchart TB
       </section>
 
       <section id="mastodon">
-        <div class="sec-head"><span class="num">20</span><h2>Mastodon interop</h2><span class="rev-chip">New in v3</span></div>
+        <div class="sec-head"><span class="num">21</span><h2>Mastodon interop</h2><span class="rev-chip">New in v3</span></div>
         <p><strong>Operator requirement:</strong> operators want to partake and watch what is happening using <em>standard Mastodon</em> — their normal account, their normal client. That's exactly the payoff of building on ActivityPub, and it works — with one honest constraint up front.</p>
         <div class="note"><strong>Constraint —</strong> a stock Mastodon server cannot <em>be</em> an <code>afp:Instance</code>. Mastodon's inbox pipeline recognizes a fixed set of activity/object types (<code>Create{Note}</code>, <code>Announce</code>, <code>Follow</code>, &hellip;) and silently drops everything else: <code>afp:Task</code>, <code>afp:Bid</code>, <code>afp:CRDTDelta</code>, signed rosters — none of it would survive transit through vanilla Mastodon. So Mastodon is the <strong>window onto</strong> the mesh, not the machine endpoint.</div>
         <h3>Dual-publish: the shadow timeline</h3>
@@ -992,7 +1043,7 @@ flowchart TB
       </section>
 
       <section id="stack">
-        <div class="sec-head"><span class="num">21</span><h2>Tech stack suggestion</h2></div>
+        <div class="sec-head"><span class="num">22</span><h2>Tech stack suggestion</h2></div>
         <p>Any HTTP framework works — the protocol is signed JSON-LD over HTTPS. Keep the actor/inbox/outbox layer a thin shim independent of each agent's actual &ldquo;brain&rdquo;; the instance is naturally one deployable unit (server + delivery queue + key store) hosting many agent actor paths.</p>
         <div class="table-wrap">
           <table>
@@ -1011,8 +1062,8 @@ flowchart TB
       </section>
 
       <section id="roadmap">
-        <div class="sec-head"><span class="num">22</span><h2>Phased roadmap</h2><span class="rev-chip">Re-sequenced</span></div>
-        <p>Cross-trust-boundary operation is the point, so what v2 deferred moves forward — while P1 preserves a cheap single-operator on-ramp: one instance must be useful alone, or nobody deploys the first one. The phases assume the federated profile; the solo/airgapped profile cherry-picks P1 + P3's hub machinery (which has no federation dependency and may be pulled forward) + optionally P5, skipping P2 and P4 entirely (&sect;19).</p>
+        <div class="sec-head"><span class="num">23</span><h2>Phased roadmap</h2><span class="rev-chip">Re-sequenced</span></div>
+        <p>Cross-trust-boundary operation is the point, so what v2 deferred moves forward — while P1 preserves a cheap single-operator on-ramp: one instance must be useful alone, or nobody deploys the first one. The phases assume the federated profile; the solo/airgapped profile cherry-picks P1 + P3's hub machinery (which has no federation dependency and may be pulled forward) + optionally P5, skipping P2 and P4 entirely (&sect;20).</p>
         <ol class="phases">
           <li class="phase">
             <p class="tag">Phase 1</p>
@@ -1023,7 +1074,7 @@ flowchart TB
           <li class="phase">
             <p class="tag">Phase 2</p>
             <h3>Instance identity &amp; federation handshake</h3>
-            <p><code>afp:Instance</code>, <code>afp:operatedBy</code>, signed roster, <code>MembershipProof</code>, the <code>FederationAgreement</code> offer/countersign flow — plus dual-publish shadow Notes (&sect;20), so operator visibility via Mastodon exists from the first federated phase.</p>
+            <p><code>afp:Instance</code>, <code>afp:operatedBy</code>, signed roster, <code>MembershipProof</code>, the <code>FederationAgreement</code> offer/countersign flow — plus dual-publish shadow Notes (&sect;21), so operator visibility via Mastodon exists from the first federated phase.</p>
             <p class="deliverable"><strong>Demo —</strong> two instances mutually recognizing each other; an operator follows an agent from a standard Mastodon account and sees its activity Notes.</p>
           </li>
           <li class="phase">
@@ -1054,7 +1105,7 @@ flowchart TB
       </section>
 
       <section id="open">
-        <div class="sec-head"><span class="num">23</span><h2>Open questions</h2></div>
+        <div class="sec-head"><span class="num">24</span><h2>Open questions</h2></div>
         <ul>
           <li><strong>Directory-of-hubs bootstrap.</strong> Left as an out-of-band, consortium-published list at a well-known URL. Hubs churn far less than agents, so a hand-maintained list suffices; revisit (a lightweight meta-hub?) only if concurrent hub count grows past a handful. Don't design it before there's evidence of the need.</li>
           <li><strong>Cross-instance bid collusion.</strong> Commit-reveal stops a single dishonest bidder from sniping off visible bids, but cannot detect two instances coordinating bids out-of-band before submission. That's a consortium-terms/policy matter — who you agree to federate with in the first place — not something the protocol can enforce cryptographically. Stated here rather than glossed over.</li>

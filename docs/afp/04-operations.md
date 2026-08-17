@@ -1,4 +1,4 @@
-# 04 — Accounting, reliability, security, Mastodon interop
+# 04 — Accounting, audit, reliability, security, Mastodon interop
 
 ## Contribution accounting
 
@@ -43,6 +43,74 @@ as equivocation.
 > transferable token or credit. The summary is a reputation/accounting artifact; what
 > operators do with it off-protocol — billing arrangements, business terms — sits outside
 > the protocol boundary by design.
+
+## Audit & provenance
+
+Every coordination flow leaves a chain of evidence by construction — signed, immutable,
+independently fetchable activities. Worked example: the 30-agent local policy swarm
+reaching a decision. What an auditor asks, and the record that answers it:
+
+| Audit question | Record |
+|---|---|
+| Who was eligible to vote, at what weight? | `afp:quorumSnapshot` + explicit voter list in the signed proposal; weights recomputable from liveness registers + the reputation `G-Set` of signed events |
+| How did each voter join? | `afp:Enroll` activities, join-epoch-tagged in the membership OR-Set |
+| Who voted, and what? | Signed `Create{Vote}` per voter outbox, correlated by round id; `afp:actingAs` attributes instance-custody votes to the specific agent |
+| Is the vote set preserved? | `G-Set` of signed vote receipts in the hub CRDT, replicated to every participant |
+| What was decided? | `afp:DecisionRecord` (below) |
+| Human-readable trail? | Dual-publish shadow Notes, followable from Mastodon |
+
+### Decision records (`afp:DecisionRecord`)
+
+Every voting round — L0 or L1 — closes with a first-class outcome artifact. Without it, an
+L0 outcome is *derivable* (recompute the tally from the vote set) but never *recorded*.
+The proposer emits it; participants MAY co-sign by `Accept`-ing it, and any verifier can
+check it by recomputing the tally over the referenced votes:
+
+```json
+{
+  "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+  "id": "https://hub.local/rounds/round-42/decision",
+  "type": "afp:DecisionRecord",
+  "afp:hub": "https://hub.local/actor",
+  "afp:round": "urn:afp:round:42",
+  "afp:outcome": "policy-candidate-7",
+  "afp:quorumSnapshot": "sha256:mem-4a71c9...",
+  "afp:countedVotes": ["sha256:vote-a01...", "sha256:vote-a02...", "..."],
+  "afp:weightTally": { "policy-candidate-7": 21.5, "policy-candidate-2": 6.0, "abstain": 2.5 },
+  "attributedTo": "https://hub.local/agents/proposer",
+  "signature": { "type": "Ed25519Signature2020", "proofValue": "..." }
+}
+```
+
+At L1 the DecisionRecord embeds or references the 2f+1 commit certificate; at L0 it *is*
+the closing artifact. Either way, `afp:countedVotes` (hashes of every counted signed vote)
+binds the outcome to its exact evidence set.
+
+### Outbox integrity: hash-chained logs (`afp:prevActivity`)
+
+Individually signed activities prove *authorship*, not *completeness* — omission of an
+inconvenient activity from an outbox is silent. Optional, RECOMMENDED for audit-grade
+deployments: a per-actor hash chain — each activity carries `afp:prevActivity`, the hash
+of that actor's previous activity — making every outbox append-only-verifiable; a gap or
+fork is detectable from the chain alone. (L1's `afp:observedVotes` already cross-references
+votes within a round; the chain generalizes that protection to the whole log.)
+
+**Solo-profile caveat, stated plainly:** one operator holds every key and every store.
+Chained logs protect against bugs and accidental corruption, not against the operator
+rewriting their own history. Audit-grade solo deployments should periodically **anchor
+chain heads outside the trust domain**: write-once storage, a timestamping service, or
+simply federating the shadow Notes (each carrying the current chain-head hash) to an
+external Mastodon server.
+
+### Rationale externalization (workflow convention)
+
+Provenance stops at the agent–instance port: internal reasoning that led to a vote is not
+captured. Where the audit requirement includes *why*, the workflow must externalize it —
+convention, not machinery:
+
+- Votes SHOULD carry a rationale in `content`.
+- Policy evaluation SHOULD run as `Task`/`Result` pairs per candidate, so each agent's
+  assessment becomes a signed `Result` entered into evidence *before* the vote.
 
 ## Reliability & failure handling
 
