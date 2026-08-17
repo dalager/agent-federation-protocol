@@ -59,7 +59,8 @@ membership is verifiable from a cached copy without a live roundtrip:
 
 ```json
 {
-  "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+  "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3",
+               "https://w3id.org/security/data-integrity/v1"],
   "id": "https://alpha.operator.example/roster",
   "type": "OrderedCollection",
   "attributedTo": "https://alpha.operator.example/actor",
@@ -70,8 +71,8 @@ membership is verifiable from a cached copy without a live roundtrip:
     { "type": "afp:RosterEntry", "agent": "https://alpha.operator.example/agents/a2",
       "status": "active", "afp:keyCustody": "instance", "since": "2026-07-15T00:00:00Z" }
   ],
-  "signature": { "type": "Ed25519Signature2020", "created": "2026-08-16T09:00:00Z",
-    "verificationMethod": "https://alpha.operator.example/actor#main-key", "proofValue": "z3Fh9..." }
+  "proof": { "type": "DataIntegrityProof", "cryptosuite": "eddsa-jcs-2022", "created": "2026-08-16T09:00:00Z",
+    "verificationMethod": "https://alpha.operator.example/actor#main-key", "proofPurpose": "assertionMethod", "proofValue": "z3Fh9..." }
 }
 ```
 
@@ -223,14 +224,28 @@ v3, to the instance standing behind it via `afp:operatedBy`.
   well-known URL (NodeInfo-style). Flagged open: revisit only if concurrent hub count
   outgrows a hand-maintained list.
 
-### Authentication
+### Authentication — two mechanisms with different lifetimes
 
-Every inbox delivery carries an **HTTP Signature** over method, path, `Date`, `Digest`,
-`Host`, verified against the sender's published key (with caching); failures are
-audit-logged and dropped. For payloads that survive relaying — everything routed through a
-hub — **Linked Data Signatures / Object Integrity Proofs** on the JSON-LD body prove
-authorship independent of the delivering hop; required as soon as anything crosses an
-instance boundary (roadmap P4), and load-bearing once payloads are hub-relayed (P5).
+| Mechanism | Authenticates | Lives |
+|---|---|---|
+| **HTTP Signature** (RFC 9421; draft-cavage for legacy peers) | One hop — method, path, `Date`, `Digest`, `Host` | Consumed on receipt; never appears in an outbox |
+| **Object integrity proof** (FEP-8b32, `eddsa-jcs-2022`) | The activity itself | Travels with the activity permanently, including through export |
+
+The distinction decides what a *replay* can check. A third party handed an exported outbox
+never sees an HTTP Signature — it was consumed by a transport that no longer exists. Only
+the object integrity proof survives. So **every activity carries a proof from P1 onward**,
+while HTTP Signatures become mandatory at P4, when there is first a real hop to
+authenticate: an instance whose agents are wired in-process has no hop to sign, and its
+record is identical either way. Failures at either layer are audit-logged and dropped,
+never processed.
+
+**Cryptosuite: `eddsa-jcs-2022`.** EdDSA signing, SHA-256 hashing, and JSON Canonicalization
+Scheme (RFC 8785) canonicalization, per FEP-8b32. Chosen deliberately over the
+RDF-canonicalization suites (`Ed25519Signature2020`, `eddsa-rdfc-2022`): JCS is essentially
+key-sorting and is implementable in any language in a couple of hundred lines, which is what
+keeps an *independent* verifier cheap — and an independent verifier is what makes the audit
+claim worth anything. Documents carrying a proof include
+`https://w3id.org/security/data-integrity/v1` in their `@context`.
 
 **Key rotation:** publish the new key with a short overlap window; on compromise, rotate
 immediately, push an `Update` of the actor document, and treat the old `keyId` as revoked.

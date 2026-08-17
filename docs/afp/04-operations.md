@@ -29,7 +29,7 @@ can recompute it independently; `afp:computedBy` is a field, not a privileged ro
       "afp:evidence": ["https://beta.operator.example/outbox/result-77#l1-cert"] }
   ],
   "afp:inputHash": "sha256-4b2e...",
-  "signature": { "type": "Ed25519Signature2020", "proofValue": "..." }
+  "proof": { "type": "DataIntegrityProof", "cryptosuite": "eddsa-jcs-2022", "proofValue": "..." }
 }
 ```
 
@@ -80,7 +80,7 @@ check it by recomputing the tally over the referenced votes:
   "afp:countedVotes": ["sha256:vote-a01...", "sha256:vote-a02...", "..."],
   "afp:weightTally": { "policy-candidate-7": 21.5, "policy-candidate-2": 6.0, "abstain": 2.5 },
   "attributedTo": "https://hub.local/agents/proposer",
-  "signature": { "type": "Ed25519Signature2020", "proofValue": "..." }
+  "proof": { "type": "DataIntegrityProof", "cryptosuite": "eddsa-jcs-2022", "proofValue": "..." }
 }
 ```
 

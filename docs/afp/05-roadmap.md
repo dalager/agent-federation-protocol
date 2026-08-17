@@ -23,8 +23,9 @@ them rather than adding them.
 ## P1 — One instance, two agents, one verifiable record
 
 The smallest deployment that already proves the thesis. **No** hub, agreements, bidding,
-voting, CRDTs, gossip, LD-Signatures, or Mastodon. Two agents in one process exchanging
-signed tasks — and a record a stranger can verify.
+voting, CRDTs, gossip, or Mastodon. Two agents in one process exchanging signed tasks — and
+a record a stranger can verify. Stack decision:
+[ADR-0001](adr/0001-p1-stack.md).
 
 ### Scope
 
@@ -33,7 +34,8 @@ signed tasks — and a record a stranger can verify.
 | Identity | Instance actor (`afp:Instance`) + agent actors carrying `afp:operatedBy` and `afp:capabilities`; WebFinger optional |
 | Roster | The signed `OrderedCollection`, two entries, `afp:keyCustody: instance` — published from day one even though no peer reads it yet |
 | Flow | `Offer{afp:Task}` → `Accept`/`Reject` → `Create{afp:Result}` or `Create{afp:Error}`, keyed by `afp:correlationId` ([03](03-coordination.md#task-delegation--the-v1-baseline-flow-unchanged)) |
-| Transport | HTTP Signatures on every delivery — *including* in-process dispatch; outbox queue with backoff, dead-letter, and failures surfaced as local `Error`s |
+| Signing | An **object integrity proof** (`eddsa-jcs-2022`) on every activity — the only signature that survives export, and therefore the only one a replay can check ([01](01-foundations.md#authentication--two-mechanisms-with-different-lifetimes)). HTTP Signatures only if P1 is wired over loopback HTTP |
+| Transport | Outbox queue with backoff, dead-letter, and failures surfaced as local `Error`s |
 | Idempotency | **Both** dedupe layers: transport dedupe on activity `id`, task-level replay on `correlationId` |
 | Record | The four obligations below |
 

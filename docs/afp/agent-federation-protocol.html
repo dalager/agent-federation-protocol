@@ -279,11 +279,11 @@
 
 <div class="page">
   <header class="hero">
-    <p class="eyebrow">Architecture Spec &middot; Multi-Operator Agent Federation &middot; Revision 3.6</p>
+    <p class="eyebrow">Architecture Spec &middot; Multi-Operator Agent Federation &middot; Revision 3.7</p>
     <h1>Agent Federation Protocol</h1>
     <p class="dek">Multiple operators, each running their own instance of agents, join forces on a common problem — federating through problem-scoped hubs over ActivityPub, the W3C protocol behind Mastodon. No central broker, consortium trust, no token economics.</p>
     <div class="callout">
-      <strong>Revision 3.6 —</strong> the multi-operator model is the organizing principle: the operator <strong>instance</strong> is a first-class trust boundary, <strong>hubs</strong> are problem-scoped rendezvous points, <code>afp:Bid</code> handles cross-operator allocation, and contribution accounting replaces any notion of currency. Revisions 3.4 and 3.5 fold in fifteen findings from an ongoing <strong>scenario-test campaign</strong> — a visibility model, an artifact layer, hub lifecycle, coalition allocation, and synthesized answers that keep their uncertainty and dissent intact. Revision 3.6 rescopes the <strong>roadmap</strong> (&sect;24) to match: seven phases in which every deployment profile is a <em>prefix</em>, and a P1 whose deliverable is a record a stranger can verify.
+      <strong>Revision 3.7 —</strong> the multi-operator model is the organizing principle: the operator <strong>instance</strong> is a first-class trust boundary, <strong>hubs</strong> are problem-scoped rendezvous points, <code>afp:Bid</code> handles cross-operator allocation, and contribution accounting replaces any notion of currency. Revisions 3.4 and 3.5 fold in fifteen findings from an ongoing <strong>scenario-test campaign</strong> — a visibility model, an artifact layer, hub lifecycle, coalition allocation, and synthesized answers that keep their uncertainty and dissent intact. Revision 3.6 rescoped the <strong>roadmap</strong> (&sect;24): seven phases in which every deployment profile is a <em>prefix</em>, and a P1 whose deliverable is a record a stranger can verify. Revision 3.7 settles the <strong>P1 stack</strong> (&sect;23) and, with it, the signature suite — <code>eddsa-jcs-2022</code>, chosen so that an independent verifier stays cheap to write.
     </div>
   </header>
 
@@ -322,7 +322,7 @@
 
     <main>
       <section id="changelog">
-        <div class="sec-head"><span class="num">&Delta;</span><h2>What changed in v3, v3.4, v3.5 &amp; v3.6</h2></div>
+        <div class="sec-head"><span class="num">&Delta;</span><h2>What changed in v3, v3.4, v3.5, v3.6 &amp; v3.7</h2></div>
         <div class="table-wrap">
           <table>
             <thead><tr><th>#</th><th>Change</th><th>Why</th></tr></thead>
@@ -358,6 +358,10 @@
               <tr><td>26</td><td>The four retrofit-hostile obligations — <code>afp:visibility</code>, <code>afp:digest</code>, <code>afp:prevActivity</code>, <code>context</code> vs <code>correlationId</code> — pulled explicitly into P1 (&sect;24)</td><td>All four arrived in v3.3&ndash;3.4 but were never phased, while P1 still said &ldquo;v1 core unchanged.&rdquo; They are data-model decisions: nearly free at activity #1, and a chain begun at activity 400 proves nothing about the first 399</td></tr>
               <tr><td>27</td><td>L0 deliberation and <code>afp:DecisionRecord</code> given a phase of their own (P2), and the instance actor plus signed roster moved into P1 (&sect;24)</td><td>L0 belonged to no phase at all, so the spec's own canonical workload — 30 agents agreeing on a policy — had no route on the roadmap. And <code>afp:keyCustody</code> is declared on a roster entry, so a P1 without a roster has nowhere to state how its agents are wired</td></tr>
               <tr><td>28</td><td>Two dedupe layers stated explicitly (&sect;7.1); the baseline Task example brought into line with &sect;17 — hash-addressed attachment, declared visibility, thread id separate from task id (&sect;07)</td><td>Transport dedupe on activity <code>id</code> and task replay on <code>correlationId</code> were specified in different sections and never contrasted; and the first example a reader meets was still attaching a bare <code>s3://</code> path that &sect;17 forbids</td></tr>
+              <tr><td colspan="3" style="background:var(--surface-2); font-weight:700;">v3.7 — the P1 stack decision, and what it forced back into the spec</td></tr>
+              <tr><td>29</td><td>Signature suite changed from <code>Ed25519Signature2020</code> to <code>DataIntegrityProof</code> / <code>eddsa-jcs-2022</code> (FEP-8b32), with <code>https://w3id.org/security/data-integrity/v1</code> added to signed documents' <code>@context</code> (&sect;06)</td><td>RDF Dataset Canonicalization exists in a handful of languages and would have silently chosen the stack. JCS (RFC&nbsp;8785) is key-sorting — a few hundred lines anywhere — which is what keeps an independent verifier affordable, and an independent verifier is what makes the audit claim worth anything</td></tr>
+              <tr><td>30</td><td>Authentication restated as <strong>two mechanisms with different lifetimes</strong> (&sect;06); P1's crypto obligation corrected from HTTP Signatures to object integrity proofs (&sect;24)</td><td>An HTTP Signature authenticates one hop and is consumed on receipt — it never enters an outbox, so a third party replaying an export never sees one. Only the object proof survives, which is precisely what P1's replay depends on</td></tr>
+              <tr><td>31</td><td>&sect;23 turned from a survey into a decision recorded as <strong>ADR-0001</strong>: TypeScript + Fedify + SQLite, zero infrastructure, and a replay verifier as an independent second implementation in Go</td><td>A verifier sharing code with the writer attests to its own bugs; two implementations in two languages are the mechanism, not redundancy. The generic three-language survey also predated the P1 rescope and no longer described anything anyone was building</td></tr>
             </tbody>
           </table>
         </div>
@@ -431,8 +435,8 @@
     { "type": "afp:RosterEntry", "agent": "https://alpha.operator.example/agents/a2",
       "status": "active", "afp:keyCustody": "instance", "since": "2026-07-15T00:00:00Z" }
   ],
-  "signature": { "type": "Ed25519Signature2020", "created": "2026-08-16T09:00:00Z",
-    "verificationMethod": "https://alpha.operator.example/actor#main-key", "proofValue": "z3Fh9..." }
+  "proof": { "type": "DataIntegrityProof", "cryptosuite": "eddsa-jcs-2022", "created": "2026-08-16T09:00:00Z",
+    "verificationMethod": "https://alpha.operator.example/actor#main-key", "proofPurpose": "assertionMethod", "proofValue": "z3Fh9..." }
 }</code></pre>
         </div>
         <h3>Proving membership</h3>
@@ -527,8 +531,18 @@
           <li><strong>Within a hub</strong> — the hub's own roster and capability registry <em>are</em> the discovery mechanism; a separate directory actor per hub is redundant and dropped.</li>
           <li><strong>Discovering hubs themselves</strong> — a thin, out-of-band consortium-published list at a well-known URL (NodeInfo-style convention). Flagged open in &sect;25: revisit only if concurrent hub count outgrows a hand-maintained list.</li>
         </ul>
-        <h3>Authentication</h3>
-        <p>Every inbox delivery carries an <strong>HTTP Signature</strong> over method, path, <code>Date</code>, <code>Digest</code>, <code>Host</code>, verified against the sender's published key (with caching), rejected on failure with an audit-logged drop. For payloads that survive relaying — everything routed through a hub — <strong>Linked Data Signatures / Object Integrity Proofs</strong> on the JSON-LD body prove authorship independent of the delivering hop; these are required as soon as anything crosses an instance boundary (roadmap P4), and load-bearing once payloads are hub-relayed (P5).</p>
+        <h3>Authentication — two mechanisms with different lifetimes</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Mechanism</th><th>Authenticates</th><th>Lives</th></tr></thead>
+            <tbody>
+              <tr><td><strong>HTTP Signature</strong> (RFC&nbsp;9421; draft-cavage for legacy peers)</td><td>One hop — method, path, <code>Date</code>, <code>Digest</code>, <code>Host</code></td><td>Consumed on receipt; never appears in an outbox</td></tr>
+              <tr><td><strong>Object integrity proof</strong> (FEP-8b32, <code>eddsa-jcs-2022</code>)</td><td>The activity itself</td><td>Travels with the activity permanently, including through export</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>The distinction decides what a <em>replay</em> can check. A third party handed an exported outbox never sees an HTTP Signature — it was consumed by a transport that no longer exists. Only the object integrity proof survives. So <strong>every activity carries a proof from P1 onward</strong>, while HTTP Signatures become mandatory at P4, when there is first a real hop to authenticate: an instance whose agents are wired in-process has no hop to sign, and its record is identical either way. Failures at either layer are audit-logged and dropped, never processed.</p>
+        <div class="callout"><p><strong>Cryptosuite: <code>eddsa-jcs-2022</code>.</strong> EdDSA signing, SHA-256 hashing, and JSON Canonicalization Scheme (RFC&nbsp;8785) canonicalization, per FEP-8b32. Chosen deliberately over the RDF-canonicalization suites (<code>Ed25519Signature2020</code>, <code>eddsa-rdfc-2022</code>): JCS is essentially key-sorting and is implementable in any language in a couple of hundred lines, which is what keeps an <em>independent</em> verifier cheap — and an independent verifier is what makes the audit claim worth anything (&sect;23). Documents carrying a proof include <code>https://w3id.org/security/data-integrity/v1</code> in their <code>@context</code>.</p></div>
         <div class="note"><strong>Key rotation —</strong> publish the new key with a short overlap window; on compromise, rotate immediately, push an <code>Update</code> of the actor document, and treat the old <code>keyId</code> as revoked. Instance-custodied agents (&sect;03) rotate centrally — one of the main operational arguments for that custody mode.</div>
       </section>
 
@@ -699,7 +713,7 @@ timeout without quorum --> Undo{Vote} / abandon round</pre>
   "afp:estimatedLatency": "PT4M",
   "afp:bidWindow": { "opens": "2026-08-16T10:00:00Z", "closes": "2026-08-16T10:05:00Z" },
   "published": "2026-08-16T10:00:12Z",
-  "signature": { "type": "Ed25519Signature2020", "proofValue": "..." }
+  "proof": { "type": "DataIntegrityProof", "cryptosuite": "eddsa-jcs-2022", "proofValue": "..." }
 }</code></pre>
         </div>
         <h3>Sniping and lying, honestly bounded</h3>
@@ -783,10 +797,12 @@ timeout without quorum --> Undo{Vote} / abandon round</pre>
       "sha256:vote-agent-b-round7f2c9e-seq1",
       "sha256:vote-agent-c-round7f2c9e-seq1"
     ],
-    "signature": {
-      "type": "Ed25519Signature2020",
+    "proof": {
+      "type": "DataIntegrityProof",
+      "cryptosuite": "eddsa-jcs-2022",
       "created": "2026-08-16T10:04:02Z",
       "verificationMethod": "https://agent-a.example/actor#key-1",
+      "proofPurpose": "assertionMethod",
       "proofValue": "z4o9c..."
     }
   },
@@ -942,7 +958,7 @@ sequenceDiagram
       "afp:evidence": ["https://beta.operator.example/outbox/result-77#l1-cert"] }
   ],
   "afp:inputHash": "sha256-4b2e...",
-  "signature": { "type": "Ed25519Signature2020", "proofValue": "..." }
+  "proof": { "type": "DataIntegrityProof", "cryptosuite": "eddsa-jcs-2022", "proofValue": "..." }
 }</code></pre>
         </div>
         <p><strong>Disputes.</strong> <code>afp:ContributionDispute{summaryId, evidence}</code> is usually mechanical — &ldquo;you omitted this outbox entry&rdquo; is re-checkable by anyone recomputing over the same public inputs, resolved by republishing a corrected summary. Genuinely contested cases (did a Result meet the quality bar?) escalate to an <code>afp:GovernanceDecision</code> vote, the same path as equivocation.</p>
@@ -981,7 +997,7 @@ sequenceDiagram
   "afp:countedVotes": ["sha256:vote-a01...", "sha256:vote-a02...", "..."],
   "afp:weightTally": { "policy-candidate-7": 21.5, "policy-candidate-2": 6.0, "abstain": 2.5 },
   "attributedTo": "https://hub.local/agents/proposer",
-  "signature": { "type": "Ed25519Signature2020", "proofValue": "..." }
+  "proof": { "type": "DataIntegrityProof", "cryptosuite": "eddsa-jcs-2022", "proofValue": "..." }
 }</code></pre>
         </div>
         <p>At L1 the DecisionRecord embeds or references the 2f+1 commit certificate; at L0 it <em>is</em> the closing artifact. Either way, <code>afp:countedVotes</code> — hashes of every counted signed vote — binds the outcome to its exact evidence set.</p>
@@ -1264,22 +1280,26 @@ flowchart TB
       </section>
 
       <section id="stack">
-        <div class="sec-head"><span class="num">23</span><h2>Tech stack suggestion</h2></div>
-        <p>Any HTTP framework works — the protocol is signed JSON-LD over HTTPS. Keep the actor/inbox/outbox layer a thin shim independent of each agent's actual &ldquo;brain&rdquo;; the instance is naturally one deployable unit (server + delivery queue + key store) hosting many agent actor paths.</p>
+        <div class="sec-head"><span class="num">23</span><h2>Tech stack</h2><span class="rev-chip">Decided in v3.7</span></div>
+        <p>No longer a survey: the P1 stack is a decision, recorded as <strong>ADR-0001</strong> in the repository. The protocol itself stays implementation-agnostic — an instance is any program that publishes the right bytes — but a reference implementation has to choose, and the choice is load-bearing for the audit claim.</p>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Concern</th><th>Node / TS</th><th>Python</th><th>Notes</th></tr></thead>
+            <thead><tr><th>Concern</th><th>P1 choice</th><th>Why this one</th></tr></thead>
             <tbody>
-              <tr><td>HTTP server</td><td>Fastify or Hono</td><td>FastAPI</td><td>Actor <code>GET</code>s, inbox <code>POST</code>s, outbox <code>GET</code>s, WebFinger, roster, policy doc</td></tr>
-              <tr><td>HTTP Signatures</td><td><code>http-signature</code> or a thin RFC&nbsp;9421 signer</td><td><code>http-message-signatures</code></td><td>Small enough to hand-roll if needed</td></tr>
-              <tr><td>Object integrity / LD-Sig</td><td>Ed25519Signature2020 suite</td><td>same</td><td>Required from P4 (anything crossing an instance boundary)</td></tr>
-              <tr><td>JSON-LD</td><td><code>jsonld.js</code> if needed</td><td><code>pyld</code></td><td>Fixed-shape JSON in practice, like most Fediverse implementations</td></tr>
-              <tr><td>CRDT library</td><td>Automerge / Yjs, or hand-rolled OR-Set/LWW</td><td><code>py-crdt</code> or hand-rolled</td><td>Delta shapes in &sect;11 are library-agnostic</td></tr>
-              <tr><td>Delivery queue</td><td>BullMQ or a Postgres job table</td><td>Celery or RQ</td><td>Per instance, not per agent; must survive restarts</td></tr>
-              <tr><td>State store</td><td>Postgres / SQLite</td><td>same</td><td><code>(hubId, crdtType)</code>-keyed CRDT snapshots, correlation tables, dedupe, roster</td></tr>
+              <tr><td>Runtime</td><td>TypeScript on Node&nbsp;22+</td><td>The only ecosystem with both a mature ActivityPub server framework and a first-class LLM SDK for the brains</td></tr>
+              <tr><td>ActivityPub layer</td><td><a href="https://fedify.dev/">Fedify</a></td><td>Actor dispatch, WebFinger, inbox pipeline, key management, and all four signature mechanisms including FEP-8b32. P1 uses perhaps a tenth of it; P4 uses the rest, and the Mastodon-quirk knowledge inside it is not worth re-deriving</td></tr>
+              <tr><td>Custom vocabulary</td><td><code>fedify generate-vocab</code></td><td>AFP is mostly <code>afp:</code> terms, and Fedify's vocabulary is code-generated. This is the known friction point of the choice — exercise it in week one, not at P4</td></tr>
+              <tr><td>Signing</td><td><code>eddsa-jcs-2022</code> (&sect;06)</td><td>JCS canonicalization is key-sorting, not RDF graph normalization — the difference between a verifier anyone can write and a verifier only four languages can host</td></tr>
+              <tr><td>State store</td><td>SQLite (<code>better-sqlite3</code>)</td><td>Outbox, seen-ids, pending tasks and roster in one file — so <em>&ldquo;export the outbox&rdquo;</em> is a file copy, which is also the sneakernet property (&sect;21)</td></tr>
+              <tr><td>Artifacts</td><td>Digest-named files on disk</td><td>Content addressing needs no database; the path <em>is</em> the digest (&sect;17)</td></tr>
+              <tr><td>Delivery queue</td><td>A SQLite table with <code>next_attempt_at</code></td><td>Backoff and dead-lettering are a query, not an operational dependency. <strong>No Redis, no broker, no container at P1</strong></td></tr>
+              <tr><td>Brains</td><td>Anthropic SDK behind the port</td><td>Swappable by construction — nothing in a brain knows ActivityPub exists (&sect;03)</td></tr>
+              <tr><td><strong>Verifier</strong></td><td><strong>Go, separate codebase, zero shared code</strong></td><td>See below</td></tr>
             </tbody>
           </table>
         </div>
+        <div class="callout"><p><strong>The verifier must not share code with the writer.</strong> If both sides canonicalize with the same buggy function, an invalid record verifies clean — and replay passing is the entire product of P1. A second implementation, in a second language, is therefore not redundancy but the mechanism itself: roughly 200 lines of RFC&nbsp;8785 key-sorting, Ed25519 verification, SHA-256 digests and a <code>prevActivity</code> chain walk. Go, because the auditor receiving it should get a single static binary and no runtime to install. It doubles as the cheapest possible interop test long before P4 goes near Mastodon.</p></div>
+        <p>Later phases add to this rather than replacing it: CRDTs at P2 (hand-rolled OR-Set/LWW — the delta shapes in &sect;11 are library-agnostic, and Automerge/Yjs solve a harder problem than AFP has), HTTP Signatures and LD proof exchange at P4 (already in Fedify), and hub-relayed anti-entropy at P5. The one thing worth reconsidering at P5 is the state store: SQLite holds a single-operator deployment comfortably, and multi-hub cross-operator sync is where Postgres starts to earn its operational cost.</p>
       </section>
 
       <section id="roadmap">
@@ -1293,7 +1313,7 @@ flowchart TB
           <li class="phase">
             <p class="tag">Phase 1</p>
             <h3>One instance, two agents, one verifiable record</h3>
-            <p>The smallest deployment that already proves the thesis. <strong>No</strong> hub, agreements, bidding, voting, CRDTs, gossip, LD-Signatures or Mastodon. Two agents in one process exchanging signed tasks — and a record a stranger can verify.</p>
+            <p>The smallest deployment that already proves the thesis. <strong>No</strong> hub, agreements, bidding, voting, CRDTs, gossip or Mastodon. Two agents in one process exchanging signed tasks — and a record a stranger can verify. Stack decision: &sect;23.</p>
             <div class="table-wrap">
               <table>
                 <thead><tr><th>Area</th><th>What P1 builds</th></tr></thead>
@@ -1301,7 +1321,8 @@ flowchart TB
                   <tr><td>Identity</td><td>Instance actor (<code>afp:Instance</code>, &sect;03) + agent actors carrying <code>afp:operatedBy</code> and <code>afp:capabilities</code>; WebFinger optional</td></tr>
                   <tr><td>Roster</td><td>The signed <code>OrderedCollection</code>, two entries, <code>afp:keyCustody: instance</code> — published from day one even though no peer reads it yet</td></tr>
                   <tr><td>Flow</td><td><code>Offer{afp:Task}</code> &rarr; <code>Accept</code>/<code>Reject</code> &rarr; <code>Create{afp:Result}</code> or <code>Create{afp:Error}</code>, keyed by <code>afp:correlationId</code> (&sect;07)</td></tr>
-                  <tr><td>Transport</td><td>HTTP Signatures on every delivery — <em>including</em> in-process dispatch; outbox queue with backoff, dead-letter, and failures surfaced as local <code>Error</code>s (&sect;18)</td></tr>
+                  <tr><td>Signing</td><td>An <strong>object integrity proof</strong> (<code>eddsa-jcs-2022</code>) on every activity — the only signature that survives export, and therefore the only one a replay can check (&sect;06). HTTP Signatures only if P1 is wired over loopback HTTP</td></tr>
+                  <tr><td>Transport</td><td>Outbox queue with backoff, dead-letter, and failures surfaced as local <code>Error</code>s (&sect;18)</td></tr>
                   <tr><td>Idempotency</td><td><strong>Both</strong> dedupe layers: transport dedupe on activity <code>id</code>, task-level replay on <code>correlationId</code> (&sect;07)</td></tr>
                   <tr><td>Record</td><td>The four obligations below</td></tr>
                 </tbody>

@@ -227,7 +227,7 @@ alongside v1's flow, it doesn't replace it.
   "afp:estimatedLatency": "PT4M",
   "afp:bidWindow": { "opens": "2026-08-16T10:00:00Z", "closes": "2026-08-16T10:05:00Z" },
   "published": "2026-08-16T10:00:12Z",
-  "signature": { "type": "Ed25519Signature2020", "proofValue": "..." }
+  "proof": { "type": "DataIntegrityProof", "cryptosuite": "eddsa-jcs-2022", "proofValue": "..." }
 }
 ```
 
@@ -339,10 +339,12 @@ hub governance.
       "sha256:vote-agent-b-round7f2c9e-seq1",
       "sha256:vote-agent-c-round7f2c9e-seq1"
     ],
-    "signature": {
-      "type": "Ed25519Signature2020",
+    "proof": {
+      "type": "DataIntegrityProof",
+      "cryptosuite": "eddsa-jcs-2022",
       "created": "2026-08-16T10:04:02Z",
       "verificationMethod": "https://agent-a.example/actor#key-1",
+      "proofPurpose": "assertionMethod",
       "proofValue": "z4o9c..."
     }
   },

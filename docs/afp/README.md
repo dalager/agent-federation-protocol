@@ -1,10 +1,10 @@
-# Agent Federation Protocol (AFP) — v3.6
+# Agent Federation Protocol (AFP) — v3.7
 
 Multiple operators, each running their own instance of agents, join forces on a common
 problem — federating through problem-scoped hubs over **ActivityPub** (the W3C protocol
 behind Mastodon). No central broker, consortium trust, no token economics.
 
-This is the markdown rendition of the full spec (Revision 3.6). Reading order:
+This is the markdown rendition of the full spec (Revision 3.7). Reading order:
 
 | File | Contents |
 |---|---|
@@ -16,6 +16,7 @@ This is the markdown rendition of the full spec (Revision 3.6). Reading order:
 | [06-deployment-profiles.md](06-deployment-profiles.md) | Solo/airgapped vs. federated profiles · the "consortium of one" · sneakernet federation |
 | [07-visibility-and-artifacts.md](07-visibility-and-artifacts.md) | Audience & visibility classes · authorized fetch · auditor grants · hash-addressed artifacts · hub lifecycle |
 | [scenarios/](scenarios/) | Spec-test scenarios — each walks a real workload end to end and ends with a verdict of what held and what strained |
+| [adr/](adr/) | Architecture decision records — [ADR-0001](adr/0001-p1-stack.md): the P1 technology stack |
 
 ## Where to start building
 
@@ -29,6 +30,11 @@ That demo is deliberately tiny and deliberately load-bearing. Signing, hash-chai
 outboxes, visibility classes and hash-addressed evidence are all **P1 obligations**, not a
 later audit phase — they are nearly free at two agents and impossible to backfill at two
 hundred. Every phase after P1 adds participants, never integrity machinery.
+
+The stack is decided in [ADR-0001](adr/0001-p1-stack.md): TypeScript on Node with Fedify,
+SQLite, `eddsa-jcs-2022` object integrity proofs — and a replay verifier written in Go as a
+deliberately independent second implementation, because a verifier that shares code with
+the writer would only be attesting to its own bugs.
 
 ## The multi-operator model
 
@@ -172,6 +178,7 @@ flowchart LR
 | v3.4 | Nine findings from the first scenario-test campaign: visibility classes & authorized fetch, hash-addressed artifacts, hub lifecycle, `correlationId`/`context` split, co-work threads, external-system reconciliation, honest L1 guarantees at small n |
 | v3.5 | Six findings from scenario 04: coalition allocation (`afp:coverage`, set-selection rules, named synthesizer), `afp:Synthesis`, `afp:Settlement`, estimator separation of duties, explicit declines |
 | v3.6 | Roadmap resequenced P1–P7 so every profile is a *prefix* (solo = P1→P3, no cherry-picking); P1 redesigned around a third-party-verifiable record with an 11-point acceptance gate; the four retrofit-hostile obligations pulled into P1; L0 deliberation and `DecisionRecord` given a phase |
+| v3.7 | P1 stack decided ([ADR-0001](adr/0001-p1-stack.md)) and the spec changes it forced: signature suite moved to `DataIntegrityProof`/`eddsa-jcs-2022` (FEP-8b32), authentication restated as two mechanisms with different lifetimes, P1's crypto obligation corrected from HTTP Signatures to object integrity proofs |
 
 All `afp:` terms are this design's own `@context` extension over W3C ActivityStreams 2.0 —
 not part of the standard.
