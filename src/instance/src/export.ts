@@ -1,0 +1,82 @@
+/**
+ * The export bundle — what you hand to someone who was not there.
+ *
+ * Everything a third party needs to check the record, and nothing else: no
+ * private keys, no database, no instance access. Actor documents are included
+ * because they are `public` anyway and carry the verification keys; the outboxes
+ * carry the signed activities; artifacts travel as their own digests.
+ *
+ * Layout:
+ *   MANIFEST.json          what this bundle contains
+ *   instance.jsonld        the instance actor
+ *   roster.jsonld          the signed roster
+ *   actors/<name>.jsonld   agent actors, each with its Multikey
+ *   outbox/<name>.jsonld   OrderedCollection, in chain order
+ *   artifacts/sha256-<hex> raw bytes, named by digest
+ */
+
+import { mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import type { AfpInstance } from "./instance.ts";
+import { AFP_CONTEXTS } from "./ap/documents.ts";
+import type { JsonValue } from "./crypto/jcs.ts";
+
+export interface ExportSummary {
+  dir: string;
+  actors: number;
+  activities: number;
+  artifacts: number;
+}
+
+export function exportBundle(instance: AfpInstance, dir: string): ExportSummary {
+  rmSync(dir, { recursive: true, force: true });
+  mkdirSync(join(dir, "actors"), { recursive: true });
+  mkdirSync(join(dir, "outbox"), { recursive: true });
+  mkdirSync(join(dir, "artifacts"), { recursive: true });
+
+  writeJson(join(dir, "instance.jsonld"), instance.instanceDocument());
+  writeJson(join(dir, "roster.jsonld"), instance.rosterDocument() as unknown as JsonValue);
+
+  let activities = 0;
+  const actorNames: string[] = [];
+
+  for (const spec of instance.specs) {
+    actorNames.push(spec.name);
+    writeJson(join(dir, "actors", `${spec.name}.jsonld`), instance.agentDocument(spec.name));
+
+    const entries = instance.outbox.byActor(instance.actorId(spec.name));
+    activities += entries.length;
+    writeJson(join(dir, "outbox", `${spec.name}.jsonld`), {
+      "@context": AFP_CONTEXTS,
+      id: `${instance.actorId(spec.name)}/outbox`,
+      type: "OrderedCollection",
+      attributedTo: instance.actorId(spec.name),
+      totalItems: entries.length,
+      orderedItems: entries.map((entry) => entry.activity),
+    });
+  }
+
+  const artifacts = instance.artifacts.all();
+  for (const ref of artifacts) {
+    // Raw bytes on purpose: the verifier's job is to notice when they no longer
+    // match their digest, so the export must not quietly refuse to carry them.
+    const bytes = instance.artifacts.getRaw(ref.digest);
+    if (bytes) writeFileSync(join(dir, "artifacts", ref.digest.replace(":", "-")), bytes);
+  }
+
+  writeJson(join(dir, "MANIFEST.json"), {
+    format: "afp-export/1",
+    instance: String(instance.instanceDocument().id),
+    exportedAt: new Date().toISOString(),
+    actors: actorNames,
+    activities,
+    artifacts: artifacts.length,
+    cryptosuite: "eddsa-jcs-2022",
+  });
+
+  return { dir, actors: actorNames.length, activities, artifacts: artifacts.length };
+}
+
+function writeJson(path: string, value: unknown): void {
+  writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
+}

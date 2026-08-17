@@ -1,0 +1,363 @@
+#!/usr/bin/env python3
+"""afp-verify — replay an AFP export and say whether it holds up.
+
+Run by someone who was not there: this reads nothing but the export directory
+and needs no access to the instance that produced it, no private keys, and no
+network. It is a deliberately independent second implementation of the record
+format (ADR-0001) — if it disagrees with the writer, that disagreement is the
+finding rather than a nuisance.
+
+    python3 afp_verify.py <export-dir> [--thread urn:afp:thread:...] [-v]
+
+Exit status is 0 only if every check passes.
+
+The replay procedure, per 04 "What closes the trail at the edges":
+    select by context -> verify each signature -> walk each prevActivity chain
+    -> verify attachment digests -> confirm the thread reaches a terminal Result
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import sys
+from dataclasses import dataclass, field
+from pathlib import Path
+
+from jcs import canonical_bytes
+
+try:
+    from cryptography.exceptions import InvalidSignature
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+except ImportError:  # pragma: no cover - environment guard
+    sys.exit("afp-verify needs `cryptography` (pip install cryptography)")
+
+CRYPTOSUITE = "eddsa-jcs-2022"
+B58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+
+
+# --------------------------------------------------------------------- base58
+
+
+def b58decode(text: str) -> bytes:
+    number = 0
+    for char in text:
+        index = B58_ALPHABET.find(char)
+        if index < 0:
+            raise ValueError(f"invalid base58 character {char!r}")
+        number = number * 58 + index
+
+    body = number.to_bytes((number.bit_length() + 7) // 8, "big") if number else b""
+    leading = len(text) - len(text.lstrip(B58_ALPHABET[0]))
+    return b"\x00" * leading + body
+
+
+def decode_multikey(multibase: str) -> bytes:
+    """Recover the raw 32-byte Ed25519 key from a `publicKeyMultibase` value."""
+    if not multibase.startswith("z"):
+        raise ValueError("only base58btc ('z') multibase is used by AFP")
+    decoded = b58decode(multibase[1:])
+    if decoded[:2] != b"\xed\x01":
+        raise ValueError("multikey is not an Ed25519 public key (expected 0xed01 prefix)")
+    if len(decoded) != 34:
+        raise ValueError(f"expected 34 bytes after multibase decode, got {len(decoded)}")
+    return decoded[2:]
+
+
+# ---------------------------------------------------------------------- proof
+
+
+def verify_proof(document: dict, public_keys: dict[str, bytes]) -> str | None:
+    """Return None when the proof is good, else a human-readable reason."""
+    proof = document.get("proof")
+    if not isinstance(proof, dict):
+        return "no proof present"
+    if proof.get("type") != "DataIntegrityProof":
+        return f"unexpected proof type {proof.get('type')!r}"
+    if proof.get("cryptosuite") != CRYPTOSUITE:
+        return f"unexpected cryptosuite {proof.get('cryptosuite')!r}"
+    if proof.get("proofPurpose") != "assertionMethod":
+        return f"unexpected proofPurpose {proof.get('proofPurpose')!r}"
+
+    method = proof.get("verificationMethod")
+    raw_key = public_keys.get(method)
+    if raw_key is None:
+        return f"no published key for verificationMethod {method!r}"
+
+    # The proof configuration is the proof minus its value, plus the document's
+    # @context. It is present while hashing and absent on the wire.
+    proof_config = {
+        "type": proof["type"],
+        "cryptosuite": proof["cryptosuite"],
+        "created": proof.get("created"),
+        "verificationMethod": method,
+        "proofPurpose": proof["proofPurpose"],
+    }
+    if "@context" in document:
+        proof_config["@context"] = document["@context"]
+
+    unsecured = {k: v for k, v in document.items() if k != "proof"}
+    signing_input = (
+        hashlib.sha256(canonical_bytes(proof_config)).digest()
+        + hashlib.sha256(canonical_bytes(unsecured)).digest()
+    )
+
+    try:
+        signature = b58decode(proof["proofValue"][1:])
+    except (ValueError, KeyError, TypeError) as exc:
+        return f"undecodable proofValue: {exc}"
+
+    try:
+        Ed25519PublicKey.from_public_bytes(raw_key).verify(signature, signing_input)
+    except InvalidSignature:
+        return "signature does not verify"
+    return None
+
+
+def digest_of(value: object) -> str:
+    return "sha256:" + hashlib.sha256(canonical_bytes(value)).hexdigest()
+
+
+# --------------------------------------------------------------------- report
+
+
+@dataclass
+class Report:
+    checks: list[tuple[str, bool, str]] = field(default_factory=list)
+
+    def record(self, name: str, ok: bool, detail: str = "") -> bool:
+        self.checks.append((name, ok, detail))
+        return ok
+
+    @property
+    def failures(self) -> list[tuple[str, bool, str]]:
+        return [check for check in self.checks if not check[1]]
+
+    def print(self, verbose: bool) -> None:
+        for name, ok, detail in self.checks:
+            if ok and not verbose:
+                continue
+            mark = "  ok  " if ok else " FAIL "
+            line = f"[{mark}] {name}"
+            print(line if not detail else f"{line}\n           {detail}")
+
+
+# -------------------------------------------------------------------- loading
+
+
+def load_json(path: Path) -> dict:
+    with path.open(encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+def collect_public_keys(export: Path) -> dict[str, bytes]:
+    """Map every published verification method id to its raw key bytes."""
+    keys: dict[str, bytes] = {}
+    documents = [export / "instance.jsonld"]
+    documents += sorted((export / "actors").glob("*.jsonld"))
+
+    for path in documents:
+        if not path.exists():
+            continue
+        for method in load_json(path).get("assertionMethod", []):
+            if isinstance(method, dict) and "publicKeyMultibase" in method:
+                keys[method["id"]] = decode_multikey(method["publicKeyMultibase"])
+    return keys
+
+
+# --------------------------------------------------------------------- checks
+
+
+def check_chain(report: Report, actor: str, activities: list[dict]) -> None:
+    """Walk one actor's hash chain: no gap, no fork, correct start."""
+    previous_digest: str | None = None
+
+    for index, activity in enumerate(activities):
+        label = f"{actor}[{index}] {activity.get('id', '<no id>')}"
+        declared = activity.get("afp:prevActivity")
+
+        if index == 0:
+            report.record(
+                f"chain: {label} starts the chain",
+                declared is None,
+                "" if declared is None else
+                f"first activity claims a predecessor ({declared}) — the chain does not start here",
+            )
+        else:
+            report.record(
+                f"chain: {label} links to its predecessor",
+                declared == previous_digest,
+                "" if declared == previous_digest else
+                f"expected afp:prevActivity {previous_digest}, found {declared}",
+            )
+
+        previous_digest = digest_of(activity)
+
+
+def check_attachments(report: Report, export: Path, activity: dict) -> None:
+    """Every attachment must carry a digest, and the bytes must match it."""
+    obj = activity.get("object")
+    attachments = obj.get("attachment", []) if isinstance(obj, dict) else []
+
+    for link in attachments:
+        if not isinstance(link, dict):
+            continue
+        activity_id = activity.get("id", "<no id>")
+        digest = link.get("afp:digest")
+
+        if not isinstance(digest, str):
+            report.record(
+                f"artifact: attachment in {activity_id} declares a digest",
+                False,
+                "attachment has no afp:digest — evidence is unverifiable",
+            )
+            continue
+
+        path = export / "artifacts" / digest.replace(":", "-")
+        if not path.exists():
+            report.record(
+                f"artifact: {digest[:24]}… present in bundle",
+                False,
+                f"referenced by {activity_id} but absent from artifacts/",
+            )
+            continue
+
+        actual = "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+        report.record(
+            f"artifact: {digest[:24]}… matches its digest",
+            actual == digest,
+            "" if actual == digest else
+            f"bytes hash to {actual[:24]}… but are referenced as {digest[:24]}… by {activity_id}",
+        )
+
+
+def check_thread(report: Report, activities: list[dict], thread: str) -> None:
+    """A replay selects by `context` and must reach a terminal outcome."""
+    in_thread = [a for a in activities if a.get("context") == thread]
+    report.record(
+        f"thread: {thread} has activities",
+        bool(in_thread),
+        "" if in_thread else "no activity carries this context",
+    )
+    if not in_thread:
+        return
+
+    outcomes = [a for a in in_thread if outcome_type(a) in ("afp:Result", "afp:Error")]
+    report.record(
+        f"thread: {thread} reaches a terminal outcome",
+        bool(outcomes),
+        "" if outcomes else "thread contains no afp:Result or afp:Error — it never closed",
+    )
+
+    # correlationId identifies one task; reusing it across tasks is the collision
+    # scenario 02 found, so a replay checks that each task closed exactly once.
+    seen: dict[str, int] = {}
+    for activity in outcomes:
+        obj = activity.get("object") or {}
+        correlation = obj.get("afp:correlationId") if isinstance(obj, dict) else None
+        if correlation:
+            seen[correlation] = seen.get(correlation, 0) + 1
+
+    duplicated = [cid for cid, count in seen.items() if count > 1]
+    report.record(
+        f"thread: {thread} has one outcome per correlationId",
+        not duplicated,
+        "" if not duplicated else f"correlationId answered more than once: {', '.join(duplicated)}",
+    )
+
+
+def outcome_type(activity: dict) -> str:
+    obj = activity.get("object")
+    return obj.get("type", "") if isinstance(obj, dict) else ""
+
+
+# ----------------------------------------------------------------------- main
+
+
+def verify_export(export: Path, thread: str | None, report: Report) -> None:
+    manifest_path = export / "MANIFEST.json"
+    if not report.record("bundle: MANIFEST.json present", manifest_path.exists()):
+        return
+    manifest = load_json(manifest_path)
+    report.record(
+        "bundle: declares the eddsa-jcs-2022 cryptosuite",
+        manifest.get("cryptosuite") == CRYPTOSUITE,
+        f"manifest says {manifest.get('cryptosuite')!r}",
+    )
+
+    keys = collect_public_keys(export)
+    report.record("keys: actor documents publish verification keys", bool(keys),
+                  "no assertionMethod entries found in any actor document")
+
+    roster_path = export / "roster.jsonld"
+    if report.record("roster: present", roster_path.exists()):
+        roster = load_json(roster_path)
+        reason = verify_proof(roster, keys)
+        # Gate check 9: the roster verifies as a whole from a cached copy.
+        report.record("roster: signature verifies from the cached copy", reason is None, reason or "")
+
+    all_activities: list[dict] = []
+    for outbox_path in sorted((export / "outbox").glob("*.jsonld")):
+        actor = outbox_path.stem
+        activities = load_json(outbox_path).get("orderedItems", [])
+        all_activities.extend(activities)
+
+        for index, activity in enumerate(activities):
+            label = f"{actor}[{index}] {activity.get('id', '<no id>')}"
+            reason = verify_proof(activity, keys)
+            report.record(f"signature: {label}", reason is None, reason or "")
+
+            visibility = activity.get("afp:visibility")
+            report.record(
+                f"visibility: {label} declares a read class",
+                isinstance(visibility, str),
+                "" if isinstance(visibility, str) else
+                "no afp:visibility — the record does not say who may read this",
+            )
+
+            check_attachments(report, export, activity)
+
+        check_chain(report, actor, activities)
+
+    threads = thread and [thread] or sorted(
+        {a["context"] for a in all_activities if isinstance(a.get("context"), str)}
+    )
+    for name in threads:
+        check_thread(report, all_activities, name)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Verify an AFP export bundle.")
+    parser.add_argument("export", type=Path, help="export directory")
+    parser.add_argument("--thread", help="only replay this context (default: every thread found)")
+    parser.add_argument("-v", "--verbose", action="store_true", help="show passing checks too")
+    args = parser.parse_args()
+
+    if not args.export.is_dir():
+        print(f"no such export directory: {args.export}", file=sys.stderr)
+        return 2
+
+    report = Report()
+    try:
+        verify_export(args.export, args.thread, report)
+    except Exception as exc:  # a malformed bundle is a failed audit, not a crash
+        report.record("bundle: readable", False, f"{type(exc).__name__}: {exc}")
+
+    report.print(args.verbose)
+    failures = report.failures
+    total = len(report.checks)
+
+    print()
+    if failures:
+        print(f"FAILED — {len(failures)} of {total} checks did not pass")
+        print("This record cannot be replayed as authentic.")
+        return 1
+
+    print(f"PASSED — {total} checks, no gaps")
+    print("Every signature verifies, every chain is unbroken, every artifact matches its digest.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,7 +1,9 @@
 # ADR-0001 — Technology stack for P1
 
-- **Status:** Accepted
-- **Date:** 2026-08-17
+- **Status:** Accepted, then **partially revised during implementation** — see
+  [Revised under contact](#revised-under-contact) at the end. Two of the five
+  decisions changed; the reasoning behind all five is unchanged.
+- **Date:** 2026-08-17 (revised the same day, once P1 was built)
 - **Applies to:** [P1 — one instance, two agents, one verifiable record](../05-roadmap.md#p1--one-instance-two-agents-one-verifiable-record)
 - **Supersedes:** the generic "tech stack suggestion" survey in the spec (§23), which
   predated the P1 rescope
@@ -156,6 +158,66 @@ disagreeing early, long before P4 goes near another implementation.
 | `generate-vocab` cannot express AFP vocabulary workably | Decision 3 — drop to a thin hand-rolled AP layer |
 | Airgapped deployment becomes the primary delivery mode | Decision 2 — single-binary runtime for the instance |
 | P5 multi-hub cross-operator sync | Decision 4 — SQLite → Postgres for the state store |
+
+## Revised under contact
+
+P1 was implemented immediately after this ADR was accepted. Two decisions did not
+survive, and one turned out better than assumed. The week-one experiment the ADR
+called for took about an hour.
+
+### Decision 3 (Fedify) — **reversed**. P1 uses the thin hand-rolled layer.
+
+The experiment was exactly the one specified: generate `afp:Task` alongside AS2
+and see what comes out. It runs, and the output is the problem.
+
+| Observation | Consequence |
+|---|---|
+| `fedify generate-vocab` requires *all* 81 AS2 schema files in its input directory and emits **one 103,585-line module** | It does not extend the vocabulary; it regenerates it |
+| The generated module declares its own `Object`, `Activity`, `Create` … alongside `Task` | A **parallel class hierarchy**, not an addition to Fedify's |
+| `@fedify/fedify` imports its vocabulary from `@fedify/vocab`, a hard dependency pinned at `2.3.4` | To use AFP types with `Federation`, you must alias the vendor's internal package to your generated module, and regenerate on every Fedify upgrade |
+
+That is the wrong dependency direction for a protocol that is ~90% custom
+vocabulary and whose product is the exact bytes of a record: **AFP's vocabulary
+would become version-locked to a framework's internal package.** The ADR
+pre-authorized this fallback, and P1 uses it — actor documents, the roster,
+activity builders and the inbox pipeline are about 400 lines of plain TypeScript.
+
+*This is not a reversal at P4.* Fedify remains the right choice for federation
+*transport* — HTTP Signatures with double-knocking, Mastodon quirks, SSRF guards,
+authorized fetch — and the nuance that makes it work is that AFP objects ride
+*inside* standard AS2 activities. Use it for the envelope, not the payload; then
+its vocabulary and ours never need to be the same classes.
+
+### Decision 5 (Go verifier) — **language changed to Python**, principle intact
+
+No Go toolchain was available in the build environment, and an acceptance gate
+that cannot actually run is worthless. The verifier is Python 3 (`cryptography`
+for Ed25519, standard library for everything else), ~250 lines.
+
+What survives: a different language, zero shared code, written from the algorithm
+rather than ported. What is lost: the single static binary an auditor could run
+with nothing installed. A Go port stays open and is a small job — the algorithm
+is now written down in `src/verifier/README.md` precisely so a third
+implementation is cheap.
+
+### Decision 2 (runtime) — **better than assumed: zero runtime dependencies**
+
+Node 22.5+ ships `node:sqlite`, and Node 23+ strips TypeScript types natively.
+With Fedify dropped and `node:crypto` covering Ed25519, the P1 instance has **no
+runtime dependencies and no build step** — `npm run demo` on a clean checkout.
+The Anthropic SDK is optional and loaded dynamically, so the acceptance gate runs
+offline against deterministic brains.
+
+One sharp edge worth recording: Node's strip-only TypeScript mode rejects
+*parameter properties* (`constructor(private readonly db: Db)`). Declare the
+fields explicitly.
+
+### What the gate says
+
+All eleven checks in
+[05 § Acceptance gate](../05-roadmap.md#acceptance-gate) pass, including check 10
+— the independent verifier accepts the clean export and rejects both deliberate
+mutations, naming the mismatched digest and the broken chain link respectively.
 
 ## References
 

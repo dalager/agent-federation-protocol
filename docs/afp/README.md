@@ -31,10 +31,19 @@ outboxes, visibility classes and hash-addressed evidence are all **P1 obligation
 later audit phase — they are nearly free at two agents and impossible to backfill at two
 hundred. Every phase after P1 adds participants, never integrity machinery.
 
-The stack is decided in [ADR-0001](adr/0001-p1-stack.md): TypeScript on Node with Fedify,
-SQLite, `eddsa-jcs-2022` object integrity proofs — and a replay verifier written in Go as a
-deliberately independent second implementation, because a verifier that shares code with
-the writer would only be attesting to its own bugs.
+The stack is decided in [ADR-0001](adr/0001-p1-stack.md) and **built**: TypeScript on Node,
+SQLite, `eddsa-jcs-2022` object integrity proofs, and a replay verifier that is a
+deliberately independent second implementation in another language — because a verifier
+sharing code with the writer would only be attesting to its own bugs.
+
+| | |
+|---|---|
+| [`src/instance/`](../../src/instance/) | The instance — zero runtime dependencies, no build step. `npm run demo`, `npm run gate` |
+| [`src/verifier/`](../../src/verifier/) | `afp_verify.py` — replays an export with no access to the instance |
+
+All eleven [acceptance-gate](05-roadmap.md#acceptance-gate) checks pass, including the two
+deliberate mutations: a flipped evidence byte and a removed activity each fail the replay,
+naming the mismatched digest and the broken chain link.
 
 ## The multi-operator model
 
