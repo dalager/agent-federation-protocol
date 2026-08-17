@@ -40,20 +40,28 @@ export function exportBundle(instance: AfpInstance, dir: string): ExportSummary 
   let activities = 0;
   const actorNames: string[] = [];
 
-  for (const spec of instance.specs) {
-    actorNames.push(spec.name);
-    writeJson(join(dir, "actors", `${spec.name}.jsonld`), instance.agentDocument(spec.name));
-
-    const entries = instance.outbox.byActor(instance.actorId(spec.name));
+  const writeOutbox = (file: string, actorUrl: string): void => {
+    const entries = instance.outbox.byActor(actorUrl);
     activities += entries.length;
-    writeJson(join(dir, "outbox", `${spec.name}.jsonld`), {
+    writeJson(join(dir, "outbox", `${file}.jsonld`), {
       "@context": AFP_CONTEXTS,
-      id: `${instance.actorId(spec.name)}/outbox`,
+      id: `${actorUrl}/outbox`,
       type: "OrderedCollection",
-      attributedTo: instance.actorId(spec.name),
+      attributedTo: actorUrl,
       totalItems: entries.length,
       orderedItems: entries.map((entry) => entry.activity),
     });
+  };
+
+  // The instance's own outbox carries the Vouch/Disown trail the roster is
+  // derived from. Without it a reader can verify *who* is on the roster but not
+  // *how they got there* (01 § Vouch / disown).
+  writeOutbox("instance", String(instance.instanceDocument().id));
+
+  for (const spec of instance.specs) {
+    actorNames.push(spec.name);
+    writeJson(join(dir, "actors", `${spec.name}.jsonld`), instance.agentDocument(spec.name));
+    writeOutbox(spec.name, instance.actorId(spec.name));
   }
 
   const artifacts = instance.artifacts.all();

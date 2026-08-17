@@ -403,11 +403,12 @@
   "afp:operator": "Alpha Robotics Collective",
   "inbox": "https://alpha.operator.example/inbox",
   "outbox": "https://alpha.operator.example/outbox",
-  "publicKey": {
-    "id": "https://alpha.operator.example/actor#main-key",
-    "owner": "https://alpha.operator.example/actor",
-    "publicKeyPem": "-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----"
-  },
+  "assertionMethod": [{
+    "id": "https://alpha.operator.example/actor#ed25519-key",
+    "type": "Multikey",
+    "controller": "https://alpha.operator.example/actor",
+    "publicKeyMultibase": "z6Mkf...ffbq"
+  }],
   "afp:roster": "https://alpha.operator.example/roster",
   "afp:policy": "https://alpha.operator.example/.well-known/afp-policy"
 }</code></pre>
@@ -443,6 +444,8 @@
         <p>Two complementary mechanisms: <strong>(a)</strong> live roster lookup — same trust model as WebFinger; <strong>(b)</strong> a short-lived <code>afp:MembershipProof</code> — a signed attestation <code>{agentId, instanceId, issuedAt, expiresAt, signature}</code> an agent presents at handshake time, so verification survives the instance being briefly unreachable. Treat it like a certificate, not a query.</p>
         <h3>Vouch / disown</h3>
         <p><code>afp:Vouch</code> (instance &rarr; agent: adds/confirms a roster entry, republishes the signed roster) and <code>afp:Disown</code> (removes it, republishes). Both are ordinary signed activities in the instance's outbox — auditable, never side-channel admin actions.</p>
+        <div class="callout"><p><strong>The roster is a projection, not a source.</strong> It is derived by replaying the instance's own <code>Vouch</code>/<code>Disown</code> trail, and signed as a convenience so members can check membership without walking it. An implementation that assembles a roster straight from configuration has made admission exactly the side-channel act this rule exists to prevent: membership verifies, but <em>how an agent came to be a member</em> is unrecorded. The instance therefore has an outbox of its own from P1 onward, and it is part of the export.</p>
+        <p>Because it is derived, a roster must be <strong>byte-stable</strong> between reads: regenerating it with a fresh timestamp on every fetch yields a different signature each time, which an auditor comparing two copies cannot distinguish from tampering. Its <code>created</code> is the time of the last membership change, not of the request.</p></div>
         <h3>Key custody</h3>
         <p>Declared per agent via <code>afp:keyCustody</code> on the roster entry: <code>self</code> (agent holds its own keypair, as in v1/v2) or <code>instance</code> (the instance signs on the agent's behalf, tagging <code>afp:actingAs</code>). Rationale: many operators will run large, low-autonomy fleets where individually rotating N keys is pure overhead. Trade-off stated honestly: instance-custodied signatures push misbehavior attribution more directly onto the instance, since the instance's key is doing the signing — this is <em>intentional</em> and feeds &sect;04's rollup rule.</p>
         <h3>The agent&ndash;instance boundary (ports &amp; adapters)</h3>
@@ -1041,6 +1044,37 @@ sequenceDiagram
         <h3>Outbox integrity: hash-chained logs (<code>afp:prevActivity</code>)</h3>
         <p>Individually signed activities prove <em>authorship</em>, not <em>completeness</em> — omission of an inconvenient activity from an outbox is silent. Optional, RECOMMENDED for audit-grade deployments: a per-actor hash chain — each activity carries <code>afp:prevActivity</code>, the hash of that actor's previous activity — making every outbox append-only-verifiable; a gap or fork is detectable from the chain alone. (L1's <code>afp:observedVotes</code> already cross-references votes within a round; the chain generalizes that protection to the whole log.)</p>
         <div class="note"><strong>Solo-profile caveat, stated plainly:</strong> one operator holds every key and every store. Chained logs protect against bugs and accidental corruption, not against the operator rewriting their own history. Audit-grade solo deployments should periodically <strong>anchor chain heads outside the trust domain</strong>: write-once storage, a timestamping service, or simply federating the shadow Notes (each carrying the current chain-head hash) to an external Mastodon server (&sect;22).</div>
+        <h3>Signature is not authority</h3>
+        <p>A valid signature proves <em>someone holding a published key</em> produced these bytes. It does not prove that key was entitled to speak for the <code>actor</code> named in the activity. Those are different questions, and a replay that asks only the first can be fooled:</p>
+        <ul>
+          <li><strong>The tail of every chain is unprotected by the chain.</strong> <code>afp:prevActivity</code> binds an activity to its predecessor, so altering a middle activity breaks the next link. The <em>last</em> activity in an outbox has no successor to break — it rests on its signature alone. Re-sign it with any published key and a signature-only replay passes.</li>
+          <li><strong>A missing participant leaves no gap.</strong> Chains are per-actor. Delete an actor's outbox entirely and every surviving chain is still intact; nothing in the remaining record points at the hole.</li>
+        </ul>
+        <p>The roster closes both, which is what it is <em>for</em>: it is the signed statement of which agents exist and who may sign for each (<code>afp:keyCustody</code>, &sect;03). A replay that verifies the roster's signature but never reads its contents has verified a document and then ignored it.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th><code>afp:keyCustody</code></th><th>Authorized signer</th><th>Additional requirement</th></tr></thead>
+            <tbody>
+              <tr><td><code>self</code></td><td>The agent's own published key</td><td>&mdash;</td></tr>
+              <tr><td><code>instance</code></td><td>The key of the instance named in the agent's <code>afp:operatedBy</code></td><td><code>afp:actingAs</code> MUST equal <code>actor</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>An activity bearing a valid signature from a key with no authority over its actor is a <strong>forgery</strong>, not a record, and MUST fail the replay.</p>
+
+        <h3>Replay procedure</h3>
+        <ol>
+          <li><strong>Resolve authority</strong> from the signed roster and the actor documents: for each agent, which key may sign for it.</li>
+          <li><strong>Select</strong> by <code>context</code>, ordering by <code>afp:seq</code> where present.</li>
+          <li><strong>Verify each activity</strong>: its signature, <em>and</em> that the signing key was authorized for its <code>actor</code>.</li>
+          <li><strong>Walk each actor's <code>afp:prevActivity</code> chain.</strong></li>
+          <li><strong>Account for every rostered agent.</strong> An agent on the roster with no outbox in the bundle is a missing participant.</li>
+          <li><strong>Verify attachment digests</strong>, discarding bytes that do not match.</li>
+          <li><strong>Check the closing <code>DecisionRecord</code>'s <code>countedVotes</code></strong> against the votes present.</li>
+        </ol>
+        <p>A gap in any chain, a digest mismatch, an activity signed by a key with no authority over its actor, a rostered agent with no outbox, or a counted vote you cannot produce is a failed audit.</p>
+        <div class="note"><strong>Found by building it —</strong> steps 1, 3 and 5 were absent until a P1 implementation was checked against this procedure: a <code>Result</code> re-signed with a <em>different agent's</em> published key passed a full replay, as did a bundle with an entire agent's outbox deleted. Two independent implementations had agreed with each other, because both faithfully implemented an incomplete rule. Independent implementations catch coding mistakes, not specification mistakes.</div>
+
         <h3>Rationale externalization (workflow convention)</h3>
         <p>Provenance stops at the agent&ndash;instance port (&sect;03): internal reasoning that led to a vote is not captured. Where the audit requirement includes <em>why</em>, the workflow must externalize it — convention, not machinery:</p>
         <ul>
@@ -1299,7 +1333,7 @@ flowchart TB
           </table>
         </div>
         <div class="callout"><p><strong>The verifier must not share code with the writer.</strong> If both sides canonicalize with the same buggy function, an invalid record verifies clean — and replay passing is the entire product of P1. A second implementation, in a second language, is therefore not redundancy but the mechanism itself: roughly 200 lines of RFC&nbsp;8785 key-sorting, Ed25519 verification, SHA-256 digests and a <code>prevActivity</code> chain walk. It doubles as the cheapest possible interop test long before P4 goes near Mastodon. Go was chosen for the single static binary an auditor could run with nothing installed; the reference build is Python because no Go toolchain was available, which keeps the essential property and loses the zero-install handoff.</p></div>
-        <p><strong>Built.</strong> All eleven acceptance-gate checks in &sect;24 pass, including the two deliberate mutations: a flipped evidence byte and a removed activity each fail the replay, naming the mismatched digest and the broken chain link. The decision record, and the two choices that changed under contact, are in ADR-0001.</p>
+        <p><strong>Built.</strong> All eleven acceptance-gate checks in &sect;24 pass, including all four deliberate mutations: a flipped evidence byte, a removed activity, an activity re-signed with another agent&rsquo;s key, and a deleted participant each fail the replay with a specific pointer. The decision record, and the two choices that changed under contact, are in ADR-0001.</p>
         <p>Later phases add to this rather than replacing it: CRDTs at P2 (hand-rolled OR-Set/LWW — the delta shapes in &sect;11 are library-agnostic, and Automerge/Yjs solve a harder problem than AFP has), HTTP Signatures and LD proof exchange at P4 (already in Fedify), and hub-relayed anti-entropy at P5. The one thing worth reconsidering at P5 is the state store: SQLite holds a single-operator deployment comfortably, and multi-hub cross-operator sync is where Postgres starts to earn its operational cost.</p>
       </section>
 
@@ -1319,11 +1353,12 @@ flowchart TB
               <table>
                 <thead><tr><th>Area</th><th>What P1 builds</th></tr></thead>
                 <tbody>
-                  <tr><td>Identity</td><td>Instance actor (<code>afp:Instance</code>, &sect;03) + agent actors carrying <code>afp:operatedBy</code> and <code>afp:capabilities</code>; WebFinger optional</td></tr>
-                  <tr><td>Roster</td><td>The signed <code>OrderedCollection</code>, two entries, <code>afp:keyCustody: instance</code> — published from day one even though no peer reads it yet</td></tr>
+                  <tr><td>Identity</td><td>Instance actor (<code>afp:Instance</code>, &sect;03) + agent actors carrying <code>afp:operatedBy</code> and <code>afp:capabilities</code>, each publishing a <strong>Multikey</strong> in <code>assertionMethod</code>; WebFinger optional</td></tr>
+                  <tr><td>Roster</td><td>The signed <code>OrderedCollection</code>, two entries, <code>afp:keyCustody: instance</code> — published from day one, and <strong>derived from the instance's own <code>afp:Vouch</code> trail</strong> rather than from configuration (&sect;03)</td></tr>
                   <tr><td>Flow</td><td><code>Offer{afp:Task}</code> &rarr; <code>Accept</code>/<code>Reject</code> &rarr; <code>Create{afp:Result}</code> or <code>Create{afp:Error}</code>, keyed by <code>afp:correlationId</code> (&sect;07)</td></tr>
                   <tr><td>Signing</td><td>An <strong>object integrity proof</strong> (<code>eddsa-jcs-2022</code>) on every activity — the only signature that survives export, and therefore the only one a replay can check (&sect;06). HTTP Signatures only if P1 is wired over loopback HTTP</td></tr>
                   <tr><td>Transport</td><td>Outbox queue with backoff, dead-letter, and failures surfaced as local <code>Error</code>s (&sect;18)</td></tr>
+                  <tr><td>Timeouts</td><td><code>afp:deadline</code> plus a delegator-side sweep: a performer that never answers yields a recorded <code>afp:Error</code>, because &ldquo;thinking&rdquo; and &ldquo;dead&rdquo; are otherwise indistinguishable (&sect;18)</td></tr>
                   <tr><td>Idempotency</td><td><strong>Both</strong> dedupe layers: transport dedupe on activity <code>id</code>, task-level replay on <code>correlationId</code> (&sect;07)</td></tr>
                   <tr><td>Record</td><td>The four obligations below</td></tr>
                 </tbody>
@@ -1353,11 +1388,19 @@ flowchart TB
 writer  --Offer{Task: "review the revision"}--&gt;  reviewer    correlationId: task-2
         &lt;--Accept--  /  &lt;--Create{Result: approved}--</pre>
             <p>Four activities per outbox, one thread, no network. Then export both outboxes and hand them to <strong>someone who was not there, holds no keys, and has no access to the instance</strong> — only the export and the publicly fetchable actor documents. They run the replay procedure from &sect;16: select by <code>context</code>, verify every signature, walk every <code>afp:prevActivity</code> link, check every attachment digest, confirm the thread reaches a terminal Result.</p>
-            <p>It passes. Then break it twice, on purpose:</p>
-            <ul>
-              <li><strong>Flip one byte</strong> in the archived source document &rarr; replay fails, naming the attachment whose digest no longer matches.</li>
-              <li><strong>Delete one activity</strong> from the middle of the writer's outbox &rarr; replay fails, naming the broken chain link.</li>
-            </ul>
+            <p>It passes. Then break it four ways, on purpose:</p>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Mutation</th><th>What fails</th><th>What it tests</th></tr></thead>
+                <tbody>
+                  <tr><td><strong>Flip one byte</strong> of the archived source document</td><td>The attachment digest no longer matches</td><td>Evidence integrity</td></tr>
+                  <tr><td><strong>Delete one activity</strong> from the middle of an outbox</td><td>The next <code>afp:prevActivity</code> link</td><td>Log completeness</td></tr>
+                  <tr><td><strong>Re-sign the last activity</strong> with another agent's published key</td><td>No authority over that <code>actor</code></td><td>Signer authority</td></tr>
+                  <tr><td><strong>Delete a whole agent's outbox</strong></td><td>A rostered agent with no activities</td><td>Participant completeness</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p>The last two matter because a signature-only replay passes both: the chain does not protect the <em>tail</em> of an outbox, and a per-actor chain cannot show that a participant is missing entirely (&sect;16).</p>
             <div class="callout"><p><strong>P1's deliverable is not a completed task.</strong> It is a record a stranger can verify and a forger cannot quietly edit — produced by a system with two agents and no network.</p></div>
 
             <h3>Acceptance gate</h3>
@@ -1372,7 +1415,7 @@ writer  --Offer{Task: "review the revision"}--&gt;  reviewer    correlationId: t
               <li>Each actor's outbox is an unbroken <code>afp:prevActivity</code> chain from its first activity, and a gap or fork is detectable from the chain alone.</li>
               <li>The thread is grouped by <code>context</code>; no <code>correlationId</code> is reused across tasks.</li>
               <li>The roster verifies as a whole against the instance key <strong>from a cached copy</strong>, with no live roundtrip.</li>
-              <li>Third-party replay by <code>context</code> succeeds on the clean export and fails, with a specific pointer, on each of the two deliberate mutations.</li>
+              <li>Third-party replay by <code>context</code> succeeds on the clean export and fails, with a specific pointer, on each of <strong>four</strong> deliberate mutations: a flipped evidence byte, a removed activity, <strong>an activity re-signed with another agent&rsquo;s published key</strong>, and <strong>a whole agent&rsquo;s outbox deleted</strong>. The last two check <em>authority</em> and <em>completeness</em> rather than integrity (&sect;16).</li>
               <li><strong>The wiring is invisible.</strong> Nothing in any actor document, activity, or outbox reveals that dispatch was in-process. This is the invariant that makes P2&ndash;P7 additive (&sect;03) — a P1 record must be indistinguishable in shape from a federated one.</li>
             </ol>
             <p class="deliverable"><strong>Check 11 is worth failing the phase over.</strong> If it holds, every later phase is a matter of adding participants; if it does not, federation becomes a rewrite.</p>

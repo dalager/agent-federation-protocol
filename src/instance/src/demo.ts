@@ -93,35 +93,69 @@ export async function runDemo(
     rmSync(config.exportDir, { recursive: true, force: true });
   }
 
-  const instance = new AfpInstance(config, agentRegistrations(config), options.clock ?? fixedClock());
+  const clock = options.clock ?? fixedClock();
+  const instance = new AfpInstance(config, agentRegistrations(config), clock);
   const thread = "urn:afp:thread:doc-1";
+  const writer = brainOf(instance, "writer");
 
-  // The human hands the writer a brief, stored as a hash-addressed artifact.
-  const brief = instance.artifacts.put(encoder.encode(BRIEF), "text/plain");
+  // The human hands the writer a brief. It entered from outside AFP, so it
+  // carries source provenance — otherwise the trail begins at "the agent said
+  // so" (07 § Artifacts).
+  const brief = instance.artifacts.put(encoder.encode(BRIEF), "text/plain", clock.now(), {
+    sourceUrl: "urn:afp:operator-brief:doc-1",
+    fetchedAt: clock.now().toISOString(),
+  });
 
-  // Task 1 — writer drafts. Delegated to itself: the brief comes from outside
-  // AFP, so the first hop is the operator asking their own agent to work.
-  instance.delegate({
-    from: "reviewer",
-    to: "writer",
+  // The writer drafts. This is the writer's own work rather than a delegated
+  // task — nobody asked it via AFP — so it enters the record as a signed,
+  // hash-addressed attachment on the Offer it then sends.
+  const drafted = await writer.handle({
     capability: "afp:cap:draft",
     content: "Draft a readiness note from the attached brief.",
+    attachments: [{ mediaType: "text/plain", bytes: encoder.encode(BRIEF) }],
     thread,
-    correlationId: "task-1",
-    attachments: [brief],
   });
-  await instance.run();
+  if (!drafted.ok) throw new Error(`writer could not draft: ${drafted.reason}`);
+  const draft = storeOutput(instance, drafted, clock.now());
 
-  // Task 2 — reviewer critiques the draft the writer just produced.
-  const draft = latestAttachment(instance, "writer");
+  // Task 1 — review the draft.
   instance.delegate({
     from: "writer",
     to: "reviewer",
     capability: "afp:cap:review",
     content: "Review the attached draft for unstated assumptions.",
     thread,
+    correlationId: "task-1",
+    attachments: [brief, draft],
+    producedBy: drafted.producedBy,
+    deadline: new Date(clock.now().getTime() + 10 * 60_000).toISOString(),
+  });
+  await instance.run();
+
+  // The writer revises against the critique, then asks again. This is the
+  // revision the spec's demo is named for: the record has to show the argument,
+  // not just its conclusion.
+  const critique = latestResultContent(instance, "reviewer");
+  const revised = await writer.handle({
+    capability: "afp:cap:draft",
+    content: `Revise your note to address this critique.\n\n${critique}`,
+    attachments: [{ mediaType: "text/plain", bytes: encoder.encode(BRIEF) }],
+    thread,
+  });
+  if (!revised.ok) throw new Error(`writer could not revise: ${revised.reason}`);
+  const revision = storeOutput(instance, revised, clock.now());
+
+  // Task 2 — review the revision.
+  instance.delegate({
+    from: "writer",
+    to: "reviewer",
+    capability: "afp:cap:review",
+    content: "Review the attached revision; the previous critique is addressed.",
+    thread,
     correlationId: "task-2",
-    attachments: draft ? [draft] : [],
+    attachments: [brief, revision],
+    producedBy: revised.producedBy,
+    deadline: new Date(clock.now().getTime() + 10 * 60_000).toISOString(),
   });
   await instance.run();
 
@@ -129,18 +163,32 @@ export async function runDemo(
   return { instance, thread, exported };
 }
 
-/** The most recent artifact an actor attached to a Result. */
-function latestAttachment(instance: AfpInstance, actorName: string) {
+function brainOf(instance: AfpInstance, name: string): Brain {
+  const brain = instance.brainFor(name);
+  if (!brain) throw new Error(`no brain registered for ${name}`);
+  return brain;
+}
+
+/** Store a brain's first attachment as a hash-addressed artifact. */
+function storeOutput(
+  instance: AfpInstance,
+  outcome: { attachments?: { mediaType: string; bytes: Uint8Array }[]; content: string },
+  now: Date,
+) {
+  const artifact = outcome.attachments?.[0];
+  return artifact
+    ? instance.artifacts.put(artifact.bytes, artifact.mediaType, now)
+    : instance.artifacts.put(encoder.encode(outcome.content), "text/markdown", now);
+}
+
+/** The content of an actor's most recent Result — the critique to revise against. */
+function latestResultContent(instance: AfpInstance, actorName: string): string {
   const entries = instance.outbox.byActor(instance.actorId(actorName));
   for (let i = entries.length - 1; i >= 0; i--) {
     const object = entries[i].activity.object;
     if (!object || typeof object !== "object" || Array.isArray(object)) continue;
-    const attachment = (object as Record<string, unknown>).attachment;
-    if (!Array.isArray(attachment) || attachment.length === 0) continue;
-    const digest = (attachment[0] as Record<string, unknown>)["afp:digest"];
-    if (typeof digest !== "string") continue;
-    const ref = instance.artifacts.lookup(digest);
-    if (ref) return ref;
+    const record = object as Record<string, unknown>;
+    if (record.type === "afp:Result" && typeof record.content === "string") return record.content;
   }
-  return null;
+  return "";
 }

@@ -184,10 +184,59 @@ merely long. An audit that lacks them ends in "the agent said so":
 | Side effects executed in external systems | Port agent MUST reconcile: follow-up Result with external ref, artifact hash, observation timestamp | [03](03-coordination.md#external-systems-keep-the-firehose-behind-the-port) |
 | Multi-task workflows | Threaded by AS2 `context`, never by reusing `correlationId` | [03](03-coordination.md#correlation-vs-threading--two-distinct-ids) |
 
-Replay procedure: select by `context` → order by `afp:seq` where present → verify each
-activity's signature and its `afp:prevActivity` chain link → verify attachment digests →
-check the closing `DecisionRecord`'s `countedVotes` against the votes present. A gap in any
-chain, a digest mismatch, or a counted vote you cannot produce is a failed audit.
+### Signature is not authority
+
+A valid signature proves *someone holding a published key* produced these bytes. It does not
+prove that key was entitled to speak for the `actor` named in the activity. Those are
+different questions, and a replay that only asks the first one can be fooled:
+
+- **The tail of every chain is unprotected by the chain.** `afp:prevActivity` binds an
+  activity to its predecessor, so altering a middle activity breaks the next link. The
+  *last* activity in an actor's outbox has no successor to break — it rests on its
+  signature alone. Re-sign it with any published key and a signature-only replay passes.
+- **A missing participant leaves no gap.** Chains are per-actor. Delete an actor's outbox
+  entirely and every surviving chain is still intact; nothing in the remaining record
+  points at the hole.
+
+The roster closes both, which is what it is *for*: it is the signed statement of which
+agents exist and who may sign for each (`afp:keyCustody`). A replay that verifies the
+roster's signature but never reads its contents has verified a document and then ignored it.
+
+**Authority rule.** For every activity, the key that signed it MUST be authorized for its
+`actor`:
+
+| `afp:keyCustody` | Authorized signer | Additional requirement |
+|---|---|---|
+| `self` | The agent's own published key | — |
+| `instance` | The key of the instance named in the agent's `afp:operatedBy` | `afp:actingAs` MUST equal `actor` |
+
+An activity bearing a valid signature from a key with no authority over its actor is a
+**forgery**, not a record, and MUST fail the replay.
+
+### Replay procedure
+
+1. **Resolve authority** from the signed roster and the actor documents: for each agent,
+   which key may sign for it.
+2. **Select** by `context`, ordering by `afp:seq` where present.
+3. **Verify each activity**: its signature, *and* that the signing key was authorized for
+   its `actor` under the rule above.
+4. **Walk each actor's `afp:prevActivity` chain** — first activity starts it, every later
+   one links to its predecessor's digest.
+5. **Account for every rostered agent.** An agent on the roster with no outbox in the
+   bundle is a missing participant.
+6. **Verify attachment digests**, discarding bytes that do not match.
+7. **Check the closing `DecisionRecord`'s `countedVotes`** against the votes present.
+
+A gap in any chain, a digest mismatch, an activity signed by a key with no authority over
+its actor, a rostered agent with no outbox, or a counted vote you cannot produce is a
+failed audit.
+
+> **Found by building it.** Steps 1, 3 and 5 were absent from this procedure until a P1
+> implementation was checked against it: a `Result` re-signed with a *different agent's*
+> published key passed a full replay, as did a bundle with an entire agent's outbox
+> deleted. Two independent implementations had agreed with each other — because both
+> faithfully implemented an incomplete rule. Independent implementations catch coding
+> mistakes, not specification mistakes.
 
 ## Reliability & failure handling
 

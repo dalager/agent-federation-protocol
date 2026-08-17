@@ -19,6 +19,15 @@ export interface ArtifactRef {
   size: number;
   /** Where the bytes are served from. */
   href: string;
+  /** Where evidence obtained outside AFP came from (07 § Artifacts). */
+  sourceUrl?: string;
+  fetchedAt?: string;
+}
+
+/** Provenance for evidence that entered from outside AFP. */
+export interface ExternalSource {
+  sourceUrl: string;
+  fetchedAt: string;
 }
 
 export class Artifacts {
@@ -37,27 +46,53 @@ export class Artifacts {
     return join(this.dir, digest.replace(":", "-"));
   }
 
-  put(bytes: Uint8Array, mediaType: string, now = new Date()): ArtifactRef {
+  /**
+   * Store bytes under their own digest.
+   *
+   * `source` records where evidence came from when it entered from outside AFP —
+   * a fetched page, a client submission, an operator's brief. Without it the
+   * trail stops at "the agent said so" (07 § Artifacts).
+   */
+  put(
+    bytes: Uint8Array,
+    mediaType: string,
+    now = new Date(),
+    source?: ExternalSource,
+  ): ArtifactRef {
     const digest = `sha256:${sha256Hex(bytes)}`;
     const path = this.pathFor(digest);
     if (!existsSync(path)) writeFileSync(path, bytes);
 
     this.db
       .prepare(
-        `INSERT INTO artifacts (digest, media_type, size, created_at) VALUES (?, ?, ?, ?)
+        `INSERT INTO artifacts (digest, media_type, size, created_at, source_url, fetched_at)
+         VALUES (?, ?, ?, ?, ?, ?)
          ON CONFLICT (digest) DO NOTHING`,
       )
-      .run(digest, mediaType, bytes.length, now.toISOString());
+      .run(
+        digest,
+        mediaType,
+        bytes.length,
+        now.toISOString(),
+        source?.sourceUrl ?? null,
+        source?.fetchedAt ?? null,
+      );
 
-    return this.ref(digest, mediaType, bytes.length);
+    return this.ref(digest, mediaType, bytes.length, source);
   }
 
-  private ref(digest: string, mediaType: string, size: number): ArtifactRef {
+  private ref(
+    digest: string,
+    mediaType: string,
+    size: number,
+    source?: ExternalSource,
+  ): ArtifactRef {
     return {
       digest,
       mediaType,
       size,
       href: `${this.origin}/artifacts/${digest.replace(":", "-")}`,
+      ...(source ? { sourceUrl: source.sourceUrl, fetchedAt: source.fetchedAt } : {}),
     };
   }
 
@@ -86,24 +121,35 @@ export class Artifacts {
       .prepare("SELECT * FROM artifacts WHERE digest = ?")
       .get(digest) as Record<string, unknown> | undefined;
     if (!row) return null;
-    return this.ref(String(row.digest), String(row.media_type), Number(row.size));
+    return this.ref(String(row.digest), String(row.media_type), Number(row.size), sourceOf(row));
   }
 
   all(): ArtifactRef[] {
     const rows = this.db
       .prepare("SELECT * FROM artifacts ORDER BY digest")
       .all() as Record<string, unknown>[];
-    return rows.map((row) => this.ref(String(row.digest), String(row.media_type), Number(row.size)));
+    return rows.map((row) =>
+      this.ref(String(row.digest), String(row.media_type), Number(row.size), sourceOf(row)),
+    );
   }
 
   /** An AS2 `Link` carrying the mandatory hash-addressing properties. */
   static toLink(ref: ArtifactRef): Record<string, string | number> {
-    return {
+    const link: Record<string, string | number> = {
       type: "Link",
       href: ref.href,
       mediaType: ref.mediaType,
       "afp:digest": ref.digest,
       "afp:size": ref.size,
     };
+    if (ref.sourceUrl) link["afp:sourceUrl"] = ref.sourceUrl;
+    if (ref.fetchedAt) link["afp:fetchedAt"] = ref.fetchedAt;
+    return link;
   }
+}
+
+function sourceOf(row: Record<string, unknown>): ExternalSource | undefined {
+  return row.source_url
+    ? { sourceUrl: String(row.source_url), fetchedAt: String(row.fetched_at ?? "") }
+    : undefined;
 }

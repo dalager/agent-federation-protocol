@@ -31,11 +31,12 @@ a record a stranger can verify. Stack decision:
 
 | Area | What P1 builds |
 |---|---|
-| Identity | Instance actor (`afp:Instance`) + agent actors carrying `afp:operatedBy` and `afp:capabilities`; WebFinger optional |
-| Roster | The signed `OrderedCollection`, two entries, `afp:keyCustody: instance` — published from day one even though no peer reads it yet |
+| Identity | Instance actor (`afp:Instance`) + agent actors carrying `afp:operatedBy` and `afp:capabilities`, each publishing a **Multikey** in `assertionMethod`; WebFinger optional |
+| Roster | The signed `OrderedCollection`, two entries, `afp:keyCustody: instance` — published from day one even though no peer reads it yet, and **derived from the instance's own `afp:Vouch` trail** rather than from configuration ([01](01-foundations.md#vouch--disown)) |
 | Flow | `Offer{afp:Task}` → `Accept`/`Reject` → `Create{afp:Result}` or `Create{afp:Error}`, keyed by `afp:correlationId` ([03](03-coordination.md#task-delegation--the-v1-baseline-flow-unchanged)) |
 | Signing | An **object integrity proof** (`eddsa-jcs-2022`) on every activity — the only signature that survives export, and therefore the only one a replay can check ([01](01-foundations.md#authentication--two-mechanisms-with-different-lifetimes)). HTTP Signatures only if P1 is wired over loopback HTTP |
 | Transport | Outbox queue with backoff, dead-letter, and failures surfaced as local `Error`s |
+| Timeouts | `afp:deadline` on delegated tasks and a delegator-side sweep: a performer that never answers yields a recorded `afp:Error`, because "thinking" and "dead" are otherwise indistinguishable ([04](04-operations.md#reliability--failure-handling)) |
 | Idempotency | **Both** dedupe layers: transport dedupe on activity `id`, task-level replay on `correlationId` |
 | Record | The four obligations below |
 
@@ -72,19 +73,28 @@ writer  --Offer{Task: "review the revision"}-->  reviewer    correlationId: task
         <--Accept-- / <--Create{Result: approved}--
 ```
 
-Four activities per outbox, one thread, no network. Then export both outboxes and hand them
-to **someone who was not there, holds no keys, and has no access to the instance** — only
-the export and the publicly fetchable actor documents. They run the replay procedure from
-[04](04-operations.md#what-closes-the-trail-at-the-edges): select by `context`, verify every
-signature, walk every `afp:prevActivity` link, check every attachment digest, confirm the
-thread reaches a terminal Result.
+The writer drafts from the brief, delegates the review, **revises against the critique**,
+and delegates again — one thread, two tasks, no network. The drafting itself is the
+writer's own work rather than a delegated task, so it enters the record as a hash-addressed
+attachment on the writer's signed Offer.
 
-It passes. Then break it twice, on purpose:
+Then export the outboxes — the two agents' **and the instance's own**, which carries the
+`Vouch` trail the roster is derived from — and hand them to **someone who was not there,
+holds no keys, and has no access to the instance**. They run the replay procedure from
+[04](04-operations.md#replay-procedure).
 
-- **Flip one byte** in the archived source document → replay fails, naming the attachment
-  whose digest no longer matches.
-- **Delete one activity** from the middle of the writer's outbox → replay fails, naming the
-  broken chain link.
+It passes. Then break it four ways, on purpose:
+
+| Mutation | What fails | What it tests |
+|---|---|---|
+| **Flip one byte** of the archived source document | The attachment digest no longer matches | Evidence integrity |
+| **Delete one activity** from the middle of an outbox | The next `afp:prevActivity` link | Log completeness |
+| **Re-sign the last activity** with another agent's published key | No authority over that `actor` | Signer authority |
+| **Delete a whole agent's outbox** | A rostered agent with no activities | Participant completeness |
+
+The last two matter because a signature-only replay passes both: the chain does not protect
+the *tail* of an outbox, and a per-actor chain cannot show that a participant is missing
+entirely ([04](04-operations.md#signature-is-not-authority)).
 
 **P1's deliverable is not a completed task. It is a record a stranger can verify and a
 forger cannot quietly edit** — produced by a system with two agents and no network.
@@ -110,7 +120,11 @@ done, not aspirations:
 9. The roster verifies as a whole against the instance key **from a cached copy**, with no
    live roundtrip.
 10. Third-party replay by `context` succeeds on the clean export and fails, with a specific
-    pointer, on each of the two deliberate mutations.
+    pointer, on each of **four** deliberate mutations: a flipped evidence byte, a removed
+    activity, **an activity re-signed with another agent's published key**, and **a whole
+    agent's outbox deleted**. The last two check *authority* and *completeness* rather than
+    integrity, and a signature-only replay passes both
+    ([04](04-operations.md#signature-is-not-authority)).
 11. **The wiring is invisible.** Nothing in any actor document, activity, or outbox reveals
     that dispatch was in-process. This is the invariant that makes P2–P7 additive
     ([01](01-foundations.md#the-agentinstance-boundary-ports--adapters)) — a P1 record must

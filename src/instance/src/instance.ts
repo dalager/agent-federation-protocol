@@ -31,7 +31,9 @@ import {
   correlationIdOf,
   createError,
   createResult,
+  disown,
   offerTask,
+  vouch,
   type Envelope,
   type Visibility,
 } from "./ap/activities.ts";
@@ -64,7 +66,6 @@ export class AfpInstance {
 
   private readonly keys = new Map<string, KeyPair>();
   private readonly agents = new Map<string, AgentRegistration>();
-  private counter = 0;
 
   readonly config: Config;
   private readonly clock: Clock;
@@ -99,6 +100,8 @@ export class AfpInstance {
         ),
       );
     }
+
+    this.provision();
   }
 
   close(): void {
@@ -126,12 +129,107 @@ export class AfpInstance {
     return agentActor(this.config.origin, agent.spec, this.key(name));
   }
 
-  rosterDocument(created?: string) {
-    return signedRoster(this.config.origin, this.specs, this.key("@instance"), created);
+  /**
+   * The roster, **derived by replaying the instance's own `Vouch`/`Disown` trail**.
+   *
+   * It is a projection, not a source. Assembling one from configuration would
+   * make admission the side-channel act that trail exists to prevent. Because it
+   * is derived, it is also byte-stable: `created` is the time of the last
+   * membership change, not of this request, so two fetches produce identical
+   * bytes and an auditor comparing copies sees tampering rather than noise
+   * (01 § Vouch / disown).
+   */
+  rosterDocument() {
+    const members = new Map<string, AgentSpec>();
+    let lastChange = "";
+
+    for (const entry of this.outbox.byActor(instanceActorId(this.config.origin))) {
+      const type = String(entry.activity.type ?? "");
+      const object = entry.activity.object as Record<string, JsonValue> | undefined;
+      const agentUrl = typeof object?.agent === "string" ? object.agent : null;
+      if (!agentUrl || (type !== "afp:Vouch" && type !== "afp:Disown")) continue;
+
+      const name = agentUrl.split("/").pop() ?? agentUrl;
+      if (type === "afp:Vouch") {
+        const capabilities = Array.isArray(object?.["afp:capabilities"])
+          ? (object["afp:capabilities"] as JsonValue[]).map(String)
+          : [];
+        members.set(name, {
+          name,
+          capabilities,
+          keyCustody: String(object?.["afp:keyCustody"] ?? "instance") as AgentSpec["keyCustody"],
+          since: String(object?.since ?? entry.published),
+        });
+      } else {
+        members.delete(name);
+      }
+      lastChange = entry.published;
+    }
+
+    return signedRoster(
+      this.config.origin,
+      [...members.values()],
+      this.key("@instance"),
+      lastChange || undefined,
+    );
+  }
+
+  /**
+   * Record a `Vouch` for any registered agent that has not been vouched for yet.
+   *
+   * Idempotent: re-opening an existing instance adds nothing, because the trail
+   * already carries the admission.
+   */
+  private provision(): void {
+    const vouched = new Set(
+      this.rosterDocument().orderedItems instanceof Array
+        ? (this.rosterDocument().orderedItems as Record<string, JsonValue>[]).map((entry) =>
+            String(entry.agent),
+          )
+        : [],
+    );
+
+    for (const agent of this.agents.values()) {
+      const agentUrl = this.actorId(agent.spec.name);
+      if (vouched.has(agentUrl)) continue;
+      this.publishAsInstance([], "urn:afp:thread:roster", "public", (envelope) =>
+        vouch(envelope, {
+          agent: agentUrl,
+          capabilities: agent.spec.capabilities,
+          keyCustody: agent.spec.keyCustody,
+        }),
+      );
+    }
+  }
+
+  /**
+   * True when every activity referencing this artifact is `public`.
+   *
+   * Artifacts inherit the visibility of what referenced them (07 § Artifacts),
+   * so an artifact attached to a `parties` Task is not world-readable even
+   * though its URL is guessable from the digest.
+   */
+  artifactIsPublic(digest: string): boolean {
+    const referencing = this.db
+      .prepare("SELECT visibility, activity_json FROM outbox WHERE activity_json LIKE ?")
+      .all(`%${digest}%`) as Record<string, unknown>[];
+    return referencing.length > 0 && referencing.every((row) => String(row.visibility) === "public");
+  }
+
+  /** Remove an agent from the roster, on the record. */
+  disownAgent(name: string, reason: string): OutboxEntry {
+    return this.publishAsInstance([], "urn:afp:thread:roster", "public", (envelope) =>
+      disown(envelope, this.actorId(name), reason),
+    );
   }
 
   actorId(name: string): string {
     return agentActorId(this.config.origin, name);
+  }
+
+  /** The brain registered for an agent — used by workflows that drive it directly. */
+  brainFor(name: string): Brain | null {
+    return this.agents.get(name)?.brain ?? null;
   }
 
   private nameOf(actorUrl: string): string | null {
@@ -166,25 +264,71 @@ export class AfpInstance {
     const agent = this.agents.get(actorName);
     if (!agent) throw new Error(`unknown agent ${actorName}`);
 
-    const actor = this.actorId(actorName);
-    const now = this.clock.now().toISOString();
-    const seq = this.outbox.nextSeq(actor);
-
-    const envelope: Envelope = {
-      activityId: `${actor}/activities/${String(seq).padStart(4, "0")}`,
-      actor,
+    const custody = agent.spec.keyCustody;
+    return this.emit({
+      actor: this.actorId(actorName),
+      signerName: custody === "instance" ? "@instance" : actorName,
+      // Instance-custody signatures name the agent they act for, so the
+      // authority rule can bind signer to actor on replay (04 § Signature is
+      // not authority).
+      actingAs: custody === "instance" ? this.actorId(actorName) : null,
       to,
       thread,
       visibility,
+      build,
+    });
+  }
+
+  /**
+   * Publish from the instance actor itself.
+   *
+   * The instance has an outbox from P1 onward because `Vouch`/`Disown` live in
+   * it: admission has to be a recorded, signed act rather than a side-channel
+   * one (01 § Vouch / disown).
+   */
+  publishAsInstance(
+    to: readonly string[],
+    thread: string,
+    visibility: Visibility,
+    build: (envelope: Envelope) => { [key: string]: JsonValue },
+  ): OutboxEntry {
+    return this.emit({
+      actor: instanceActorId(this.config.origin),
+      signerName: "@instance",
+      actingAs: null,
+      to,
+      thread,
+      visibility,
+      build,
+    });
+  }
+
+  private emit(options: {
+    actor: string;
+    signerName: string;
+    actingAs: string | null;
+    to: readonly string[];
+    thread: string;
+    visibility: Visibility;
+    build: (envelope: Envelope) => { [key: string]: JsonValue };
+  }): OutboxEntry {
+    const now = this.clock.now().toISOString();
+    const seq = this.outbox.nextSeq(options.actor);
+
+    const envelope: Envelope = {
+      activityId: `${options.actor}/activities/${String(seq).padStart(4, "0")}`,
+      actor: options.actor,
+      to: options.to,
+      thread: options.thread,
+      visibility: options.visibility,
       published: now,
-      prevActivity: this.outbox.headDigest(actor),
+      prevActivity: this.outbox.headDigest(options.actor),
     };
 
-    let activity = build(envelope);
-    const custody = agent.spec.keyCustody;
-    const signer = custody === "instance" ? this.key("@instance") : this.key(actorName);
-    if (custody === "instance") activity["afp:actingAs"] = actor;
+    const activity = options.build(envelope);
+    if (options.actingAs) activity["afp:actingAs"] = options.actingAs;
 
+    const signer = this.key(options.signerName);
     const signed = attachProof(activity, {
       privateKey: signer.privateKey,
       verificationMethod: signer.keyId,
@@ -192,7 +336,7 @@ export class AfpInstance {
     }) as unknown as { [key: string]: JsonValue };
 
     const entry = this.outbox.append(signed);
-    for (const target of to) this.queue.enqueue(target, signed, this.clock.now());
+    for (const target of options.to) this.queue.enqueue(target, signed, this.clock.now());
     return entry;
   }
 
@@ -206,6 +350,7 @@ export class AfpInstance {
     correlationId: string;
     attachments?: ArtifactRef[];
     deadline?: string;
+    producedBy?: string;
     visibility?: Visibility;
   }): OutboxEntry {
     const target = this.actorId(options.to);
@@ -221,6 +366,7 @@ export class AfpInstance {
           correlationId: options.correlationId,
           content: options.content,
           deadline: options.deadline,
+          producedBy: options.producedBy,
           attachments: (options.attachments ?? []).map((ref) => Artifacts.toLink(ref) as JsonValue),
         }),
     );
@@ -448,6 +594,8 @@ export class AfpInstance {
    * local `afp:Error` so an exhausted delivery is never a silent drop.
    */
   async run(transport: Transport = this.localTransport()): Promise<void> {
+    this.sweepOverdue();
+
     for (let pass = 0; pass < 8; pass++) {
       const report = await this.queue.drain(transport, this.clock.now());
 
@@ -471,6 +619,36 @@ export class AfpInstance {
 
       if (report.delivered === 0 && report.deadLettered.length === 0) break;
     }
+
+    this.sweepOverdue();
+  }
+
+  /**
+   * Close out tasks whose deadline has passed with no outcome.
+   *
+   * "Thinking" and "dead" look identical over an async inbox (04 § Reliability),
+   * so a performer that simply never answers would otherwise leave a pending
+   * task open forever and the thread would never reach a terminal outcome. The
+   * delegator records the timeout itself, as an `afp:Error` on the same thread.
+   */
+  sweepOverdue(): number {
+    const overdue = this.tasks.overdue(this.clock.now());
+
+    for (const task of overdue) {
+      const delegator = this.nameOf(task.delegator);
+      if (!delegator) continue;
+      this.publish(delegator, [], task.thread, "parties", (envelope) =>
+        createError(envelope, {
+          errorId: `${envelope.actor}/errors/deadline-${task.correlationId}`,
+          correlationId: task.correlationId,
+          code: "afp:err:deadline-missed",
+          reason: `no outcome from ${task.performer} by ${task.deadline}`,
+        }),
+      );
+      this.tasks.setState(task.correlationId, "failed", this.clock.now());
+    }
+
+    return overdue.length;
   }
 
   /** Digest of an activity as recorded in the chain — exposed for tests. */

@@ -88,7 +88,10 @@ CREATE TABLE IF NOT EXISTS artifacts (
   digest     TEXT PRIMARY KEY,
   media_type TEXT NOT NULL,
   size       INTEGER NOT NULL,
-  created_at TEXT NOT NULL
+  created_at TEXT NOT NULL,
+  -- Provenance for evidence that entered from outside AFP (07 § Artifacts).
+  source_url TEXT,
+  fetched_at TEXT
 );
 `;
 

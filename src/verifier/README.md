@@ -41,6 +41,10 @@ another implementation.
 | Actor documents publish verification keys | Nothing can be verified at all |
 | Roster signature verifies **from the cached copy** | Membership was altered, or the roster needs a live roundtrip it should not need |
 | Every activity's proof verifies | The record was edited after signing |
+| **Every signing key had authority over its actor** | A valid signature from a key entitled to sign for someone else — a forgery |
+| **Every rostered agent contributes an outbox** | A whole participant was removed; no per-actor chain can show this |
+| **Every artifact is referenced by an activity** | Unbound evidence, travelling with the record but proving nothing |
+| Outbox `totalItems` matches its contents | The collection disagrees with itself |
 | Every activity declares `afp:visibility` | The record does not say who may read it |
 | Every attachment carries `afp:digest`, and the bytes match | Evidence was swapped or altered |
 | Each actor's chain starts at its first activity | The log does not begin where it claims |
@@ -71,6 +75,13 @@ the instance's source. Signatures are `eddsa-jcs-2022`
    resolved from the `assertionMethod` entries of the actor documents in the
    bundle. `proofValue` is multibase base58btc (`z` prefix).
 
+**Authority.** A signature answers *who wrote these bytes*, not *who was entitled to*. For
+each activity the signing key must be authorized for its `actor`, per the roster's
+`afp:keyCustody`: under `self` custody the agent's own key, under `instance` custody the key
+of its `afp:operatedBy` instance — and then `afp:actingAs` must name the agent. This is not
+belt-and-braces: the **tail** of every chain has no successor to protect it, so an
+unauthorized re-signing of the last activity is invisible to integrity checks alone.
+
 Chain digests use the same canonicalization: `afp:prevActivity` is
 `sha256:<hex>` over the canonical form of the previous activity **including its
 proof**, so the chain binds signed bytes rather than a payload someone could
@@ -84,12 +95,14 @@ instance.jsonld         the instance actor
 roster.jsonld           the signed roster
 actors/<name>.jsonld    agent actors, each carrying a Multikey
 outbox/<name>.jsonld    OrderedCollection of signed activities, in chain order
+outbox/instance.jsonld  the instance's own Vouch/Disown trail — how the roster came to be
 artifacts/sha256-<hex>  raw bytes, named by their own digest
 ```
 
 ## Trying to break it
 
-The two mutations P1's demo calls for, and what they produce:
+The four mutations P1's demo calls for. The first two are integrity failures; the
+last two are the ones a signature-only replay accepts.
 
 ```bash
 cp -r ../instance/export /tmp/tampered
@@ -109,5 +122,19 @@ python3 afp_verify.py /tmp/tampered
 #          expected afp:prevActivity sha256:4bd2ba5a…, found sha256:7f02ecf5…
 ```
 
-Both are exercised automatically by gate check 10 in
+And the two that need the roster:
+
+```bash
+# re-sign the LAST activity of an outbox with another agent's published key
+python3 afp_verify.py /tmp/tampered
+# [ FAIL ] authority: writer[1] …/activities/0002
+#          signed with …/agents/reviewer#ed25519-key, which has no authority over …/agents/writer
+
+# delete a whole agent's outbox — every surviving chain is still intact
+python3 afp_verify.py /tmp/tampered
+# [ FAIL ] completeness: rostered agent writer has an outbox
+#          …/agents/writer is on the signed roster but contributes no outbox to this bundle
+```
+
+All four are exercised automatically by gate check 10 in
 `../instance/test/gate.test.ts`, which shells out to this script.

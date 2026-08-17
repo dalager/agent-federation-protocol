@@ -33,15 +33,24 @@ agreement with.
   "afp:operator": "Alpha Robotics Collective",
   "inbox": "https://alpha.operator.example/inbox",
   "outbox": "https://alpha.operator.example/outbox",
-  "publicKey": {
-    "id": "https://alpha.operator.example/actor#main-key",
-    "owner": "https://alpha.operator.example/actor",
-    "publicKeyPem": "-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----"
-  },
+  "assertionMethod": [{
+    "id": "https://alpha.operator.example/actor#ed25519-key",
+    "type": "Multikey",
+    "controller": "https://alpha.operator.example/actor",
+    "publicKeyMultibase": "z6Mkf...ffbq"
+  }],
   "afp:roster": "https://alpha.operator.example/roster",
   "afp:policy": "https://alpha.operator.example/.well-known/afp-policy"
 }
 ```
+
+**Two key formats, two jobs.** `assertionMethod` publishes a **Multikey**, which is what
+`eddsa-jcs-2022` object integrity proofs verify against — required from P1, because proofs
+are what survive an export. HTTP Signatures instead read a `publicKey`/`publicKeyPem`
+entry; an instance adds one at **P4**, when it first has a hop to authenticate and needs to
+interoperate with Mastodon. Publishing both is normal and they may share a key. Publishing
+only `publicKeyPem` — as earlier revisions of this example did — leaves every object proof
+unverifiable.
 
 **Agent → instance link.** Every agent actor document carries `afp:operatedBy`:
 
@@ -91,6 +100,18 @@ Two complementary mechanisms:
 `afp:Vouch` (instance → agent: adds/confirms a roster entry, republishes the signed roster)
 and `afp:Disown` (removes it, republishes). Both are ordinary signed activities in the
 instance's outbox — auditable, never side-channel admin actions.
+
+**The roster is a projection, not a source.** It is derived by replaying the instance's own
+`Vouch`/`Disown` trail, and signed as a convenience so members can check it without walking
+that trail. An implementation that assembles a roster straight from configuration has made
+admission exactly the side-channel act this rule exists to prevent: the membership verifies,
+but *how an agent came to be a member* is unrecorded and unauditable. The instance therefore
+has an outbox of its own from P1 onward, and it is part of the export.
+
+Because a roster is derived, it must be **byte-stable** between reads: regenerating it with
+a fresh timestamp on every fetch yields a different signature each time, which an auditor
+comparing two copies cannot distinguish from tampering. Its `created` is the time of the
+last membership change, not the time of the request.
 
 ### Key custody
 

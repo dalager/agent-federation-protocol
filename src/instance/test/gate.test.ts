@@ -273,39 +273,76 @@ describe("P1 acceptance gate", () => {
       "an agent was added to the roster without breaking its signature");
   });
 
-  it("10 — an independent verifier passes the clean export and fails each mutation", async () => {
-    const { exported, thread } = await freshDemo();
+  it("10 — an independent verifier passes the clean export and fails all four mutations", async () => {
+    const { instance, exported, thread } = await freshDemo();
+    const config = instance.config;
     const verifier = join(import.meta.dirname, "..", "..", "verifier", "afp_verify.py");
 
     const clean = runVerifier(verifier, exported.dir, thread);
     assert.equal(clean.code, 0, `clean export failed to verify:\n${clean.output}`);
     assert.match(clean.output, /PASSED/);
 
-    // Mutation A — flip one byte of archived evidence.
-    const flipped = join(workspace().dataDir, "flipped");
-    cpSync(exported.dir, flipped, { recursive: true });
-    const artifactDir = join(flipped, "artifacts");
-    const artifact = join(artifactDir, readdirSync(artifactDir)[0]);
+    const mutate = (name: string): string => {
+      const dir = join(workspace().dataDir, name);
+      cpSync(exported.dir, dir, { recursive: true });
+      return dir;
+    };
+
+    // A — flip one byte of archived evidence. Tests integrity.
+    const flipped = mutate("flipped");
+    const artifact = join(flipped, "artifacts", readdirSync(join(flipped, "artifacts"))[0]);
     const bytes = readFileSync(artifact);
     bytes[0] ^= 0x01;
     writeFileSync(artifact, bytes);
+    const flippedResult = runVerifier(verifier, flipped, thread);
+    assert.equal(flippedResult.code, 1, "a flipped evidence byte was not detected");
+    assert.match(flippedResult.output, /matches its digest/);
 
-    const tamperedArtifact = runVerifier(verifier, flipped, thread);
-    assert.equal(tamperedArtifact.code, 1, "a flipped evidence byte was not detected");
-    assert.match(tamperedArtifact.output, /matches its digest/);
-
-    // Mutation B — remove one activity from the middle of an outbox.
-    const gapped = join(workspace().dataDir, "gapped");
-    cpSync(exported.dir, gapped, { recursive: true });
-    const outboxPath = join(gapped, "outbox", "writer.jsonld");
-    const outbox = JSON.parse(readFileSync(outboxPath, "utf8"));
-    outbox.orderedItems.splice(1, 1);
-    outbox.totalItems = outbox.orderedItems.length;
-    writeFileSync(outboxPath, JSON.stringify(outbox, null, 2));
-
+    // B — remove one activity from the middle of an outbox. Tests log completeness.
+    const gapped = mutate("gapped");
+    const gappedPath = join(gapped, "outbox", "reviewer.jsonld");
+    const gappedOutbox = JSON.parse(readFileSync(gappedPath, "utf8"));
+    gappedOutbox.orderedItems.splice(1, 1);
+    gappedOutbox.totalItems = gappedOutbox.orderedItems.length;
+    writeFileSync(gappedPath, JSON.stringify(gappedOutbox, null, 2));
     const gappedResult = runVerifier(verifier, gapped, thread);
     assert.equal(gappedResult.code, 1, "a removed activity was not detected");
     assert.match(gappedResult.output, /links to its predecessor/);
+
+    // C — re-sign the TAIL of an outbox with another agent's published key.
+    // The chain cannot catch this: the last activity has no successor to break.
+    // Only the roster's authority rule can (04 § Signature is not authority).
+    const forged = mutate("forged");
+    const reviewerKey = loadOrCreateKeyPair(
+      config.keyDir,
+      "reviewer",
+      instance.actorId("reviewer"),
+    );
+    const forgedPath = join(forged, "outbox", "writer.jsonld");
+    const forgedOutbox = JSON.parse(readFileSync(forgedPath, "utf8"));
+    const tail = forgedOutbox.orderedItems.length - 1;
+    const activity = JSON.parse(JSON.stringify(forgedOutbox.orderedItems[tail]));
+    delete activity.proof;
+    activity.object.content = "FORGED: approved, ship it.";
+    forgedOutbox.orderedItems[tail] = attachProof(activity, {
+      privateKey: reviewerKey.privateKey,
+      verificationMethod: reviewerKey.keyId,
+      created: String(activity.published),
+    });
+    writeFileSync(forgedPath, JSON.stringify(forgedOutbox, null, 2));
+    const forgedResult = runVerifier(verifier, forged, thread);
+    assert.equal(forgedResult.code, 1, "a tail activity re-signed with another key was accepted");
+    assert.match(forgedResult.output, /no authority over/);
+
+    // D — delete a whole agent's outbox. Chains are per-actor, so no surviving
+    // chain has a gap; only the roster shows the participant is missing.
+    const erased = mutate("erased");
+    rmSync(join(erased, "outbox", "writer.jsonld"));
+    const erasedResult = runVerifier(verifier, erased, thread);
+    assert.equal(erasedResult.code, 1, "a deleted participant was not detected");
+    assert.match(erasedResult.output, /is on the signed roster but contributes no outbox/);
+
+    instance.close();
   });
 
   it("11 — the record carries no trace of in-process wiring", async () => {
@@ -342,6 +379,89 @@ describe("P1 acceptance gate", () => {
       const doc = readFileSync(join(exported.dir, "actors", `${spec.name}.jsonld`), "utf8");
       assert.ok(!doc.includes("PRIVATE KEY"), `${spec.name}'s actor document contains a private key`);
     }
+    instance.close();
+  });
+});
+
+describe("spec conformance — findings from the P1 review", () => {
+  it("admission is on the record: the roster is derived from a Vouch trail", async () => {
+    const { instance } = await freshDemo();
+    const instanceUrl = String(instance.instanceDocument().id);
+
+    const vouches = instance.outbox
+      .byActor(instanceUrl)
+      .filter((entry) => entry.activity.type === "afp:Vouch");
+    assert.equal(vouches.length, instance.specs.length,
+      "every agent should have a signed Vouch, not a config entry");
+
+    // The roster is a projection of that trail, not a source of truth.
+    const roster = instance.rosterDocument();
+    const rostered = (roster.orderedItems as Record<string, string>[]).map((e) => e.agent).sort();
+    const vouched = vouches.map((v) => String((v.activity.object as Record<string, string>).agent)).sort();
+    assert.deepEqual(rostered, vouched);
+
+    // Disowning is equally on the record, and the projection follows it.
+    instance.disownAgent("reviewer", "no longer in service");
+    const after = (instance.rosterDocument().orderedItems as Record<string, string>[]).map((e) => e.agent);
+    assert.ok(!after.some((a) => a.endsWith("/reviewer")), "Disown did not remove the entry");
+    instance.close();
+  });
+
+  it("the roster is byte-stable between reads", async () => {
+    const { instance } = await freshDemo();
+    const first = JSON.stringify(instance.rosterDocument());
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    const second = JSON.stringify(instance.rosterDocument());
+    assert.equal(first, second,
+      "regenerating the roster with a fresh timestamp makes tampering indistinguishable from noise");
+    instance.close();
+  });
+
+  it("a deadline that passes with no outcome becomes a recorded afp:Error", async () => {
+    const paths = workspace();
+    const config = loadConfig(paths);
+    const instance = new AfpInstance(config, agentRegistrations(config), fixedClock());
+
+    // Offer a task whose deadline is already in the past, and never deliver it:
+    // "thinking" and "dead" are indistinguishable, so the delegator must decide.
+    instance.delegate({
+      from: "writer", to: "reviewer", capability: "afp:cap:review",
+      content: "review", thread: "urn:afp:thread:late", correlationId: "task-late",
+      deadline: "2020-01-01T00:00:00.000Z",
+    });
+
+    assert.equal(instance.sweepOverdue(), 1, "the overdue task was not swept");
+    const errors = instance.outbox
+      .byActor(instance.actorId("writer"))
+      .filter((entry) => objectType(entry.activity) === "afp:Error");
+    assert.equal(errors.length, 1);
+    assert.match(String(errorCode(errors[0].activity)), /deadline-missed/);
+    assert.equal(instance.tasks.get("task-late")?.state, "failed");
+    instance.close();
+  });
+
+  it("evidence from outside AFP carries its source provenance", async () => {
+    const { instance } = await freshDemo();
+    const links = instance.specs
+      .flatMap((spec) => instance.outbox.byActor(instance.actorId(spec.name)))
+      .flatMap((entry) => attachmentsOf(entry.activity));
+
+    const external = instance.artifacts.all().filter((ref) => ref.sourceUrl);
+    assert.ok(external.length > 0, "the operator's brief should record where it came from");
+    for (const ref of external) {
+      assert.ok(ref.fetchedAt, `${ref.digest} has a sourceUrl but no fetchedAt`);
+    }
+    assert.ok(links.length > 0);
+    instance.close();
+  });
+
+  it("the instance's own outbox is part of the export", async () => {
+    const { instance, exported } = await freshDemo();
+    const path = join(exported.dir, "outbox", "instance.jsonld");
+    const outbox = JSON.parse(readFileSync(path, "utf8"));
+    assert.equal(outbox.attributedTo, String(instance.instanceDocument().id));
+    assert.ok(outbox.orderedItems.length > 0,
+      "without the instance outbox a reader sees who is on the roster but not how");
     instance.close();
   });
 });

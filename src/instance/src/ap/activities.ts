@@ -48,6 +48,8 @@ export interface TaskSpec {
   correlationId: string;
   content: string;
   deadline?: string;
+  /** What produced any attached work product — symmetric with `ResultSpec`. */
+  producedBy?: string;
   attachments?: JsonValue[];
 }
 
@@ -60,6 +62,7 @@ export function offerTask(envelope: Envelope, task: TaskSpec): { [key: string]: 
     content: task.content,
   };
   if (task.deadline) object["afp:deadline"] = task.deadline;
+  if (task.producedBy) object["afp:producedBy"] = task.producedBy;
   if (task.attachments?.length) object.attachment = task.attachments;
 
   return { ...base(envelope, "Offer"), object };
@@ -144,6 +147,46 @@ export function createError(envelope: Envelope, spec: ErrorSpec): { [key: string
       content: spec.reason,
       attributedTo: envelope.actor,
     },
+  };
+}
+
+export interface VouchSpec {
+  agent: string;
+  capabilities: readonly string[];
+  keyCustody: "self" | "instance";
+}
+
+/**
+ * `afp:Vouch` — the instance adds or confirms a roster entry.
+ *
+ * The roster is a *projection* of these; assembling one straight from
+ * configuration would make admission the side-channel act this activity exists
+ * to prevent (01 § Vouch / disown).
+ */
+export function vouch(envelope: Envelope, spec: VouchSpec): { [key: string]: JsonValue } {
+  return {
+    ...base(envelope, "afp:Vouch"),
+    object: {
+      type: "afp:RosterEntry",
+      agent: spec.agent,
+      status: "active",
+      "afp:keyCustody": spec.keyCustody,
+      "afp:capabilities": [...spec.capabilities],
+      since: envelope.published,
+    },
+  };
+}
+
+/** `afp:Disown` — the instance removes an agent from its roster. */
+export function disown(
+  envelope: Envelope,
+  agent: string,
+  reason: string,
+): { [key: string]: JsonValue } {
+  return {
+    ...base(envelope, "afp:Disown"),
+    object: { type: "afp:RosterEntry", agent, status: "removed", since: envelope.published },
+    summary: reason,
   };
 }
 

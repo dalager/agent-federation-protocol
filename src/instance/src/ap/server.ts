@@ -63,11 +63,18 @@ export function createHttpServer(instance: AfpInstance): Server {
       if (artifactMatch) {
         const digest = artifactMatch[1].replace("-", ":");
         const ref = instance.artifacts.lookup(digest);
-        const bytes = instance.artifacts.get(digest);
-        // Artifacts inherit the visibility of the activity that referenced them,
-        // and P1's are all `parties` — so a stranger gets nothing here either.
+        // `get` re-hashes before returning, so bytes that no longer match their
+        // own name are indistinguishable from an absent artifact.
+        const bytes = ref ? instance.artifacts.get(digest) : null;
         if (!ref || !bytes) return notFound();
-        return notFound();
+
+        // An artifact inherits the visibility of the activity that referenced
+        // it. Serve it unauthenticated only if every such activity is `public`;
+        // otherwise a stranger gets 404, like any other closed resource.
+        if (!instance.artifactIsPublic(digest)) return notFound();
+
+        res.writeHead(200, { "content-type": ref.mediaType, "content-length": String(ref.size) });
+        return res.end(Buffer.from(bytes));
       }
 
       if (path === "/.well-known/afp-policy") {

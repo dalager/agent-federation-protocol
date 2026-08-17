@@ -11,9 +11,16 @@ finding rather than a nuisance.
 
 Exit status is 0 only if every check passes.
 
-The replay procedure, per 04 "What closes the trail at the edges":
-    select by context -> verify each signature -> walk each prevActivity chain
-    -> verify attachment digests -> confirm the thread reaches a terminal Result
+The replay procedure, per 04 "Replay procedure":
+    resolve authority from the roster -> select by context -> verify each
+    signature AND that its key had authority over the actor -> walk each
+    prevActivity chain -> account for every rostered agent -> verify attachment
+    digests -> confirm the thread reaches a terminal Result
+
+Authority and completeness are not decoration. A signature-only replay accepts
+an activity re-signed with any published key (the tail of a chain has no
+successor to protect it) and accepts a bundle with a whole agent's outbox
+deleted (chains are per-actor, so nothing points at the hole).
 """
 
 from __future__ import annotations
@@ -154,16 +161,127 @@ def load_json(path: Path) -> dict:
 def collect_public_keys(export: Path) -> dict[str, bytes]:
     """Map every published verification method id to its raw key bytes."""
     keys: dict[str, bytes] = {}
-    documents = [export / "instance.jsonld"]
-    documents += sorted((export / "actors").glob("*.jsonld"))
-
-    for path in documents:
-        if not path.exists():
-            continue
+    for path in actor_documents(export):
         for method in load_json(path).get("assertionMethod", []):
             if isinstance(method, dict) and "publicKeyMultibase" in method:
                 keys[method["id"]] = decode_multikey(method["publicKeyMultibase"])
     return keys
+
+
+def actor_documents(export: Path) -> list[Path]:
+    paths = [export / "instance.jsonld"]
+    paths += sorted((export / "actors").glob("*.jsonld"))
+    return [p for p in paths if p.exists()]
+
+
+@dataclass
+class Authority:
+    """Which keys may sign for which actor, per the signed roster.
+
+    A valid signature only proves that *someone holding a published key* wrote
+    these bytes. Authority is the separate question of whether that key was
+    entitled to speak for the actor named in the activity — see
+    04 "Signature is not authority".
+    """
+
+    # actor URL -> verification-method ids permitted to sign for it
+    keys_for_actor: dict[str, set[str]] = field(default_factory=dict)
+    # actor URL -> True when the roster says the instance signs on its behalf
+    instance_custody: dict[str, bool] = field(default_factory=dict)
+    rostered: set[str] = field(default_factory=set)
+
+
+def build_authority(export: Path) -> Authority:
+    """Derive signing authority from the roster plus the actor documents."""
+    authority = Authority()
+
+    # Which key ids does each actor control, per its own document?
+    controlled: dict[str, set[str]] = {}
+    for path in actor_documents(export):
+        doc = load_json(path)
+        actor = doc.get("id")
+        if not actor:
+            continue
+        ids = {
+            m["id"]
+            for m in doc.get("assertionMethod", [])
+            if isinstance(m, dict) and "id" in m
+        }
+        controlled[actor] = ids
+        # An instance speaks for itself with its own keys.
+        authority.keys_for_actor.setdefault(actor, set()).update(ids)
+
+    instance_doc = export / "instance.jsonld"
+    instance_id = load_json(instance_doc).get("id") if instance_doc.exists() else None
+
+    roster_path = export / "roster.jsonld"
+    if not roster_path.exists():
+        return authority
+
+    for entry in load_json(roster_path).get("orderedItems", []):
+        if not isinstance(entry, dict):
+            continue
+        agent = entry.get("agent")
+        if not agent:
+            continue
+        authority.rostered.add(agent)
+
+        custody = entry.get("afp:keyCustody", "instance")
+        if custody == "self":
+            authority.instance_custody[agent] = False
+            authority.keys_for_actor.setdefault(agent, set()).update(controlled.get(agent, set()))
+        else:
+            # `instance` custody: the operating instance signs, and must say so.
+            authority.instance_custody[agent] = True
+            operator = agent_operator(export, agent) or instance_id
+            authority.keys_for_actor[agent] = set(controlled.get(operator, set()))
+
+    return authority
+
+
+def agent_operator(export: Path, agent_url: str) -> str | None:
+    """The instance an agent declares as its operator, from its actor document."""
+    for path in sorted((export / "actors").glob("*.jsonld")):
+        doc = load_json(path)
+        if doc.get("id") == agent_url:
+            return doc.get("afp:operatedBy")
+    return None
+
+
+def check_authority(report: Report, authority: Authority, label: str, activity: dict) -> None:
+    """The signing key must be entitled to speak for this activity's actor."""
+    actor = activity.get("actor")
+    proof = activity.get("proof")
+    method = proof.get("verificationMethod") if isinstance(proof, dict) else None
+
+    permitted = authority.keys_for_actor.get(actor)
+    if permitted is None:
+        report.record(
+            f"authority: {label}",
+            False,
+            f"actor {actor} is not on the roster, so nothing may be signed for it",
+        )
+        return
+
+    ok = method in permitted
+    report.record(
+        f"authority: {label}",
+        ok,
+        "" if ok else
+        f"signed with {method}, which has no authority over {actor} "
+        f"(permitted: {', '.join(sorted(permitted)) or 'none'})",
+    )
+
+    # Under instance custody the signature is the instance's, so the activity
+    # must name the agent it acts for or attribution is unbound.
+    if authority.instance_custody.get(actor):
+        acting_as = activity.get("afp:actingAs")
+        report.record(
+            f"authority: {label} names the agent it acts for",
+            acting_as == actor,
+            "" if acting_as == actor else
+            f"instance-custody activity has afp:actingAs {acting_as!r}, expected {actor!r}",
+        )
 
 
 # --------------------------------------------------------------------- checks
@@ -243,12 +361,18 @@ def check_thread(report: Report, activities: list[dict], thread: str) -> None:
     if not in_thread:
         return
 
+    # Only threads that delegated something are expected to close. An
+    # administrative thread — the instance's Vouch/Disown trail, say — has no
+    # terminal outcome by design, and demanding one would report a gap where
+    # there is none.
+    tasks = [a for a in in_thread if outcome_type(a) == "afp:Task"]
     outcomes = [a for a in in_thread if outcome_type(a) in ("afp:Result", "afp:Error")]
-    report.record(
-        f"thread: {thread} reaches a terminal outcome",
-        bool(outcomes),
-        "" if outcomes else "thread contains no afp:Result or afp:Error — it never closed",
-    )
+    if tasks:
+        report.record(
+            f"thread: {thread} reaches a terminal outcome",
+            bool(outcomes),
+            "" if outcomes else "thread contains no afp:Result or afp:Error — it never closed",
+        )
 
     # correlationId identifies one task; reusing it across tasks is the collision
     # scenario 02 found, so a replay checks that each task closed exactly once.
@@ -297,16 +421,34 @@ def verify_export(export: Path, thread: str | None, report: Report) -> None:
         # Gate check 9: the roster verifies as a whole from a cached copy.
         report.record("roster: signature verifies from the cached copy", reason is None, reason or "")
 
+    authority = build_authority(export)
+
     all_activities: list[dict] = []
+    seen_actors: set[str] = set()
+
     for outbox_path in sorted((export / "outbox").glob("*.jsonld")):
+        outbox = load_json(outbox_path)
+        actor_url = outbox.get("attributedTo", outbox_path.stem)
         actor = outbox_path.stem
-        activities = load_json(outbox_path).get("orderedItems", [])
+        seen_actors.add(actor_url)
+        activities = outbox.get("orderedItems", [])
         all_activities.extend(activities)
+
+        declared = outbox.get("totalItems")
+        report.record(
+            f"outbox: {actor} totalItems matches its contents",
+            declared is None or declared == len(activities),
+            f"declares {declared}, contains {len(activities)}",
+        )
 
         for index, activity in enumerate(activities):
             label = f"{actor}[{index}] {activity.get('id', '<no id>')}"
             reason = verify_proof(activity, keys)
             report.record(f"signature: {label}", reason is None, reason or "")
+
+            # Authentication is not authorization. Checked separately and on
+            # purpose: the tail of a chain rests on its signature alone.
+            check_authority(report, authority, label, activity)
 
             visibility = activity.get("afp:visibility")
             report.record(
@@ -319,6 +461,37 @@ def verify_export(export: Path, thread: str | None, report: Report) -> None:
             check_attachments(report, export, activity)
 
         check_chain(report, actor, activities)
+
+    # Evidence in the bundle that no activity points at is unbound: it proves
+    # nothing and cannot be checked, so it should not be travelling with the
+    # record at all.
+    referenced = {
+        link.get("afp:digest")
+        for activity in all_activities
+        for link in (
+            activity.get("object", {}).get("attachment", [])
+            if isinstance(activity.get("object"), dict)
+            else []
+        )
+        if isinstance(link, dict)
+    }
+    for path in sorted((export / "artifacts").glob("*")):
+        digest = path.name.replace("-", ":", 1)
+        report.record(
+            f"artifact: {digest[:24]}… is referenced by an activity",
+            digest in referenced,
+            "" if digest in referenced else
+            "present in the bundle but attached to nothing — unbound evidence",
+        )
+
+    # A per-actor chain cannot show that a whole participant is missing.
+    for agent in sorted(authority.rostered):
+        report.record(
+            f"completeness: rostered agent {agent.split('/')[-1]} has an outbox",
+            agent in seen_actors,
+            "" if agent in seen_actors else
+            f"{agent} is on the signed roster but contributes no outbox to this bundle",
+        )
 
     threads = thread and [thread] or sorted(
         {a["context"] for a in all_activities if isinstance(a.get("context"), str)}

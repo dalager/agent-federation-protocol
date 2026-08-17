@@ -21,19 +21,27 @@ Ed25519, `node:sqlite` covers the store, and the model endpoint is plain
 ```
 thread urn:afp:thread:doc-1 — 6 activities
 
-   1  reviewer  Offer{afp:Task}      parties
-   1  writer    Accept               parties
-   2  writer    Create{afp:Result}   parties
-   3  writer    Offer{afp:Task}      parties
-   2  reviewer  Accept               parties
-   3  reviewer  Create{afp:Result}   parties
+   1  writer    Offer{afp:Task}      parties     review the draft
+   1  reviewer  Accept               parties
+   2  reviewer  Create{afp:Result}   parties     "Rejected: …optimistic performance estimates"
+   2  writer    Offer{afp:Task}      parties     review the revision
+   3  reviewer  Accept               parties
+   4  reviewer  Create{afp:Result}   parties     "Approved: …"
 ```
+
+The writer drafts from the brief, delegates the review, **revises against the critique**,
+and delegates again. Its own drafting is not a delegated task — nobody asked for it over
+AFP — so it enters the record as a hash-addressed attachment on the writer's signed Offer,
+alongside the brief it was working from.
+
+A third outbox, `instance.jsonld`, carries the `afp:Vouch` trail the roster is derived from:
+membership is a recorded act, not a config entry.
 
 Then hand `export/` to someone who was not there:
 
 ```bash
 python3 ../verifier/afp_verify.py export --thread urn:afp:thread:doc-1
-# PASSED — 30 checks, no gaps
+# PASSED — 62 checks, no gaps
 ```
 
 The deliverable is not the finished document. It is a record a stranger can
