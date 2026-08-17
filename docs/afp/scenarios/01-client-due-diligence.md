@@ -1,0 +1,139 @@
+# Scenario 01 — Agentic due diligence on a new client
+
+> Spec-test scenario. Exercises: solo profile, hub-per-case scoping, direct delegation,
+> deadlines, rationale externalization, L0 weighted voting, `afp:DecisionRecord`,
+> Mastodon human-in-the-loop, audit replay. Verdict at the end.
+
+## User story
+
+**As** the managing partner of an IT consultancy,
+**I want** an agent swarm to run structured due diligence on every prospective client —
+registry, finances, sanctions, adverse media, conflicts of interest, security posture —
+**so that** we onboard fast without skipping checks, every engagement decision is backed by
+recorded evidence, and a compliance review years later can replay exactly who checked
+what, when, and why we decided as we did.
+
+## Cast
+
+One `afp:Instance` (the firm's — solo profile, no federation), one short-lived hub per
+prospect. All agents are `instance`-custody, in-process wiring.
+
+| Actor | Capability | Data it touches |
+|---|---|---|
+| `case-manager` | Coordination, round proposer | — |
+| `registry-agent` | `dd.registry` — company registry (CVR), ownership chain, UBOs | Public registries |
+| `finance-agent` | `dd.finance` — annual reports, credit score | Public filings, credit bureau |
+| `sanctions-agent` | `dd.sanctions` — sanctions/PEP screening of UBOs & directors | Screening lists |
+| `media-agent` | `dd.adverse-media` — adverse media sweep | News/web |
+| `conflicts-agent` | `dd.conflicts` — conflict-of-interest vs. current portfolio | **Internal CRM (sensitive)** |
+| `security-agent` | `dd.secposture` — breach history, DNS/TLS hygiene of prospect | Public scans |
+| Christian (partner) | Authorized controller | Via personal Mastodon account |
+
+## Walkthrough
+
+**1. Kickoff — human in, via Mastodon.**
+Christian mentions the case manager from his Mastodon account:
+`@case-manager@afp.firm.example start dd "Northgate Logistics A/S" CVR:44556677 deadline:3d`.
+The instance's inbound command mapping (§21) verifies the sender against `afp:policy`'s
+authorized-controllers list and converts the mention into a signed `Offer{Task}` to
+`case-manager`.
+
+**2. Case hub.**
+`case-manager` spins up hub `dd-northgate-2026-08` — a route on the same instance
+(§20, consortium of one) — and `afp:Enroll`s the six specialist agents with their
+capabilities. Hub-per-case gives clean state scoping: the hub's CRDT + activity record
+*is* the case file.
+
+**3. Fan-out — direct delegation, not bidding.**
+Each workstream target is known (one specialist per capability), so the degenerate flow
+applies (§09): six direct `Offer{Task}`s, each with `afp:deadline` (72h), `afp:hub`
+pointing at the case hub, and `correlationId` per workstream. No announce/bid ceremony —
+exactly what the spec prescribes when the announcer already knows who should do the work.
+
+**4. Evidence comes back as signed Results.**
+Each agent returns `Create{afp:Result}` with its assessment in `content` (rationale
+externalization, §16) and evidence as attachments — registry extract, screening report,
+media hits. Two notable returns:
+
+- `sanctions-agent`: no direct hits, but one UBO traces to a holding company in a
+  jurisdiction with opaque ownership — flagged in the Result with `confidence: 0.7`.
+- `media-agent`: two minor adverse items (a 2023 payment dispute, resolved). Result
+  includes source URLs + content hashes of the fetched articles.
+- `conflicts-agent`: no conflict with current portfolio. Its Result contains only the
+  *conclusion*, not CRM contents.
+
+Progress rides the shadow timeline throughout — Christian watches
+`#dd-northgate-2026-08` in his Mastodon client as Notes arrive (§21).
+
+**5. The recommendation vote.**
+When all six Results (or their deadlines) land, `case-manager` proposes an L0 weighted
+round (§8c) on the pinned voter set — snapshot of the six enrolled agents
+(`afp:quorumSnapshot`, §13): *engage / engage-with-conditions / decline*. Each
+`Create{Vote}` carries its rationale in `content`, referencing the voter's own Result by
+id. Outcome: **engage-with-conditions** at weight 4.4 vs. 1.6 (conditions: prepayment
+for the first phase; no data-processing work until a DPA is executed and the UBO chain is
+clarified).
+
+**6. Decision record.**
+The round closes with `Create{afp:DecisionRecord}` (§16): outcome, snapshot hash, hashes
+of all six counted votes, weight tally. Dual-published as a Note.
+
+**7. The human decision.**
+The recommendation is not the decision. Christian replies `approve` to the
+DecisionRecord's shadow Note from his authorized account; the instance maps that to a
+signed activity recording partner approval, referencing the DecisionRecord. The
+engagement proceeds under the stated conditions.
+
+**8. Two years later — compliance review.**
+A client-vetting audit asks: was Northgate screened, by what process, on what evidence?
+Replay from the case hub's records: enrollments (§13), six Tasks with deadlines, six
+signed Results with evidence hashes, six votes with rationale, the DecisionRecord binding
+outcome to counted votes, and the partner's signed approval. Outbox hash chains
+(`afp:prevActivity`) + chain heads anchored via shadow Notes federated to an external
+Mastodon server (§16) make the record's completeness checkable — the firm can show the
+trail wasn't pruned after the fact.
+
+**Growth path (out of scope here, supported by the spec):** if the firm later contracts a
+specialized KYC provider running their own agents, that's a `FederationAgreement` + the
+provider enrolling their screening agent into case hubs — same flows, now cross-operator,
+with L1 voting and LD-Signatures activating per the federated profile.
+
+## Acceptance criteria → spec mapping
+
+| Criterion | Spec mechanism |
+|---|---|
+| Kickoff and approval by a human, from a normal client app | §21 inbound command mapping, authorized controllers |
+| Every check has an owner, a deadline, and a recorded outcome | §07 Task/deadline, §16 Results as evidence |
+| Case isolation — one prospect's data never bleeds into another's state | §05 hub-per-case scoping, `(hubId, crdtType)` keys |
+| Recommendation is multi-agent, weighted, and attributable | §8c L0 round, §13 snapshot + weights |
+| Decision is a recorded artifact bound to its evidence | §16 `afp:DecisionRecord` + `countedVotes` |
+| Human approval is distinct from agent recommendation | §21 command mapping; approval references DecisionRecord |
+| Full replay under audit, completeness checkable | §16 hash chains + external anchoring |
+
+## Spec verdict
+
+**Held.** Solo profile, hub-per-case, direct delegation, deadlines, rationale
+externalization, DecisionRecord, Mastodon HITL, audit replay — the scenario runs on
+existing machinery end to end. Notably, the §09 rule "bidding only when the target is
+unknown" correctly kept ceremony out of all six workstreams.
+
+**Strained — three findings:**
+
+1. **Confidentiality is unspecified (the big one).** The spec is strong on integrity and
+   authenticity but silent on *read-side access control*. Outboxes are described as
+   "independently auditable by anyone who can fetch it"; DD Results contain client PII,
+   financials, and screening outcomes, and `conflicts-agent` touches internal CRM data.
+   Solo profile masks this (everything is inside one trust domain), but the growth path —
+   a federated KYC provider — makes it acute: AP addressing (`to`/`cc`) implies audience,
+   but the spec never states visibility rules for outbox reads, hub state reads, or what
+   an auditor may fetch vs. a stranger. **Needs a section: audience & visibility.**
+2. **Hub lifecycle is unspecified.** Hubs-per-case means many short-lived hubs. The spec
+   covers creation and enrollment but has no close/archive semantics — when is a hub
+   read-only? What's the canonical "case file export"? A closing activity (e.g.,
+   `afp:Archive` referencing the final DecisionRecord and a state snapshot hash) would
+   pin the case file.
+3. **External-evidence attestation is only implicit.** `media-agent` hashing fetched
+   articles was invented by the scenario, not required by the spec. The rationale
+   convention (§16) should extend: Results whose evidence is fetched from external
+   sources SHOULD attach source URL + content hash + fetch timestamp, so evidence
+   provenance doesn't stop at "the agent said so."

@@ -14,6 +14,8 @@ This is the markdown rendition of the full spec (Revision 3). Reading order:
 | [04-operations.md](04-operations.md) | Contribution accounting · reliability · security · Mastodon interop |
 | [05-roadmap.md](05-roadmap.md) | Phased roadmap P1–P6 · open questions |
 | [06-deployment-profiles.md](06-deployment-profiles.md) | Solo/airgapped vs. federated profiles · the "consortium of one" · sneakernet federation |
+| [07-visibility-and-artifacts.md](07-visibility-and-artifacts.md) | Audience & visibility classes · authorized fetch · auditor grants · hash-addressed artifacts · hub lifecycle |
+| [scenarios/](scenarios/) | Spec-test scenarios — each walks a real workload end to end and ends with a verdict of what held and what strained |
 
 ## The multi-operator model
 

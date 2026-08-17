@@ -33,6 +33,48 @@ vocabulary for. Core object types from v1: `Task`, `Capability`, `Result`, `Erro
 returns `Create{afp:Result}` with the same `correlationId`, or `Create{afp:Error}` on
 failure — the typed-outcome objects AS2 lacks.
 
+### Correlation vs. threading — two distinct ids
+
+These were conflated in earlier revisions; scenario testing surfaced the collision.
+
+| Id | Scope | Purpose |
+|---|---|---|
+| `afp:correlationId` | **One task**, globally unique | Matches Offer→Accept→Result; the idempotency/replay key (an agent already holding it replays its cached Result) |
+| `context` (standard AS2) | **One thread**, spanning many tasks | Groups every activity belonging to one incident, case, or backlog item — e.g. `"urn:afp:incident:inc-4471"` |
+
+Never reuse a `correlationId` across tasks to express "same workflow" — that collides with
+the dedupe rule and will cause a second task to be answered with the first one's cached
+Result. Use `context`, which AS2 provides precisely for grouping related activities. Audit
+replay follows `context`; delivery mechanics follow `correlationId`.
+
+### Co-work: the ping-pong thread
+
+`Offer`/`Accept`/`Result` assumes exactly one performer, which is what keeps attribution
+(and therefore contribution accounting) exact. Genuinely joint work — two agents iterating
+on one artifact — is modeled as **alternating single-performer tasks sharing one
+`context`**: A produces, B critiques and returns, A revises, converged. The thread is the
+co-work record; every hop has exactly one author, like pair programming where each commit
+still has one committer.
+
+Where a Result truly has no single author, AS2's `attributedTo` accepts an array. If used,
+the emitting instances MUST also state a contribution split (`afp:contributionSplit`, a
+map of actor → fraction summing to 1) so ContributionSummary stays computable; absent it,
+verifiers count such a Result for no one rather than double-counting.
+
+### External systems: keep the firehose behind the port
+
+AFP is a coordination protocol, **not** an event bus. High-frequency external signals
+(metrics, logs, traces, webhooks) belong behind an agent's adapter (01 — ports & adapters),
+aggregated by its brain; only decision-worthy events cross the port as activities. Piping
+a raw stream into an inbox defeats retry queues, dedupe stores, and audit replay alike.
+
+Conversely, for side effects an agent executes in an external system (opening a change
+proposal, filing a tracker record, merging), the authoritative outcome lives outside AFP.
+Port agents **MUST reconcile**: emit a follow-up `Result` into the same `context` carrying
+the external reference, a content hash of the artifact, and an observation timestamp —
+otherwise the trail ends at "we proposed" and audit cannot establish what actually
+happened.
+
 ### v2 terms (consensus, state, ordering)
 
 | Term | Attached to | Purpose |
@@ -71,6 +113,13 @@ failure — the typed-outcome objects AS2 lacks.
 | `afp:ContributionDispute` | Activity | Challenge to a ContributionSummary, with evidence |
 | `afp:DecisionRecord` | Object (in `Create`) | First-class outcome record closing every voting round: outcome, snapshot hash, counted-vote hashes, weight tally |
 | `afp:prevActivity` | Property (any activity) | Optional per-actor outbox hash chain — makes logs append-only-verifiable |
+| `context` (standard AS2) | Property (any activity) | Thread id grouping all activities of one incident/case/item — distinct from `correlationId` |
+| `afp:contributionSplit` | Property (Result) | Actor → fraction map, required when `attributedTo` names several actors |
+| `afp:visibility` | Property (any activity) | `public` \| `hub` \| `parties` \| `internal` — read-side access class (07) |
+| `afp:AuditGrant` | Credential | Signed, expiring, scoped read grant naming an auditor actor (07) |
+| `afp:digest`, `afp:size` | Properties (Link) | Hash-addressing for artifacts; `afp:digest` is mandatory on attachments (07) |
+| `afp:sourceUrl`, `afp:fetchedAt` | Properties (Link) | Provenance for externally-fetched evidence (07) |
+| `afp:Freeze` / `afp:Archive` | Activity | Hub lifecycle: suspend new work / terminal read-only close with canonical state hashes (07) |
 
 ## Coordination patterns
 
@@ -237,6 +286,18 @@ downgrades **liveness** to best-effort: soft rounds under generous timeouts ridi
 outbox retry queue; a stalled round triggers a simplified view change (the
 highest-reputation live replica issues a fresh round referencing the stalled one). No
 formal termination bound, but no silent inconsistency either.
+
+**What L1 buys at small operator counts — read this before claiming "Byzantine
+tolerance":**
+
+| Operators in hub | Guarantee |
+|---|---|
+| 1 (solo profile) | Nothing L1 adds — equivocation defense would defend against yourself. Stay at L0 |
+| 2 | **Accountability, not tolerance.** No honest majority exists to outvote a dishonest party, but misbehavior yields portable cryptographic proof (EquivocationProof) usable commercially and in governance. Deadlock resolves off-protocol |
+| ≥4 (f=1) | Actual Byzantine fault *tolerance*: `floor(2n/3)+1` can proceed correctly despite f malicious voters |
+
+Both properties are worth having; conflating them is not. At n=2 the value is a
+non-repudiable record, not automatic recovery.
 
 Raft was rejected: its leader must detect its own unreachability via missed acks in bounded
 time, and this transport has no delivery acks at all.

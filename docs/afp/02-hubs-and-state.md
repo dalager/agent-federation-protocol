@@ -74,6 +74,19 @@ ordering requirement, and duplicates are free. This eliminates reordering as a c
 this entire state class; task execution, which has real side effects, uses causal ordering
 instead (below).
 
+### Application-defined stores
+
+The table above enumerates the *protocol's own* state. The `crdtId`/`crdtType` machinery is
+deliberately generic: applications MAY define their own hub-scoped stores using the same
+delta envelope and the same CRDT types — a shared backlog as
+`OR-Map<itemId, LWW-Register<{status, assignee, priority}>>`, a knowledge-base index as
+`OR-Map<tag, OR-Set<entryId>>`, and so on. They gain hub scoping, cross-operator sync,
+order-tolerance, and audit for free.
+
+Two rules: pick a `crdtId` that won't collide with protocol stores (prefix application
+stores, e.g. `app:backlog`), and remember that CRDTs converge state — they don't record
+*work*. Work stays in threaded activities (`context`); the CRDT holds the current view.
+
 ```json
 {
   "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],

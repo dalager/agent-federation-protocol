@@ -112,6 +112,22 @@ convention, not machinery:
 - Policy evaluation SHOULD run as `Task`/`Result` pairs per candidate, so each agent's
   assessment becomes a signed `Result` entered into evidence *before* the vote.
 
+### What closes the trail at the edges
+
+Three conventions, each defined elsewhere, are what make a replay complete rather than
+merely long. An audit that lacks them ends in "the agent said so":
+
+| Edge | Requirement | Defined in |
+|---|---|---|
+| Evidence fetched from outside AFP | Attachment carries `afp:digest` + `afp:sourceUrl` + `afp:fetchedAt` | [07](07-visibility-and-artifacts.md#artifacts--attachments) |
+| Side effects executed in external systems | Port agent MUST reconcile: follow-up Result with external ref, artifact hash, observation timestamp | [03](03-coordination.md#external-systems-keep-the-firehose-behind-the-port) |
+| Multi-task workflows | Threaded by AS2 `context`, never by reusing `correlationId` | [03](03-coordination.md#correlation-vs-threading--two-distinct-ids) |
+
+Replay procedure: select by `context` → order by `afp:seq` where present → verify each
+activity's signature and its `afp:prevActivity` chain link → verify attachment digests →
+check the closing `DecisionRecord`'s `countedVotes` against the votes present. A gap in any
+chain, a digest mismatch, or a counted vote you cannot produce is a failed audit.
+
 ## Reliability & failure handling
 
 ActivityPub delivery is fire-and-forget HTTP POST: a 2xx means "I accepted the bytes,"
