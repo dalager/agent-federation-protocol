@@ -6,7 +6,7 @@ is a *degenerate case* of the federated one — never a fork.
 ## Federated consortium (the default story)
 
 Multiple operator instances, bilateral `FederationAgreement`s, shared problem-scoped hubs —
-everything in this spec, phases P1–P6.
+everything in this spec, phases P1–P7.
 
 ## Solo / airgapped: the consortium of one
 
@@ -36,7 +36,7 @@ route (`/hub/*`) mounted next to the agent actors (`/agents/*`), not a second sy
 |---|---|---|
 | `FederationAgreement` | Required, bilateral, deny-by-default | None — the trust gate short-circuits on `operatedBy == self` (do **not** model a self-agreement) |
 | L1 Byzantine voting | Triggered at ≥2 operators in a hub | Skipped — one trust domain means equivocation defense defends against yourself. Stay at L0; governance quorum-of-one auto-passes |
-| LD-Signatures on relayed payloads | Required from P3 | Skipped — the relay is you |
+| LD-Signatures on relayed payloads | Required from P4 | Skipped — the relay is you |
 | DNS / TLS | Public DNS, public CA | Internal DNS, private CA — or plain HTTP inside the gap |
 | HTTP Signatures + signed outboxes | Required | **Keep.** See below — this is the one thing an airgapped deployment must not drop |
 
@@ -63,11 +63,20 @@ and signed outboxes inside the airgap therefore buys two things:
 
 ### Profile → phase mapping
 
+Since v3.5 the phases are ordered so that **every profile is a prefix, never a subset** —
+the solo operator stops, rather than skipping around:
+
 | Profile | Phases |
 |---|---|
-| **Solo / airgapped** | P1 + the hub machinery from P3 (local-only, no LD-Sigs, no hub-relay concerns) + optionally P5 bidding. Skip P2 and P4 entirely. |
-| **Federated consortium** | P1 → P6 in order. |
+| **Solo / airgapped** | P1 → P3 (single instance, local hub and L0 deliberation, local allocation), then stop |
+| **Federated consortium** | P1 → P7 in order |
 
-The hub machinery has **no federation dependency** — a solo deployment can adopt it
-immediately after P1. Only P3's cross-boundary parts (LD-Signatures, hub-relayed state
-sync) and P2/P4 are federation-specific.
+That ordering is possible because the hub machinery, L0 deliberation and announce/bid/award
+have **no federation dependency** — they are useful to one operator on day one, and
+everything genuinely bilateral (agreements, LD-Signatures, hub relaying, L1, contribution
+accounting) sits behind them. A solo deployment that later joins a consortium continues from
+P4; it does not revisit P1–P3.
+
+One optional exception, in the additive direction: dual-publish shadow Notes (nominally P4)
+need no agreement and may be switched on at any phase, since they are the cheapest external
+anchor for outbox chain heads — see above.

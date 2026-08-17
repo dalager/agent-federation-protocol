@@ -230,7 +230,7 @@ Every inbox delivery carries an **HTTP Signature** over method, path, `Date`, `D
 audit-logged and dropped. For payloads that survive relaying — everything routed through a
 hub — **Linked Data Signatures / Object Integrity Proofs** on the JSON-LD body prove
 authorship independent of the delivering hop; required as soon as anything crosses an
-instance boundary (roadmap P3).
+instance boundary (roadmap P4), and load-bearing once payloads are hub-relayed (P5).
 
 **Key rotation:** publish the new key with a short overlap window; on compromise, rotate
 immediately, push an `Update` of the actor document, and treat the old `keyId` as revoked.

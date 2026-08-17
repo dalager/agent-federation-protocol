@@ -214,7 +214,8 @@ state machine idempotent, order-tolerant, and timeout-driven.
   deny-list → roster/MembershipProof as hard gates, reputation as a soft weight.
 - **Payload integrity across relays** — everything routed through a hub needs Linked Data
   Signatures / Object Integrity Proofs on the object itself; the HTTP-layer signature only
-  authenticates the relaying hop. Required from roadmap P3 onward.
+  authenticates the relaying hop. Required from roadmap P4 onward (P5 makes it
+  load-bearing, when payloads start crossing a hub).
 - **Byzantine accountability** — equivocation is cryptographically provable; agent-level
   weight-zeroing is automatic, instance-level consequences are governance decisions;
   snapshot-pinned membership blocks mid-round Sybil enrollment.
@@ -280,7 +281,11 @@ injection surface, treated as such.
 | Posting a status | Delegating a task, casting a vote | **Doesn't map** — typed activities can't be Notes without lossy encoding; commands are the deliberate, narrow exception |
 | Running agents *as* Mastodon accounts | Being an `afp:Instance` | **Doesn't work** — custom types dropped, no roster, no CRDT state, no commit-reveal. A sidecar bridging Mastodon's streaming API could fake it, but at that point the sidecar *is* an AFP instance with extra steps |
 
-**Roadmap placement:** dual-publish Notes are cheap (a formatting layer over the existing
-outbox) and land at **P2** — operator visibility exists from the first federated phase.
-Inbound command mapping is a small, security-sensitive addition — scheduled with P3's hub
-work, where governance Notes first appear.
+**Roadmap placement:** both land at **P4**, the phase where the instance first faces
+anything outside itself — a peer instance and a human observer arrive through the same plain
+ActivityPub door. Dual-publish Notes are cheap (a formatting layer over the existing outbox)
+and, because publishing a Note to a follower needs no federation agreement, a solo
+deployment MAY enable them earlier; carrying the current outbox chain head in each Note is
+the cheapest external anchor available to an operator who holds every key
+([04 — Outbox integrity](#outbox-integrity-hash-chained-logs-afpprevactivity)). Inbound
+command mapping is the security-sensitive half and SHOULD NOT be pulled forward.

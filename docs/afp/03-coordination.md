@@ -22,9 +22,16 @@ vocabulary for. Core object types from v1: `Task`, `Capability`, `Result`, `Erro
     "afp:capability": "afp:cap:image-classification",
     "afp:deadline": "2026-08-16T14:30:00Z",
     "afp:correlationId": "task-9931",
-    "afp:hub": "https://hub.consortium.example/actor",
+    "context": "urn:afp:thread:batch-12",
+    "afp:visibility": "parties",
     "content": "Classify the attached image set",
-    "attachment": [{ "type": "Link", "href": "s3://bucket/batch-12/", "mediaType": "application/x-directory" }]
+    "attachment": [{
+      "type": "Link",
+      "href": "https://alpha.operator.example/artifacts/sha256-4b71...",
+      "mediaType": "application/zip",
+      "afp:digest": "sha256:4b71...c908",
+      "afp:size": 20971520
+    }]
   }
 }
 ```
@@ -33,12 +40,20 @@ vocabulary for. Core object types from v1: `Task`, `Capability`, `Result`, `Erro
 returns `Create{afp:Result}` with the same `correlationId`, or `Create{afp:Error}` on
 failure — the typed-outcome objects AS2 lacks.
 
+Everything above is available to a single operator with two agents and no network — it is
+the whole of roadmap P1. Note what is already mandatory at that scale: the attachment is
+hash-addressed rather than a bare `s3://` path ([07](07-visibility-and-artifacts.md#artifacts--attachments)),
+the activity declares its read class rather than defaulting open, and the thread id is
+carried separately from the task id. `afp:hub` joins this object only once a hub exists to
+scope it to (P2); it is absent, not empty, before then.
+
 ### Correlation vs. threading — two distinct ids
 
 These were conflated in earlier revisions; scenario testing surfaced the collision.
 
 | Id | Scope | Purpose |
 |---|---|---|
+| `id` (standard AS2) | **One activity**, globally unique | Transport dedupe: a redelivered POST is dropped at the inbox *before* dispatch |
 | `afp:correlationId` | **One task**, globally unique | Matches Offer→Accept→Result; the idempotency/replay key (an agent already holding it replays its cached Result) |
 | `context` (standard AS2) | **One thread**, spanning many tasks | Groups every activity belonging to one incident, case, or backlog item — e.g. `"urn:afp:incident:inc-4471"` |
 
@@ -46,6 +61,14 @@ Never reuse a `correlationId` across tasks to express "same workflow" — that c
 the dedupe rule and will cause a second task to be answered with the first one's cached
 Result. Use `context`, which AS2 provides precisely for grouping related activities. Audit
 replay follows `context`; delivery mechanics follow `correlationId`.
+
+**Two dedupe layers, not one — build both.** They sit at different depths and answer
+different questions. `id` dedupe (a short-TTL seen-ids store) absorbs retry storms and
+duplicate delivery of *the same activity*. `correlationId` replay (the pending-task table)
+absorbs *the same task* arriving as a genuinely new, differently-identified activity — a
+re-send after a delegator timeout, a re-auction, a peer that never saw the 2xx. An
+implementation with only the first executes work twice; one with only the second drops
+legitimate redeliveries it should have absorbed silently.
 
 ### Co-work: the ping-pong thread
 

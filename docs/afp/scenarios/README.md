@@ -4,6 +4,11 @@ Each scenario walks a realistic workload through the protocol end to end, maps a
 criteria to spec mechanisms, and closes with a **verdict**: what held, and what strained.
 Findings feed back into the spec — this directory is the reason v3.4 exists.
 
+Not every revision comes from here: **v3.6** came from a readiness review of the roadmap
+itself rather than from a scenario, and rescoped the phases (P1–P7, every profile a prefix)
+after the phasing had fallen two revisions behind the design. Scenarios test what the
+protocol does; that review tested whether the build order still matched it.
+
 | # | Scenario | Axis stressed | Findings |
 |---|---|---|---|
 | [01](01-client-due-diligence.md) | Agentic due diligence on a new client | Solo profile, hub-per-case, direct delegation, HITL, audit replay | 3 |

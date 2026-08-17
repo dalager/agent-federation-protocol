@@ -95,8 +95,9 @@ Hubs are cheap to create and, in case-per-hub patterns, numerous. A hub ends exp
 | `afp:Freeze` | Hub accepts no new Tasks/Bids/rounds; existing threads may still close. Reversible by governance |
 | `afp:Archive` | Terminal. References the final state: CRDT snapshot hash, the closing `DecisionRecord`s, artifact manifest. Hub becomes read-only |
 
-`afp:Archive` is a `GovernanceDecision` (member quorum, §05) in a federated hub, and a
-plain instance-signed activity in the solo profile. Its payload is the **canonical case
+`afp:Archive` is a `GovernanceDecision` (member quorum,
+[02](02-hubs-and-state.md#membership--dynamic-quorum)) in a federated hub, and a plain
+instance-signed activity in the solo profile. Its payload is the **canonical case
 file**: enough hashes for any member to verify their own retained replica is the complete,
 unpruned record. Post-archive, member instances retain their replicas independently — the
 hub host going away does not destroy the archive.
