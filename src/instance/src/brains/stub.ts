@@ -2,8 +2,9 @@
  * Deterministic brains, used by the demo and the acceptance gate.
  *
  * The gate has to be reproducible and runnable offline — an LLM in the loop
- * would make "did the record verify" depend on sampling. The Anthropic brain in
- * `anthropic.ts` implements the same port and is selected by configuration.
+ * would make "did the record verify" depend on sampling, and gate check 10 needs
+ * two independent implementations to agree byte for byte. The endpoint-backed
+ * brain in `openai.ts` implements the same port and is selected by configuration.
  */
 
 import type { Brain, TaskOutcome, TaskRequest } from "./port.ts";
