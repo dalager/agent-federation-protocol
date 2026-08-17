@@ -10,8 +10,8 @@
 import { mkdirSync } from "node:fs";
 import type { Config } from "./config.ts";
 import type { JsonValue } from "./crypto/jcs.ts";
-import { loadOrCreateKeyPair, publicKeyFromMultibase, type KeyPair } from "./crypto/keys.ts";
-import { attachProof, digestOf, verifyProof } from "./crypto/proof.ts";
+import { loadOrCreateKeyPair, type KeyPair } from "./crypto/keys.ts";
+import { attachProof, digestOf } from "./crypto/proof.ts";
 import { openDb, type Db } from "./store/db.ts";
 import { Outbox, type OutboxEntry } from "./store/outbox.ts";
 import { SeenIds } from "./store/dedupe.ts";
@@ -27,17 +27,16 @@ import {
   type AgentSpec,
 } from "./ap/documents.ts";
 import {
-  acceptTask,
   correlationIdOf,
   createError,
-  createResult,
   disown,
   offerTask,
   vouch,
   type Envelope,
   type Visibility,
 } from "./ap/activities.ts";
-import type { Brain, BrainArtifact } from "./brains/port.ts";
+import type { Brain } from "./brains/port.ts";
+import { Inbox } from "./inbox.ts";
 
 export interface AgentRegistration {
   spec: AgentSpec;
@@ -68,7 +67,8 @@ export class AfpInstance {
   private readonly agents = new Map<string, AgentRegistration>();
 
   readonly config: Config;
-  private readonly clock: Clock;
+  readonly clock: Clock;
+  private pipeline: Inbox | null = null;
 
   constructor(
     config: Config,
@@ -106,6 +106,22 @@ export class AfpInstance {
 
   close(): void {
     this.db.close();
+  }
+
+  /** The inbound half of the adapter stack. */
+  get inbox(): Inbox {
+    this.pipeline ??= new Inbox(this);
+    return this.pipeline;
+  }
+
+  /** Accept an inbound activity. Delegates to the inbox pipeline. */
+  async receive(activity: { [key: string]: JsonValue }): Promise<ReceiveOutcome> {
+    return this.inbox.receive(activity);
+  }
+
+  /** The audit log of dropped deliveries, newest last. */
+  auditLog(): { at: string; outcome: string; activityId: string | null; reason: string }[] {
+    return this.inbox.auditLog();
   }
 
   // ---------------------------------------------------------------- documents
@@ -232,14 +248,15 @@ export class AfpInstance {
     return this.agents.get(name)?.brain ?? null;
   }
 
-  private nameOf(actorUrl: string): string | null {
+  /** Local name for an actor URL on this instance, or null if it is a stranger. */
+  nameOf(actorUrl: string): string | null {
     for (const name of this.agents.keys()) {
       if (this.actorId(name) === actorUrl) return name;
     }
     return null;
   }
 
-  private key(name: string): KeyPair {
+  key(name: string): KeyPair {
     const key = this.keys.get(name);
     if (!key) throw new Error(`no key for ${name}`);
     return key;
@@ -383,196 +400,6 @@ export class AfpInstance {
     );
 
     return entry;
-  }
-
-  // ------------------------------------------------------------------ inbound
-
-  /**
-   * The inbox pipeline, in order: verify the proof, run the trust gate, dedupe
-   * on activity id, then dispatch. Anything that fails a step is dropped with a
-   * reason rather than processed.
-   */
-  async receive(activity: { [key: string]: JsonValue }): Promise<ReceiveOutcome> {
-    const activityId = typeof activity.id === "string" ? activity.id : "";
-    const actorUrl = String(activity.actor ?? "");
-    if (!activityId) return this.drop("rejected", "", actorUrl, "activity has no id");
-
-    const signerUrl = typeof activity["afp:actingAs"] === "string"
-      ? instanceActorId(this.config.origin)
-      : actorUrl;
-    const verification = this.verifySignature(activity, signerUrl);
-    if (!verification.ok) {
-      return this.drop("rejected", activityId, actorUrl, verification.reason);
-    }
-
-    // Trust gate. P1 is a single trust domain, so this short-circuits on
-    // `operatedBy == self` (06) — there is no agreement to check and no
-    // self-agreement to model.
-    if (this.nameOf(actorUrl) === null) {
-      return this.drop(
-        "rejected",
-        activityId,
-        actorUrl,
-        `actor ${actorUrl} is not on this instance's roster`,
-      );
-    }
-
-    if (!this.seen.markSeen(activityId, this.clock.now())) {
-      return this.drop("duplicate", activityId, actorUrl, `activity ${activityId} already delivered`);
-    }
-
-    await this.dispatch(activity);
-    return { status: "dispatched" };
-  }
-
-  /** Record a dropped delivery, then report it. Nothing is discarded silently. */
-  private drop(
-    outcome: "rejected" | "duplicate",
-    activityId: string,
-    actor: string,
-    reason: string,
-  ): ReceiveOutcome {
-    this.db
-      .prepare("INSERT INTO audit_log (at, outcome, activity_id, actor, reason) VALUES (?, ?, ?, ?, ?)")
-      .run(this.clock.now().toISOString(), outcome, activityId || null, actor || null, reason);
-    return { status: outcome, reason } as ReceiveOutcome;
-  }
-
-  /** The audit log of dropped deliveries, newest last. */
-  auditLog(): { at: string; outcome: string; activityId: string | null; reason: string }[] {
-    const rows = this.db
-      .prepare("SELECT at, outcome, activity_id, reason FROM audit_log ORDER BY id ASC")
-      .all() as Record<string, unknown>[];
-    return rows.map((row) => ({
-      at: String(row.at),
-      outcome: String(row.outcome),
-      activityId: row.activity_id === null ? null : String(row.activity_id),
-      reason: String(row.reason),
-    }));
-  }
-
-  private verifySignature(
-    activity: { [key: string]: JsonValue },
-    signerUrl: string,
-  ): { ok: true } | { ok: false; reason: string } {
-    const instanceId = instanceActorId(this.config.origin);
-    const name = signerUrl === instanceId ? "@instance" : this.nameOf(signerUrl);
-    if (name === null) return { ok: false, reason: `no known key for signer ${signerUrl}` };
-
-    const publicKey = publicKeyFromMultibase(this.key(name).publicKeyMultibase);
-    const result = verifyProof(activity, publicKey);
-    return result.ok ? { ok: true } : { ok: false, reason: result.reason };
-  }
-
-  private async dispatch(activity: { [key: string]: JsonValue }): Promise<void> {
-    const type = String(activity.type ?? "");
-    const object = activity.object;
-    const objectType =
-      object && typeof object === "object" && !Array.isArray(object)
-        ? String((object as { [key: string]: JsonValue }).type ?? "")
-        : "";
-
-    if (type === "Offer" && objectType === "afp:Task") return this.onTaskOffered(activity);
-    if (type === "Accept") return this.onAccepted(activity);
-    if (type === "Create" && objectType === "afp:Result") return this.onResult(activity);
-    if (type === "Create" && objectType === "afp:Error") return this.onError(activity);
-    // Unknown types are recorded as received and otherwise ignored — an inbox is
-    // a hint, never an instruction (04 § Reliability).
-  }
-
-  private async onTaskOffered(activity: { [key: string]: JsonValue }): Promise<void> {
-    const task = activity.object as { [key: string]: JsonValue };
-    const correlationId = String(task["afp:correlationId"] ?? "");
-    const thread = String(activity.context ?? "");
-    const performerUrl = firstRecipient(activity);
-    const performerName = performerUrl ? this.nameOf(performerUrl) : null;
-    if (!performerName) return;
-
-    const performer = this.agents.get(performerName)!;
-
-    // Dedupe layer 2: the same *task* arriving as a genuinely new activity.
-    // A hit replays the cached outcome; the brain is not invoked again.
-    const cached = this.tasks.cachedResult(correlationId, performerUrl!);
-    if (cached) {
-      this.queue.enqueue(String(activity.actor ?? ""), cached, this.clock.now());
-      return;
-    }
-
-    this.publish(performerName, [String(activity.actor ?? "")], thread, "parties", (envelope) =>
-      acceptTask(envelope, String(activity.id ?? ""), correlationId),
-    );
-
-    const attachments = this.materialize(task.attachment);
-    const outcome = await performer.brain.handle({
-      capability: String(task["afp:capability"] ?? ""),
-      content: String(task.content ?? ""),
-      attachments,
-      thread,
-    });
-
-    const delegator = String(activity.actor ?? "");
-    if (!outcome.ok) {
-      const entry = this.publish(performerName, [delegator], thread, "parties", (envelope) =>
-        createError(envelope, {
-          errorId: `${envelope.actor}/errors/${correlationId}`,
-          correlationId,
-          code: "afp:err:brain-failed",
-          reason: outcome.reason,
-        }),
-      );
-      this.tasks.cacheResult(correlationId, performerUrl!, entry.activity, this.clock.now());
-      return;
-    }
-
-    const produced = (outcome.attachments ?? []).map((artifact) =>
-      Artifacts.toLink(this.artifacts.put(artifact.bytes, artifact.mediaType, this.clock.now())) as JsonValue,
-    );
-
-    const entry = this.publish(performerName, [delegator], thread, "parties", (envelope) =>
-      createResult(envelope, {
-        resultId: `${envelope.actor}/results/${correlationId}`,
-        correlationId,
-        content: outcome.content,
-        summary: outcome.summary,
-        producedBy: outcome.producedBy,
-        attachments: produced,
-      }),
-    );
-    this.tasks.cacheResult(correlationId, performerUrl!, entry.activity, this.clock.now());
-  }
-
-  private async onAccepted(activity: { [key: string]: JsonValue }): Promise<void> {
-    const correlationId = correlationIdOf(activity);
-    if (correlationId) this.tasks.setState(correlationId, "accepted", this.clock.now());
-  }
-
-  private async onResult(activity: { [key: string]: JsonValue }): Promise<void> {
-    const correlationId = correlationIdOf(activity);
-    if (correlationId) this.tasks.setState(correlationId, "completed", this.clock.now());
-  }
-
-  private async onError(activity: { [key: string]: JsonValue }): Promise<void> {
-    const correlationId = correlationIdOf(activity);
-    if (correlationId) this.tasks.setState(correlationId, "failed", this.clock.now());
-  }
-
-  /**
-   * Turn attachment Links into bytes for a brain, discarding anything whose
-   * digest does not match — a brain never sees unverified evidence.
-   */
-  private materialize(attachment: JsonValue | undefined): BrainArtifact[] {
-    if (!Array.isArray(attachment)) return [];
-    const out: BrainArtifact[] = [];
-    for (const link of attachment) {
-      if (!link || typeof link !== "object" || Array.isArray(link)) continue;
-      const digest = (link as { [key: string]: JsonValue })["afp:digest"];
-      const mediaType = (link as { [key: string]: JsonValue }).mediaType;
-      if (typeof digest !== "string") continue;
-      const bytes = this.artifacts.get(digest);
-      if (!bytes) continue;
-      out.push({ mediaType: typeof mediaType === "string" ? mediaType : "application/octet-stream", bytes });
-    }
-    return out;
   }
 
   // ------------------------------------------------------------------ running
