@@ -1,0 +1,143 @@
+"""ADR-0002 Decision 3 — the three-check `afp:DecisionRecord` verifier extension.
+
+Kept apart from `afp_verify.py` for the same reason `proof.py` is kept apart:
+a reader auditing "what does the P2 extension actually check" should not have
+to wade through the rest of the replay procedure to find it.
+
+Per 04 "Replay procedure" step 7: recompute the tally from the referenced
+votes, confirm every counted vote is actually producible, and confirm every
+counted voter was inside the pinned quorum snapshot. All three are
+set-membership and arithmetic over already-verified signatures — no new
+cryptography, no consensus protocol.
+
+Runs only when an export contains an `afp:DecisionRecord`; an export with
+none (all of P1) runs none of this — backward compatible by construction.
+"""
+
+from __future__ import annotations
+
+from proof import digest_of, verify_proof
+
+
+def afp_object(activity: dict, afp_type: str) -> dict | None:
+    """The `afp:*` payload of an activity, whether it travels bare or wrapped.
+
+    03 wraps payloads in standard AS2 activities — `Offer{afp:Proposal}`,
+    `Create{afp:Vote}`, `Create{afp:DecisionRecord}` — while a bare activity
+    typed `afp:*` is also accepted. Either way the fields live on the payload.
+    """
+    if activity.get("type") == afp_type:
+        return activity
+    obj = activity.get("object")
+    if isinstance(obj, dict) and obj.get("type") == afp_type:
+        return obj
+    return None
+
+
+def check_decision_record(
+    report,
+    decision_activity: dict,
+    all_activities: list[dict],
+    keys: dict[str, bytes],
+) -> None:
+    decision = afp_object(decision_activity, "afp:DecisionRecord") or {}
+    label = decision.get("id", "<no id>")
+    round_id = decision.get("afp:round")
+
+    proposal = next(
+        (
+            obj
+            for a in all_activities
+            if (obj := afp_object(a, "afp:Proposal")) is not None
+            and obj.get("afp:round") == round_id
+        ),
+        None,
+    )
+    if not report.record(
+        f"decision: {label} has a matching afp:Proposal",
+        proposal is not None,
+        "" if proposal is not None else
+        f"no afp:Proposal for afp:round {round_id!r} — voter weights and the pinned "
+        f"voter set are unrecoverable",
+    ):
+        return
+
+    voter_weights: dict[str, float] = proposal.get("afp:voterWeights", {})
+    # The pinned set is the explicit voter list (02 "Snapshot-pinning"); the
+    # weight map's keys are the fallback when a proposal omits it.
+    pinned_voters = set(proposal.get("afp:voters", []) or voter_weights)
+    by_digest = {digest_of(a): a for a in all_activities}
+
+    missing: list[str] = []
+    counted_voters: set[str] = set()
+    outside: list[tuple[str, str]] = []
+    unsigned: list[str] = []
+    tally: dict[str, float] = {}
+
+    for vote_hash in decision.get("afp:countedVotes", []):
+        vote_activity = by_digest.get(vote_hash)
+        vote_obj = afp_object(vote_activity, "afp:Vote") if isinstance(vote_activity, dict) else None
+        if vote_activity is None or vote_obj is None:
+            # Check 2 — evidence-set completeness. A hash the export cannot
+            # resolve to a present, signed afp:Vote is a failure by itself,
+            # per 04: "a counted vote you cannot produce is a failure."
+            missing.append(vote_hash)
+            continue
+
+        reason = verify_proof(vote_activity, keys)
+        if reason is not None:
+            unsigned.append(f"{vote_hash[:24]}… ({reason})")
+            continue
+
+        voter = vote_activity.get("actor")
+        if voter not in pinned_voters:
+            # Check 3 — snapshot discipline. Valid signature, wrong ballot:
+            # the vote comes from outside the pinned afp:quorumSnapshot voter
+            # set, e.g. a mid-round enrollment. Rejected even though it
+            # verifies, per 02 "Snapshot-pinning."
+            outside.append((vote_hash, voter))
+            continue
+
+        value = vote_obj.get("value")
+        tally[value] = tally.get(value, 0) + voter_weights.get(voter, 0)
+        counted_voters.add(voter)
+
+    report.record(
+        f"decision: {label} evidence-set completeness",
+        not missing,
+        "" if not missing else
+        "afp:countedVotes names a hash with no present, valid afp:Vote to back it: "
+        + ", ".join(h[:24] + "…" for h in missing),
+    )
+    report.record(
+        f"decision: {label} counted votes are validly signed",
+        not unsigned,
+        "" if not unsigned else "counted vote fails signature verification: " + "; ".join(unsigned),
+    )
+    report.record(
+        f"decision: {label} snapshot discipline",
+        not outside,
+        "" if not outside else
+        "counted vote from outside the pinned quorum snapshot: "
+        + ", ".join(f"{voter} ({h[:24]}…)" for h, voter in outside),
+    )
+
+    # Check 1 — tally recomputation, over whatever votes survived checks 2/3.
+    # A pinned voter with no counted vote abstains by omission, and its weight
+    # lands under "abstain" (04's DecisionRecord example carries that key).
+    # Zero-weight entries on either side (an option nobody chose, an explicit
+    # abstain: 0) are not a mismatch — compare over the union with default 0.
+    abstain = sum(voter_weights.get(v, 0) for v in pinned_voters - counted_voters)
+    if abstain:
+        tally["abstain"] = tally.get("abstain", 0) + abstain
+    declared_tally = decision.get("afp:weightTally", {})
+    values_match = all(
+        abs(tally.get(k, 0) - declared_tally.get(k, 0)) < 1e-9
+        for k in set(tally) | set(declared_tally)
+    )
+    report.record(
+        f"decision: {label} weightTally recomputes from countedVotes",
+        values_match,
+        "" if values_match else
+        f"recomputed {tally!r} but afp:DecisionRecord declares {declared_tally!r}",
+    )

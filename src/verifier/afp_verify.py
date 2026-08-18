@@ -32,6 +32,7 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from decision import afp_object, check_decision_record
 from proof import CRYPTOSUITE, decode_multikey, digest_of, verify_proof
 
 
@@ -407,6 +408,13 @@ def verify_export(export: Path, thread: str | None, report: Report) -> None:
     )
     for name in threads:
         check_thread(report, all_activities, name)
+
+    # ADR-0002 Decision 3 / 04 replay step 7. Exports with no DecisionRecord
+    # (all of P1, and any P2 export without a closed vote) run none of this —
+    # backward compatible by construction.
+    for activity in all_activities:
+        if afp_object(activity, "afp:DecisionRecord") is not None:
+            check_decision_record(report, activity, all_activities, keys)
 
 
 def main() -> int:

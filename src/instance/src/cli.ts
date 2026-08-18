@@ -61,6 +61,30 @@ async function main(): Promise<void> {
       break;
     }
 
+    case "p2": {
+      const { runP2Demo } = await import("./demoP2.ts");
+      // Own export dir: ./export is the checked-in P1 reference bundle.
+      const { instance, hub, decision, exported, thread } = await runP2Demo({
+        fresh: true,
+        config: { exportDir: "./export-p2" },
+      });
+
+      const object = decision.activity.object as Record<string, unknown>;
+      const tally = object["afp:weightTally"] as Record<string, number>;
+      const counted = (object["afp:countedVotes"] as string[]).length;
+
+      console.log(`\nhub ${hub.actorId}`);
+      console.log(`round ${object["afp:round"]} — ${hub.members().length} enrolled, ${counted} votes counted\n`);
+      for (const [option, weight] of Object.entries(tally).sort((a, b) => b[1] - a[1])) {
+        console.log(`  ${option.padEnd(16)} ${"█".repeat(Math.round(weight))} ${weight}`);
+      }
+      console.log(`\noutcome:  ${object["afp:outcome"]}  (afp:DecisionRecord ${decision.activity.id})`);
+      console.log(`export:   ${exported.activities} activities -> ${exported.dir}`);
+      console.log(`\nverify it:  python3 ../verifier/afp_verify.py ${exported.dir} --thread ${thread} --verbose\n`);
+      instance.close();
+      break;
+    }
+
     case "export": {
       const config = loadConfig();
       const instance = new AfpInstance(config, agentRegistrations(config));
@@ -83,7 +107,7 @@ async function main(): Promise<void> {
     }
 
     default:
-      console.error(`unknown command: ${command}\nusage: cli.ts [demo|export|serve]`);
+      console.error(`unknown command: ${command}\nusage: cli.ts [demo|p2|export|serve]`);
       process.exit(1);
   }
 }

@@ -51,6 +51,9 @@ another implementation.
 | Each `afp:prevActivity` links to its predecessor | An activity was removed, inserted, or reordered |
 | The thread reaches a terminal `afp:Result` / `afp:Error` | The workflow never closed |
 | One outcome per `correlationId` | A task was answered twice — the collision scenario 02 found |
+| **(P2) `afp:DecisionRecord`'s `afp:weightTally` recomputes from `afp:countedVotes`** | The declared outcome doesn't match the arithmetic over the votes actually cast |
+| **(P2) Every hash in `afp:countedVotes` resolves to a present, validly signed `afp:Vote`** | A counted vote you cannot produce — evidence for the outcome does not exist |
+| **(P2) Every counted vote's `actor` is in the pinned `afp:quorumSnapshot` voter set** | A vote from outside the snapshot was counted — the mid-round-enrollment attack 02 names |
 
 ## The algorithm, restated
 
@@ -85,7 +88,48 @@ unauthorized re-signing of the last activity is invisible to integrity checks al
 Chain digests use the same canonicalization: `afp:prevActivity` is
 `sha256:<hex>` over the canonical form of the previous activity **including its
 proof**, so the chain binds signed bytes rather than a payload someone could
-re-sign.
+re-sign. `afp:countedVotes` hashes use the same digest, over the full signed
+`Create{afp:Vote}` activity — not just its `object` — for the same reason.
+
+**DecisionRecord — the three-check extension (ADR-0002 Decision 3, 04 replay
+step 7).** Run only when an export contains at least one `afp:DecisionRecord`;
+an export with none (all of P1) runs none of this and verifies exactly as
+before. Payloads may travel bare (an activity typed `afp:DecisionRecord`) or
+wrapped in the standard AS2 activities 03 specifies —
+`Create{afp:DecisionRecord}`, `Offer{afp:Proposal}`, `Create{afp:Vote}` —
+and the checks read their fields from the payload either way. For each
+`afp:DecisionRecord`:
+
+1. Find the `afp:Proposal` with the same `afp:round`. It carries the explicit
+   per-voter weights for the round (`afp:voterWeights`) — P2 weight is
+   liveness-gated uniform weight, recorded explicitly so the tally never
+   depends on state the verifier can't see (02, ADR-0002 Decision 3). The
+   pinned voter set is the proposal's explicit `afp:voters` list, falling
+   back to the keys of `afp:voterWeights` when a proposal omits it. No
+   matching proposal is itself a failure: without it neither the pinned
+   voter set nor the weights are recoverable.
+2. **Evidence-set completeness.** For each hash in `afp:countedVotes`, look it
+   up among the signed activities present in the bundle. Missing, or present
+   but not a `Create{afp:Vote}`, or present but its signature doesn't
+   verify — each is a failure naming that hash. *"A counted vote you cannot
+   produce is a failure"* (04).
+3. **Snapshot discipline.** For each counted vote that resolved, its `actor`
+   must be in the pinned voter set the proposal named at round start. A
+   validly signed vote from an actor outside that set is rejected anyway
+   (02 "Snapshot-pinning": an agent enrolled after round start isn't in the
+   pinned set even if it later votes).
+4. **Tally recomputation.** Sum each surviving vote's value weighted by
+   `afp:voterWeights[actor]`. A pinned voter with no counted vote abstains
+   by omission: its weight is added under `"abstain"` (04's DecisionRecord
+   example carries that key). Compare against `afp:weightTally` over the
+   union of keys with default 0 and float tolerance — a zero-weight entry
+   on either side (an option nobody chose, an explicit `abstain: 0`) is not
+   a mismatch. Any real mismatch is a failure showing both the recomputed
+   and the declared tally.
+
+This is set-membership checking and arithmetic over already-verified
+signatures — no second signature suite, no consensus protocol, nothing that
+would compromise the verifier's zero-dependency property.
 
 ## The bundle it reads
 
@@ -138,3 +182,32 @@ python3 afp_verify.py /tmp/tampered
 
 All four are exercised automatically by gate check 10 in
 `../instance/test/gate.test.ts`, which shells out to this script.
+
+### DecisionRecord: the three P2 mutations
+
+`test/fixtures/` hand-builds a small, self-contained L0 voting round (its own
+export bundle, signed with test keys — no dependency on the TypeScript hub)
+and derives the three mutations ADR-0002 Decision 3 calls for:
+
+```bash
+python3 test/fixtures/mutate_decision_fixture.py /tmp/decision-fixtures
+python3 afp_verify.py /tmp/decision-fixtures/clean --thread urn:afp:thread:round-1
+# PASSED
+
+python3 afp_verify.py /tmp/decision-fixtures/mistally --thread urn:afp:thread:round-1
+# [ FAIL ] decision: …/decision weightTally recomputes from countedVotes
+#          recomputed {'candidate-x': 2.0, 'candidate-y': 1.0} but afp:DecisionRecord declares {'candidate-x': 99.0, ...}
+
+python3 afp_verify.py /tmp/decision-fixtures/missing-vote --thread urn:afp:thread:round-1
+# [ FAIL ] decision: …/decision evidence-set completeness
+#          afp:countedVotes names a hash with no present, valid afp:Vote to back it: sha256:6fc7e552…
+
+python3 afp_verify.py /tmp/decision-fixtures/outside-snapshot --thread urn:afp:thread:round-1
+# [ FAIL ] decision: …/decision snapshot discipline
+#          counted vote from outside the pinned quorum snapshot: …/agents/voter-outsider (sha256:b46a57ff…)
+```
+
+Each mutation trips exactly the check it targets — `mistally` and
+`outside-snapshot` re-sign the `DecisionRecord` after mutating it, so the
+fault is isolated to the arithmetic/membership check rather than also
+tripping the general signature check the way a naive post-hoc edit would.

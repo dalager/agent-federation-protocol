@@ -28,7 +28,14 @@ export interface ExportSummary {
   artifacts: number;
 }
 
-export function exportBundle(instance: AfpInstance, dir: string): ExportSummary {
+/** What the export needs from a hub — the actor-shaped surface only, no Hub import. */
+export interface ExportableHub {
+  actorId: string;
+  actorDocument(): { [key: string]: JsonValue };
+  outbox: { byActor(actorUrl: string): { activity: { [key: string]: JsonValue } }[] };
+}
+
+export function exportBundle(instance: AfpInstance, dir: string, hubs: ExportableHub[] = []): ExportSummary {
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(join(dir, "actors"), { recursive: true });
   mkdirSync(join(dir, "outbox"), { recursive: true });
@@ -62,6 +69,28 @@ export function exportBundle(instance: AfpInstance, dir: string): ExportSummary 
     actorNames.push(spec.name);
     writeJson(join(dir, "actors", `${spec.name}.jsonld`), instance.agentDocument(spec.name));
     writeOutbox(spec.name, instance.actorId(spec.name));
+  }
+
+  // Hub actors (P2): same shape as any agent — a document in actors/ and an
+  // OrderedCollection outbox. A hub on the record is vouched onto the roster
+  // like anyone else, so nothing here is a special case for the verifier.
+  for (const hub of hubs) {
+    // Prefixed so a hub whose id segment matches an agent name can never
+    // overwrite that agent's actors/ or outbox/ file. The verifier matches
+    // actors by URL, not by filename, so the prefix is purely a namespace.
+    const name = `hub-${hub.actorId.split("/").pop() ?? hub.actorId}`;
+    actorNames.push(name);
+    writeJson(join(dir, "actors", `${name}.jsonld`), hub.actorDocument());
+    const entries = hub.outbox.byActor(hub.actorId);
+    activities += entries.length;
+    writeJson(join(dir, "outbox", `${name}.jsonld`), {
+      "@context": AFP_CONTEXTS,
+      id: `${hub.actorId}/outbox`,
+      type: "OrderedCollection",
+      attributedTo: hub.actorId,
+      totalItems: entries.length,
+      orderedItems: entries.map((entry) => entry.activity),
+    });
   }
 
   const artifacts = instance.artifacts.all();

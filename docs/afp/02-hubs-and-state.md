@@ -168,7 +168,9 @@ Quorum size is computed, not configured, over live (non-suspected) weighted memb
   quorum is a weight-sum threshold
 
 **Snapshot-pinning.** At round start the proposer hashes the merged membership CRDT and
-embeds it (`afp:quorumSnapshot`) plus the explicit voter list in the proposal. Votes are
+embeds it (`afp:quorumSnapshot`) plus the explicit voter list (`afp:voters`) and the
+per-voter weights (`afp:voterWeights`) in the proposal — recorded explicitly so tally
+recomputation never depends on state a verifier can't see. Votes are
 validated against the pinned set: an agent enrolled *after* round start simply isn't in it.
 This closes late-join tally skew and the mid-round Sybil attack — in the multi-operator
 setting, it's what stops an operator from bulk-enrolling agents mid-vote to swing a

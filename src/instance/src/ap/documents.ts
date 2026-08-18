@@ -21,8 +21,14 @@ export const AFP_CONTEXTS: JsonValue = [AS2_CONTEXT, AFP_CONTEXT, DATA_INTEGRITY
 export type KeyCustody = "self" | "instance";
 
 export interface AgentSpec {
-  /** Local name; the actor URL is `${origin}/agents/${name}`. */
+  /** Local name; the actor URL is `${origin}/agents/${name}` unless `url` overrides it. */
   name: string;
+  /**
+   * Exact actor URL, when it is not the default `/agents/<name>` shape — a
+   * vouched hub actor under `/hubs/`, for instance. Roster entries derived
+   * from the Vouch trail carry the URL the Vouch named (01 § Vouch / disown).
+   */
+  url?: string;
   capabilities: readonly string[];
   keyCustody: KeyCustody;
   since: string;
@@ -68,6 +74,12 @@ export function agentActor(
   origin: string,
   spec: AgentSpec,
   key: KeyPair,
+  /**
+   * Hub-scoped verification methods (ADR-0002 Decision 4), published alongside
+   * the P1 `assertionMethod` key rather than replacing it — keys cannot be
+   * backfilled onto an already-published actor document.
+   */
+  hubKeys: readonly KeyPair[] = [],
 ): { [key: string]: JsonValue } {
   const id = agentActorId(origin, spec.name);
   return {
@@ -77,6 +89,33 @@ export function agentActor(
     name: spec.name,
     "afp:operatedBy": instanceActorId(origin),
     "afp:capabilities": [...spec.capabilities],
+    inbox: `${id}/inbox`,
+    outbox: `${id}/outbox`,
+    "afp:visibility": "public",
+    assertionMethod: [multikey(key), ...hubKeys.map(multikey)],
+  };
+}
+
+export function hubActorId(origin: string, hubId: string): string {
+  return `${origin}/hubs/${hubId}`;
+}
+
+/**
+ * `afp:Hub` — an AS2 `Group` (ADR-0002 Decision 1). It reaches agents through
+ * the same inbox/outbox shape as any other actor: no field here differs from
+ * what a hub running as a separate federated service would publish.
+ */
+export function hubActor(
+  origin: string,
+  hubId: string,
+  key: KeyPair,
+): { [key: string]: JsonValue } {
+  const id = hubActorId(origin, hubId);
+  return {
+    "@context": AFP_CONTEXTS,
+    id,
+    type: ["Group", "afp:Hub"],
+    name: hubId,
     inbox: `${id}/inbox`,
     outbox: `${id}/outbox`,
     "afp:visibility": "public",
@@ -112,7 +151,7 @@ export function signedRoster(
     "afp:visibility": "public",
     orderedItems: agents.map((agent) => ({
       type: "afp:RosterEntry",
-      agent: agentActorId(origin, agent.name),
+      agent: agent.url ?? agentActorId(origin, agent.name),
       status: "active",
       "afp:keyCustody": agent.keyCustody,
       since: agent.since,

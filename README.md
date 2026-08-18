@@ -21,11 +21,17 @@ and ADRs.
 
 ## The implementation
 
-P1 is built: **one instance, two agents, one verifiable record.** A writer and a reviewer
+**P1 is built** — one instance, two agents, one verifiable record. A writer and a reviewer
 in a single process, no network — draft, critique, revision. The deliverable is not the
 finished document; it is an exported record that a third party can replay and verify, and
 that fails loudly when a single byte of evidence is altered or a single activity is
 removed.
+
+**P2 is built** — local hub & L0 deliberation. An `afp:Hub` beside the agents (same
+process, same dispatch port), two-level enrollment, hub-scoped CRDT state with version
+vectors, and weighted-quorum rounds pinned to a membership snapshot, each closing with a
+signed `afp:DecisionRecord` whose tally any member — or stranger — recomputes from the
+record alone. Stack: [ADR-0002](docs/afp/adr/0002-p2-hub-and-crdt-stack.md).
 
 | | |
 |---|---|
@@ -34,19 +40,24 @@ removed.
 
 ```bash
 cd src/instance
-npm run demo:offline   # writer drafts, reviewer critiques, bundle exported
-npm run gate           # the 11-point acceptance gate
+npm run demo:offline   # P1: writer drafts, reviewer critiques, bundle exported
+npm run demo:p2        # P2: 30 agents agree on the best policy — DecisionRecord + export
+npm run gate           # the acceptance gate: P1's 11 checks, CRDT property tests, the hub round
 
 cd ../verifier
 python3 afp_verify.py ../instance/export --thread urn:afp:thread:doc-1
+python3 afp_verify.py ../instance/export-p2 --thread urn:afp:thread:codebase-integrity
 ```
 
 The verifier is a deliberately independent second implementation in another language — a
-verifier sharing code with the writer would only be attesting to its own bugs.
+verifier sharing code with the writer would only be attesting to its own bugs. That
+independence keeps paying: the P2 end-to-end (a real TypeScript-produced hub round
+replayed by the Python verifier) caught two cross-implementation divergences the
+single-sided fixtures had masked.
 
-All eleven [acceptance-gate](docs/afp/05-roadmap.md#acceptance-gate) checks pass, including
-the two deliberate mutations: a flipped evidence byte and a removed activity each fail the
-replay, naming the mismatched digest and the broken chain link.
+All [acceptance-gate](docs/afp/05-roadmap.md#acceptance-gate) checks pass, including the
+four deliberate P1 mutations and P2's three DecisionRecord mutations — each fails the
+replay with a specific pointer.
 
 ## Why integrity is in phase one
 

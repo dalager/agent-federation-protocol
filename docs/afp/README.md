@@ -16,7 +16,7 @@ This is the markdown rendition of the full spec (Revision 3.7). Reading order:
 | [06-deployment-profiles.md](06-deployment-profiles.md) | Solo/airgapped vs. federated profiles · the "consortium of one" · sneakernet federation |
 | [07-visibility-and-artifacts.md](07-visibility-and-artifacts.md) | Audience & visibility classes · authorized fetch · auditor grants · hash-addressed artifacts · hub lifecycle |
 | [scenarios/](scenarios/) | Spec-test scenarios — each walks a real workload end to end and ends with a verdict of what held and what strained |
-| [adr/](adr/) | Architecture decision records — [ADR-0001](adr/0001-p1-stack.md): the P1 technology stack |
+| [adr/](adr/) | Architecture decision records — [ADR-0001](adr/0001-p1-stack.md): the P1 technology stack · [ADR-0002](adr/0002-p2-hub-and-crdt-stack.md): the P2 hub & CRDT stack |
 
 ## Where to start building
 
@@ -35,6 +35,11 @@ The stack is decided in [ADR-0001](adr/0001-p1-stack.md) and **built**: TypeScri
 SQLite, `eddsa-jcs-2022` object integrity proofs, and a replay verifier that is a
 deliberately independent second implementation in another language — because a verifier
 sharing code with the writer would only be attesting to its own bugs.
+
+**[P2](05-roadmap.md#p2p7) — local hub & L0 deliberation — is built too**
+([ADR-0002](adr/0002-p2-hub-and-crdt-stack.md)): an `afp:Hub` beside the agents, two-level
+enrollment, hub-scoped CRDT state with version vectors, and weighted-quorum rounds closing
+with a signed `afp:DecisionRecord` the verifier recomputes from the record alone.
 
 | | |
 |---|---|

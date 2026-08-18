@@ -61,6 +61,25 @@ export function publicKeyFromMultibase(multibase: string): KeyObject {
 }
 
 /**
+ * Load or create a hub-scoped keypair for `controller` under one hub.
+ *
+ * P2 extends the key store to `(actorId, hubId?) → key` (ADR-0002 Decision 4):
+ * the file name carries the hub scope so it never collides with the P1
+ * `assertionMethod` key, and the `keyId` matches the `afp:hubKey` shape from
+ * 02 (`…#hub-key-<hubId>`) so it publishes alongside the P1 key rather than
+ * replacing it.
+ */
+export function loadOrCreateHubKeyPair(
+  keyDir: string,
+  name: string,
+  controller: string,
+  hubId: string,
+): KeyPair {
+  const pair = loadOrCreateKeyPair(keyDir, `${name}--hub-${hubId}`, controller);
+  return { ...pair, keyId: `${controller}#hub-key-${hubId}` };
+}
+
+/**
  * Load the keypair for `controller`, generating and persisting one on first use.
  *
  * P1 runs `keyCustody: "instance"`, so in practice this is the instance key

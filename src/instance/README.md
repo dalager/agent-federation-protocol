@@ -1,13 +1,16 @@
-# AFP P1 — reference instance
+# AFP reference instance — P1 + P2
 
-One instance, two agents, one verifiable record. No hub, no agreements, no
-bidding, no voting, no network — see
-[05-roadmap.md § P1](../../docs/afp/05-roadmap.md#p1--one-instance-two-agents-one-verifiable-record).
+**P1**: one instance, two agents, one verifiable record — no network
+([05 § P1](../../docs/afp/05-roadmap.md#p1--one-instance-two-agents-one-verifiable-record)).
+**P2**: a local hub beside the agents — enrollment, hub-scoped CRDT state, and
+L0 weighted-quorum deliberation closing with a signed `afp:DecisionRecord`
+([ADR-0002](../../docs/afp/adr/0002-p2-hub-and-crdt-stack.md)).
 
 ```bash
-npm run demo          # writer drafts, reviewer critiques, bundle exported
+npm run demo          # P1: writer drafts, reviewer critiques, bundle exported
 npm run demo:offline  # the same, against deterministic brains
-npm run gate          # the 11-point acceptance gate
+npm run demo:p2       # P2: 30 agents agree on the best policy (-> ./export-p2)
+npm run gate          # the acceptance gate: P1's 11 checks + CRDT + hub round
 npm run serve         # the public HTTP surface
 ```
 
@@ -48,6 +51,40 @@ The deliverable is not the finished document. It is a record a stranger can
 verify and a forger cannot quietly edit — produced by a system with two agents
 and no network.
 
+## The P2 demo
+
+The roadmap's own scenario: *"30 agents agree on the best policy for codebase
+integrity."* Thirty voters enroll in a local `afp:Hub` (same process, same
+dispatch port — the wiring stays invisible in the record), an L0 round runs
+over a pinned membership snapshot with explicit per-voter weights, three
+agents abstain by omission, and the hub closes the round with a signed
+`Create{afp:DecisionRecord}`:
+
+```
+hub https://alpha.operator.local/hubs/policy-hub
+round urn:afp:round:codebase-integrity — 30 enrolled, 27 votes counted
+
+  signed-commits   ███████████████ 15
+  review-quorum    █████████ 9
+  trunk-freeze     ███ 3
+  abstain          ███ 3
+
+outcome:  signed-commits
+```
+
+The hub is vouched onto the roster like any agent (self-custody), so the
+export replays with no special case:
+
+```bash
+python3 ../verifier/afp_verify.py export-p2 --thread urn:afp:thread:codebase-integrity
+# PASSED — 462 checks, no gaps
+```
+
+The verifier recomputes the tally from `afp:countedVotes`, demands every
+counted vote be producible, and rejects any vote from outside the pinned
+snapshot — and fails loudly, with a specific pointer, when the record is
+mutated any of those three ways.
+
 ## Layout
 
 ```
@@ -73,10 +110,21 @@ src/
     port.ts          the entire agent contract — mentions no protocol at all
     stub.ts          deterministic brains, so the gate is reproducible offline
     openai.ts        the same port, an OpenAI-compatible endpoint behind it
+  crdt/              P2: the four hand-rolled CRDTs (G-Set, LWW, OR-Set, OR-Map)
+                     + the keyed SQLite store with per-actor version vectors
+  hub/
+    hub.ts           the afp:Hub actor — enrollment, L0 rounds, DecisionRecord,
+                     Freeze/Archive; reaches agents only through the shared port
+    activities.ts    Enroll/Unenroll, Offer{Proposal}, Create{Vote/DecisionRecord}
+    crdtAdapter.ts   class-shaped view over crdt/ for the hub's call sites
+    store.ts         rounds + vote receipts (CRDT state lives in crdt/)
   instance.ts        the adapter stack: signing, chain, gate, dedupe, dispatch
-  export.ts          the bundle you hand to a third party
-  demo.ts, cli.ts
-test/gate.test.ts    the 11 acceptance checks
+  export.ts          the bundle you hand to a third party — hub outboxes included
+  demo.ts, demoP2.ts, cli.ts
+test/gate.test.ts    the 11 P1 acceptance checks
+test/crdt.test.ts    P2: merge property tests (commutative/associative/idempotent)
+test/hub.test.ts     P2: enrollment, a full L0 round, lifecycle, and the
+                     end-to-end replay through the Python verifier
 ```
 
 ## The boundary

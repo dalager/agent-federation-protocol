@@ -33,9 +33,9 @@ export async function freshDemo() {
   return runDemo({ fresh: true, config: workspace(), clock: fixedClock() });
 }
 
-export function runVerifier(script: string, dir: string, thread: string) {
+export function runVerifier(script: string, dir: string, thread: string, extraArgs: string[] = []) {
   try {
-    const output = execFileSync("python3", [script, dir, "--thread", thread], {
+    const output = execFileSync("python3", [script, dir, "--thread", thread, ...extraArgs], {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "pipe"],
     });

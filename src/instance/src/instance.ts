@@ -172,6 +172,7 @@ export class AfpInstance {
           : [];
         members.set(name, {
           name,
+          url: agentUrl,
           capabilities,
           keyCustody: String(object?.["afp:keyCustody"] ?? "instance") as AgentSpec["keyCustody"],
           since: String(object?.since ?? entry.published),
