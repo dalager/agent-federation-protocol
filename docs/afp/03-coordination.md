@@ -231,7 +231,9 @@ alongside v1's flow, it doesn't replace it.
 }
 ```
 
-*(Shown post-reveal; the commit phase sends only `afp:commitment`, a hash of this payload.)*
+*(Shown post-reveal; the commit phase sends only `afp:commitment`, a hash of this
+payload — which MUST include a `nonce` field, or a low-entropy bid is recoverable from
+its commitment by enumerating the handful of plausible values.)*
 
 **Sniping and lying, honestly bounded.** Signatures give non-repudiation of what was
 *claimed*, not truth of the claim. The real deterrent is reputational: declared
