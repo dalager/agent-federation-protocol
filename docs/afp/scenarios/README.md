@@ -15,6 +15,7 @@ protocol does; that review tested whether the build order still matched it.
 | [02](02-observability-fix-pipeline.md) | Observability-to-fix pipeline | Standing hubs, ports vs. external providers, bidding as routing, risk gates | 3 |
 | [03](03-co-staffed-project.md) | Two consultancies co-staffing a project | Federation, cross-operator governance, shared state, co-work, billing evidence | 4 + 2 recurring |
 | [04](04-federated-estimation.md) | A question pushed to the hub: federated estimation | Unknown-arity allocation, partial answers, reconciliation, unverifiable deliverables | 6 |
+| [05](05-integration-practice.md) | The integration practice: domain intelligence as an internal service | Standing solo instance answering other teams' shape/size/effort asks, requester roles, cross-team asset reuse, settlement on requester-reported actuals | 3 |
 
 ## Findings ledger
 
@@ -52,8 +53,19 @@ Six findings from scenario 04. Two are protocol additions, not conventions:
 Useful scenarios stress an axis the existing ones don't. Untested so far: three or more
 operators (real Byzantine tolerance, coalition dynamics at n≥4), long-lived hubs with heavy
 membership churn, sneakernet/airgapped federation, an adversarial operator rather than a
-merely buggy one, client/observer participation with read-only scope, and a task whose
-answer must be revised after the fact (retraction/supersession of a published Synthesis).
+merely buggy one, and a task whose answer must be revised after the fact
+(retraction/supersession of a published Synthesis). Client/observer participation was
+exercised by scenario 05 — and strained into finding 2 (requester roles).
+
+### Campaign 3 → open
+
+Three findings from scenario 05, not yet landed in a spec revision:
+
+| # | Finding | Proposed resolution |
+|---|---|---|
+| 16 | Reusable components have identity across hubs; capabilities describe agents, artifacts are bare bytes | An `afp:Asset` object (id, version, digest, provenance) referenceable from Bids and Results, so reuse claims are checkable at replay |
+| 17 | Enrollment is binary; serving non-member teams needs a requester/observer role | `afp:role` on the Enroll, recorded in the membership CRDT, enforced at bid admission and snapshot-pinning |
+| 18 | A staffing policy now wants to consume reputation — ADR-0003 Decision 5's revisit trigger has fired | A named, published score derivation over the settlement trail, pinned in the Announce like a selection rule, recomputable from the record |
 
 Keep the format: user story → cast → walkthrough → acceptance criteria mapped to spec
 mechanisms → verdict with findings. Be willing to conclude that something strained; a
