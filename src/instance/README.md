@@ -15,6 +15,7 @@ npm run demo          # P1: writer drafts, reviewer critiques, bundle exported
 npm run demo:offline  # the same, against deterministic brains
 npm run demo:p2       # P2: 30 agents agree on the best policy (-> ./export-p2)
 npm run demo:p3       # P3: two auctions, coalition award, synthesis (-> ./export-p3)
+npm run demo:p3:llm   # the same auction, answers written by a real local model
 npm run gate          # the acceptance gate: P1's 11 checks + CRDT + hub + auction
 npm run serve         # the public HTTP surface
 ```
@@ -130,6 +131,54 @@ the announced answer-sufficiency threshold, the synthesis binding, and the
 estimator wall. An award timeout is swept into a recorded `afp:Reauction`
 whose fast-path award names the excluded failed winners.
 
+### Running it with a real model
+
+`npm run demo:p3:llm` runs the same estimation auction with the coalition's
+partial answers and the Synthesis produced by a local model (any
+OpenAI-compatible endpoint; see Configuration). The machinery — bids, sealing,
+selection, ratification — is byte-for-byte the deterministic path; only the
+words change, and the export passes the identical verifier checks. Runs so far
+have also demonstrated *why* Synthesis is ratified rather than trusted: a
+small model occasionally combines the partial ranges wrongly, and that
+discretion is exactly what the L0 round and the recorded dissent exist to
+catch.
+
+## Defining the agent collection
+
+`src/profiles.ts` is the recipe: **one `AgentProfile` per agent, from which
+everything the record carries about it is derived** — the Vouch/roster
+capabilities, the hub enrollment, the sealed bid's `afp:coverage` and cost
+posture, and (in LLM mode) the persona woven into the system prompt. A fact
+stated twice — what the agent claims vs. what its prompt says it is — is a
+place where claim and behavior drift; deriving both from one declaration is
+what keeps the record honest.
+
+Three layers, because the protocol consumes them differently:
+
+| Layer | Granularity | Where it lands | Who checks it |
+|---|---|---|---|
+| `capabilities` | coarse, stable (`afp:cap:estimate`) | Vouch → roster, Enroll → hub OR-Map, Announce filter | routing only — an open vocabulary, nothing verifies it |
+| `coverage` | domain → integer-percent confidence | inside the sealed bid payload | the selection rule at award, and `afp:Settlement` after actuals — declare only confidences you are willing to be graded on |
+| `persona` | one sentence of free text | the LLM system prompt | the ratification round, when its Synthesis exercises discretion |
+
+Collection-level rules enforced or exercised by the panel:
+
+- `assertCoverage()` runs at demo start: the non-estimator profiles must
+  jointly cover every announced domain at the confidence floor, or the run
+  fails at build time instead of as a dead auction.
+- Overlap is a feature — two profiles claiming `compliance` gives the coverage
+  rule real choices and the synthesizer a cross-check.
+- A profile with an **empty coverage map** is the on-record decliner: capable
+  of the task class, covering none of these domains, so it `Reject`s within
+  the bid window instead of staying silent.
+- A profile flagged `estimator: true` is listed in the announce's
+  `afp:estimators` and rejected at bid admission under the `exclude` policy —
+  the separation is data in the record, so a verifier checks it was applied.
+
+Capability ids are **not** protocol vocabulary: AFP defines the machinery
+around capability strings (declaration, matching, settlement) but no catalogue
+of names. Keep your own registry small and namespaced.
+
 ## Layout
 
 ```
@@ -172,9 +221,12 @@ src/
     allocator.ts     admission gate, award/reauction sweep, settlements
     store.ts         auctions, bids, declines, admission audit log,
                      pending accepts, settlements — same SQLite file
+  profiles.ts        agent profiles: one declaration per agent — roster
+                     capabilities, bid coverage, cost posture, persona — plus
+                     the collection-level coverage assertion
   instance.ts        the adapter stack: signing, chain, gate, dedupe, dispatch
   export.ts          the bundle you hand to a third party — hub outboxes included
-  demo.ts, demoP2.ts, demoP3.ts, cli.ts
+  demo.ts, demoP2.ts, demoP3.ts, experimentP3.ts, cli.ts
 test/gate.test.ts    the 11 P1 acceptance checks
 test/crdt.test.ts    P2: merge property tests (commutative/associative/idempotent)
 test/hub.test.ts     P2: enrollment, a full L0 round, lifecycle, and the

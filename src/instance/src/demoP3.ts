@@ -23,9 +23,20 @@ import { bidCommit, bidPayload, bidReveal, commitmentOf, createSynthesis, type B
 import { Hub, hubTransport } from "./hub/hub.ts";
 import type { OutboxEntry } from "./store/outbox.ts";
 import type { Transport } from "./store/queue.ts";
+import type { JsonValue } from "./crypto/jcs.ts";
+import {
+  ESTIMATION_PANEL,
+  PANEL_DOMAINS,
+  PANEL_MIN_CONFIDENCE,
+  assertCoverage,
+  biddersFor,
+  declinersFor,
+  eligibleDomains,
+  estimateBid,
+  toAgentSpec,
+} from "./profiles.ts";
 
 const HUB_ID = "estimation-hub";
-const DOMAINS = ["infra", "data", "compliance", "licensing"];
 
 /** A stepping clock the demo can jump forward — bid windows are real instants. */
 export function jumpClock(start = "2026-08-17T09:00:00.000Z", stepMs = 1000) {
@@ -39,19 +50,11 @@ export function jumpClock(start = "2026-08-17T09:00:00.000Z", stepMs = 1000) {
 }
 
 /**
- * name → declared coverage (domain → confidence, in percent) for the
- * estimation bidders. Percent, not fractions: the AFP JCS profile forbids
- * non-integer numbers in signed documents, so every fractional quantity on
- * the wire is a scaled integer.
+ * Scenario-specific bid posture for the ranking auction (a different task
+ * class than estimation), keyed by panel profile names. Everything about the
+ * estimation auction — coverage, cost posture, personas, the estimator wall,
+ * the decliner — derives from `profiles.ts` instead.
  */
-const COVERAGE: Record<string, Record<string, number>> = {
-  "a-infra": { infra: 90, data: 70 },
-  "a-data": { data: 90 },
-  "b-compliance": { compliance: 80, licensing: 50 },
-  "b-licensing": { licensing: 90, compliance: 65 },
-  "c-generalist": { infra: 65, data: 60, compliance: 60, licensing: 55 },
-};
-
 const RANKING_BIDS: Record<string, Omit<BidFields, "task" | "bidder" | "nonce" | "coverage">> = {
   "a-infra": { capabilityMatch: 80, estimatedCost: { unit: "afp:compute-unit", value: 140 }, estimatedLatency: "PT6M" },
   "a-data": { capabilityMatch: 95, estimatedCost: { unit: "afp:compute-unit", value: 120 }, estimatedLatency: "PT4M" },
@@ -59,17 +62,22 @@ const RANKING_BIDS: Record<string, Omit<BidFields, "task" | "bidder" | "nonce" |
 };
 
 /**
- * `afp:estimatedCost` on these bids is what performing the estimation work
- * costs the bidder (compute units) — never the migration-cost answer itself,
- * which lives in the Synthesis (03 "Precision": do not conflate them).
+ * Content hooks: the allocation flow is identical either way; what varies is
+ * who writes the words. The default is deterministic stub text (the gate must
+ * run offline); `experimentP3.ts` plugs a real model in here — and nothing
+ * about the record's shape changes, which is the port earning its keep.
  */
-const ESTIMATE_BIDS: Record<string, { cost: number; latency: string }> = {
-  "a-infra": { cost: 30, latency: "PT2H" },
-  "a-data": { cost: 25, latency: "PT1H" },
-  "b-compliance": { cost: 20, latency: "PT3H" },
-  "b-licensing": { cost: 35, latency: "PT4H" },
-  "c-generalist": { cost: 60, latency: "PT8H" },
-};
+export interface P3Content {
+  /** One coalition member's partial answer for the estimation question. */
+  resultOf?: (
+    name: string,
+    domains: string[],
+  ) => Promise<{ content: string; producedBy: string; objection: string | null }>;
+  /** Combine the coalition's partials into the synthesis payload. */
+  synthesize?: (
+    inputs: { name: string; content: string; objection: string | null }[],
+  ) => Promise<{ method: string; answer: JsonValue; confidence: number; assumptions: string[] }>;
+}
 
 export interface P3DemoResult {
   instance: AfpInstance;
@@ -84,17 +92,27 @@ export interface P3DemoResult {
 }
 
 export async function runP3Demo(
-  options: { fresh?: boolean; config?: Partial<Config>; clock?: Clock & { jumpTo(iso: string): void } } = {},
+  options: {
+    fresh?: boolean;
+    config?: Partial<Config>;
+    clock?: Clock & { jumpTo(iso: string): void };
+    content?: P3Content;
+  } = {},
 ): Promise<P3DemoResult> {
   const config = loadConfig(options.config);
   if (options.fresh) rmSync(config.dataDir, { recursive: true, force: true });
   const clock = options.clock ?? jumpClock();
 
   const since = "2026-08-17T00:00:00Z";
-  const names = [...Object.keys(COVERAGE), "d-secops", "e-estimator"];
-  const agents: AgentRegistration[] = names.map((name) => ({
-    spec: { name, capabilities: ["afp:cap:estimate"], keyCustody: "instance" as const, since },
-    brain: new CountingBrain(name, ["afp:cap:estimate"], () => ({ ok: true, content: "n/a" })),
+  // One declaration per agent (profiles.ts): roster specs, bid coverage, the
+  // decliner, and the estimator wall all derive from the same panel — checked
+  // up front so an uncoverable domain fails here, not as a dead auction.
+  assertCoverage(ESTIMATION_PANEL, PANEL_DOMAINS, PANEL_MIN_CONFIDENCE);
+  const names = ESTIMATION_PANEL.map((profile) => profile.name);
+  const profileOf = new Map(ESTIMATION_PANEL.map((profile) => [profile.name, profile]));
+  const agents: AgentRegistration[] = ESTIMATION_PANEL.map((profile) => ({
+    spec: toAgentSpec(profile, since),
+    brain: new CountingBrain(profile.name, [...profile.capabilities], () => ({ ok: true, content: "n/a" })),
   }));
   const instance = new AfpInstance(config, agents, clock);
 
@@ -148,6 +166,7 @@ export async function runP3Demo(
     bidders: string[];
     bidOf: (name: string) => BidFields;
     windowCloses: string;
+    resultOf?: (name: string) => Promise<{ content: string; producedBy: string }>;
   }) => {
     const taskId = `${hub.actorId}/tasks/${auction.slug}`;
     hub.allocation.announce({
@@ -161,11 +180,12 @@ export async function runP3Demo(
       selectionRule: auction.rule as never,
       answerSufficiency: auction.sufficiency as never,
       estimatorPolicy: "exclude",
-      estimators: [instance.actorId("e-estimator")],
+      estimators: ESTIMATION_PANEL.filter((p) => p.estimator).map((p) => instance.actorId(p.name)),
     });
 
-    // Sealed phase: commits only. The estimator tries anyway and is rejected
-    // at admission (Decision 6); d-secops declines on the record (03).
+    // Sealed phase: commits only. Estimator profiles try anyway and are
+    // rejected at admission (Decision 6); profiles with no eligible coverage
+    // decline on the record instead of staying silent (03).
     const payloads = new Map<string, { [key: string]: never }>();
     for (const name of auction.bidders) {
       const payload = bidPayload(auction.bidOf(name));
@@ -174,16 +194,17 @@ export async function runP3Demo(
         bidCommit(envelope, { task: taskId, hub: hub.actorId, commitment: commitmentOf(payload) }),
       );
     }
-    const estimatorPayload = bidPayload({
-      task: taskId, bidder: instance.actorId("e-estimator"), capabilityMatch: 90,
-      estimatedCost: { unit: "afp:compute-unit", value: 10 }, estimatedLatency: "PT1H", nonce: `nonce-e-${auction.slug}`,
-    });
-    instance.publish("e-estimator", [hub.actorId], auction.thread, "hub", (envelope) =>
-      bidCommit(envelope, { task: taskId, hub: hub.actorId, commitment: commitmentOf(estimatorPayload) }),
-    );
-    instance.publish("d-secops", [hub.actorId], auction.thread, "hub", (envelope) =>
-      rejectTask(envelope, taskId, auction.slug, "not my domain: security operations, not estimation"),
-    );
+    for (const profile of ESTIMATION_PANEL.filter((p) => p.estimator)) {
+      const payload = bidPayload(estimateBid(profile, taskId, instance.actorId(profile.name), auction.slug));
+      instance.publish(profile.name, [hub.actorId], auction.thread, "hub", (envelope) =>
+        bidCommit(envelope, { task: taskId, hub: hub.actorId, commitment: commitmentOf(payload) }),
+      );
+    }
+    for (const profile of declinersFor(ESTIMATION_PANEL, PANEL_DOMAINS, PANEL_MIN_CONFIDENCE)) {
+      instance.publish(profile.name, [hub.actorId], auction.thread, "hub", (envelope) =>
+        rejectTask(envelope, taskId, auction.slug, `not my domain: ${profile.persona}`),
+      );
+    }
     await instance.run(transport);
 
     // Reveal phase, after the window closes.
@@ -207,14 +228,17 @@ export async function runP3Demo(
       instance.publish(name, [hub.actorId], auction.thread, "hub", (envelope) =>
         acceptTask(envelope, String(awardObject.id), `${auction.slug}--${name}`),
       );
+      const produced = auction.resultOf
+        ? await auction.resultOf(name)
+        : { content: `partial answer from ${name} for ${auction.slug}`, producedBy: "stub-brain/1" };
       results.set(
         name,
         instance.publish(name, [hub.actorId], auction.thread, "hub", (envelope) =>
           createResult(envelope, {
             resultId: `${envelope.actor}/results/${auction.slug}`,
             correlationId: `${auction.slug}--${name}`,
-            content: `partial answer from ${name} for ${auction.slug}`,
-            producedBy: "stub-brain/1",
+            content: produced.content,
+            producedBy: produced.producedBy,
           }),
         ),
       );
@@ -240,47 +264,77 @@ export async function runP3Demo(
     windowCloses: "2026-08-17T09:10:00.000Z",
   });
 
+  // When a content hook is present, each coalition member's partial answer is
+  // real model output; the objection (if any) becomes recorded dissent.
+  const objections = new Map<string, string | null>();
+  const partials = new Map<string, string>();
   const estimate = await runAuction({
     slug: "q-88",
     thread: "urn:afp:thread:q-88-migration-estimate",
     capability: "afp:cap:estimate",
     content: "Estimate the total cost of the payments-platform migration",
-    rule: { name: "coverage", params: { domains: DOMAINS, minConfidence: 60 } },
-    sufficiency: { coverage: DOMAINS, count: 2 },
-    bidders: Object.keys(COVERAGE),
-    bidOf: (name) => ({
-      task: `${hub.actorId}/tasks/q-88`,
-      bidder: instance.actorId(name),
-      capabilityMatch: 80,
-      estimatedCost: { unit: "afp:compute-unit", value: ESTIMATE_BIDS[name].cost },
-      estimatedLatency: ESTIMATE_BIDS[name].latency,
-      coverage: COVERAGE[name],
-      nonce: `nonce-${name}-q-88`,
-    }),
+    rule: { name: "coverage", params: { domains: [...PANEL_DOMAINS], minConfidence: PANEL_MIN_CONFIDENCE } },
+    sufficiency: { coverage: [...PANEL_DOMAINS], count: 2 },
+    bidders: biddersFor(ESTIMATION_PANEL, PANEL_DOMAINS, PANEL_MIN_CONFIDENCE).map((p) => p.name),
+    bidOf: (name) => estimateBid(profileOf.get(name)!, `${hub.actorId}/tasks/q-88`, instance.actorId(name), "q-88"),
     windowCloses: "2026-08-17T09:30:00.000Z",
+    resultOf: options.content?.resultOf
+      ? async (name) => {
+          const eligible = eligibleDomains(profileOf.get(name)!, PANEL_DOMAINS, PANEL_MIN_CONFIDENCE);
+          const produced = await options.content!.resultOf!(name, eligible);
+          objections.set(name, produced.objection);
+          partials.set(name, produced.content);
+          return produced;
+        }
+      : undefined,
   });
 
   // The synthesizer the Award names reconciles the partial answers (04).
+  // Stub mode scripts one dissenting performer; with content hooks, dissent is
+  // whatever objections the performers actually raised — possibly none.
   const synthesizerName = instance.nameOf(String(estimate.awardObject["afp:synthesizer"]))!;
-  const dissenter = estimate.performers.find((name) => name !== synthesizerName) ?? synthesizerName;
+  const dissenters = options.content?.resultOf
+    ? estimate.performers.filter((name) => objections.get(name))
+    : [estimate.performers.find((name) => name !== synthesizerName) ?? synthesizerName];
+  const dissent = options.content?.resultOf
+    ? dissenters.map((name) => ({
+        actor: instance.actorId(name),
+        summary: objections.get(name)!,
+        result: estimate.results.get(name)!.digest,
+      }))
+    : [
+        {
+          actor: instance.actorId(dissenters[0]),
+          summary: "Q3 deadline unachievable at any cost: 14-week licensing lead time",
+          result: estimate.results.get(dissenters[0])!.digest,
+        },
+      ];
+  const combined = options.content?.synthesize
+    ? await options.content.synthesize(
+        estimate.performers.map((name) => ({
+          name,
+          content: partials.get(name) ?? "",
+          objection: objections.get(name) ?? null,
+        })),
+      )
+    : {
+        method: "sum-of-disjoint-ranges",
+        answer: { unit: "kDKK", low: 9000, high: 11700 } as JsonValue,
+        confidence: 72,
+        assumptions: ["dual-run parallel period", "network segmentation contains PCI scope"],
+      };
   const synthesis = instance.publish(synthesizerName, [hub.actorId], "urn:afp:thread:q-88-migration-estimate", "hub", (
     envelope,
   ) =>
     createSynthesis(envelope, {
       synthesisId: `${envelope.actor}/syntheses/q-88`,
       award: String(estimate.awardObject.id),
-      method: "sum-of-disjoint-ranges",
-      answer: { unit: "kDKK", low: 9000, high: 11700 },
-      confidence: 72,
+      method: combined.method,
+      answer: combined.answer,
+      confidence: combined.confidence,
       contributingResults: [...estimate.results.values()].map((entry) => entry.digest),
-      assumptions: ["dual-run parallel period", "network segmentation contains PCI scope"],
-      dissent: [
-        {
-          actor: instance.actorId(dissenter),
-          summary: "Q3 deadline unachievable at any cost: 14-week licensing lead time",
-          result: estimate.results.get(dissenter)!.digest,
-        },
-      ],
+      assumptions: combined.assumptions,
+      dissent,
     }),
   );
   await instance.run(transport);
@@ -303,7 +357,7 @@ export async function runP3Demo(
         round,
         proposalHash: proposal.digest,
         quorumSnapshot,
-        value: name === dissenter ? "reject" : synthesisId,
+        value: dissenters.includes(name) ? "reject" : synthesisId,
       }),
     );
   }
@@ -317,10 +371,10 @@ export async function runP3Demo(
     Object.fromEntries(
       estimate.performers.map((name) => [
         instance.actorId(name),
-        { "afp:actualCost": { unit: "afp:compute-unit", value: ESTIMATE_BIDS[name].cost + 5 }, "afp:actualLatency": "PT6H" },
+        { "afp:actualCost": { unit: "afp:compute-unit", value: profileOf.get(name)!.bidPosture.cost.value + 5 }, "afp:actualLatency": "PT6H" },
       ]),
     ),
-    [instance.actorId(dissenter)],
+    dissenters.map((name) => instance.actorId(name)),
     synthesisId,
   );
 

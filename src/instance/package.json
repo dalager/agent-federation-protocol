@@ -15,6 +15,7 @@
     "test": "npm run gate",
     "demo:offline": "AFP_BRAIN=stub node --experimental-sqlite src/cli.ts demo",
     "demo:p2": "node --experimental-sqlite src/cli.ts p2",
-    "demo:p3": "node --experimental-sqlite src/cli.ts p3"
+    "demo:p3": "node --experimental-sqlite src/cli.ts p3",
+    "demo:p3:llm": "node --experimental-sqlite src/cli.ts p3:llm"
   }
 }

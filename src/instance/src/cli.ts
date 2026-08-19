@@ -114,6 +114,38 @@ async function main(): Promise<void> {
       break;
     }
 
+    case "p3:llm": {
+      const config = loadConfig();
+      const { runP3Experiment } = await import("./experimentP3.ts");
+      const short = (url: unknown) => String(url).split("/").pop();
+
+      console.log(`brains: ${config.llmModel} @ ${config.llmBaseUrl}\n`);
+      const { instance, hub, coverageAward, synthesis, ratification, settlement, exported, threads, partials } =
+        await runP3Experiment({ endpoint: endpointOf(config), config: { exportDir: "./export-p3-llm" } });
+
+      const cov = coverageAward.activity.object as Record<string, unknown>;
+      const syn = synthesis.activity.object as Record<string, unknown>;
+      const decision = ratification.activity.object as Record<string, unknown>;
+      const dissent = syn["afp:dissent"] as { actor: string; summary: string }[];
+
+      console.log(`hub ${hub.actorId} — ${hub.members().length} agents enrolled`);
+      console.log(`coalition [${(cov["afp:performers"] as string[]).map(short).join(", ")}], synthesizer ${short(cov["afp:synthesizer"])}\n`);
+      for (const partial of partials) {
+        console.log(`--- ${partial.name} ---`);
+        console.log(partial.content.trim().split("\n").slice(0, 6).join("\n"), "\n");
+      }
+      console.log(`synthesis: ${JSON.stringify(syn["afp:answer"])} confidence ${syn["afp:confidence"]}%`);
+      console.log(`method:    ${syn["afp:method"]}`);
+      for (const entry of dissent) console.log(`dissent:   ${short(entry.actor)} — ${entry.summary}`);
+      if (!dissent.length) console.log("dissent:   none recorded");
+      console.log(`ratified:  ${decision["afp:outcome"] === syn.id ? "yes" : `no (${decision["afp:outcome"]})`}`);
+      console.log(`settled:   ${(settlement.activity.object as Record<string, unknown>)["afp:synthesis"] ? "bound to synthesis" : "recorded"}`);
+      console.log(`export:    ${exported.activities} activities -> ${exported.dir}`);
+      console.log(`\nverify it:  python3 ../verifier/afp_verify.py ${exported.dir} --thread ${threads.estimate} --verbose\n`);
+      instance.close();
+      break;
+    }
+
     case "export": {
       const config = loadConfig();
       const instance = new AfpInstance(config, agentRegistrations(config));

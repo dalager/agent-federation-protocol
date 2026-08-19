@@ -135,6 +135,24 @@ describe("P3 selection rules are pure and deterministic", () => {
   });
 });
 
+describe("P3 agent profiles: one declaration drives the whole record", () => {
+  it("the panel covers every announced domain, and a gap fails at build time", async () => {
+    const { ESTIMATION_PANEL, PANEL_DOMAINS, PANEL_MIN_CONFIDENCE, assertCoverage, biddersFor, declinersFor } =
+      await import("../src/profiles.ts");
+    assertCoverage(ESTIMATION_PANEL, PANEL_DOMAINS, PANEL_MIN_CONFIDENCE); // must not throw
+    // A domain nobody claims fails before any auction is announced.
+    assert.throws(
+      () => assertCoverage(ESTIMATION_PANEL, [...PANEL_DOMAINS, "quantum"], PANEL_MIN_CONFIDENCE),
+      /quantum/,
+    );
+    // The decliner and the estimator fall out of the same declaration.
+    assert.deepEqual(declinersFor(ESTIMATION_PANEL, PANEL_DOMAINS, PANEL_MIN_CONFIDENCE).map((p) => p.name), ["d-secops"]);
+    const bidders = biddersFor(ESTIMATION_PANEL, PANEL_DOMAINS, PANEL_MIN_CONFIDENCE).map((p) => p.name);
+    assert.ok(!bidders.includes("e-estimator"), "estimator profiles never enter the bidder pool");
+    assert.equal(bidders.length, 5);
+  });
+});
+
 describe("P3 admission: sealed bids, windows, and the estimator wall", () => {
   it("rejects tampered reveals, out-of-window commits, strangers, and excluded estimators — all audit-logged", () => {
     const { hub, jumpTo } = fakeHub(["https://a.test/a", "https://a.test/b", "https://a.test/estimator"]);
