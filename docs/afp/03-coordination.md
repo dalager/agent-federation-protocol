@@ -146,18 +146,176 @@ happened.
 | `afp:coverage` | Property (Bid) | Declared sub-domains this bidder claims, with per-domain confidence — input to set-selection rules |
 | `afp:Synthesis` | Object (in `Create`) | Combined answer bound to contributing Results: method, range, confidence, assumptions, dissent, superseded inputs (04) |
 | `afp:Settlement` | Activity | Links prior estimates to observed actuals, releasing deferred reputation adjustment (04) |
+| `afp:bidWindow` | Property (announced Task) | `{opens, closes}` — commits land inside `[opens, closes)`, reveals after `closes` |
+| `afp:selectionRule` | Property (announced Task) | `{name, params}` — a rule from the published registry, pinned before any bid |
+| `afp:answerSufficiency` | Property (announced Task) | Coverage list and/or count that makes an acceptable answer — checkable at replay (ADR-0003) |
+| `afp:estimatorPolicy`, `afp:estimators` | Properties (announced Task) | The hub's recorded position on estimator/bidder separation, and who it applies to |
+| `afp:commitment` | Property (`afp:bidCommit`) | `sha256(JCS(bid payload))` — the sealed phase carries only this |
+| `afp:winningBids`, `afp:performers`, `afp:synthesizer`, `afp:acceptBy` | Properties (Award) | The recomputable outcome: winning payload digests, performer set, named synthesizer, accept deadline |
+| `afp:priorAward`, `afp:excludedBidders` | Properties (Award, reauction fast path) | Bind a re-award's reduced bid pool to the failed award it supersedes |
+
+> **Numeric profile.** Signed AFP documents carry **integers only** — the JCS
+> canonicalization this profile signs over ([01](01-foundations.md)) rejects non-integer
+> numbers, because float serialization is where two otherwise-correct implementations
+> quietly disagree. Every fractional quantity on the wire is a scaled integer:
+> confidences and capability match as percent (`93`, not `0.93`), money in minor or
+> scaled units. The examples below follow this.
+
+## The data model in pictures
+
+Every activity shares one signed envelope; the `afp:*` object types ride inside it. What
+makes the record *replayable* is that outcome objects carry digests of their evidence —
+each arrow in the second diagram is a hash reference a verifier resolves and recomputes.
+
+```mermaid
+classDiagram
+    class Activity {
+        id
+        type: AS2 or afp:*
+        actor
+        to[]
+        published
+        context: thread id
+        afp:visibility: public|hub|parties|internal
+        afp:prevActivity: hash chain
+        afp:correlationId?: one task
+        proof: eddsa-jcs-2022
+    }
+    class Task {
+        afp:capability
+        afp:deadline?
+        afp:hub?
+        afp:bidWindow?
+        afp:selectionRule?
+        afp:answerSufficiency?
+        afp:estimatorPolicy?
+        afp:estimators[]?
+        content
+        attachment[]
+    }
+    class Bid {
+        afp:task
+        afp:bidder
+        afp:capabilityMatch: int %
+        afp:estimatedCost
+        afp:estimatedLatency
+        afp:coverage: domain -> int %
+        nonce: mandatory
+    }
+    class Award {
+        afp:task
+        afp:selectionRule
+        afp:winningBids[]: payload digests
+        afp:performers[]
+        afp:synthesizer?
+        afp:acceptBy
+        afp:priorAward?
+        afp:excludedBidders[]?
+    }
+    class Result {
+        afp:correlationId
+        content
+        afp:producedBy?
+        attachment[]
+    }
+    class Proposal {
+        afp:round
+        afp:options[]
+        afp:quorumSnapshot
+        afp:voters[]
+        afp:voterWeights
+    }
+    class Vote {
+        afp:round
+        afp:proposalHash
+        afp:quorumSnapshot
+        value
+    }
+    class DecisionRecord {
+        afp:round
+        afp:outcome
+        afp:quorumSnapshot
+        afp:countedVotes[]: vote digests
+        afp:weightTally
+    }
+    class Synthesis {
+        afp:award
+        afp:method
+        afp:answer
+        afp:confidence: int %
+        afp:contributingResults[]: result digests
+        afp:assumptions[]
+        afp:dissent[]: first-class
+    }
+    class Settlement {
+        afp:task
+        afp:synthesis?
+        afp:settles[]: estimate vs actual per bid
+        afp:dissentVindicated[]?
+    }
+    class Link {
+        href
+        mediaType
+        afp:digest: mandatory
+        afp:size
+        afp:sourceUrl?
+        afp:fetchedAt?
+    }
+
+    Activity "1" *-- "0..1" Task : object
+    Activity "1" *-- "0..1" Bid : object of BidReveal
+    Activity "1" *-- "0..1" Award : object
+    Activity "1" *-- "0..1" Result : object
+    Activity "1" *-- "0..1" Proposal : object
+    Activity "1" *-- "0..1" Vote : object
+    Activity "1" *-- "0..1" DecisionRecord : object
+    Activity "1" *-- "0..1" Synthesis : object
+    Activity "1" *-- "0..1" Settlement : object
+    Task "1" *-- "0..*" Link : attachment
+    Result "1" *-- "0..*" Link : attachment
+```
+
+Evidence bindings — how outcome objects chain back to what justifies them:
+
+```mermaid
+flowchart LR
+    subgraph auction [allocation]
+        AN[Announce Task<br/>rule + window pinned] --> BC[afp:bidCommit<br/>afp:commitment]
+        BC -- "sha256(JCS(payload))<br/>must match" --> BR[afp:BidReveal<br/>payload + nonce]
+        BR -- "payload digest in<br/>afp:winningBids" --> AW[afp:Award]
+        AW -- "afp:priorAward +<br/>afp:excludedBidders" --> AW2[re-auction Award]
+    end
+    subgraph work [performance]
+        AW -- "Accept / Create{Result}<br/>per correlationId" --> R[afp:Result]
+        R -- "digest in<br/>afp:contributingResults" --> SY[afp:Synthesis]
+    end
+    subgraph deliberation [ratification]
+        PR[Offer Proposal<br/>snapshot pinned] --> V[afp:Vote]
+        V -- "digest in<br/>afp:countedVotes" --> DR[afp:DecisionRecord]
+        SY -- "named as<br/>afp:outcome" --> DR
+    end
+    SY -- "afp:synthesis" --> ST[afp:Settlement]
+    BR -- "estimate vs actual<br/>per bid digest" --> ST
+```
+
+Every actor's outbox is additionally an `afp:prevActivity` hash chain, so the *absence*
+of an activity is as detectable as the alteration of one.
 
 ## Coordination patterns
 
 ### 8a — Direct task delegation (v1 baseline, still the workhorse)
 
-```
-agent-a1 (Alpha)                              agent-b1 (Beta)
-    |--Offer{Task task-9931}------------------->|  signed POST; two-tier trust gate
-    |<--Accept{task-9931}------------------------|  (or Reject w/ reason)
-    |               ... work happens locally ... |
-    |<--Create{Result, correlationId=task-9931}--|
-    |  match by correlationId to pending task    |
+```mermaid
+sequenceDiagram
+    participant A as agent-a1 (Alpha)
+    participant B as agent-b1 (Beta)
+
+    A->>B: Offer{afp:Task, correlationId=task-9931}
+    Note right of B: signed POST, two-tier trust gate.<br/>HTTP 2xx means "delivered", never "accepted"
+    B->>A: Accept (or Reject with reason)
+    Note over B: work happens locally, behind the port
+    B->>A: Create{afp:Result, correlationId=task-9931}
+    Note left of A: matched to the pending-task row by correlationId —<br/>deadline miss becomes a recorded afp:Error
 ```
 
 The delegator keeps a pending-task table keyed by `correlationId` with a deadline; the HTTP
@@ -166,20 +324,43 @@ target agent is already known — bidding exists for when it isn't.
 
 ### 8b — Capability discovery inside a hub
 
-```
-alpha-instance --afp:Enroll{agent-a1, caps}--> hub H   (after instance Follow/Accept)
-hub H --Announce / gossip--> members' inboxes
-members merge the delta into their (hubId)-scoped CRDT capability registry
+```mermaid
+sequenceDiagram
+    participant I as alpha-instance
+    participant H as hub H
+    participant M1 as member m1
+    participant M2 as member m2
+
+    Note over I,H: instance-level Follow/Accept already in place
+    I->>H: afp:Enroll{agent-a1, capabilities, hubKey}
+    Note over H: fold into membership OR-Set and<br/>capability OR-Map (hub-scoped CRDT state)
+    H->>M1: Announce / gossip {afp:CRDTDelta}
+    H->>M2: Announce / gossip {afp:CRDTDelta}
+    Note over M1,M2: each member merges the delta into its<br/>(hubId)-scoped CRDT capability registry —<br/>convergent, no subscriber lists anywhere
 ```
 
 ### 8c — Consensus Level 0: cooperative broadcast quorum
 
-```
-proposer --Offer{Proposal}--> pinned voter set (membership snapshot)
-each voter --Create{Vote}--> all peers (mesh)
-each participant tallies locally; weighted quorum --> proceed
-quorum reached --> proposer emits Create{afp:DecisionRecord}   (see 04 — Audit & provenance)
-timeout without quorum --> Undo{Vote} / abandon round
+```mermaid
+sequenceDiagram
+    participant P as proposer
+    participant V1 as voter (pinned)
+    participant V2 as voter (pinned)
+    participant L as late joiner
+
+    Note over P: pin membership snapshot + explicit voter list<br/>+ per-voter weights into the Proposal itself
+    P->>V1: Offer{afp:Proposal, quorumSnapshot}
+    P->>V2: Offer{afp:Proposal, quorumSnapshot}
+    V1->>P: Create{afp:Vote, proposalHash, quorumSnapshot}
+    V2->>P: Create{afp:Vote, proposalHash, quorumSnapshot}
+    L--xP: Create{afp:Vote} — outside the snapshot: dropped, never tallied
+    Note over P: tally from counted votes alone — absent pinned voter = abstain
+    alt weighted quorum reached
+        P->>V1: Create{afp:DecisionRecord, countedVotes, weightTally}
+        P->>V2: Create{afp:DecisionRecord, countedVotes, weightTally}
+    else timeout without quorum
+        Note over P: Undo{Vote} / abandon round
+    end
 ```
 
 Default consensus level — eventually-consistent, reorder-tolerant, not linearizable;
@@ -200,40 +381,94 @@ When the target is known, skip all of this and use the direct `Offer` flow; `Bid
 alongside v1's flow, it doesn't replace it.
 
 1. **Announce** — `afp:Announce{Task}` broadcast to the hub: task spec, required
-   capabilities, deadline, `afp:hub`, and — published up front, not decided after the
-   fact — the **selection rule** that will pick the performer(s).
-2. **Bid, sealed** — during the bid window, bidders submit only a commitment hash
-   (`afp:bidCommit`); after it closes they submit `afp:BidReveal` with values matching the
-   hash. Commit-reveal deters last-moment undercutting off visible bids — open bidding on a
-   hub (needed for auditability) would invite exactly that.
+   capabilities, deadline, `afp:hub`, the `afp:bidWindow`, the `afp:answerSufficiency`
+   threshold, the hub's `afp:estimatorPolicy`, and — published up front, not decided
+   after the fact — the **`afp:selectionRule`** that will pick the performer(s).
+2. **Bid, sealed** — inside `[opens, closes)`, bidders submit only `afp:bidCommit` with
+   `afp:commitment = sha256(JCS(bid payload))`; after `closes` they submit
+   `afp:BidReveal` carrying the full payload, verified by recomputing the digest.
+   Commit-reveal deters last-moment undercutting off visible bids — open bidding on a
+   hub (needed for auditability) would invite exactly that. Two rules keep the sealing
+   honest, enforced at admission and re-checked at replay (ADR-0003): **one commitment
+   per bidder per task** — a second, differing commitment is a free option (commit
+   several bids, reveal whichever looks best) and is rejected on the record — and
+   **reveals land after the window closes**, or the bid showed its hand to later
+   bidders.
 3. **Award** — the announcer (or the pre-published deterministic rule) emits `afp:Award`
-   referencing the winning bid(s). Anyone can recompute the published rule over the
-   revealed bids and verify the award — selection is checkable even when a human made
-   the call.
+   naming the winning payload digests (`afp:winningBids`), the `afp:performers`, the
+   `afp:synthesizer` where the rule awards several, and `afp:acceptBy`. Anyone
+   recomputes the published rule over the admitted reveals and must reach the same
+   performer set, synthesizer, *and* winning digests — selection is checkable even when
+   a human made the call.
 4. **Accept / Result** — exactly the v1 flow keyed by `correlationId`, seeded by a Bid
-   instead of a direct Offer.
+   instead of a direct Offer. A coalition gives each performer its own correlation leg;
+   one `correlationId` is never shared across performers.
+
+```mermaid
+sequenceDiagram
+    participant H as hub (announcer)
+    participant B1 as bidder b1
+    participant B2 as bidder b2
+    participant D as agent d (out of domain)
+
+    H->>B1: Announce{afp:Task, bidWindow, selectionRule, answerSufficiency}
+    H->>B2: Announce{afp:Task, ...}
+    H->>D: Announce{afp:Task, ...}
+
+    rect rgb(235, 235, 235)
+        Note over H,D: sealed phase — [opens, closes)
+        B1->>H: afp:bidCommit {commitment = sha256(JCS(payload₁))}
+        B2->>H: afp:bidCommit {commitment = sha256(JCS(payload₂))}
+        D->>H: Reject — "not my domain" (declining is a record)
+    end
+
+    Note over H: window closes
+    B1->>H: afp:BidReveal {payload₁ incl. nonce}
+    B2->>H: afp:BidReveal {payload₂ incl. nonce}
+    Note over H: digest of each payload must equal its bidder's single commitment
+
+    H->>B1: afp:Award {winningBids, performers, synthesizer?, acceptBy}
+    H->>B2: afp:Award (broadcast — the selection is everyone's to recompute)
+
+    alt winner accepts in time
+        B1->>H: Accept
+        B1->>H: Create{afp:Result, correlationId}
+    else no Accept by acceptBy
+        Note over H: afp:Reauction {priorAward} — fast path
+        H->>B2: afp:Award {priorAward, excludedBidders=[b1]}
+    end
+```
+
+The committed payload is deliberately free of ids, timestamps and proofs — it is exactly
+the fields the selection rule reads, plus a **mandatory `nonce`** (without one, a
+low-entropy bid is recoverable from its commitment by enumerating the handful of
+plausible values). The reveal wraps it unchanged:
 
 ```json
 {
   "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
-  "id": "https://beta.operator.example/activities/bid-77",
-  "type": "afp:Bid",
+  "id": "https://beta.operator.example/agents/b1/activities/0007",
+  "type": "afp:BidReveal",
   "actor": "https://beta.operator.example/agents/b1",
-  "afp:instanceEndorsement": "https://beta.operator.example/actor",
-  "object": "https://hub.consortium.example/tasks/task-42",
   "afp:hub": "https://hub.consortium.example/actor",
-  "afp:capabilityMatch": 0.93,
-  "afp:estimatedCost": { "unit": "afp:compute-unit", "value": 120 },
-  "afp:estimatedLatency": "PT4M",
-  "afp:bidWindow": { "opens": "2026-08-16T10:00:00Z", "closes": "2026-08-16T10:05:00Z" },
-  "published": "2026-08-16T10:00:12Z",
+  "object": {
+    "type": "afp:Bid",
+    "afp:task": "https://hub.consortium.example/tasks/task-42",
+    "afp:bidder": "https://beta.operator.example/agents/b1",
+    "afp:capabilityMatch": 93,
+    "afp:estimatedCost": { "unit": "afp:compute-unit", "value": 120 },
+    "afp:estimatedLatency": "PT4M",
+    "afp:coverage": { "infra": 90, "data": 70 },
+    "nonce": "b1-task-42-8c1f"
+  },
+  "published": "2026-08-16T10:05:12Z",
   "proof": { "type": "DataIntegrityProof", "cryptosuite": "eddsa-jcs-2022", "proofValue": "..." }
 }
 ```
 
-*(Shown post-reveal; the commit phase sends only `afp:commitment`, a hash of this
-payload — which MUST include a `nonce` field, or a low-entropy bid is recoverable from
-its commitment by enumerating the handful of plausible values.)*
+*(The commit phase sent only `afp:commitment = sha256(JCS(object))`. The payload's
+`afp:bidder` MUST equal the reveal's `actor` — a payload bidding as someone else is
+rejected at admission and fails replay.)*
 
 **Sniping and lying, honestly bounded.** Signatures give non-repudiation of what was
 *claimed*, not truth of the claim. The real deterrent is reputational: declared
@@ -241,12 +476,16 @@ its commitment by enumerating the handful of plausible values.)*
 chronic over-promising drags hub-scoped reputation down, which feeds future selection odds.
 A statistical guarantee, not a hard one.
 
-- **Tie-breaking** — deterministic and discretion-free: `hash(taskId || bidderId)` as the
-  secondary sort key, a protocol constant, never a per-task choice.
+- **Tie-breaking** — deterministic and discretion-free: `sha256(taskId "\n" bidderId)`
+  (newline-separated so no id pair is ambiguous), lower hex digest first — a protocol
+  constant, never a per-task choice.
 - **Re-auction** — on award-timeout (no `Accept`) or deadline miss,
-  `afp:Reauction{taskId, priorAward}`. Fast path: next-ranked bidder from the same pool if
-  the window hasn't gone stale; slow path: full re-`Announce`. The failed winner takes the
-  reputation hit either way.
+  `afp:Reauction{taskId, priorAward}`. Fast path: rerun the same rule over the same pool
+  minus the failed winner(s) if the window hasn't gone stale; slow path: full
+  re-`Announce`. The fast-path Award records `afp:priorAward` and `afp:excludedBidders`
+  — each excluded bidder must be a performer of the prior award it names — so a
+  verifier rebuilds the reduced pool from the record instead of trusting it (ADR-0003).
+  The failed winner takes the reputation hit either way.
 
 ### Selection rules: one performer, or several
 
@@ -262,9 +501,9 @@ Set selection exists because some tasks cannot be answered by any single agent: 
 spanning four constraint domains, where each bidder covers one or two, needs a *coalition*,
 and how many is a property of the question discovered from the bids — not something the
 announcer can declare up front. Bids therefore carry `afp:coverage`: the declared
-sub-domains this bidder claims, with per-domain confidence. A typical rule reads *"minimal
-set covering all declared domains at confidence ≥ 0.6, ties broken by the protocol
-constant."*
+sub-domains this bidder claims, with per-domain confidence (integer percent). A typical
+rule reads *"minimal set covering all declared domains at confidence ≥ 60, ties broken by
+the protocol constant."*
 
 When a rule awards several performers it MUST also name, by the same deterministic rule, a
 **synthesizer** — the agent responsible for reconciling partial answers into one
@@ -275,7 +514,9 @@ policy MAY require the resulting synthesis to be ratified by a vote.
 **Answer sufficiency is not voting quorum.** [02](02-hubs-and-state.md)'s quorum math
 governs *voting* participation. "How many independent answers make an acceptable answer"
 is a separate threshold, and a hub may express it as coverage (all domains spanned), as a
-count (at least 3 independent estimates), or both. State it in the announce, not after.
+count (at least 3 independent estimates), or both. State it in the announce
+(`afp:answerSufficiency`), not after — a selection that fails it is a recorded no-award,
+and a replay checks the awarded set against it (ADR-0003).
 
 ### Declining is a record; silence is not
 
@@ -295,6 +536,11 @@ bid sniping, not this. Hub policy MUST take a position, and SHOULD do one of:
   estimated; or
 - permit it, and record bid-vs-own-estimate divergence as a reputation signal, visible to
   every hub member.
+
+The position travels on the announce as `afp:estimatorPolicy`
+(`"exclude" | "permit-and-record"`) with the affected actors in `afp:estimators` — so
+enforcement is checkable at replay, not a claim about what the hub would have done. Under
+`exclude`, an estimator's commit is rejected at admission and audit-logged.
 
 > **Precision:** `afp:estimatedCost` on a Bid means *what performing this task costs the
 > bidder* — bid metadata. When the task is itself a costing question, the answer's figure
@@ -419,7 +665,7 @@ sequenceDiagram
 
     B-->>D: Announce{afp:EquivocationProof}
     C-->>D: Announce{afp:EquivocationProof}
-    Note over B,C: D's weight zeroed; instance-level consequence goes to hub governance
+    Note over B,C: D's weight zeroed — instance-level consequence goes to hub governance
 
     par commit (honest replicas only)
         B->>C: Create{Vote phase=commit seq=2}
