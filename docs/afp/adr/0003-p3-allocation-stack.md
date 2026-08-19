@@ -1,7 +1,7 @@
 # ADR-0003 — Technology stack for P3
 
-- **Status:** Proposed
-- **Date:** 2026-08-18
+- **Status:** Accepted
+- **Date:** 2026-08-18 (accepted 2026-08-19)
 - **Applies to:** [P3 — Local allocation](../05-roadmap.md#p2p7)
 - **Builds on:** [ADR-0001](0001-p1-stack.md), [ADR-0002](0002-p2-hub-and-crdt-stack.md) —
   everything both decided is inherited unchanged; this ADR only covers what P3 adds
