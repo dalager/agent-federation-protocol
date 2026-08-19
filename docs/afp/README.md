@@ -1,10 +1,10 @@
-# Agent Federation Protocol (AFP) — v3.7
+# Agent Federation Protocol (AFP) — v3.8
 
 Multiple operators, each running their own instance of agents, join forces on a common
 problem — federating through problem-scoped hubs over **ActivityPub** (the W3C protocol
 behind Mastodon). No central broker, consortium trust, no token economics.
 
-This is the markdown rendition of the full spec (Revision 3.7). Reading order:
+This is the markdown rendition of the full spec (Revision 3.8). Reading order:
 
 | File | Contents |
 |---|---|
@@ -16,7 +16,7 @@ This is the markdown rendition of the full spec (Revision 3.7). Reading order:
 | [06-deployment-profiles.md](06-deployment-profiles.md) | Solo/airgapped vs. federated profiles · the "consortium of one" · sneakernet federation |
 | [07-visibility-and-artifacts.md](07-visibility-and-artifacts.md) | Audience & visibility classes · authorized fetch · auditor grants · hash-addressed artifacts · hub lifecycle |
 | [scenarios/](scenarios/) | Spec-test scenarios — each walks a real workload end to end and ends with a verdict of what held and what strained |
-| [adr/](adr/) | Architecture decision records — [ADR-0001](adr/0001-p1-stack.md): the P1 technology stack · [ADR-0002](adr/0002-p2-hub-and-crdt-stack.md): the P2 hub & CRDT stack |
+| [adr/](adr/) | Architecture decision records — [ADR-0001](adr/0001-p1-stack.md): the P1 technology stack · [ADR-0002](adr/0002-p2-hub-and-crdt-stack.md): the P2 hub & CRDT stack · [ADR-0003](adr/0003-p3-allocation-stack.md): the P3 allocation stack |
 
 ## Where to start building
 
@@ -41,14 +41,27 @@ sharing code with the writer would only be attesting to its own bugs.
 enrollment, hub-scoped CRDT state with version vectors, and weighted-quorum rounds closing
 with a signed `afp:DecisionRecord` the verifier recomputes from the record alone.
 
+**[P3](05-roadmap.md#p2p7) — local allocation — is built**
+([ADR-0003](adr/0003-p3-allocation-stack.md)): sealed commit-reveal bidding, a registry of
+pure selection rules (ranking and coverage set-selection with a deterministically named
+synthesizer), a recomputable `afp:Award`, `afp:Reauction` on timeout, `afp:Synthesis` with
+first-class dissent ratified by an L0 round, `afp:Settlement`, and the estimator/bidder
+wall enforced at bid admission. Both rule families are independently reimplemented in the
+verifier, which rebuilds the admitted bid pool from the record alone. The same auction
+also runs with real model-written answers (`npm run demo:p3:llm`) — the record's shape,
+and the verifier's verdict, are identical either way. That completes the **solo profile**
+(P1→P3); the next phase is P4's federation handshake.
+
 | | |
 |---|---|
-| [`src/instance/`](../../src/instance/) | The instance — no dependencies, no build step. `npm run demo`, `npm run gate`. Brains run on any OpenAI-compatible endpoint (a local Qwen by default) |
+| [`src/instance/`](../../src/instance/) | The instance — no dependencies, no build step. `npm run demo`, `demo:p2`, `demo:p3`, `npm run gate`. Brains run on any OpenAI-compatible endpoint (a local Qwen by default) |
 | [`src/verifier/`](../../src/verifier/) | `afp_verify.py` — replays an export with no access to the instance |
 
-All eleven [acceptance-gate](05-roadmap.md#acceptance-gate) checks pass, including the two
-deliberate mutations: a flipped evidence byte and a removed activity each fail the replay,
-naming the mismatched digest and the broken chain link.
+All [acceptance-gate](05-roadmap.md#acceptance-gate) checks pass across the three built
+phases, including the ten deliberate mutations — four P1 (flipped evidence byte, removed
+activity, re-signed tail, deleted outbox), three P2 (DecisionRecord attacks), three P3
+(deleted winning reveal, swapped performer set, mismatched winning-bid evidence) — each
+failing the replay with a specific pointer.
 
 ## The multi-operator model
 
@@ -193,6 +206,7 @@ flowchart LR
 | v3.5 | Six findings from scenario 04: coalition allocation (`afp:coverage`, set-selection rules, named synthesizer), `afp:Synthesis`, `afp:Settlement`, estimator separation of duties, explicit declines |
 | v3.6 | Roadmap resequenced P1–P7 so every profile is a *prefix* (solo = P1→P3, no cherry-picking); P1 redesigned around a third-party-verifiable record with an 11-point acceptance gate; the four retrofit-hostile obligations pulled into P1; L0 deliberation and `DecisionRecord` given a phase |
 | v3.7 | P1 stack decided ([ADR-0001](adr/0001-p1-stack.md)) and the spec changes it forced: signature suite moved to `DataIntegrityProof`/`eddsa-jcs-2022` (FEP-8b32), authentication restated as two mechanisms with different lifetimes, P1's crypto obligation corrected from HTTP Signatures to object integrity proofs |
+| v3.8 | P1–P3 built and the spec changes implementation + review forced: the integer-only JCS numeric profile stated (03), commit-reveal hardened (mandatory `nonce`, one commitment per bidder, reveals after close, payload names its signer), the announce's pinned fields named (`afp:bidWindow`, `afp:selectionRule`, `afp:answerSufficiency`, `afp:estimatorPolicy`), reauction pools bound to the prior award, the tie-break constant made ambiguity-free; data-model and pattern diagrams in 03; scenario 05 (domain intelligence as an internal service) opens campaign 3: `afp:Asset` identity, requester/observer roles, the reputation-consumption trigger |
 
 All `afp:` terms are this design's own `@context` extension over W3C ActivityStreams 2.0 —
 not part of the standard.

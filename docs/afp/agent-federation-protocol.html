@@ -279,11 +279,11 @@
 
 <div class="page">
   <header class="hero">
-    <p class="eyebrow">Architecture Spec &middot; Multi-Operator Agent Federation &middot; Revision 3.7</p>
+    <p class="eyebrow">Architecture Spec &middot; Multi-Operator Agent Federation &middot; Revision 3.8</p>
     <h1>Agent Federation Protocol</h1>
     <p class="dek">Multiple operators, each running their own instance of agents, join forces on a common problem — federating through problem-scoped hubs over ActivityPub, the W3C protocol behind Mastodon. No central broker, consortium trust, no token economics.</p>
     <div class="callout">
-      <strong>Revision 3.7 —</strong> the multi-operator model is the organizing principle: the operator <strong>instance</strong> is a first-class trust boundary, <strong>hubs</strong> are problem-scoped rendezvous points, <code>afp:Bid</code> handles cross-operator allocation, and contribution accounting replaces any notion of currency. Revisions 3.4 and 3.5 fold in fifteen findings from an ongoing <strong>scenario-test campaign</strong> — a visibility model, an artifact layer, hub lifecycle, coalition allocation, and synthesized answers that keep their uncertainty and dissent intact. Revision 3.6 rescoped the <strong>roadmap</strong> (&sect;24): seven phases in which every deployment profile is a <em>prefix</em>, and a P1 whose deliverable is a record a stranger can verify. Revision 3.7 settles the <strong>P1 stack</strong> (&sect;23) and, with it, the signature suite — <code>eddsa-jcs-2022</code>, chosen so that an independent verifier stays cheap to write.
+      <strong>Revision 3.7 —</strong> the multi-operator model is the organizing principle: the operator <strong>instance</strong> is a first-class trust boundary, <strong>hubs</strong> are problem-scoped rendezvous points, <code>afp:Bid</code> handles cross-operator allocation, and contribution accounting replaces any notion of currency. Revisions 3.4 and 3.5 fold in fifteen findings from an ongoing <strong>scenario-test campaign</strong> — a visibility model, an artifact layer, hub lifecycle, coalition allocation, and synthesized answers that keep their uncertainty and dissent intact. Revision 3.6 rescoped the <strong>roadmap</strong> (&sect;24): seven phases in which every deployment profile is a <em>prefix</em>, and a P1 whose deliverable is a record a stranger can verify. Revision 3.7 settles the <strong>P1 stack</strong> (&sect;23) and, with it, the signature suite — <code>eddsa-jcs-2022</code>, chosen so that an independent verifier stays cheap to write. Revision 3.8 reflects <strong>P1&ndash;P3 built</strong> — the whole solo profile — and what implementation and review forced back into the spec: an integer-only numeric profile, hardened commit-reveal, the announce's pinned auction fields, and reauction pools bound to the award they supersede.
     </div>
   </header>
 
@@ -322,7 +322,7 @@
 
     <main>
       <section id="changelog">
-        <div class="sec-head"><span class="num">&Delta;</span><h2>What changed in v3, v3.4, v3.5, v3.6 &amp; v3.7</h2></div>
+        <div class="sec-head"><span class="num">&Delta;</span><h2>What changed in v3, v3.4, v3.5, v3.6, v3.7 &amp; v3.8</h2></div>
         <div class="table-wrap">
           <table>
             <thead><tr><th>#</th><th>Change</th><th>Why</th></tr></thead>
@@ -362,6 +362,11 @@
               <tr><td>29</td><td>Signature suite changed from <code>Ed25519Signature2020</code> to <code>DataIntegrityProof</code> / <code>eddsa-jcs-2022</code> (FEP-8b32), with <code>https://w3id.org/security/data-integrity/v1</code> added to signed documents' <code>@context</code> (&sect;06)</td><td>RDF Dataset Canonicalization exists in a handful of languages and would have silently chosen the stack. JCS (RFC&nbsp;8785) is key-sorting — a few hundred lines anywhere — which is what keeps an independent verifier affordable, and an independent verifier is what makes the audit claim worth anything</td></tr>
               <tr><td>30</td><td>Authentication restated as <strong>two mechanisms with different lifetimes</strong> (&sect;06); P1's crypto obligation corrected from HTTP Signatures to object integrity proofs (&sect;24)</td><td>An HTTP Signature authenticates one hop and is consumed on receipt — it never enters an outbox, so a third party replaying an export never sees one. Only the object proof survives, which is precisely what P1's replay depends on</td></tr>
               <tr><td>31</td><td>&sect;23 turned from a survey into a decision recorded as <strong>ADR-0001</strong>: TypeScript + Fedify + SQLite, zero infrastructure, and a replay verifier as an independent second implementation in Go</td><td>A verifier sharing code with the writer attests to its own bugs; two implementations in two languages are the mechanism, not redundancy. The generic three-language survey also predated the P1 rescope and no longer described anything anyone was building</td></tr>
+              <tr><td colspan="3" style="background:var(--surface-2); font-weight:700;">v3.8 — P1&ndash;P3 built (ADR-0002, ADR-0003), and what implementation plus review forced back into the spec</td></tr>
+              <tr><td>32</td><td><strong>Integer-only numeric profile</strong> stated for signed documents (&sect;07): every fractional quantity on the wire is a scaled integer — confidences and capability match as percent, money in minor units</td><td>Float serialization is where two otherwise-correct JCS implementations quietly disagree; the reference canonicalizer rejects non-integers, and the spec's own examples were unwritable by it</td></tr>
+              <tr><td>33</td><td><strong>Commit-reveal hardened</strong> (&sect;09): the committed payload carries a mandatory <code>nonce</code> and names its signer (<code>afp:bidder</code> = actor); one commitment per bidder per task; reveals land only after the window closes — all admission-enforced and re-checked at replay</td><td>Without the nonce a low-entropy bid is recoverable from its commitment by enumeration; a second differing commitment is a free option (commit several bids, reveal the best); an in-window reveal shows its hand to later bidders</td></tr>
+              <tr><td>34</td><td><strong>Named auction fields on the announce</strong> (&sect;07, &sect;09): <code>afp:bidWindow</code>, <code>afp:selectionRule</code> (name + params from a small registry), <code>afp:answerSufficiency</code>, <code>afp:estimatorPolicy</code>/<code>afp:estimators</code>; reauction fast-path Awards carry <code>afp:priorAward</code> + <code>afp:excludedBidders</code>; the tie-break constant made ambiguity-free (<code>sha256(taskId "\n" bidderId)</code>)</td><td>A verifier can only recompute an auction whose every input is pinned in the record: the rule, the window, the sufficiency bar, the estimator wall, and — on re-award — exactly which failed winners left the pool, bound to the award that failed them</td></tr>
+              <tr><td>35</td><td><strong>Scenario 05</strong> (domain intelligence as an internal service) opens campaign 3: <code>afp:Asset</code> identity for reusable components, requester/observer roles on <code>afp:Enroll</code>, and the reputation-consumption trigger of ADR-0003 firing</td><td>Serving other teams strains three seams: assets have identity across hubs but no primitive, enrollment is binary where a requester needs narrow scope, and a staffing policy finally wants to <em>consume</em> the settlement trail — recomputably</td></tr>
             </tbody>
           </table>
         </div>
@@ -696,34 +701,40 @@ timeout without quorum --> Undo{Vote} / abandon round</pre>
         <div class="sec-head"><span class="num">09</span><h2>Bidding &amp; allocation</h2><span class="rev-chip">New in v3</span></div>
         <p>Cross-operator allocation — the case where the announcer <em>doesn't</em> know who should do the task. When the target is known (single candidate, pre-arranged assignment), skip all of this and use the direct <code>Offer</code> flow; <code>Bid</code> sits alongside v1's flow, it doesn't replace it.</p>
         <ol class="plain">
-          <li><strong>Announce</strong> — <code>afp:Announce{Task}</code> broadcast to the hub: task spec, required capabilities, deadline, <code>afp:hub</code>, and — published up front, not decided after the fact — the <strong>selection rule</strong> that will pick the performer(s).</li>
-          <li><strong>Bid, sealed</strong> — during the bid window, bidders submit only a commitment hash (<code>afp:bidCommit</code>); after it closes they submit <code>afp:BidReveal</code> with values matching the hash. Commit-reveal exists specifically to deter last-moment undercutting off visible bids — open bidding on a hub (needed for auditability) would invite exactly that.</li>
-          <li><strong>Award</strong> — the announcer (or the pre-published deterministic rule) emits <code>afp:Award</code> referencing the winning bid(s). Anyone can recompute the published rule over the revealed bids and verify the award — selection is checkable even when a human made the call.</li>
-          <li><strong>Accept / Result</strong> — exactly the v1 flow keyed by <code>correlationId</code>, seeded by a Bid instead of a direct Offer.</li>
+          <li><strong>Announce</strong> — <code>afp:Announce{Task}</code> broadcast to the hub: task spec, required capabilities, deadline, <code>afp:hub</code>, the <code>afp:bidWindow</code>, the <code>afp:answerSufficiency</code> threshold, the hub's <code>afp:estimatorPolicy</code>, and — published up front, not decided after the fact — the <strong><code>afp:selectionRule</code></strong> that will pick the performer(s).</li>
+          <li><strong>Bid, sealed</strong> — inside <code>[opens, closes)</code>, bidders submit only <code>afp:bidCommit</code> with <code>afp:commitment = sha256(JCS(bid payload))</code>; after <code>closes</code> they submit <code>afp:BidReveal</code> carrying the full payload, verified by recomputing the digest. Commit-reveal exists specifically to deter last-moment undercutting off visible bids — open bidding on a hub (needed for auditability) would invite exactly that. Two rules keep the sealing honest, enforced at admission and re-checked at replay: <strong>one commitment per bidder per task</strong> (a second, differing commitment is a free option — commit several bids, reveal whichever looks best — and is rejected on the record), and <strong>reveals land after the window closes</strong>, or the bid showed its hand to later bidders.</li>
+          <li><strong>Award</strong> — the announcer (or the pre-published deterministic rule) emits <code>afp:Award</code> naming the winning payload digests (<code>afp:winningBids</code>), the <code>afp:performers</code>, the <code>afp:synthesizer</code> where the rule awards several, and <code>afp:acceptBy</code>. Anyone recomputes the published rule over the admitted reveals and must reach the same performer set, synthesizer <em>and</em> winning digests — selection is checkable even when a human made the call.</li>
+          <li><strong>Accept / Result</strong> — exactly the v1 flow keyed by <code>correlationId</code>, seeded by a Bid instead of a direct Offer. A coalition gives each performer its own correlation leg; one <code>correlationId</code> is never shared across performers.</li>
         </ol>
+        <div class="note"><strong>Numeric profile.</strong> Signed AFP documents carry <strong>integers only</strong> — the JCS canonicalization this profile signs over rejects non-integer numbers, because float serialization is where two otherwise-correct implementations quietly disagree. Every fractional quantity on the wire is a scaled integer: confidences and capability match as percent (<code>93</code>, not <code>0.93</code>), money in minor or scaled units.</div>
         <div class="snippet">
-          <figcaption>A revealed bid (the commit phase sends only afp:commitment, a hash of this payload)</figcaption>
+          <figcaption>A reveal wrapping the committed payload (the commit phase sent only afp:commitment = sha256(JCS(object)); the payload is deliberately free of ids, timestamps and proofs, and its nonce is mandatory)</figcaption>
           <pre><code>{
   "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
-  "id": "https://beta.operator.example/activities/bid-77",
-  "type": "afp:Bid",
+  "id": "https://beta.operator.example/agents/b1/activities/0007",
+  "type": "afp:BidReveal",
   "actor": "https://beta.operator.example/agents/b1",
-  "afp:instanceEndorsement": "https://beta.operator.example/actor",
-  "object": "https://hub.consortium.example/tasks/task-42",
   "afp:hub": "https://hub.consortium.example/actor",
-  "afp:capabilityMatch": 0.93,
-  "afp:estimatedCost": { "unit": "afp:compute-unit", "value": 120 },
-  "afp:estimatedLatency": "PT4M",
-  "afp:bidWindow": { "opens": "2026-08-16T10:00:00Z", "closes": "2026-08-16T10:05:00Z" },
-  "published": "2026-08-16T10:00:12Z",
+  "object": {
+    "type": "afp:Bid",
+    "afp:task": "https://hub.consortium.example/tasks/task-42",
+    "afp:bidder": "https://beta.operator.example/agents/b1",
+    "afp:capabilityMatch": 93,
+    "afp:estimatedCost": { "unit": "afp:compute-unit", "value": 120 },
+    "afp:estimatedLatency": "PT4M",
+    "afp:coverage": { "infra": 90, "data": 70 },
+    "nonce": "b1-task-42-8c1f"
+  },
+  "published": "2026-08-16T10:05:12Z",
   "proof": { "type": "DataIntegrityProof", "cryptosuite": "eddsa-jcs-2022", "proofValue": "..." }
 }</code></pre>
         </div>
+        <p>The payload's <code>afp:bidder</code> MUST equal the reveal's <code>actor</code> — a payload bidding as someone else is rejected at admission and fails replay.</p>
         <h3>Sniping and lying, honestly bounded</h3>
         <p>Signatures give non-repudiation of what was <em>claimed</em>, not truth of the claim — nothing cryptographic proves a capability or cost estimate accurate. The real deterrent is reputational: declared <code>estimatedCost</code>/<code>estimatedLatency</code> are checked against the Result's actual telemetry, and chronic over-promising drags hub-scoped reputation (&sect;04) down, which feeds future selection odds. A statistical guarantee, not a hard one — stated plainly rather than oversold.</p>
         <ul>
-          <li><strong>Tie-breaking</strong> — deterministic and discretion-free: <code>hash(taskId || bidderId)</code> as the secondary sort key, a protocol constant, never a per-task choice.</li>
-          <li><strong>Re-auction</strong> — on award-timeout (no <code>Accept</code>) or deadline miss, <code>afp:Reauction{taskId, priorAward}</code>. Fast path: next-ranked bidder from the same pool if the window hasn't gone stale; slow path: full re-<code>Announce</code>. The failed winner takes the reputation hit either way.</li>
+          <li><strong>Tie-breaking</strong> — deterministic and discretion-free: <code>sha256(taskId "\n" bidderId)</code> (newline-separated so no id pair is ambiguous), lower hex digest first — a protocol constant, never a per-task choice.</li>
+          <li><strong>Re-auction</strong> — on award-timeout (no <code>Accept</code>) or deadline miss, <code>afp:Reauction{taskId, priorAward}</code>. Fast path: rerun the same rule over the same pool minus the failed winner(s) if the window hasn't gone stale; slow path: full re-<code>Announce</code>. The fast-path Award records <code>afp:priorAward</code> and <code>afp:excludedBidders</code> — each excluded bidder must be a performer of the prior award it names — so a verifier rebuilds the reduced pool from the record instead of trusting it. The failed winner takes the reputation hit either way.</li>
         </ul>
 
         <h3>9.1 &middot; Selection rules: one performer, or several</h3>
@@ -737,15 +748,15 @@ timeout without quorum --> Undo{Vote} / abandon round</pre>
             </tbody>
           </table>
         </div>
-        <p>Set selection exists because some tasks cannot be answered by any single agent: a question spanning four constraint domains, where each bidder covers one or two, needs a <em>coalition</em> — and how many is a property of the question discovered from the bids, not something the announcer can declare up front. Bids therefore carry <code>afp:coverage</code>: the sub-domains this bidder claims, with per-domain confidence. A typical rule reads <em>&ldquo;minimal set covering all declared domains at confidence &ge; 0.6, ties broken by the protocol constant.&rdquo;</em></p>
+        <p>Set selection exists because some tasks cannot be answered by any single agent: a question spanning four constraint domains, where each bidder covers one or two, needs a <em>coalition</em> — and how many is a property of the question discovered from the bids, not something the announcer can declare up front. Bids therefore carry <code>afp:coverage</code>: the sub-domains this bidder claims, with per-domain confidence (integer percent). A typical rule reads <em>&ldquo;minimal set covering all declared domains at confidence &ge; 60, ties broken by the protocol constant.&rdquo;</em></p>
         <p>When a rule awards several performers it MUST also name, by the same deterministic rule, a <strong>synthesizer</strong> — the agent responsible for reconciling partial answers into one (&sect;16). Synthesizing carries real discretion, so who holds it is never an ad-hoc choice, and hub policy MAY require the resulting synthesis to be ratified by a vote.</p>
-        <div class="note"><strong>Answer sufficiency is not voting quorum.</strong> &sect;13's quorum math governs <em>voting</em> participation. &ldquo;How many independent answers make an acceptable answer&rdquo; is a separate threshold — a hub may express it as coverage (all domains spanned), as a count (at least 3 independent estimates), or both. State it in the announce, not after.</div>
+        <div class="note"><strong>Answer sufficiency is not voting quorum.</strong> &sect;13's quorum math governs <em>voting</em> participation. &ldquo;How many independent answers make an acceptable answer&rdquo; is a separate threshold — a hub may express it as coverage (all domains spanned), as a count (at least 3 independent estimates), or both. State it in the announce (<code>afp:answerSufficiency</code>), not after — a selection that fails it is a recorded no-award, and a replay checks the awarded set against it.</div>
 
         <h3>9.2 &middot; Declining is a record; silence is not</h3>
         <p>On an announced task, not bidding is ambiguous — &ldquo;not my domain,&rdquo; &ldquo;saturated,&rdquo; &ldquo;offline,&rdquo; and &ldquo;never saw it&rdquo; are indistinguishable. Agents that cannot contribute SHOULD <code>Reject</code> explicitly within the bid window with a reason. That converts the enrolled population's coverage of a question from an inference into a record — which is what an audit asking <em>&ldquo;were the right agents consulted?&rdquo;</em> actually needs.</p>
 
         <h3>9.3 &middot; Estimating what you may later be paid to do</h3>
-        <p>Where a task's <em>answer</em> is a cost or effort figure, whoever answers frames a budget they may later bid to earn — an incentive to shade in either direction. Commit-reveal addresses bid sniping, not this. Hub policy MUST take a position, and SHOULD either exclude agents (or their whole instance) from bidding on execution of work they estimated, or permit it while recording bid-vs-own-estimate divergence as a reputation signal visible to every hub member.</p>
+        <p>Where a task's <em>answer</em> is a cost or effort figure, whoever answers frames a budget they may later bid to earn — an incentive to shade in either direction. Commit-reveal addresses bid sniping, not this. Hub policy MUST take a position, and SHOULD either exclude agents (or their whole instance) from bidding on execution of work they estimated, or permit it while recording bid-vs-own-estimate divergence as a reputation signal visible to every hub member. The position travels on the announce as <code>afp:estimatorPolicy</code> (<code>"exclude" | "permit-and-record"</code>) with the affected actors in <code>afp:estimators</code> — so enforcement is checkable at replay, not a claim about what the hub would have done. Under <code>exclude</code>, an estimator's commit is rejected at admission and audit-logged.</p>
         <div class="note"><strong>Precision:</strong> <code>afp:estimatedCost</code> on a Bid means <em>what performing this task costs the bidder</em> — bid metadata. When the task is itself a costing question, the answer's figure lives in the <code>Result</code>/<code>afp:Synthesis</code>, never in the Bid. Do not conflate them.</div>
       </section>
 
@@ -1012,8 +1023,8 @@ sequenceDiagram
   "type": "afp:Synthesis",
   "context": "urn:afp:question:q-88",
   "afp:method": "sum-of-disjoint-ranges",
-  "afp:answer": { "unit": "MDKK", "low": 9.0, "high": 11.7 },
-  "afp:confidence": 0.72,
+  "afp:answer": { "unit": "kDKK", "low": 9000, "high": 11700 },
+  "afp:confidence": 72,
   "afp:contributingResults": ["sha256:res-a-infra-rev2...", "sha256:res-a-data...",
                               "sha256:res-b-compliance...", "sha256:res-b-licensing..."],
   "afp:assumptions": ["dual-run parallel period", "network segmentation contains PCI scope"],
@@ -1333,8 +1344,8 @@ flowchart TB
           </table>
         </div>
         <div class="callout"><p><strong>The verifier must not share code with the writer.</strong> If both sides canonicalize with the same buggy function, an invalid record verifies clean — and replay passing is the entire product of P1. A second implementation, in a second language, is therefore not redundancy but the mechanism itself: roughly 200 lines of RFC&nbsp;8785 key-sorting, Ed25519 verification, SHA-256 digests and a <code>prevActivity</code> chain walk. It doubles as the cheapest possible interop test long before P4 goes near Mastodon. Go was chosen for the single static binary an auditor could run with nothing installed; the reference build is Python because no Go toolchain was available, which keeps the essential property and loses the zero-install handoff.</p></div>
-        <p><strong>Built.</strong> All eleven acceptance-gate checks in &sect;24 pass, including all four deliberate mutations: a flipped evidence byte, a removed activity, an activity re-signed with another agent&rsquo;s key, and a deleted participant each fail the replay with a specific pointer. The decision record, and the two choices that changed under contact, are in ADR-0001.</p>
-        <p>Later phases add to this rather than replacing it: CRDTs at P2 (hand-rolled OR-Set/LWW — the delta shapes in &sect;11 are library-agnostic, and Automerge/Yjs solve a harder problem than AFP has), HTTP Signatures and LD proof exchange at P4 (already in Fedify), and hub-relayed anti-entropy at P5. The one thing worth reconsidering at P5 is the state store: SQLite holds a single-operator deployment comfortably, and multi-hub cross-operator sync is where Postgres starts to earn its operational cost.</p>
+        <p><strong>Built — the whole solo profile, P1&ndash;P3.</strong> Every acceptance gate across the three phases holds, including ten deliberate mutations: four P1 (a flipped evidence byte, a removed activity, an activity re-signed with another agent&rsquo;s key, a deleted participant), three P2 (DecisionRecord attacks: an unproducible counted vote, a tally that doesn't recompute, an out-of-snapshot vote), and three P3 (a deleted winning reveal, a swapped performer set, mismatched winning-bid evidence) — each failing the replay with a specific pointer. The decision records are <strong>ADR-0001</strong> (P1 stack), <strong>ADR-0002</strong> (P2: hand-rolled OR-Set/LWW/OR-Map/G-Set CRDTs persisted beside the outbox, the hub in-process behind the same dispatch port), and <strong>ADR-0003</strong> (P3: commitments as <code>sha256(JCS(bid))</code>, a two-entry selection-rule registry mirrored independently in the verifier, reputation recorded but never computed into an Award). The P3 auction also runs with real model-written answers over a local OpenAI-compatible endpoint — the record's shape, and the verifier's verdict, are identical either way.</p>
+        <p>Later phases add to this rather than replacing it: HTTP Signatures and LD proof exchange at P4 (already in Fedify), and hub-relayed anti-entropy at P5. The one thing worth reconsidering at P5 is the state store: SQLite holds a single-operator deployment comfortably, and multi-hub cross-operator sync is where Postgres starts to earn its operational cost.</p>
       </section>
 
       <section id="roadmap">
@@ -1421,16 +1432,16 @@ writer  --Offer{Task: "review the revision"}--&gt;  reviewer    correlationId: t
             <p class="deliverable"><strong>Check 11 is worth failing the phase over.</strong> If it holds, every later phase is a matter of adding participants; if it does not, federation becomes a rewrite.</p>
           </li>
           <li class="phase">
-            <p class="tag">Phase 2</p>
+            <p class="tag">Phase 2 &middot; built (ADR-0002)</p>
             <h3>Local hub &amp; L0 deliberation</h3>
             <p><code>afp:Hub</code> as a local route beside the agents (&sect;05), enrollment, hub-scoped CRDT capability registry (&sect;11), L0 weighted-quorum voting (&sect;08), <code>afp:DecisionRecord</code> closing every round (&sect;16), <code>afp:GovernanceDecision</code>, hub lifecycle <code>Freeze</code>/<code>Archive</code> (&sect;17). Still one operator — the hub machinery has no federation dependency.</p>
-            <p class="deliverable"><strong>Demo —</strong> <em>&ldquo;30 agents agree on the best policy for codebase integrity&rdquo;</em>: a local swarm deliberates and closes with a DecisionRecord.<br><strong>Gate —</strong> any member recomputes the weight tally from the recorded <code>countedVotes</code> and agrees; a vote missing from the tally is detectable from the record alone.</p>
+            <p class="deliverable"><strong>Demo —</strong> <em>&ldquo;30 agents agree on the best policy for codebase integrity&rdquo;</em>: a local swarm deliberates and closes with a DecisionRecord.<br><strong>Gate —</strong> any member recomputes the weight tally from the recorded <code>countedVotes</code> and agrees; a vote missing from the tally is detectable from the record alone. <strong>Holds:</strong> the independent verifier recomputes the tally, demands every counted vote be producible, and rejects out-of-snapshot votes.</p>
           </li>
           <li class="phase">
-            <p class="tag">Phase 3</p>
+            <p class="tag">Phase 3 &middot; built (ADR-0003)</p>
             <h3>Local allocation</h3>
-            <p><code>afp:Bid</code> with commit-reveal windows, selection rules in both families — ranking <strong>and</strong> set-selection over <code>afp:coverage</code> — deterministic tie-break, <code>afp:Award</code> naming performer(s) and synthesizer, <code>afp:Reauction</code>, <code>afp:Synthesis</code>, <code>afp:Settlement</code>, estimator/bidder separation of duties (&sect;09, &sect;16). Local bidding is real load balancing.</p>
-            <p class="deliverable"><strong>Demo —</strong> a question no single agent covers, awarded to a coalition whose size the bid pool forced, answered by a Synthesis carrying its dissent.<br><strong>Gate —</strong> any member recomputes the published selection rule over the revealed bids and reaches the same performer set and synthesizer; every reveal matches its commitment hash.</p>
+            <p><code>afp:Bid</code> with commit-reveal windows (one commitment per bidder, reveals after close), selection rules in both families — ranking <strong>and</strong> set-selection over <code>afp:coverage</code> — deterministic tie-break, <code>afp:Award</code> naming performer(s) and synthesizer, <code>afp:Reauction</code> with its reduced pool bound to the prior award, <code>afp:Synthesis</code>, <code>afp:Settlement</code>, estimator/bidder separation enforced at bid admission (&sect;09, &sect;16). Local bidding is real load balancing.</p>
+            <p class="deliverable"><strong>Demo —</strong> a question no single agent covers, awarded to a coalition whose size the bid pool forced, answered by a ratified Synthesis carrying its dissent — also runnable with real model-written answers.<br><strong>Gate —</strong> any member recomputes the published selection rule over the revealed bids and reaches the same performer set and synthesizer; every reveal matches its commitment hash. <strong>Holds:</strong> the independent verifier rebuilds the admitted bid pool from the record alone, reruns both rule families, and demands the recomputed performers, synthesizer and winning-bid digests equal the Award's — plus answer sufficiency, synthesis binding, and the estimator wall.</p>
           </li>
           <li class="phase">
             <p class="tag">Phase 4</p>
