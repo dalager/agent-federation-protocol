@@ -54,6 +54,11 @@ another implementation.
 | **(P2) `afp:DecisionRecord`'s `afp:weightTally` recomputes from `afp:countedVotes`** | The declared outcome doesn't match the arithmetic over the votes actually cast |
 | **(P2) Every hash in `afp:countedVotes` resolves to a present, validly signed `afp:Vote`** | A counted vote you cannot produce — evidence for the outcome does not exist |
 | **(P2) Every counted vote's `actor` is in the pinned `afp:quorumSnapshot` voter set** | A vote from outside the snapshot was counted — the mid-round-enrollment attack 02 names |
+| **(P3) Every `afp:BidReveal` hashes to a prior in-window `afp:bidCommit` by the same actor** | A reveal with no sealed commitment behind it, or a commit snuck in outside the bid window |
+| **(P3) Every digest in `afp:winningBids` resolves to a present reveal** | An unproducible winning bid — the auction's version of a counted vote you cannot produce |
+| **(P3) The announced selection rule recomputes to the Award's performer set and synthesizer** | The published rule did not actually pick these winners (rules reimplemented here from spec: `ranking`, `coverage`) |
+| **(P3) A multi-performer Award's `afp:Synthesis` binds present Results, a method, and dissent** | The combined answer floats free of its evidence, or dissent was summarized away |
+| **(P3) Under `afp:estimatorPolicy: exclude`, no performer is a listed estimator** | The agent that framed the budget was awarded the work it estimated |
 
 ## The algorithm, restated
 

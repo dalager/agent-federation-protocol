@@ -30,6 +30,9 @@ import {
 import { GSet, LWWRegister, ORMap, ORSet } from "./crdtAdapter.ts";
 import { CRDTStore } from "../crdt/index.ts";
 import { ensureHubSchema, saveRound, saveVoteReceipt, type RoundRow } from "./store.ts";
+import { Allocator } from "../allocation/allocator.ts";
+
+export { hubTransport } from "./transport.ts";
 
 export type ReceiveOutcome =
   | { status: "dispatched" }
@@ -71,6 +74,8 @@ export class Hub {
   readonly actorId: string;
   readonly outbox: Outbox;
   readonly queue: DeliveryQueue;
+  /** Allocation lives beside the hub — same process, same dispatch port (ADR-0003 Decision 1). */
+  readonly allocation: Allocator;
 
   private readonly db: Db;
   private readonly origin: string;
@@ -110,6 +115,14 @@ export class Hub {
     this.key = loadOrCreateKeyPair(deps.keyDir, `hub-${deps.hubId}`, this.actorId);
     this.outbox = new Outbox(this.db);
     this.queue = new DeliveryQueue(this.db, deps.maxDeliveryAttempts, deps.backoffBaseMs);
+    this.allocation = new Allocator({
+      hubId: this.hubId,
+      actorId: this.actorId,
+      db: this.db,
+      members: () => this.members(),
+      now: () => this.now(),
+      emit: (to, thread, visibility, build) => this.emit(to, thread, visibility, build),
+    });
   }
 
   actorDocument(): ActorDocument {
@@ -197,8 +210,15 @@ export class Hub {
     if (type === "afp:Enroll") return this.onEnroll(activity);
     if (type === "afp:Unenroll") return this.onUnenroll(activity);
     if (type === "Create" && objectType === "afp:Vote") return this.onVote(activity);
-    // Other inbound types (e.g. an Accept co-signing a DecisionRecord) are
-    // recorded by delivery alone — an inbox is a hint, never an instruction.
+    // Allocation (ADR-0003 Decision 1): commits, reveals, declines and award
+    // Accepts route to the allocator beside the hub. Each handler ignores
+    // activities that reference no open auction of ours.
+    if (type === "afp:bidCommit") return this.allocation.onCommit(activity);
+    if (type === "afp:BidReveal") return this.allocation.onReveal(activity);
+    if (type === "Reject") return this.allocation.onDecline(activity);
+    if (type === "Accept") return this.allocation.onAccept(activity);
+    // Other inbound types are recorded by delivery alone — an inbox is a hint,
+    // never an instruction.
   }
 
   private onEnroll(activity: { [key: string]: JsonValue }): void {
@@ -306,7 +326,7 @@ export class Hub {
 
   // ----------------------------------------------------------------- outbound
 
-  private emit(to: readonly string[], thread: string, visibility: Visibility, build: (envelope: Envelope) => { [key: string]: JsonValue }): OutboxEntry {
+  emit(to: readonly string[], thread: string, visibility: Visibility, build: (envelope: Envelope) => { [key: string]: JsonValue }): OutboxEntry {
     const now = this.now().toISOString();
     const seq = this.outbox.nextSeq(this.actorId);
     const envelope: Envelope = {
@@ -469,28 +489,4 @@ export class Hub {
       if (report.delivered === 0 && report.deadLettered.length === 0) break;
     }
   }
-}
-
-/**
- * The delivery port hub and agents share: `deliver(target, activity)` routes
- * by URL alone, so nothing in the bytes leaking through it can tell whether
- * the recipient is in-process or a remote service (gate check 11, carried
- * from P1 into ADR-0002 Decision 1).
- */
-export function hubTransport(
-  hub: Hub,
-  agentTransport: Transport,
-  nameOf: (actorUrl: string) => boolean,
-): Transport {
-  return {
-    name: "local",
-    deliver: async (target, activity) => {
-      if (target === hub.actorId) {
-        await hub.receive(activity);
-        return;
-      }
-      if (!nameOf(target)) throw new Error(`no local actor at ${target}`);
-      await agentTransport.deliver(target, activity);
-    },
-  };
 }

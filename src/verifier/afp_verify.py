@@ -32,6 +32,7 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from allocation import check_award
 from decision import afp_object, check_decision_record
 from proof import CRYPTOSUITE, decode_multikey, digest_of, verify_proof
 
@@ -415,6 +416,12 @@ def verify_export(export: Path, thread: str | None, report: Report) -> None:
     for activity in all_activities:
         if afp_object(activity, "afp:DecisionRecord") is not None:
             check_decision_record(report, activity, all_activities, keys)
+
+    # ADR-0003 Decision 7 / 03 "Bidding & allocation". Exports with no Award
+    # (all of P1/P2) run none of this — backward compatible by construction.
+    for activity in all_activities:
+        if afp_object(activity, "afp:Award") is not None:
+            check_award(report, activity, all_activities)
 
 
 def main() -> int:

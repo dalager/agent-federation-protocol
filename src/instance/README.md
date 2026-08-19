@@ -1,16 +1,21 @@
-# AFP reference instance — P1 + P2
+# AFP reference instance — P1 + P2 + P3
 
 **P1**: one instance, two agents, one verifiable record — no network
 ([05 § P1](../../docs/afp/05-roadmap.md#p1--one-instance-two-agents-one-verifiable-record)).
 **P2**: a local hub beside the agents — enrollment, hub-scoped CRDT state, and
 L0 weighted-quorum deliberation closing with a signed `afp:DecisionRecord`
 ([ADR-0002](../../docs/afp/adr/0002-p2-hub-and-crdt-stack.md)).
+**P3**: local allocation — sealed commit-reveal bidding, a published
+deterministic selection rule (ranking or coverage set-selection), a
+recomputable `afp:Award` with coalition + synthesizer, ratified `afp:Synthesis`,
+and `afp:Settlement` ([ADR-0003](../../docs/afp/adr/0003-p3-allocation-stack.md)).
 
 ```bash
 npm run demo          # P1: writer drafts, reviewer critiques, bundle exported
 npm run demo:offline  # the same, against deterministic brains
 npm run demo:p2       # P2: 30 agents agree on the best policy (-> ./export-p2)
-npm run gate          # the acceptance gate: P1's 11 checks + CRDT + hub round
+npm run demo:p3       # P3: two auctions, coalition award, synthesis (-> ./export-p3)
+npm run gate          # the acceptance gate: P1's 11 checks + CRDT + hub + auction
 npm run serve         # the public HTTP surface
 ```
 
@@ -77,13 +82,53 @@ export replays with no special case:
 
 ```bash
 python3 ../verifier/afp_verify.py export-p2 --thread urn:afp:thread:codebase-integrity
-# PASSED — 462 checks, no gaps
+# PASSED — 466 checks, no gaps
 ```
 
 The verifier recomputes the tally from `afp:countedVotes`, demands every
 counted vote be producible, and rejects any vote from outside the pinned
 snapshot — and fails loudly, with a specific pointer, when the record is
 mutated any of those three ways.
+
+## The P3 demo
+
+Two auctions on one hub — scenario 04's federated estimation, at one operator.
+A `ranking` auction picks a single load-test performer by published linear
+weights; a `coverage` auction over four estimation domains awards a two-agent
+coalition and deterministically names the synthesizer. Bids are sealed
+commit-reveal (`afp:bidCommit` → `afp:BidReveal`, commitment =
+`sha256(JCS(bid payload))` with a mandatory nonce), one agent declines on the
+record, and the estimator who framed the budget is rejected at bid admission
+under `afp:estimatorPolicy: exclude` — audit-logged, and checkable at replay:
+
+```
+ranking  auction load-42: winner a-data
+coverage auction q-88:    coalition [c-generalist, b-licensing], synthesizer c-generalist
+  declined: d-secops — not my domain: security operations, not estimation
+  admission rejected: e-estimator — estimator excluded from bidding …
+```
+
+The coalition's partial answers land as ordinary `Create{afp:Result}`s; the
+synthesizer emits `Create{afp:Synthesis}` binding them by digest, with method,
+assumptions, and first-class dissent; ratification is an ordinary P2 L0 round
+whose `DecisionRecord` outcome literally names the Synthesis; and an
+`afp:Settlement` links each winning bid's estimates to observed actuals —
+recorded signals, never a live score (ADR-0003 Decision 5).
+
+```bash
+python3 ../verifier/afp_verify.py export-p3 --thread urn:afp:thread:q-88-migration-estimate
+# PASSED — 324 checks, no gaps
+```
+
+For each `afp:Award` the verifier rebuilds the admitted bid pool from the
+record alone (enrollment trail, one commitment per bidder, commit inside the
+window, reveal after it, payload naming its signing actor, estimators out,
+reauction exclusions bound to the prior award), reruns the announced selection
+rule with its own independent implementation, and demands the recomputed
+performers, synthesizer, *and* winning-bid digests equal the Award's — plus
+the announced answer-sufficiency threshold, the synthesis binding, and the
+estimator wall. An award timeout is swept into a recorded `afp:Reauction`
+whose fast-path award names the excluded failed winners.
 
 ## Layout
 
@@ -118,13 +163,24 @@ src/
     activities.ts    Enroll/Unenroll, Offer{Proposal}, Create{Vote/DecisionRecord}
     crdtAdapter.ts   class-shaped view over crdt/ for the hub's call sites
     store.ts         rounds + vote receipts (CRDT state lives in crdt/)
+    transport.ts     the shared delivery port routing by URL alone
+  allocation/        P3: allocation beside the hub (ADR-0003)
+    rules.ts         the selection-rule registry — ranking + coverage, pure,
+                     tie-broken by the protocol constant
+    activities.ts    Announce{Task}, bidCommit/BidReveal, Award, Reauction,
+                     Create{Synthesis}, Settlement
+    allocator.ts     admission gate, award/reauction sweep, settlements
+    store.ts         auctions, bids, declines, admission audit log,
+                     pending accepts, settlements — same SQLite file
   instance.ts        the adapter stack: signing, chain, gate, dedupe, dispatch
   export.ts          the bundle you hand to a third party — hub outboxes included
-  demo.ts, demoP2.ts, cli.ts
+  demo.ts, demoP2.ts, demoP3.ts, cli.ts
 test/gate.test.ts    the 11 P1 acceptance checks
 test/crdt.test.ts    P2: merge property tests (commutative/associative/idempotent)
 test/hub.test.ts     P2: enrollment, a full L0 round, lifecycle, and the
                      end-to-end replay through the Python verifier
+test/allocation.test.ts  P3: rule determinism, sealed-bid admission, reauction
+                     sweep, and the end-to-end replay incl. three mutations
 ```
 
 ## The boundary
@@ -179,10 +235,11 @@ made it. Naming the producer is the cheapest useful externalization available,
 and it costs one field. A brain that is a rule engine or a human queue puts its
 own identifier there.
 
-## What P1 deliberately does not do
+## What this instance deliberately does not do yet
 
-Hubs, federation agreements, bidding, voting, CRDTs, gossip, HTTP Signatures,
-Mastodon. Those are P2–P7. What P1 *does* carry is the whole integrity floor —
+Federation agreements, real HTTP transport between instances, HTTP Signatures,
+gossip anti-entropy, cross-operator bidding, Mastodon visibility. Those are
+P4–P7. What P1 *does* carry is the whole integrity floor —
 signing, hash-chained outboxes, visibility classes and hash-addressed evidence —
 because those four are nearly free at two agents and cannot be backfilled later.
 

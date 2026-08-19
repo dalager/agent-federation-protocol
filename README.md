@@ -33,6 +33,16 @@ vectors, and weighted-quorum rounds pinned to a membership snapshot, each closin
 signed `afp:DecisionRecord` whose tally any member — or stranger — recomputes from the
 record alone. Stack: [ADR-0002](docs/afp/adr/0002-p2-hub-and-crdt-stack.md).
 
+**P3 is built** — local allocation. `Announce{Task}` with the selection rule published up
+front, sealed commit-reveal bidding (`sha256(JCS(bid))`, mandatory nonce), a small
+registry of pure selection rules — ranking, and coverage set-selection naming a coalition
+plus its synthesizer — an `afp:Award` any member recomputes, award timeout swept into a
+recorded `afp:Reauction`, `afp:Synthesis` with first-class dissent ratified by an L0
+round, `afp:Settlement` linking estimates to actuals, and the estimator/bidder wall
+enforced at bid admission. Both rule families are independently reimplemented in the
+Python verifier, which rebuilds the admitted bid pool from the record alone. Stack:
+[ADR-0003](docs/afp/adr/0003-p3-allocation-stack.md).
+
 | | |
 |---|---|
 | [`src/instance/`](src/instance/) | The instance — TypeScript on Node 22.5+, no dependencies, no build step |
@@ -42,11 +52,13 @@ record alone. Stack: [ADR-0002](docs/afp/adr/0002-p2-hub-and-crdt-stack.md).
 cd src/instance
 npm run demo:offline   # P1: writer drafts, reviewer critiques, bundle exported
 npm run demo:p2        # P2: 30 agents agree on the best policy — DecisionRecord + export
-npm run gate           # the acceptance gate: P1's 11 checks, CRDT property tests, the hub round
+npm run demo:p3        # P3: two sealed auctions, a coalition award, a ratified Synthesis
+npm run gate           # the acceptance gate: P1's 11 checks, CRDT property tests, hub, auction
 
 cd ../verifier
 python3 afp_verify.py ../instance/export --thread urn:afp:thread:doc-1
 python3 afp_verify.py ../instance/export-p2 --thread urn:afp:thread:codebase-integrity
+python3 afp_verify.py ../instance/export-p3 --thread urn:afp:thread:q-88-migration-estimate
 ```
 
 The verifier is a deliberately independent second implementation in another language — a
@@ -56,8 +68,9 @@ replayed by the Python verifier) caught two cross-implementation divergences the
 single-sided fixtures had masked.
 
 All [acceptance-gate](docs/afp/05-roadmap.md#acceptance-gate) checks pass, including the
-four deliberate P1 mutations and P2's three DecisionRecord mutations — each fails the
-replay with a specific pointer.
+four deliberate P1 mutations, P2's three DecisionRecord mutations, and P3's three award
+mutations (a deleted winning reveal, a swapped performer set, mismatched winning-bid
+evidence) — each fails the replay with a specific pointer.
 
 ## Why integrity is in phase one
 

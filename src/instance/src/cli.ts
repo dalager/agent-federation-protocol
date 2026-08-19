@@ -85,6 +85,35 @@ async function main(): Promise<void> {
       break;
     }
 
+    case "p3": {
+      const { runP3Demo } = await import("./demoP3.ts");
+      const { instance, hub, rankingAward, coverageAward, synthesis, ratification, exported, threads } =
+        await runP3Demo({ fresh: true, config: { exportDir: "./export-p3" } });
+
+      const short = (url: unknown) => String(url).split("/").pop();
+      const rank = rankingAward.activity.object as Record<string, unknown>;
+      const cov = coverageAward.activity.object as Record<string, unknown>;
+      const decision = ratification.activity.object as Record<string, unknown>;
+
+      console.log(`\nhub ${hub.actorId} — ${hub.members().length} enrolled\n`);
+      console.log(`ranking  auction load-42: winner ${short((rank["afp:performers"] as string[])[0])}`);
+      console.log(
+        `coverage auction q-88:    coalition [${(cov["afp:performers"] as string[]).map(short).join(", ")}], synthesizer ${short(cov["afp:synthesizer"])}`,
+      );
+      for (const decline of hub.allocation.declines(String(cov["afp:task"]))) {
+        console.log(`  declined: ${short(decline.actor)} — ${decline.reason}`);
+      }
+      for (const entry of hub.allocation.admissions(String(cov["afp:task"]))) {
+        console.log(`  admission ${entry.outcome}: ${short(entry.actor)} — ${entry.reason}`);
+      }
+      console.log(`\nsynthesis ${String((synthesis.activity.object as Record<string, unknown>).id)}`);
+      console.log(`ratified: ${decision["afp:outcome"]} (round ${decision["afp:round"]})`);
+      console.log(`export:   ${exported.activities} activities -> ${exported.dir}`);
+      console.log(`\nverify it:  python3 ../verifier/afp_verify.py ${exported.dir} --thread ${threads.estimate} --verbose\n`);
+      instance.close();
+      break;
+    }
+
     case "export": {
       const config = loadConfig();
       const instance = new AfpInstance(config, agentRegistrations(config));
@@ -107,7 +136,7 @@ async function main(): Promise<void> {
     }
 
     default:
-      console.error(`unknown command: ${command}\nusage: cli.ts [demo|p2|export|serve]`);
+      console.error(`unknown command: ${command}\nusage: cli.ts [demo|p2|p3|export|serve]`);
       process.exit(1);
   }
 }
