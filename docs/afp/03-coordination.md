@@ -153,6 +153,11 @@ happened.
 | `afp:commitment` | Property (`afp:bidCommit`) | `sha256(JCS(bid payload))` — the sealed phase carries only this |
 | `afp:winningBids`, `afp:performers`, `afp:synthesizer`, `afp:acceptBy` | Properties (Award) | The recomputable outcome: winning payload digests, performer set, named synthesizer, accept deadline |
 | `afp:priorAward`, `afp:excludedBidders` | Properties (Award, reauction fast path) | Bind a re-award's reduced bid pool to the failed award it supersedes |
+| `afp:role` | Property (`afp:Enroll`) | `member` \| `requester` \| `observer` — participation scope, enforced at bid admission and snapshot-pinning (02, ADR-0004) |
+| `afp:Asset` | Object (in `Update`) | A reusable component with identity, version, digest and provenance — registered on the record, hub-scoped (07, ADR-0004) |
+| `afp:reuses` / `afp:reused` | Properties (Bid / Result) | An asset-reuse claim under the sealed commitment, and its delivered closure — both resolvable at replay |
+| `afp:reputationRule` | Property (announced Task) | `{name, params}` — a named pure derivation over settlements, from a small registry; pinned before any bid (ADR-0004) |
+| `afp:settlementSnapshot` | Property (announced Task) | Digests of every `afp:Settlement` the reputation derivation runs over — pinned at announce time, like `afp:quorumSnapshot` pins voters |
 
 > **Numeric profile.** Signed AFP documents carry **integers only** — the JCS
 > canonicalization this profile signs over ([01](01-foundations.md)) rejects non-integer
@@ -393,7 +398,8 @@ alongside v1's flow, it doesn't replace it.
    per bidder per task** — a second, differing commitment is a free option (commit
    several bids, reveal whichever looks best) and is rejected on the record — and
    **reveals land after the window closes**, or the bid showed its hand to later
-   bidders.
+   bidders. A commit from a non-`member` role (a requester or observer — 02, ADR-0004) is
+   rejected at admission the same way, and the verifier's pool reconstruction excludes it.
 3. **Award** — the announcer (or the pre-published deterministic rule) emits `afp:Award`
    naming the winning payload digests (`afp:winningBids`), the `afp:performers`, the
    `afp:synthesizer` where the rule awards several, and `afp:acceptBy`. Anyone
@@ -545,6 +551,37 @@ enforcement is checkable at replay, not a claim about what the hub would have do
 > **Precision:** `afp:estimatedCost` on a Bid means *what performing this task costs the
 > bidder* — bid metadata. When the task is itself a costing question, the answer's figure
 > lives in the `Result`/`afp:Synthesis`, never in the Bid. Do not conflate them.
+
+### Consuming reputation, recomputably
+
+Recorded settlements (04) accumulate from P3 day one; **consuming** them in selection is
+opt-in and takes the same form as selection itself (ADR-0004): a small named registry of
+pure derivations. An Announce that wants past accuracy in its ranking pins two things:
+
+- `afp:reputationRule` — `{name, params}` from the registry. The first entry is
+  **`divergence-decay`**: per bidder, a score from estimate-vs-actual divergence over the
+  pinned settlements, decay favoring recent evidence, a neutral prior for bidders with no
+  history, and a bonus for `afp:dissentVindicated` entries — a swarm that penalizes
+  accurate minority objections stops producing them (04). Two determinism rules keep it
+  identically computable twice: divergence is **relative** (integer percent of the
+  estimate, unit-free — an entry whose estimated/actual units differ is skipped, never
+  guessed at), and decay is **exact rational arithmetic over the recency ordering**
+  (settlements by `published`, ties by digest; per-step decay a ratio of small integers)
+  — never a wall-clock float exponential.
+- `afp:settlementSnapshot` — the digests of every `afp:Settlement` the derivation runs
+  over, pinned at announce time. The rule computes over evidence the record can produce,
+  never over "whatever the hub knew" — no snapshot, no reputation input. The snapshot is
+  **exhaustive, not curated**: it MUST name every settlement of this hub published before
+  the announce, so cherry-picking away a favored bidder's bad history is a named replay
+  failure, checkable against the hub's own outbox.
+
+The `ranking` family gains an optional `reputation` weight whose term is the pinned
+derivation's output; `coverage` stays reputation-free at this phase. At replay, a
+verifier resolves every snapshot digest (a missing settlement is a failure), recomputes
+the derivation with its own implementation, and feeds it into selection recomputation.
+An unknown derivation name is a verification failure, not a skip. An Announce that pins
+no reputation rule behaves exactly as before — and vote weights are untouched either
+way: this is selection odds, not governance.
 
 ## Consensus hardening — Level 1
 

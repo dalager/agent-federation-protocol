@@ -85,6 +85,36 @@ Large-blob transfer is out of scope: AFP addresses and authenticates artifacts, 
 not define a bulk transport. Instances MAY front artifact endpoints with ordinary
 object storage or a CDN, provided the gate and digest rules are preserved.
 
+### Assets: identity for reusable components
+
+An artifact is bytes with a digest. A **reusable component** — built in one project,
+hardened in another, offered for reuse in a third — is a third thing between agents and
+artifacts: an **asset**, with identity, versions, and provenance across hubs (ADR-0004,
+from scenario 05):
+
+```json
+{
+  "id": "urn:afp:asset:mitid-broker-adapter",
+  "type": "afp:Asset",
+  "afp:version": "3.1",
+  "afp:digest": "sha256:…",
+  "afp:sourceUrl": "https://git.example/integrations/mitid-broker-adapter",
+  "afp:originContext": "urn:afp:thread:proj-x-build",
+  "attributedTo": "https://alpha.operator.example/agents/i-identity"
+}
+```
+
+- **Registration is on the record**: a hub-scoped OR-Map `assetId → asset record`, fed by
+  ordinary signed `Update{afp:Asset}` activities — never a side-channel catalogue. One
+  (id, version) is immutable once registered; a new version is a new entry.
+- **Referenceable from allocation** (03): a Bid MAY claim `afp:reuses` — "my cost is low
+  *because* I start from this," under the sealed commitment — and the delivering Result
+  MAY carry `afp:reused` with the adaptation's own digest, closing the loop. Reuse
+  becomes a fact in the record rather than a slide.
+- **Checkable at replay**: every asset reference must resolve to a registered
+  `afp:Asset` whose (id, version, digest) triple is consistent — an unresolvable reuse
+  claim is the asset-flavored *"counted vote you cannot produce."*
+
 ## Hub lifecycle
 
 Hubs are cheap to create and, in case-per-hub patterns, numerous. A hub ends explicitly.

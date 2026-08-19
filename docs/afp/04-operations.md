@@ -147,6 +147,12 @@ producing them, which is the failure mode the `afp:dissent` field exists to prev
 Unsettled forever is a legitimate terminal state: work that was never commissioned yields
 no evidence, and inventing a score for it would be worse than leaving it open.
 
+Settlements now have a recorded consumer (ADR-0004): an Announce may pin a named
+reputation derivation plus an `afp:settlementSnapshot` — the digests of exactly the
+settlements the score is computed over — so selection odds can reflect past accuracy
+while the Award stays a pure function of the record
+([03 — Consuming reputation, recomputably](03-coordination.md#consuming-reputation-recomputably)).
+
 ### Outbox integrity: hash-chained logs (`afp:prevActivity`)
 
 Individually signed activities prove *authorship*, not *completeness* — omission of an

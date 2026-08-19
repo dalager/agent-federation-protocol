@@ -140,6 +140,13 @@ adding participants; if it does not, federation becomes a rewrite.
 Each phase is independently demoable, and earlier phases keep working unmodified as later
 ones add capability around them.
 
+> **Before P4 opens the federation door**, the solo foundation is hardened per
+> [ADR-0004](adr/0004-solo-foundation-hardening.md): enrollment roles
+> (`member`/`requester`/`observer`), `afp:Asset` identity for reusable components, and
+> recomputable reputation consumption (`afp:reputationRule` + `afp:settlementSnapshot`).
+> All three are P1–P3-scoped record extensions that turn into migrations if deferred past
+> the point where two operators share the state.
+
 | Phase | Scope | Demo | Gate |
 |---|---|---|---|
 | **P2 — Local hub & L0 deliberation** — **built**, stack in [ADR-0002](adr/0002-p2-hub-and-crdt-stack.md) | `afp:Hub` as a local route beside the agents, enrollment, hub-scoped CRDT capability registry, L0 weighted-quorum voting, `afp:DecisionRecord` closing every round, `afp:GovernanceDecision`, hub lifecycle (`Freeze`/`Archive`). Still one operator — the hub machinery has no federation dependency | *"30 agents agree on the best policy for codebase integrity"*: a local swarm deliberates and closes with a DecisionRecord — `npm run demo:p2` runs exactly this | Any member recomputes the weight tally from the recorded `countedVotes` and agrees; a vote missing from the tally is detectable from the record alone. **Holds:** the independent verifier recomputes the tally, demands every counted vote be producible, and rejects out-of-snapshot votes |

@@ -57,15 +57,19 @@ merely buggy one, and a task whose answer must be revised after the fact
 (retraction/supersession of a published Synthesis). Client/observer participation was
 exercised by scenario 05 — and strained into finding 2 (requester roles).
 
-### Campaign 3 → open
+### Campaign 3 → v3.9 (ADR-0004)
 
-Three findings from scenario 05, not yet landed in a spec revision:
+Three findings from scenario 05, landed as the solo-foundation hardening before any
+federation work ([ADR-0004](../adr/0004-solo-foundation-hardening.md)):
 
-| # | Finding | Proposed resolution |
+| # | Finding | Resolution |
 |---|---|---|
-| 16 | Reusable components have identity across hubs; capabilities describe agents, artifacts are bare bytes | An `afp:Asset` object (id, version, digest, provenance) referenceable from Bids and Results, so reuse claims are checkable at replay |
-| 17 | Enrollment is binary; serving non-member teams needs a requester/observer role | `afp:role` on the Enroll, recorded in the membership CRDT, enforced at bid admission and snapshot-pinning |
-| 18 | A staffing policy now wants to consume reputation — ADR-0003 Decision 5's revisit trigger has fired | A named, published score derivation over the settlement trail, pinned in the Announce like a selection rule, recomputable from the record |
+| 16 | Reusable components have identity across hubs; capabilities describe agents, artifacts are bare bytes | [07 — Assets](../07-visibility-and-artifacts.md#assets-identity-for-reusable-components): `afp:Asset` registered on the record, `afp:reuses`/`afp:reused` claims resolvable at replay |
+| 17 | Enrollment is binary; serving non-member teams needs a requester/observer role | [02 — Enrollment](../02-hubs-and-state.md#enrollment-is-two-level-deliberately): `afp:role` on the Enroll, enforced at bid admission and snapshot-pinning, replayed from the Enroll trail |
+| 18 | A staffing policy now wants to consume reputation — ADR-0003 Decision 5's revisit trigger has fired | [03 — Consuming reputation, recomputably](../03-coordination.md#consuming-reputation-recomputably): `afp:reputationRule` + `afp:settlementSnapshot` pinned in the Announce; `divergence-decay` as the first registry entry |
+
+Scenario 05's minor precision also landed:
+[06 — Where visibility ends](../06-deployment-profiles.md#where-visibility-ends-the-port-boundary).
 
 Keep the format: user story → cast → walkthrough → acceptance criteria mapped to spec
 mechanisms → verdict with findings. Be willing to conclude that something strained; a

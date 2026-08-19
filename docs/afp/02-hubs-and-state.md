@@ -25,12 +25,24 @@ different hubs.
   "target": "https://hub.consortium.example/actor",
   "afp:hub": "https://hub.consortium.example/actor",
   "afp:capabilities": ["afp:cap:image-classification"],
-  "afp:hubKey": "https://alpha.operator.example/agents/a1#hub-key-1"
+  "afp:hubKey": "https://alpha.operator.example/agents/a1#hub-key-1",
+  "afp:role": "member"
 }
 ```
 
 `afp:Unenroll` removes one agent from the hub's membership OR-Set; `Undo{Follow}` at
 instance level mass-unenrolls everything that instance put into the hub.
+
+**Enrollment carries a role** (`afp:role`, default `member` — ADR-0004): not everyone on
+a hub is there to decide. A **`requester`** may announce tasks and publish Results on its
+own threads (an ask, and later the observed actuals that settle it) but never bids,
+votes, or appears in a quorum snapshot; an **`observer`** only reads at `hub` visibility.
+The role is folded into the membership state and replayed from the Enroll trail, so "who
+could ask," "who could answer," and "who could decide" are distinguishable in the record
+— enforcement at bid admission and snapshot-pinning, never in workflow code. Role state
+merges deterministically: per-agent last-writer-wins over the Enroll trail (latest
+`published`; equal timestamps break by higher activity digest) — re-enrolling with a new
+role is the upgrade/downgrade path, on the record.
 
 ### Hub-scoped state
 
@@ -168,7 +180,8 @@ Quorum size is computed, not configured, over live (non-suspected) weighted memb
   quorum is a weight-sum threshold
 
 **Snapshot-pinning.** At round start the proposer hashes the merged membership CRDT and
-embeds it (`afp:quorumSnapshot`) plus the explicit voter list (`afp:voters`) and the
+embeds it (`afp:quorumSnapshot`) plus the explicit voter list (`afp:voters`) — only
+`member`-role enrollees are eligible (ADR-0004) — and the
 per-voter weights (`afp:voterWeights`) in the proposal — recorded explicitly so tally
 recomputation never depends on state a verifier can't see. Votes are
 validated against the pinned set: an agent enrolled *after* round start simply isn't in it.

@@ -61,6 +61,19 @@ and signed outboxes inside the airgap therefore buys two things:
    chain heads outside the trust domain: write-once media, a timestamping service, or
    shadow Notes (carrying the chain-head hash) federated to an external Mastodon server.
 
+### Where visibility ends: the port boundary
+
+Visibility classes ([07](07-visibility-and-artifacts.md#audience--visibility)) scope
+**the record** — who may read which published activity. They do not scope what an agent's
+*brain* has seen: a brain that reads confidential inputs to ground a published answer has
+seen them, whatever the answer cites (a rate card consulted for an estimate, client terms
+behind an assumption). What a brain may say about what it read is **operator policy at
+the port boundary** (01 — ports & adapters), not protocol machinery — prompt discipline,
+adapter-side redaction, or restricting which stores an adapter materializes. Deployments
+handling confidential inputs should state that policy as explicitly as they state their
+visibility defaults; the protocol is honest about where its guarantee ends (ADR-0004,
+from scenario 05).
+
 ### Profile → phase mapping
 
 Since v3.5 the phases are ordered so that **every profile is a prefix, never a subset** —

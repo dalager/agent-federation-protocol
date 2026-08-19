@@ -16,7 +16,7 @@ holding no keys.
 
 ## The spec
 
-**[docs/afp/](docs/afp/README.md)** — Revision 3.8, in seven parts, with scenario tests
+**[docs/afp/](docs/afp/README.md)** — Revision 3.9, in seven parts, with scenario tests
 and ADRs.
 
 ## The implementation
