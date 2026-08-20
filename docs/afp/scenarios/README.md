@@ -18,6 +18,7 @@ protocol does; that review tested whether the build order still matched it.
 | [05](05-integration-practice.md) | The integration practice: domain intelligence as an internal service | Standing solo instance answering other teams' shape/size/effort asks, requester roles, cross-team asset reuse, settlement on requester-reported actuals | 3 |
 | [06](06-issue-triage-loop.md) | The issue triage loop: from bug tracker to reviewed fix | External system as initiator, untrusted third-party content entering the record, acting on your own classification, idempotent external writes, author/reviewer separation, supersession after review | 6 |
 | [07](07-the-retraction.md) | The retraction: revising an answer the world already acted on | Superseding a ratified Synthesis, the cost of overturning a quorum, dispositions for acted-on justifications | 0 (sharpened 24) |
+| [08](08-the-subcontract.md) | The subcontract: two operators, one boundary, no shared hub | The P4 handshake alone — adversarial probing of the gate, direct cross-boundary delegation, agreement expiry vs in-flight work, two-export replay | 5 |
 
 ## Findings ledger
 
@@ -54,8 +55,9 @@ Six findings from scenario 04. Two are protocol additions, not conventions:
 
 Useful scenarios stress an axis the existing ones don't. Untested so far: three or more
 operators (real Byzantine tolerance, coalition dynamics at n≥4), long-lived hubs with heavy
-membership churn, sneakernet/airgapped federation, an adversarial operator rather than a
-merely buggy one, and a task whose answer must be revised after the fact — exercised by
+membership churn, sneakernet/airgapped federation, an adversarial operator beyond
+[scenario 08](08-the-subcontract.md)'s probing Mallory (replay, equivocation, a captured
+key), and a task whose answer must be revised after the fact — exercised by
 [scenario 07](07-the-retraction.md) and resolved in [ADR-0007](../adr/0007-supersession.md). Client/observer participation was
 exercised by scenario 05 — and strained into finding 2 (requester roles).
 
@@ -97,3 +99,18 @@ v3.12), 21 and 22 as spec precision (v3.13), then 19 as spec text and 24 through
 [scenario 07](07-the-retraction.md) — the scenario finding 24 asked for, which sharpened
 it into [ADR-0007](../adr/0007-supersession.md)'s three decisions (v3.14). Campaign
 closed.
+
+### Campaign 5 — open
+
+Five findings from [scenario 08](08-the-subcontract.md), the P4 shakedown: the handshake
+exercised alone, with an adversarial prober and a two-export replay. Unresolved;
+candidates are the scenario's own suggestions. ADR-0008 (the P4 stack) is the expected
+landing ground for 25–28; 29 is verifier architecture.
+
+| # | Finding | Candidate |
+|---|---|---|
+| 25 | The agreement's scope grammar is hub-shaped — the narrowest real federation (direct delegation, no hub) cannot state its own scope | Scope as a set of grants: hubs and/or capabilities-for-direct-delegation, the gate checking each activity against the grant that admits it |
+| 26 | Boundary rejection leaves no trace — a refused stranger and a silent wire are the same record | The admission-audit discipline (ADR-0003 D6, ADR-0006) applied at the boundary: the refusing instance logs what it refused and why, locally |
+| 27 | The roadmap's "LD-Signatures" row predates ADR-0001 and contradicts its canonicalization choice | Restate P4's obligation as HTTP Signatures for the hop plus the existing `eddsa-jcs-2022` object proofs — or argue concretely for more |
+| 28 | Agreement expiry vs in-flight work was unstated | As ruled in the scenario, mirroring the hub-availability gate: expiry stalls new work; an accepted `correlationId` flows to its terminal outcome |
+| 29 | Verifier completeness is single-domain | Per-trust-domain completeness, cross-export reference resolution, holes attributed to the domain that owns them — build the two-export replay before P5 multiplies the traffic |
