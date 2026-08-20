@@ -170,6 +170,7 @@ cherry-pick:
 | Profile | Phases |
 |---|---|
 | **Solo / airgapped** | P1 → P3, then stop |
+| **Pairwise** | P1 → P4, then stop — recognition and direct delegation, no shared hub ([06](06-deployment-profiles.md#the-pairwise-profile-federation-without-a-hub)) |
 | **Federated consortium** | P1 → P7 in order |
 
 A solo deployment MAY additionally switch on P4's **dual-publish shadow Notes** at any point

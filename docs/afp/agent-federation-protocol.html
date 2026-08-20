@@ -279,7 +279,7 @@
 
 <div class="page">
   <header class="hero">
-    <p class="eyebrow">Architecture Spec &middot; Multi-Operator Agent Federation &middot; Revision 3.14</p>
+    <p class="eyebrow">Architecture Spec &middot; Multi-Operator Agent Federation &middot; Revision 3.15</p>
     <h1>Agent Federation Protocol</h1>
     <p class="dek">Multiple operators, each running their own instance of agents, join forces on a common problem — federating through problem-scoped hubs over ActivityPub, the W3C protocol behind Mastodon. No central broker, consortium trust, no token economics.</p>
     <div class="callout">
@@ -322,7 +322,7 @@
 
     <main>
       <section id="changelog">
-        <div class="sec-head"><span class="num">&Delta;</span><h2>What changed in v3, v3.4&ndash;3.14</h2></div>
+        <div class="sec-head"><span class="num">&Delta;</span><h2>What changed in v3, v3.4&ndash;3.15</h2></div>
         <div class="table-wrap">
           <table>
             <thead><tr><th>#</th><th>Change</th><th>Why</th></tr></thead>
@@ -390,6 +390,8 @@
               <tr><td colspan="3" style="background:var(--surface-2); font-weight:700;">v3.14 &mdash; campaign 4 closed (findings 19 and 24; scenario 07, ADR-0007)</td></tr>
               <tr><td>51</td><td>The port&rsquo;s ingestion duty stated positively (&sect;08): third-party content enters as a hash-addressed artifact with a declared content type; the task text agents act on is the port&rsquo;s own bounded summary</td><td>A bug report is arbitrary text from whoever could file it, and a port that splices it into a Task&rsquo;s <code>content</code> has handed a stranger the prompt — the third injection door, beside fediverse commands and untrusted results</td></tr>
               <tr><td>52</td><td><code>afp:supersedes</code> for answer-level retraction, distinct from input-level <code>supersededInputs</code>; ratification parity; and <code>afp:disposes</code> for every action whose justification was withdrawn (&sect;16, ADR-0007)</td><td>Scenario 07: an advisory acted on, then proven wrong — a quorum&rsquo;s answer must not be un-decided by one signature, and the acted-on consequence must be visibly dealt with, not orphaned. Supersession is an edge, never an erasure</td></tr>
+              <tr><td colspan="3" style="background:var(--surface-2); font-weight:700;">v3.15 &mdash; the pairwise profile named (&sect;21)</td></tr>
+              <tr><td>53</td><td>Federation without a hub: P1&rarr;P4, recognition and direct cross-operator delegation, then stop. Everything replay-guaranteed survives the hub&rsquo;s absence, because the hub was never a trust anchor; what the profile gives up is listed in cost order &mdash; the electorate first</td><td>Scenario 08 proved it by walking it, and its boundary is one sentence: a hub is what you call the place where an electorate keeps its membership. The adoption path is the argument &mdash; start pairwise, add a hub the day a decision must bind three parties</td></tr>
             </tbody>
           </table>
         </div>

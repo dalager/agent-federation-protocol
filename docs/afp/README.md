@@ -1,10 +1,10 @@
-# Agent Federation Protocol (AFP) — v3.14
+# Agent Federation Protocol (AFP) — v3.15
 
 Multiple operators, each running their own instance of agents, join forces on a common
 problem — federating through problem-scoped hubs over **ActivityPub** (the W3C protocol
 behind Mastodon). No central broker, consortium trust, no token economics.
 
-This is the markdown rendition of the full spec (Revision 3.14). Reading order:
+This is the markdown rendition of the full spec (Revision 3.15). Reading order:
 
 | File | Contents |
 |---|---|
@@ -223,6 +223,8 @@ flowchart LR
 | v3.13 | Campaign 4's two precision findings: external side effects MUST carry an idempotency key derived from the `correlationId`, so a crash between acting and recording recovers by lookup rather than by a second pull request (03, 04); and `afp:err:insufficient-information` named as the honest terminal outcome for a task unanswerable as posed — the thread closes, and a later reply is a new ask with the closed thread as prehistory (03) |
 
 | v3.14 | Campaign 4 closed. Finding 19: the port's ingestion duty stated positively — third-party content enters as hash-addressed evidence with a declared content type, and the task text agents act on is the port's own bounded summary; the reporter's prose is what the investigation is *about*, never what it is asked to do (03). Finding 24, via scenario 07 and [ADR-0007](adr/0007-supersession.md): `afp:supersedes` for answer-level retraction (distinct from input-level `supersededInputs`), ratification parity — a quorum's answer is retracted only by a quorum — and `afp:disposes`, so every action whose justification was withdrawn is visibly dealt with (04) |
+
+| v3.15 | The **pairwise profile** named (06): federation without a hub — P1→P4, recognition and direct delegation, then stop. Coherent because the hub was never a trust anchor (02: no unilateral power beyond availability), so everything replay-guaranteed survives its absence; what it gives up is listed in cost order — the electorate first, then discovery, commons reputation, O(n) coordination, the canonical case file. Its boundary in one sentence: a hub is what you call the place where an electorate keeps its membership |
 
 All `afp:` terms are this design's own `@context` extension over W3C ActivityStreams 2.0 —
 not part of the standard.

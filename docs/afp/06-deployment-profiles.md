@@ -74,6 +74,61 @@ handling confidential inputs should state that policy as explicitly as they stat
 visibility defaults; the protocol is honest about where its guarantee ends (ADR-0004,
 from scenario 05).
 
+## The pairwise profile: federation without a hub
+
+Scenario 08 proved a third profile by walking it: two operators, one agreement, direct
+delegation — recognition without rendezvous. It is coherent, already half-real (P4a *is*
+this profile), and worth choosing deliberately, because what it gives up is precise.
+
+The reason it works at all is a property 02 already states: the hub has **no unilateral
+power beyond availability** — it can censor or go dark, never forge. The hub was never a
+trust anchor; it is an actor. So everything whose guarantee is *replay* survives its
+absence: direct delegation, settlement and bilateral standing, even sealed bidding — an
+announcer can run its own auction, pinning rule and window and recomputing the Award
+from the reveals, and an announcer-auctioneer can censor commits no more and no less
+detectably than a hub can (the bidder's own outbox proves what was sent either way).
+The neutral party never bought integrity; it bought reach.
+
+What the profile gives up, in order of how much it hurts:
+
+1. **The electorate.** A quorum needs a defined voter set, and the voter set *is* hub
+   membership — the Enroll trail, the pinned snapshot, the per-operator seats
+   (ADR-0005). Without it there is no answer to "who gets to vote," and everything
+   downstream collapses: rounds, `DecisionRecord`, `afp:MemberAdmit`/`Expel`,
+   ratification and therefore ratification parity (ADR-0007), Byzantine machinery at
+   n≥3. Multi-party governance degrades to diplomacy — pairwise contracts cannot bind
+   a third party.
+2. **Discovery.** No capability registry means delegating only to firms already known;
+   a bid pool is an address book, and "push a question to the hub and let coverage
+   decide" (scenario 04) has nowhere to be pushed.
+3. **Commons reputation.** Bilateral standing accumulates fine (scenario 08 settles);
+   a *shared* settlement trail that a third operator's selection can consume
+   (ADR-0004) has nowhere to live. Alpha's history with Bravo cannot inform Gamma's
+   choice.
+4. **O(n) coordination.** k counterparties means k(k−1)/2 agreements to negotiate,
+   renew and expire, and pairwise state sync — against 02's NAT reality, where two
+   firewalled instances often have no inbound path to each other and hub relay is the
+   answer. A "dumb relay" fix is a hub with fewer features.
+5. **The canonical case file.** Archive-as-record (07) has no single home; an
+   engagement's history is two half-views permanently — the two-export problem
+   (finding 29a) as a way of life rather than a transition.
+
+What it gains: no hub host and none of the hosting politics (scenario 03's "hosted on
+Alpha's infrastructure" is a soft power position); agreements that map one-to-one onto
+contracts a lawyer can read; and — underrated — **metadata privacy**: a hub sees the
+coordination graph of all its members (who asked, who bid, how often) even when
+payloads travel direct, while a pairwise mesh shows each pair's pattern only to that
+pair.
+
+The boundary of the profile is one sentence: **a hub is what you call the place where
+an electorate keeps its membership.** Everything else a hub does is convenience that
+pairwise machinery replaces at O(n²) cost. Federating without one works for exactly as
+long as every question has at most two parties; the first decision that must bind
+three is the moment a membership record exists, whatever it gets called. The adoption
+path this implies is the profile's best argument: start pairwise on P4a — one
+counterparty, one agreement, the smallest first bite — and add a hub the day an
+electorate is needed, not before.
+
 ### Profile → phase mapping
 
 Since v3.5 the phases are ordered so that **every profile is a prefix, never a subset** —
@@ -82,6 +137,7 @@ the solo operator stops, rather than skipping around:
 | Profile | Phases |
 |---|---|
 | **Solo / airgapped** | P1 → P3 (single instance, local hub and L0 deliberation, local allocation), then stop |
+| **Pairwise** | P1 → P4 (recognition and direct cross-operator delegation, no shared hub), then stop |
 | **Federated consortium** | P1 → P7 in order |
 
 That ordering is possible because the hub machinery, L0 deliberation and announce/bid/award
