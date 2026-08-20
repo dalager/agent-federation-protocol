@@ -1,0 +1,104 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://afp.example/ns/v3",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "https://alpha.operator.local/agents/e-estimator/outbox",
+  "type": "OrderedCollection",
+  "attributedTo": "https://alpha.operator.local/agents/e-estimator",
+  "totalItems": 3,
+  "orderedItems": [
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://afp.example/ns/v3",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/agents/e-estimator/activities/0001",
+      "type": "afp:bidCommit",
+      "actor": "https://alpha.operator.local/agents/e-estimator",
+      "to": [
+        "https://alpha.operator.local/hubs/estimation-hub"
+      ],
+      "published": "2026-08-17T09:01:08.000Z",
+      "context": "urn:afp:thread:load-test",
+      "afp:visibility": "hub",
+      "object": "https://alpha.operator.local/hubs/estimation-hub/tasks/load-42",
+      "afp:hub": "https://alpha.operator.local/hubs/estimation-hub",
+      "afp:commitment": "sha256:fa7ce3d9caa9bd307179201679384a1fabf8d4150ce6fb96a19ab5095cb3161e",
+      "afp:actingAs": "https://alpha.operator.local/agents/e-estimator",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:01:08.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z4MyamhT2cSxLNgwx3Krr9v7n1JTgoUA6S9BS11753KVUfT5SynoRUTZiNQgFNnZz2pWUEAT1fWmRxCxfhiVYuP1R"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://afp.example/ns/v3",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/agents/e-estimator/activities/0002",
+      "type": "afp:bidCommit",
+      "actor": "https://alpha.operator.local/agents/e-estimator",
+      "to": [
+        "https://alpha.operator.local/hubs/estimation-hub"
+      ],
+      "published": "2026-08-17T09:10:53.000Z",
+      "context": "urn:afp:thread:q-88-migration-estimate",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:7f8ed0c259427a574d48ef5d8cc1a0cc9fbc504c93ce918ad031d081991c522b",
+      "object": "https://alpha.operator.local/hubs/estimation-hub/tasks/q-88",
+      "afp:hub": "https://alpha.operator.local/hubs/estimation-hub",
+      "afp:commitment": "sha256:874625c2119cea3ba4c5e9778722f16016b3f8867b2984ca7b565e7a4d02a81c",
+      "afp:actingAs": "https://alpha.operator.local/agents/e-estimator",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:10:53.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z5KzDnmAjpH4rP6my5nGSZMhVE1nqtuxaZ6U2R54kkkuuwz2NhemuuDvruMDSRXr35cFV6CCVdm6PbjgLVYoANPeu"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://afp.example/ns/v3",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/agents/e-estimator/activities/0003",
+      "type": "Create",
+      "actor": "https://alpha.operator.local/agents/e-estimator",
+      "to": [
+        "https://alpha.operator.local/hubs/estimation-hub"
+      ],
+      "published": "2026-08-17T09:31:10.000Z",
+      "context": "urn:afp:thread:q-88-migration-estimate",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:ebcb66d94dee9c278c6fe34b25c4b6739c7ec8627a448cef55e2ae4fc95a72d7",
+      "object": {
+        "id": "https://alpha.operator.local/agents/e-estimator/votes/urn:afp:round:q-88-ratify",
+        "type": "afp:Vote",
+        "afp:round": "urn:afp:round:q-88-ratify",
+        "afp:proposalHash": "sha256:593c8ab40d1b0b3b218cca2ab78f817fc60b7d8fb02ec4cca2c4048d4f505e86",
+        "afp:quorumSnapshot": "sha256:7f2d23bd30572b1e5ec1cab22189a2ab80d4834de9834c99a392c66aff2bed71",
+        "value": "https://alpha.operator.local/agents/c-generalist/syntheses/q-88"
+      },
+      "afp:actingAs": "https://alpha.operator.local/agents/e-estimator",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:31:10.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z2qZTyBTeA72fyJhfTNCw2oLJp6HRNW4yNC5CYNEKtVhysPN4xt3VVtmS1sAGq5o1rYR2UYBvStcRvAZuvscTZH2C"
+      }
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://afp.example/ns/v3",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "https://alpha.operator.local/hubs/estimation-hub",
+  "type": [
+    "Group",
+    "afp:Hub"
+  ],
+  "name": "estimation-hub",
+  "inbox": "https://alpha.operator.local/hubs/estimation-hub/inbox",
+  "outbox": "https://alpha.operator.local/hubs/estimation-hub/outbox",
+  "afp:visibility": "public",
+  "assertionMethod": [
+    {
+      "id": "https://alpha.operator.local/hubs/estimation-hub#ed25519-key",
+      "type": "Multikey",
+      "controller": "https://alpha.operator.local/hubs/estimation-hub",
+      "publicKeyMultibase": "z6MkgfC9WFA6TwZZrjVue4mDLHnTK4VcZ3XVK1CHJ3xV1FHa"
+    }
+  ]
+}

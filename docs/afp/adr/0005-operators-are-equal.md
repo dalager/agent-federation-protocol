@@ -1,6 +1,6 @@
 # ADR-0005 — Operators are equal against a hub
 
-- **Status:** Accepted — not yet built (see [Build status](#build-status))
+- **Status:** Accepted, and **built** except the P4-gated seat check (see [Build status](#build-status))
 - **Date:** 2026-08-20
 - **Applies to:** L0 deliberation from P2 onward, and the federation handshake it precedes
   ([P4](../05-roadmap.md#p2p7))
@@ -196,16 +196,22 @@ votes.
 
 ## Build status
 
-Nothing here is built. The decisions are recorded so P4 does not have to discover them
-during handshake design, and because Decision 2 is free to land now.
+Everything but the P4-gated seat check is built. Existing exports verify unchanged: at one
+instance the weighting reduces to the uniform weight of 1, and every Enroll on the record
+was already issued by the agent's own instance.
 
-| ID | Task | Where |
-|---|---|---|
-| **E1** | Per-instance weighting in `proposeRound`, with `L` from the pinned voters' instances | `hub/hub.ts` |
-| **E2** | Verifier recomputes `afp:voterWeights` from the pinned voters and the roster; a mismatch is a named failure | `decision.py` |
-| **E3** | Enroll issuer must be the agent's own instance — hub admission and a mirrored verifier check | `hub/hub.ts`, `decision.py` |
-| **E4** | Seat evidence (`Accept{Follow}`) required for enrollment, gated to P4 | with the P4 handshake |
-| **E5** | Parity cases for `L` and the per-instance division, in the raw-JSON harness ADR-0004 established | `test/parity/cases.json` |
+| ID | Task | Status | Where |
+|---|---|---|---|
+| **E1** | Per-instance weighting in `proposeRound`, with `L` from the pinned voters' instances; the enrolling instance folded into hub state and rehydrated on restart | **done** | `hub/weights.ts`, `hub/hub.ts` |
+| **E2** | The verifier recomputes `afp:voterWeights` from the pinned voters and the Enroll trail; a mismatch is a named failure | **done** | `decision.py` |
+| **E3** | Enroll issuer must be the agent's own instance — resolved from the agent's `afp:operatedBy`, at hub admission and mirrored in the verifier | **done** | `hub/hub.ts`, `decision.py` |
+| **E4** | Seat evidence (`Accept{Follow}`) required for enrollment | deferred to P4 | with the handshake |
+| **E5** | Parity cases for `L` and the per-instance division, in the raw-JSON harness ADR-0004 established | **done** | `test/parity/cases.json` |
+
+The gate is `test/adr0005.test.ts`: two operators, deliberately lopsided, where the one
+running a single agent must weigh exactly as much as the one running four — and both new
+verifier checks are exercised by a mutation that makes them fail, since a check that
+cannot fail is decoration.
 
 ## References
 

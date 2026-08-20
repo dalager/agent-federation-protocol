@@ -1,0 +1,25 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://afp.example/ns/v3",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "https://alpha.operator.local/agents/e-estimator",
+  "type": "Service",
+  "name": "e-estimator",
+  "afp:operatedBy": "https://alpha.operator.local/actor",
+  "afp:capabilities": [
+    "afp:cap:estimate"
+  ],
+  "inbox": "https://alpha.operator.local/agents/e-estimator/inbox",
+  "outbox": "https://alpha.operator.local/agents/e-estimator/outbox",
+  "afp:visibility": "public",
+  "assertionMethod": [
+    {
+      "id": "https://alpha.operator.local/agents/e-estimator#ed25519-key",
+      "type": "Multikey",
+      "controller": "https://alpha.operator.local/agents/e-estimator",
+      "publicKeyMultibase": "z6Mkeo9AT7YLLypQN7Us8nyLBAp96L74ojawhm3hS8hbr6VD"
+    }
+  ]
+}

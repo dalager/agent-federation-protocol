@@ -1,0 +1,500 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://afp.example/ns/v3",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "https://alpha.operator.local/actor/outbox",
+  "type": "OrderedCollection",
+  "attributedTo": "https://alpha.operator.local/actor",
+  "totalItems": 15,
+  "orderedItems": [
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://afp.example/ns/v3",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0001",
+      "type": "afp:Vouch",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [],
+      "published": "2026-08-17T09:00:01.000Z",
+      "context": "urn:afp:thread:roster",
+      "afp:visibility": "public",
+      "object": {
+        "type": "afp:RosterEntry",
+        "agent": "https://alpha.operator.local/agents/a-infra",
+        "status": "active",
+        "afp:keyCustody": "instance",
+        "afp:capabilities": [
+          "afp:cap:estimate"
+        ],
+        "since": "2026-08-17T09:00:01.000Z"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:01.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z48493uE8z6LVf2qrdgkp686CFbpCbFbozznqWMpjq4bKQrSjjDhyNQ9jX343ney6CAPA8eG7g3MTyXj9wmsbvMaJ"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://afp.example/ns/v3",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0002",
+      "type": "afp:Vouch",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [],
+      "published": "2026-08-17T09:00:02.000Z",
+      "context": "urn:afp:thread:roster",
+      "afp:visibility": "public",
+      "afp:prevActivity": "sha256:a95d3c0ac5a93d10e14a7350d922e9073725ef5d2649f27faba79fd8f4c316f4",
+      "object": {
+        "type": "afp:RosterEntry",
+        "agent": "https://alpha.operator.local/agents/a-data",
+        "status": "active",
+        "afp:keyCustody": "instance",
+        "afp:capabilities": [
+          "afp:cap:estimate"
+        ],
+        "since": "2026-08-17T09:00:02.000Z"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:02.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z2ThDjJyk8ei8rixR1MT3UQLHABvjQfq1VWhxnpEiCg6BFPSNa92kdMpfP3KjERBhLoEqh3GFfuJk53qTexG6fuNF"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://afp.example/ns/v3",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0003",
+      "type": "afp:Vouch",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [],
+      "published": "2026-08-17T09:00:03.000Z",
+      "context": "urn:afp:thread:roster",
+      "afp:visibility": "public",
+      "afp:prevActivity": "sha256:efb18e7bc3684ecde406eb63962fac2852a85212a14057df9ddf6d0955ed4901",
+      "object": {
+        "type": "afp:RosterEntry",
+        "agent": "https://alpha.operator.local/agents/b-compliance",
+        "status": "active",
+        "afp:keyCustody": "instance",
+        "afp:capabilities": [
+          "afp:cap:estimate"
+        ],
+        "since": "2026-08-17T09:00:03.000Z"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:03.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z2qznJqxdJvJqQPu1r9QyBBFMAYJee46P4bAsYSxnUrSH5iMFg2cGq961rVX8bWGUzrRc5kvrhzacr2kJCrxurujm"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://afp.example/ns/v3",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0004",
+      "type": "afp:Vouch",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [],
+      "published": "2026-08-17T09:00:04.000Z",
+      "context": "urn:afp:thread:roster",
+      "afp:visibility": "public",
+      "afp:prevActivity": "sha256:428c03db0fadceb6cdf25b4b0118a9db1b4cdf631df1dc6fae89b19f0da9d25a",
+      "object": {
+        "type": "afp:RosterEntry",
+        "agent": "https://alpha.operator.local/agents/b-licensing",
+        "status": "active",
+        "afp:keyCustody": "instance",
+        "afp:capabilities": [
+          "afp:cap:estimate"
+        ],
+        "since": "2026-08-17T09:00:04.000Z"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:04.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "zP2n1WV3ZNkDV9JQufvGN5NLgNCjuAUKed4oSZ2oNNT5c95Auv5DQJgS8KUpZBU1We7nch2TrLdRrJhRPwXm8GDS"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://afp.example/ns/v3",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0005",
+      "type": "afp:Vouch",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [],
+      "published": "2026-08-17T09:00:05.000Z",
+      "context": "urn:afp:thread:roster",
+      "afp:visibility": "public",
+      "afp:prevActivity": "sha256:7957cf5b9120c7ee57d84079f100dfb8220921b3401fc39eb06435beb2556bcd",
+      "object": {
+        "type": "afp:RosterEntry",
+        "agent": "https://alpha.operator.local/agents/c-generalist",
+        "status": "active",
+        "afp:keyCustody": "instance",
+        "afp:capabilities": [
+          "afp:cap:estimate"
+        ],
+        "since": "2026-08-17T09:00:05.000Z"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:05.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z2RgiV1rSbW7Z1ASFrxqH472fP6HD6fWSVahJDN2jwSXotcibotd1vSQUAdSBELzh5dni33zXoUCxQwS2hrThwvmk"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://afp.example/ns/v3",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0006",
+      "type": "afp:Vouch",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [],
+      "published": "2026-08-17T09:00:06.000Z",
+      "context": "urn:afp:thread:roster",
+      "afp:visibility": "public",
+      "afp:prevActivity": "sha256:78ba4d56df06d5d4ed1079e5a07c4889edf0c9ca337fdd517d18e990907c271f",
+      "object": {
+        "type": "afp:RosterEntry",
+        "agent": "https://alpha.operator.local/agents/d-secops",
+        "status": "active",
+        "afp:keyCustody": "instance",
+        "afp:capabilities": [
+          "afp:cap:estimate"
+        ],
+        "since": "2026-08-17T09:00:06.000Z"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:06.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z3aGwvy5VMcLfxYcmnHqPp6QskQ1gb3hMBSyVw8ANPLGJgFUWZkgQdsMywEsPUdcSSBVF5Ezio16NZytDZv9A8isC"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://afp.example/ns/v3",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0007",
+      "type": "afp:Vouch",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [],
+      "published": "2026-08-17T09:00:07.000Z",
+      "context": "urn:afp:thread:roster",
+      "afp:visibility": "public",
+      "afp:prevActivity": "sha256:544d9bd73a2a770cd8212d89d26c24783133450676720368f1e7f4594ad7f465",
+      "object": {
+        "type": "afp:RosterEntry",
+        "agent": "https://alpha.operator.local/agents/e-estimator",
+        "status": "active",
+        "afp:keyCustody": "instance",
+        "afp:capabilities": [
+          "afp:cap:estimate"
+        ],
+        "since": "2026-08-17T09:00:07.000Z"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:07.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z4tXbTC5atR4vU7gx82mjJust8E52w7PprmFyebzXcyBmC6NFhcwHB2SJhmzE53CsuaE8esYctD4sx8CadKtRxLT5"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://afp.example/ns/v3",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0008",
+      "type": "afp:Enroll",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [
+        "https://alpha.operator.local/hubs/estimation-hub"
+      ],
+      "published": "2026-08-17T09:00:08.000Z",
+      "context": "urn:afp:thread:enroll",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:5185c56ff59945c6e56e15ec83b896610787c0f91a89f54630f7fb422d9d48bd",
+      "object": "https://alpha.operator.local/agents/a-infra",
+      "target": "https://alpha.operator.local/hubs/estimation-hub",
+      "afp:hub": "https://alpha.operator.local/hubs/estimation-hub",
+      "afp:capabilities": [
+        "afp:cap:estimate"
+      ],
+      "afp:hubKey": "https://alpha.operator.local/agents/a-infra#hub-key-estimation-hub",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:08.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z28k9gDokGMwTgNCHdrzdmUdFeymyNYBFWcWh9rTXFwoN1EcuZdUmjrZNfCyZjbxnbA45X9yC82W6RGBKJknUymv9"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://afp.example/ns/v3",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0009",
+      "type": "afp:Enroll",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [
+        "https://alpha.operator.local/hubs/estimation-hub"
+      ],
+      "published": "2026-08-17T09:00:10.000Z",
+      "context": "urn:afp:thread:enroll",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:6d7ffcc272b5bc8af1c13e5b08d87c8f260eb3852409401dc2cb8e45e3b886cf",
+      "object": "https://alpha.operator.local/agents/a-data",
+      "target": "https://alpha.operator.local/hubs/estimation-hub",
+      "afp:hub": "https://alpha.operator.local/hubs/estimation-hub",
+      "afp:capabilities": [
+        "afp:cap:estimate"
+      ],
+      "afp:hubKey": "https://alpha.operator.local/agents/a-data#hub-key-estimation-hub",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:10.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z2Xwemo6nVrCgJn8hMXcAGCE4ZcCMJoEWiHpVDa99YMthB5qyKkiFppde8vf2dt9niT9wA9Y8MQGehBRcn9BDDstF"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://afp.example/ns/v3",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0010",
+      "type": "afp:Enroll",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [
+        "https://alpha.operator.local/hubs/estimation-hub"
+      ],
+      "published": "2026-08-17T09:00:12.000Z",
+      "context": "urn:afp:thread:enroll",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:d68fd9ecf60cc19a5197a012e15850f39c3f53ed2ac04aa120ea41857d51199c",
+      "object": "https://alpha.operator.local/agents/b-compliance",
+      "target": "https://alpha.operator.local/hubs/estimation-hub",
+      "afp:hub": "https://alpha.operator.local/hubs/estimation-hub",
+      "afp:capabilities": [
+        "afp:cap:estimate"
+      ],
+      "afp:hubKey": "https://alpha.operator.local/agents/b-compliance#hub-key-estimation-hub",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:12.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z5hQ37eDhuEAUehCDs7X5CWq2scfkB6rTfPuf9AYzrVqjU1Wz1dkDXJcdPSvQaiBEAtPAwqzypzVZuzDvBucm9k5y"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://afp.example/ns/v3",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0011",
+      "type": "afp:Enroll",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [
+        "https://alpha.operator.local/hubs/estimation-hub"
+      ],
+      "published": "2026-08-17T09:00:14.000Z",
+      "context": "urn:afp:thread:enroll",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:285a2aea203bf99e78739dc6d29a9380b8b22c7b81a070e105c2079f8ce01aa9",
+      "object": "https://alpha.operator.local/agents/b-licensing",
+      "target": "https://alpha.operator.local/hubs/estimation-hub",
+      "afp:hub": "https://alpha.operator.local/hubs/estimation-hub",
+      "afp:capabilities": [
+        "afp:cap:estimate"
+      ],
+      "afp:hubKey": "https://alpha.operator.local/agents/b-licensing#hub-key-estimation-hub",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:14.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "zzzUwt1ky7gXFcjRJVmSTyUJf6f4wcdt5gDsiB4Xdkj4oqRW5o5z1x3CJRJ1mwpo5TGVGQT1rLNtWsXxNXS6cWoS"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://afp.example/ns/v3",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0012",
+      "type": "afp:Enroll",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [
+        "https://alpha.operator.local/hubs/estimation-hub"
+      ],
+      "published": "2026-08-17T09:00:16.000Z",
+      "context": "urn:afp:thread:enroll",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:c9481b0545fcddc1e86d096de794aa285ee5cd25eaf1d9a6cde78d5adda82533",
+      "object": "https://alpha.operator.local/agents/c-generalist",
+      "target": "https://alpha.operator.local/hubs/estimation-hub",
+      "afp:hub": "https://alpha.operator.local/hubs/estimation-hub",
+      "afp:capabilities": [
+        "afp:cap:estimate"
+      ],
+      "afp:hubKey": "https://alpha.operator.local/agents/c-generalist#hub-key-estimation-hub",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:16.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "zedMsy9bE5wCSifgowYTQJg3PmVTC5KVornCECYhaNMiLWAH8czYHXyiEcjC6b1yVwmz8eXh3GiEAeoZQktwAM2V"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://afp.example/ns/v3",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0013",
+      "type": "afp:Enroll",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [
+        "https://alpha.operator.local/hubs/estimation-hub"
+      ],
+      "published": "2026-08-17T09:00:18.000Z",
+      "context": "urn:afp:thread:enroll",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:b5f2ee42c39508dc543ffa32c483ae37a47162b3b47bb2bda146dd6d91164d78",
+      "object": "https://alpha.operator.local/agents/d-secops",
+      "target": "https://alpha.operator.local/hubs/estimation-hub",
+      "afp:hub": "https://alpha.operator.local/hubs/estimation-hub",
+      "afp:capabilities": [
+        "afp:cap:estimate"
+      ],
+      "afp:hubKey": "https://alpha.operator.local/agents/d-secops#hub-key-estimation-hub",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:18.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "zJDCwBarWQEBDkx6NPCmoqrHQrUpTHjfKRN7e1SL52aa57Bcsx2GeHgtWhmSGvJDYUAaxECQJRv65PcdsA5Urdq7"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://afp.example/ns/v3",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0014",
+      "type": "afp:Enroll",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [
+        "https://alpha.operator.local/hubs/estimation-hub"
+      ],
+      "published": "2026-08-17T09:00:20.000Z",
+      "context": "urn:afp:thread:enroll",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:ef7ca6ef9323ec0a3d75c0d9d4b0c047cafbe4fb74dd7c0581a9c931e8741a0d",
+      "object": "https://alpha.operator.local/agents/e-estimator",
+      "target": "https://alpha.operator.local/hubs/estimation-hub",
+      "afp:hub": "https://alpha.operator.local/hubs/estimation-hub",
+      "afp:capabilities": [
+        "afp:cap:estimate"
+      ],
+      "afp:hubKey": "https://alpha.operator.local/agents/e-estimator#hub-key-estimation-hub",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:20.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z4PLJbwYC24zGXxSeVbd6UWKeFx41iJF3Pkxr6w6eCsCRAQZGn37brDg5CkttrD72cYjMULB8FJEZSzpnUJ8tDYsh"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://afp.example/ns/v3",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0015",
+      "type": "afp:Vouch",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [],
+      "published": "2026-08-17T09:31:48.000Z",
+      "context": "urn:afp:thread:roster",
+      "afp:visibility": "public",
+      "afp:prevActivity": "sha256:96021df59bffe2a6096c8610e6ce6cb449d04976f18f4aaab309fa3bfc2dbf4a",
+      "object": {
+        "type": "afp:RosterEntry",
+        "agent": "https://alpha.operator.local/hubs/estimation-hub",
+        "status": "active",
+        "afp:keyCustody": "self",
+        "afp:capabilities": [
+          "afp:cap:hub"
+        ],
+        "since": "2026-08-17T09:31:48.000Z"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:31:48.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "znKerBw8ZapJgRTwa4twkj71mviWsKU5rEq9ryPhct243hodh4YC5XiZCyRexKkEswWj5xyPxUuHbUwGA3f8Zxct"
+      }
+    }
+  ]
+}

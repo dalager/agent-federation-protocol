@@ -1,0 +1,25 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://afp.example/ns/v3",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "https://alpha.operator.local/agents/c-generalist",
+  "type": "Service",
+  "name": "c-generalist",
+  "afp:operatedBy": "https://alpha.operator.local/actor",
+  "afp:capabilities": [
+    "afp:cap:estimate"
+  ],
+  "inbox": "https://alpha.operator.local/agents/c-generalist/inbox",
+  "outbox": "https://alpha.operator.local/agents/c-generalist/outbox",
+  "afp:visibility": "public",
+  "assertionMethod": [
+    {
+      "id": "https://alpha.operator.local/agents/c-generalist#ed25519-key",
+      "type": "Multikey",
+      "controller": "https://alpha.operator.local/agents/c-generalist",
+      "publicKeyMultibase": "z6MkiUdp8bR8iUXqUgMBE6WfSckMo7bEYMxgELbdwsbMrUiZ"
+    }
+  ]
+}

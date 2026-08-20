@@ -34,7 +34,7 @@ from pathlib import Path
 
 from allocation import check_announce_role, check_award
 from asset import check_assets
-from decision import afp_object, check_decision_record
+from decision import afp_object, check_decision_record, check_enroll_authority
 from proof import CRYPTOSUITE, decode_multikey, digest_of, verify_proof
 
 
@@ -101,6 +101,9 @@ class Authority:
     # actor URL -> True when the roster says the instance signs on its behalf
     instance_custody: dict[str, bool] = field(default_factory=dict)
     rostered: set[str] = field(default_factory=set)
+    # actor URL -> the instance its own document names as operator
+    # (`afp:operatedBy`) — who is entitled to enroll it (ADR-0005 Decision 2)
+    operated_by: dict[str, str] = field(default_factory=dict)
 
 
 def build_authority(export: Path) -> Authority:
@@ -122,6 +125,9 @@ def build_authority(export: Path) -> Authority:
         controlled[actor] = ids
         # An instance speaks for itself with its own keys.
         authority.keys_for_actor.setdefault(actor, set()).update(ids)
+        operator = doc.get("afp:operatedBy")
+        if isinstance(operator, str):
+            authority.operated_by[actor] = operator
 
     instance_doc = export / "instance.jsonld"
     instance_id = load_json(instance_doc).get("id") if instance_doc.exists() else None
@@ -410,6 +416,10 @@ def verify_export(export: Path, thread: str | None, report: Report) -> None:
     )
     for name in threads:
         check_thread(report, all_activities, name)
+
+    # ADR-0005 Decision 2: who was entitled to issue each afp:Enroll. Exports
+    # with no enrollment (all of P1) run none of this.
+    check_enroll_authority(report, authority, all_activities)
 
     # ADR-0002 Decision 3 / 04 replay step 7. Exports with no DecisionRecord
     # (all of P1, and any P2 export without a closed vote) run none of this —

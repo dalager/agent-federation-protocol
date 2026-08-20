@@ -23,7 +23,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))  # -> src/verifier
 
-from decision import instant_millis
+from decision import instant_millis, voter_weights
 from reputation import REPUTATION_RULES
 
 
@@ -37,6 +37,13 @@ def main() -> int:
         try:
             results[key] = derivation({}, case["settlements"], case["bidder"])
         except Exception as error:  # a crash on one side is itself a divergence
+            results[key] = f"THREW: {type(error).__name__}"
+
+    for case in cases.get("weights", []):
+        key = f"weights:{case['name']}"
+        try:
+            results[key] = voter_weights([(a, i) for a, i in case["voters"]])
+        except Exception as error:
             results[key] = f"THREW: {type(error).__name__}"
 
     for value in cases["instants"]:

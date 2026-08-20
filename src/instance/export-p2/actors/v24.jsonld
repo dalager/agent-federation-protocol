@@ -1,0 +1,25 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://afp.example/ns/v3",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "https://alpha.operator.local/agents/v24",
+  "type": "Service",
+  "name": "v24",
+  "afp:operatedBy": "https://alpha.operator.local/actor",
+  "afp:capabilities": [
+    "afp:cap:vote"
+  ],
+  "inbox": "https://alpha.operator.local/agents/v24/inbox",
+  "outbox": "https://alpha.operator.local/agents/v24/outbox",
+  "afp:visibility": "public",
+  "assertionMethod": [
+    {
+      "id": "https://alpha.operator.local/agents/v24#ed25519-key",
+      "type": "Multikey",
+      "controller": "https://alpha.operator.local/agents/v24",
+      "publicKeyMultibase": "z6Mko8nGUjQf4aCsCZH6Y93zP6QmT7Q4a44r9wCjgp1cV6RX"
+    }
+  ]
+}

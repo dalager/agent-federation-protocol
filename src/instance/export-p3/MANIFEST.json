@@ -1,0 +1,18 @@
+{
+  "format": "afp-export/1",
+  "instance": "https://alpha.operator.local/actor",
+  "exportedAt": "2026-08-19T17:40:49.850Z",
+  "actors": [
+    "a-infra",
+    "a-data",
+    "b-compliance",
+    "b-licensing",
+    "c-generalist",
+    "d-secops",
+    "e-estimator",
+    "hub-estimation-hub"
+  ],
+  "activities": 56,
+  "artifacts": 0,
+  "cryptosuite": "eddsa-jcs-2022"
+}

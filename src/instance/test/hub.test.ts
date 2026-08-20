@@ -7,6 +7,8 @@
 import { after, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { join } from "node:path";
+import { readFileSync, writeFileSync, cpSync, mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
 
 import { loadConfig } from "../src/config.ts";
 import { AfpInstance, type AgentRegistration } from "../src/instance.ts";
@@ -237,7 +239,46 @@ describe("P2 hub: enrollment and an L0 weighted-quorum round", () => {
     const clean = runVerifier(verifier, config.exportDir, "urn:afp:thread:policy-1", ["--verbose"]);
     assert.equal(clean.code, 0, clean.output);
     assert.match(clean.output, /decision: .* weightTally recomputes from countedVotes/);
+    assert.match(clean.output, /decision: .* voter weights recompute per instance/);
+    assert.match(clean.output, /enroll: .* enrolled by its own instance/);
     assert.match(clean.output, /PASSED/);
+
+    // ADR-0005: both new checks must be able to fail, or they are decoration.
+    const mutate = (name: string, edit: (outbox: { orderedItems: Record<string, unknown>[] }) => void) => {
+      const dir = mkdtempSync(join(tmpdir(), "afp-adr5-mut-"));
+      cpSync(config.exportDir, dir, { recursive: true });
+      const path = join(dir, "outbox", `${name}.jsonld`);
+      const outbox = JSON.parse(readFileSync(path, "utf8"));
+      edit(outbox);
+      outbox.totalItems = outbox.orderedItems.length;
+      writeFileSync(path, JSON.stringify(outbox, null, 2));
+      return runVerifier(verifier, dir, "urn:afp:thread:policy-1", ["--verbose"]);
+    };
+
+    // A hub that writes the weights it wants into its own proposal — the exact
+    // reason recorded-for-inspection is not the same as recomputable.
+    const forgedWeights = mutate(`hub-${hub.hubId}`, (outbox) => {
+      for (const activity of outbox.orderedItems) {
+        const object = activity.object as Record<string, unknown> | undefined;
+        if (object?.type === "afp:Proposal") {
+          const weights = object["afp:voterWeights"] as Record<string, number>;
+          object["afp:voterWeights"] = Object.fromEntries(
+            Object.entries(weights).map(([voter, w], i) => [voter, i === 0 ? w + 5 : w]),
+          );
+        }
+      }
+    });
+    assert.notEqual(forgedWeights.code, 0);
+    assert.match(forgedWeights.output, /FAIL \] decision: .*voter weights recompute per instance/);
+
+    // An Enroll issued by someone other than the agent's own operator.
+    const poachedEnroll = mutate("instance", (outbox) => {
+      for (const activity of outbox.orderedItems) {
+        if (activity.type === "afp:Enroll") { activity.actor = instance.actorId("a2"); break; }
+      }
+    });
+    assert.notEqual(poachedEnroll.code, 0);
+    assert.match(poachedEnroll.output, /FAIL \] enroll: .*enrolled by its own instance/);
 
     // --- Lifecycle: Freeze suspends new work but existing rounds still close;
     // Archive is terminal and read-only.

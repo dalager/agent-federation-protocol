@@ -11,23 +11,62 @@
     "",
     "Each entry is fed to the named derivation and the two results must match."
   ],
-
   "reputation": [
     {
       "name": "integer-valued float estimate is usable, not skipped",
       "why": "JSON draws no int/float line and the JCS profile forbids only non-integer numbers, so 100.0 is legal, canonicalizes to 100, and must score identically on both sides.",
       "bidder": "X",
       "settlements": [
-        { "digest": "sha256:s1", "published": "2026-01-01T00:00:00.000Z", "object": { "type": "afp:Settlement",
-          "afp:settles": [ { "actor": "X", "afp:estimated": { "afp:estimatedCost": { "unit": "EUR", "value": 100.0 } }, "afp:actual": { "unit": "EUR", "value": 100 } } ] } }
+        {
+          "digest": "sha256:s1",
+          "published": "2026-01-01T00:00:00.000Z",
+          "object": {
+            "type": "afp:Settlement",
+            "afp:settles": [
+              {
+                "actor": "X",
+                "afp:estimated": {
+                  "afp:estimatedCost": {
+                    "unit": "EUR",
+                    "value": 100.0
+                  }
+                },
+                "afp:actual": {
+                  "unit": "EUR",
+                  "value": 100
+                }
+              }
+            ]
+          }
+        }
       ]
     },
     {
       "name": "integer-valued float actual is usable, not skipped",
       "bidder": "X",
       "settlements": [
-        { "digest": "sha256:s1", "published": "2026-01-01T00:00:00.000Z", "object": { "type": "afp:Settlement",
-          "afp:settles": [ { "actor": "X", "afp:estimated": { "afp:estimatedCost": { "unit": "EUR", "value": 100 } }, "afp:actual": { "unit": "EUR", "value": 100.0 } } ] } }
+        {
+          "digest": "sha256:s1",
+          "published": "2026-01-01T00:00:00.000Z",
+          "object": {
+            "type": "afp:Settlement",
+            "afp:settles": [
+              {
+                "actor": "X",
+                "afp:estimated": {
+                  "afp:estimatedCost": {
+                    "unit": "EUR",
+                    "value": 100
+                  }
+                },
+                "afp:actual": {
+                  "unit": "EUR",
+                  "value": 100.0
+                }
+              }
+            ]
+          }
+        }
       ]
     },
     {
@@ -35,24 +74,84 @@
       "why": "est 10.0 / act 1000 scores 0 when usable and 50 when skipped; picking values whose two answers differ is what makes the case able to fail.",
       "bidder": "X",
       "settlements": [
-        { "digest": "sha256:s1", "published": "2026-01-01T00:00:00.000Z", "object": { "type": "afp:Settlement",
-          "afp:settles": [ { "actor": "X", "afp:estimated": { "afp:estimatedCost": { "unit": "EUR", "value": 10.0 } }, "afp:actual": { "unit": "EUR", "value": 1000 } } ] } }
+        {
+          "digest": "sha256:s1",
+          "published": "2026-01-01T00:00:00.000Z",
+          "object": {
+            "type": "afp:Settlement",
+            "afp:settles": [
+              {
+                "actor": "X",
+                "afp:estimated": {
+                  "afp:estimatedCost": {
+                    "unit": "EUR",
+                    "value": 10.0
+                  }
+                },
+                "afp:actual": {
+                  "unit": "EUR",
+                  "value": 1000
+                }
+              }
+            ]
+          }
+        }
       ]
     },
     {
       "name": "genuine fraction is skipped on both sides",
       "bidder": "X",
       "settlements": [
-        { "digest": "sha256:s1", "published": "2026-01-01T00:00:00.000Z", "object": { "type": "afp:Settlement",
-          "afp:settles": [ { "actor": "X", "afp:estimated": { "afp:estimatedCost": { "unit": "EUR", "value": 100.5 } }, "afp:actual": { "unit": "EUR", "value": 100 } } ] } }
+        {
+          "digest": "sha256:s1",
+          "published": "2026-01-01T00:00:00.000Z",
+          "object": {
+            "type": "afp:Settlement",
+            "afp:settles": [
+              {
+                "actor": "X",
+                "afp:estimated": {
+                  "afp:estimatedCost": {
+                    "unit": "EUR",
+                    "value": 100.5
+                  }
+                },
+                "afp:actual": {
+                  "unit": "EUR",
+                  "value": 100
+                }
+              }
+            ]
+          }
+        }
       ]
     },
     {
       "name": "boolean cost is never a cost",
       "bidder": "X",
       "settlements": [
-        { "digest": "sha256:s1", "published": "2026-01-01T00:00:00.000Z", "object": { "type": "afp:Settlement",
-          "afp:settles": [ { "actor": "X", "afp:estimated": { "afp:estimatedCost": { "unit": "EUR", "value": true } }, "afp:actual": { "unit": "EUR", "value": 100 } } ] } }
+        {
+          "digest": "sha256:s1",
+          "published": "2026-01-01T00:00:00.000Z",
+          "object": {
+            "type": "afp:Settlement",
+            "afp:settles": [
+              {
+                "actor": "X",
+                "afp:estimated": {
+                  "afp:estimatedCost": {
+                    "unit": "EUR",
+                    "value": true
+                  }
+                },
+                "afp:actual": {
+                  "unit": "EUR",
+                  "value": 100
+                }
+              }
+            ]
+          }
+        }
       ]
     },
     {
@@ -60,16 +159,32 @@
       "why": "A bare membership test against a string is a substring search; 'bidder-42' occurs inside 'did:example:sub-bidder-42' and would award an undeserved bonus.",
       "bidder": "bidder-42",
       "settlements": [
-        { "digest": "sha256:s1", "published": "2026-01-01T00:00:00.000Z", "object": { "type": "afp:Settlement",
-          "afp:settles": [], "afp:dissentVindicated": "did:example:sub-bidder-42" } }
+        {
+          "digest": "sha256:s1",
+          "published": "2026-01-01T00:00:00.000Z",
+          "object": {
+            "type": "afp:Settlement",
+            "afp:settles": [],
+            "afp:dissentVindicated": "did:example:sub-bidder-42"
+          }
+        }
       ]
     },
     {
       "name": "dissentVindicated as a proper list still counts",
       "bidder": "bidder-42",
       "settlements": [
-        { "digest": "sha256:s1", "published": "2026-01-01T00:00:00.000Z", "object": { "type": "afp:Settlement",
-          "afp:settles": [], "afp:dissentVindicated": ["bidder-42"] } }
+        {
+          "digest": "sha256:s1",
+          "published": "2026-01-01T00:00:00.000Z",
+          "object": {
+            "type": "afp:Settlement",
+            "afp:settles": [],
+            "afp:dissentVindicated": [
+              "bidder-42"
+            ]
+          }
+        }
       ]
     },
     {
@@ -77,28 +192,128 @@
       "why": "String-sorted, '-01:00' precedes 'Z' — but the instant it denotes follows. The decay weights differ, so a wrong order is a wrong score.",
       "bidder": "X",
       "settlements": [
-        { "digest": "sha256:s1", "published": "2026-01-01T00:00:00Z", "object": { "type": "afp:Settlement",
-          "afp:settles": [ { "actor": "X", "afp:estimated": { "afp:estimatedCost": { "unit": "EUR", "value": 100 } }, "afp:actual": { "unit": "EUR", "value": 100 } } ] } },
-        { "digest": "sha256:s2", "published": "2026-01-01T00:00:00-01:00", "object": { "type": "afp:Settlement",
-          "afp:settles": [ { "actor": "X", "afp:estimated": { "afp:estimatedCost": { "unit": "EUR", "value": 100 } }, "afp:actual": { "unit": "EUR", "value": 300 } } ] } }
+        {
+          "digest": "sha256:s1",
+          "published": "2026-01-01T00:00:00Z",
+          "object": {
+            "type": "afp:Settlement",
+            "afp:settles": [
+              {
+                "actor": "X",
+                "afp:estimated": {
+                  "afp:estimatedCost": {
+                    "unit": "EUR",
+                    "value": 100
+                  }
+                },
+                "afp:actual": {
+                  "unit": "EUR",
+                  "value": 100
+                }
+              }
+            ]
+          }
+        },
+        {
+          "digest": "sha256:s2",
+          "published": "2026-01-01T00:00:00-01:00",
+          "object": {
+            "type": "afp:Settlement",
+            "afp:settles": [
+              {
+                "actor": "X",
+                "afp:estimated": {
+                  "afp:estimatedCost": {
+                    "unit": "EUR",
+                    "value": 100
+                  }
+                },
+                "afp:actual": {
+                  "unit": "EUR",
+                  "value": 300
+                }
+              }
+            ]
+          }
+        }
       ]
     },
     {
       "name": "recency ordering: same instant spelled two ways ties, broken by digest",
       "bidder": "X",
       "settlements": [
-        { "digest": "sha256:aaa", "published": "2026-01-01T00:00:00Z", "object": { "type": "afp:Settlement",
-          "afp:settles": [ { "actor": "X", "afp:estimated": { "afp:estimatedCost": { "unit": "EUR", "value": 100 } }, "afp:actual": { "unit": "EUR", "value": 100 } } ] } },
-        { "digest": "sha256:bbb", "published": "2026-01-01T00:00:00.000Z", "object": { "type": "afp:Settlement",
-          "afp:settles": [ { "actor": "X", "afp:estimated": { "afp:estimatedCost": { "unit": "EUR", "value": 100 } }, "afp:actual": { "unit": "EUR", "value": 200 } } ] } }
+        {
+          "digest": "sha256:aaa",
+          "published": "2026-01-01T00:00:00Z",
+          "object": {
+            "type": "afp:Settlement",
+            "afp:settles": [
+              {
+                "actor": "X",
+                "afp:estimated": {
+                  "afp:estimatedCost": {
+                    "unit": "EUR",
+                    "value": 100
+                  }
+                },
+                "afp:actual": {
+                  "unit": "EUR",
+                  "value": 100
+                }
+              }
+            ]
+          }
+        },
+        {
+          "digest": "sha256:bbb",
+          "published": "2026-01-01T00:00:00.000Z",
+          "object": {
+            "type": "afp:Settlement",
+            "afp:settles": [
+              {
+                "actor": "X",
+                "afp:estimated": {
+                  "afp:estimatedCost": {
+                    "unit": "EUR",
+                    "value": 100
+                  }
+                },
+                "afp:actual": {
+                  "unit": "EUR",
+                  "value": 200
+                }
+              }
+            ]
+          }
+        }
       ]
     },
     {
       "name": "unit mismatch is skipped, never guessed at",
       "bidder": "X",
       "settlements": [
-        { "digest": "sha256:s1", "published": "2026-01-01T00:00:00.000Z", "object": { "type": "afp:Settlement",
-          "afp:settles": [ { "actor": "X", "afp:estimated": { "afp:estimatedCost": { "unit": "EUR", "value": 100 } }, "afp:actual": { "unit": "USD", "value": 100 } } ] } }
+        {
+          "digest": "sha256:s1",
+          "published": "2026-01-01T00:00:00.000Z",
+          "object": {
+            "type": "afp:Settlement",
+            "afp:settles": [
+              {
+                "actor": "X",
+                "afp:estimated": {
+                  "afp:estimatedCost": {
+                    "unit": "EUR",
+                    "value": 100
+                  }
+                },
+                "afp:actual": {
+                  "unit": "USD",
+                  "value": 100
+                }
+              }
+            ]
+          }
+        }
       ]
     },
     {
@@ -110,30 +325,107 @@
       "name": "malformed settles entries are tolerated identically",
       "bidder": "X",
       "settlements": [
-        { "digest": "sha256:s1", "published": "2026-01-01T00:00:00.000Z", "object": { "type": "afp:Settlement",
-          "afp:settles": [ null, "nonsense", 42, { "actor": "X" }, { "actor": "X", "afp:estimated": {}, "afp:actual": null } ] } }
+        {
+          "digest": "sha256:s1",
+          "published": "2026-01-01T00:00:00.000Z",
+          "object": {
+            "type": "afp:Settlement",
+            "afp:settles": [
+              null,
+              "nonsense",
+              42,
+              {
+                "actor": "X"
+              },
+              {
+                "actor": "X",
+                "afp:estimated": {},
+                "afp:actual": null
+              }
+            ]
+          }
+        }
       ]
     },
     {
       "name": "zero estimate cannot divide",
       "bidder": "X",
       "settlements": [
-        { "digest": "sha256:s1", "published": "2026-01-01T00:00:00.000Z", "object": { "type": "afp:Settlement",
-          "afp:settles": [ { "actor": "X", "afp:estimated": { "afp:estimatedCost": { "unit": "EUR", "value": 0 } }, "afp:actual": { "unit": "EUR", "value": 5 } } ] } }
+        {
+          "digest": "sha256:s1",
+          "published": "2026-01-01T00:00:00.000Z",
+          "object": {
+            "type": "afp:Settlement",
+            "afp:settles": [
+              {
+                "actor": "X",
+                "afp:estimated": {
+                  "afp:estimatedCost": {
+                    "unit": "EUR",
+                    "value": 0
+                  }
+                },
+                "afp:actual": {
+                  "unit": "EUR",
+                  "value": 5
+                }
+              }
+            ]
+          }
+        }
       ]
     },
     {
       "name": "unparseable published sorts deterministically on both sides",
       "bidder": "X",
       "settlements": [
-        { "digest": "sha256:s1", "published": "not-a-timestamp", "object": { "type": "afp:Settlement",
-          "afp:settles": [ { "actor": "X", "afp:estimated": { "afp:estimatedCost": { "unit": "EUR", "value": 100 } }, "afp:actual": { "unit": "EUR", "value": 400 } } ] } },
-        { "digest": "sha256:s2", "published": "2026-01-01T00:00:00.000Z", "object": { "type": "afp:Settlement",
-          "afp:settles": [ { "actor": "X", "afp:estimated": { "afp:estimatedCost": { "unit": "EUR", "value": 100 } }, "afp:actual": { "unit": "EUR", "value": 100 } } ] } }
+        {
+          "digest": "sha256:s1",
+          "published": "not-a-timestamp",
+          "object": {
+            "type": "afp:Settlement",
+            "afp:settles": [
+              {
+                "actor": "X",
+                "afp:estimated": {
+                  "afp:estimatedCost": {
+                    "unit": "EUR",
+                    "value": 100
+                  }
+                },
+                "afp:actual": {
+                  "unit": "EUR",
+                  "value": 400
+                }
+              }
+            ]
+          }
+        },
+        {
+          "digest": "sha256:s2",
+          "published": "2026-01-01T00:00:00.000Z",
+          "object": {
+            "type": "afp:Settlement",
+            "afp:settles": [
+              {
+                "actor": "X",
+                "afp:estimated": {
+                  "afp:estimatedCost": {
+                    "unit": "EUR",
+                    "value": 100
+                  }
+                },
+                "afp:actual": {
+                  "unit": "EUR",
+                  "value": 100
+                }
+              }
+            ]
+          }
+        }
       ]
     }
   ],
-
   "instants": [
     "2026-01-01T00:00:00Z",
     "2026-01-01T00:00:00.000Z",
@@ -147,5 +439,157 @@
     "2026-06-15T12:34:56.789Z",
     "not-a-timestamp",
     ""
+  ],
+  "weights": [
+    {
+      "name": "single instance reduces to the uniform weight of 1",
+      "why": "ADR-0002 Decision 3's behaviour must survive verbatim, or every existing export stops recomputing.",
+      "voters": [
+        [
+          "a1",
+          "A"
+        ],
+        [
+          "a2",
+          "A"
+        ],
+        [
+          "a3",
+          "A"
+        ],
+        [
+          "a4",
+          "A"
+        ]
+      ]
+    },
+    {
+      "name": "three instances, unequal headcounts, equal totals",
+      "why": "3/2/1 voters -> weights 2/3/6, each instance summing to L=6.",
+      "voters": [
+        [
+          "a1",
+          "A"
+        ],
+        [
+          "a2",
+          "A"
+        ],
+        [
+          "a3",
+          "A"
+        ],
+        [
+          "b1",
+          "B"
+        ],
+        [
+          "b2",
+          "B"
+        ],
+        [
+          "c1",
+          "C"
+        ]
+      ]
+    },
+    {
+      "name": "two instances, coprime counts",
+      "voters": [
+        [
+          "a1",
+          "A"
+        ],
+        [
+          "a2",
+          "A"
+        ],
+        [
+          "a3",
+          "A"
+        ],
+        [
+          "b1",
+          "B"
+        ],
+        [
+          "b2",
+          "B"
+        ]
+      ]
+    },
+    {
+      "name": "lone voter carries its instance alone",
+      "voters": [
+        [
+          "a1",
+          "A"
+        ]
+      ]
+    },
+    {
+      "name": "one against many — the attack this exists to stop",
+      "why": "B running five agents must not outvote A running one; both totals are L.",
+      "voters": [
+        [
+          "a1",
+          "A"
+        ],
+        [
+          "b1",
+          "B"
+        ],
+        [
+          "b2",
+          "B"
+        ],
+        [
+          "b3",
+          "B"
+        ],
+        [
+          "b4",
+          "B"
+        ],
+        [
+          "b5",
+          "B"
+        ]
+      ]
+    },
+    {
+      "name": "no voters at all",
+      "voters": []
+    },
+    {
+      "name": "input order does not change the result",
+      "why": "Same multiset as the three-instance case, shuffled; weights must be identical.",
+      "voters": [
+        [
+          "c1",
+          "C"
+        ],
+        [
+          "b2",
+          "B"
+        ],
+        [
+          "a1",
+          "A"
+        ],
+        [
+          "b1",
+          "B"
+        ],
+        [
+          "a3",
+          "A"
+        ],
+        [
+          "a2",
+          "A"
+        ]
+      ]
+    }
   ]
 }

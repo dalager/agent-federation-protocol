@@ -26,6 +26,7 @@ import { describe, it } from "node:test";
 
 import { runReputationRule, type PinnedSettlement } from "../src/allocation/reputation.ts";
 import { instantMillis } from "../src/crypto/time.ts";
+import { voterWeights } from "../src/hub/weights.ts";
 
 const PARITY_DIR = join(import.meta.dirname, "..", "..", "verifier", "test", "parity");
 const CASES_PATH = join(PARITY_DIR, "cases.json");
@@ -33,6 +34,7 @@ const CASES_PATH = join(PARITY_DIR, "cases.json");
 interface Cases {
   reputation: { name: string; bidder: string; settlements: PinnedSettlement[] }[];
   instants: string[];
+  weights: { name: string; voters: [string, string][] }[];
 }
 
 /** The TypeScript side's answers, keyed exactly as the Python runner keys its own. */
@@ -46,6 +48,14 @@ function typescriptResults(cases: Cases): Record<string, unknown> {
         testCase.settlements,
         testCase.bidder,
       );
+    } catch (error) {
+      results[key] = `THREW: ${(error as Error).constructor.name}`;
+    }
+  }
+  for (const testCase of cases.weights) {
+    const key = `weights:${testCase.name}`;
+    try {
+      results[key] = voterWeights(testCase.voters.map(([agent, instance]) => ({ agent, instance })));
     } catch (error) {
       results[key] = `THREW: ${(error as Error).constructor.name}`;
     }
@@ -72,8 +82,17 @@ describe("cross-implementation parity (writer vs verifier)", () => {
     const py = pythonResults();
 
     const keys = [...new Set([...Object.keys(ts), ...Object.keys(py)])].sort();
+    // Compare canonically: a weights map is an object, and object key order
+    // is not semantic — JCS sorts keys before anything is signed, and the
+    // Python runner serializes with sort_keys. Comparing raw JSON.stringify
+    // would report an ordering artefact as a divergence.
+    const canonical = (v: unknown): string =>
+      v !== null && typeof v === "object" && !Array.isArray(v)
+        ? JSON.stringify(Object.fromEntries(Object.entries(v as object).sort(([a], [b]) => (a < b ? -1 : 1))))
+        : JSON.stringify(v);
+    const same = (a: unknown, b: unknown) => canonical(a) === canonical(b);
     const divergent = keys
-      .filter((key) => ts[key] !== py[key])
+      .filter((key) => !same(ts[key], py[key]))
       .map((key) => `  ${key}\n    writer=${JSON.stringify(ts[key])}  verifier=${JSON.stringify(py[key])}`);
 
     assert.equal(
@@ -81,7 +100,7 @@ describe("cross-implementation parity (writer vs verifier)", () => {
       0,
       `the two implementations disagree on ${divergent.length} case(s):\n${divergent.join("\n")}`,
     );
-    assert.ok(keys.length >= cases.reputation.length + cases.instants.length);
+    assert.ok(keys.length >= cases.reputation.length + cases.instants.length + cases.weights.length);
   });
 
   // A parity harness that silently compares nothing would be worse than none:
@@ -107,5 +126,27 @@ describe("cross-implementation parity (writer vs verifier)", () => {
     assert.notEqual(instantMillis("2026-01-01T00:00:00-01:00"), instantMillis("2026-01-01T00:00:00Z"));
     assert.equal(instantMillis("2026-01-01T00:00:00.000Z"), instantMillis("2026-01-01T00:00:00Z"));
     assert.equal(instantMillis("not-a-timestamp"), 0, "unparseable is 0, never NaN — NaN in a sort key is unspecified");
+
+    // The weighting's whole point is that these two are the same total.
+    const w = (name: string) => {
+      const c = cases.weights.find((x) => x.name === name)!;
+      return voterWeights(c.voters.map(([agent, instance]) => ({ agent, instance })));
+    };
+    const solo = w("single instance reduces to the uniform weight of 1");
+    assert.deepEqual(Object.values(solo), [1, 1, 1, 1], "one instance must still weigh 1 per voter");
+
+    const three = w("three instances, unequal headcounts, equal totals");
+    assert.deepEqual(three, { a1: 2, a2: 2, a3: 2, b1: 3, b2: 3, c1: 6 });
+    const total = (weights: Record<string, number>, prefix: string) =>
+      Object.entries(weights).filter(([a]) => a.startsWith(prefix)).reduce((s, [, v]) => s + v, 0);
+    assert.equal(total(three, "a"), 6);
+    assert.equal(total(three, "b"), 6);
+    assert.equal(total(three, "c"), 6);
+
+    // One operator with one agent must not be outvoted by one with five.
+    const lopsided = w("one against many — the attack this exists to stop");
+    assert.equal(total(lopsided, "a"), total(lopsided, "b"), "five agents buy no more say than one");
+
+    assert.deepEqual(w("input order does not change the result"), three, "ordering is not an input");
   });
 });

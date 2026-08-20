@@ -30,6 +30,7 @@ import {
   type Visibility,
 } from "./activities.ts";
 import { LWWRegister, ORMap, ORMapLWW, ORSet } from "./crdtAdapter.ts";
+import { voterWeights } from "./weights.ts";
 import { CRDTStore, type LWWState, type ORMapState, type ORSetState } from "../crdt/index.ts";
 import { ensureHubSchema, loadRound, saveRound, saveVoteReceipt, voteReceiptsFor, type RoundRow } from "./store.ts";
 import { Allocator } from "../allocation/allocator.ts";
@@ -100,6 +101,14 @@ export class Hub {
    * the upgrade/downgrade path, on the record.
    */
   private readonly roles = new Map<string, LWWRegister<HubRole>>();
+  /**
+   * The instance that enrolled each agent (ADR-0005 Decision 2) — the operator
+   * an agent counts for when votes are weighted per instance rather than per
+   * agent. Folded from the Enroll's own actor, which Decision 2 binds to the
+   * agent's `afp:operatedBy`, so the trail carries the mapping the weighting
+   * rests on.
+   */
+  private readonly instances = new Map<string, LWWRegister<string>>();
   /**
    * The asset registry (ADR-0004 Decision 2): a hub-scoped OR-Map
    * `"assetId@version"` → asset record, fed by signed `Update{afp:Asset}`
@@ -174,6 +183,10 @@ export class Hub {
         const register = new LWWRegister<HubRole>();
         register.restore(state as LWWState<HubRole>);
         this.roles.set(crdtId.slice("role:".length), register);
+      } else if (crdtId.startsWith("instance:") && crdtType === "LWW_REGISTER") {
+        const register = new LWWRegister<string>();
+        register.restore(state as LWWState<string>);
+        this.instances.set(crdtId.slice("instance:".length), register);
       }
     }
 
@@ -315,6 +328,28 @@ export class Hub {
     if (!agent) return;
     const tag = String(activity.id);
     const origin = String(activity.actor ?? "");
+
+    // ADR-0005 Decision 2: an Enroll is issued by the enrolled agent's own
+    // instance and by nobody else. Without this an agent publishes
+    // Enroll{object: self, afp:role: member} and self-promotes — and since the
+    // trail is also what says which operator an agent counts for, a forged
+    // issuer would forge a seat as well as a role. The agent's own actor
+    // document names its operator, so the hub resolves this the same way it
+    // resolves a signing key: from the document the actor publishes.
+    const operatedBy = String(this.fetchActor(agent)?.["afp:operatedBy"] ?? "");
+    if (!operatedBy || origin !== operatedBy) {
+      logAdmission(
+        this.db,
+        this.now().toISOString(),
+        agent,
+        origin,
+        "rejected",
+        operatedBy
+          ? `enroll issued by ${origin}, but ${agent} is operated by ${operatedBy} (ADR-0005)`
+          : `enroll for ${agent}, whose actor document names no afp:operatedBy`,
+      );
+      return;
+    }
     const capabilities = Array.isArray(activity["afp:capabilities"])
       ? (activity["afp:capabilities"] as JsonValue[]).map(String)
       : [];
@@ -360,6 +395,22 @@ export class Hub {
       origin,
       this.now(),
     );
+
+    // The operator this agent counts for when a round is weighted (ADR-0005).
+    const seat = { value: origin, timestamp: role.timestamp, nodeId: role.nodeId };
+    const seatRegister = this.instances.get(agent) ?? new LWWRegister<string>();
+    seatRegister.apply(seat);
+    this.instances.set(agent, seatRegister);
+    this.crdt.apply(
+      { hub: this.hubId, crdtId: `instance:${agent}`, crdtType: "LWW_REGISTER", delta: seat },
+      origin,
+      this.now(),
+    );
+  }
+
+  /** The instance that enrolled `agent` — the operator it counts for (ADR-0005). */
+  instanceOf(agent: string): string | null {
+    return this.instances.get(agent)?.getState()?.value ?? null;
   }
 
   private onUnenroll(activity: { [key: string]: JsonValue }): void {
@@ -526,8 +577,11 @@ export class Hub {
     const voters = [...(options.voters ?? this.members())].filter(
       (agent) => this.isLive(agent) && this.roleOf(agent) === "member",
     );
-    const weights: Record<string, number> = {};
-    for (const voter of voters) weights[voter] = 1.0; // liveness-gated uniform weight
+    // One operator, one weight (ADR-0005 Decision 1): each seated instance
+    // carries the same total, divided among its pinned voters. At a single
+    // instance this reduces to the liveness-gated uniform weight of 1 that
+    // ADR-0002 Decision 3 pinned, so the solo profile is unchanged.
+    const weights = voterWeights(voters.map((agent) => ({ agent, instance: this.instanceOf(agent) ?? agent })));
 
     const quorumSnapshot = digestOf([...voters].sort());
     const proposalId = `${this.actorId}/proposals/${options.round}`;

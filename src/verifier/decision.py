@@ -17,6 +17,7 @@ none (all of P1) runs none of this — backward compatible by construction.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from math import lcm
 
 from proof import digest_of, verify_proof
 
@@ -89,6 +90,91 @@ def enrolled_roles(hub_actor: str, all_activities: list[dict]) -> dict[str, str]
     return roles
 
 
+def enrolled_instances(hub_actor: str, all_activities: list[dict]) -> dict[str, str]:
+    """agent -> the instance that enrolled it (ADR-0005 Decision 2).
+
+    Replayed from the same trail and with the same last-writer-wins rule as
+    `enrolled_roles`. ADR-0005 binds the Enroll's actor to the agent's own
+    `afp:operatedBy` — checked separately in `check_enroll_authority` — so
+    this trail is what says which operator an agent counts for when a round is
+    weighted per instance.
+    """
+    instances: dict[str, str] = {}
+    trail = [
+        a
+        for a in all_activities
+        if a.get("type") in ("afp:Enroll", "afp:Unenroll") and a.get("target") == hub_actor
+    ]
+    for activity in sorted(trail, key=lambda a: (instant_millis(a.get("published")), digest_of(a))):
+        agent = activity.get("object")
+        if not isinstance(agent, str):
+            continue
+        if activity.get("type") == "afp:Enroll":
+            actor = activity.get("actor")
+            if isinstance(actor, str):
+                instances[agent] = actor
+        else:
+            instances.pop(agent, None)
+    return instances
+
+
+def voter_weights(voters: list[tuple[str, str]]) -> dict[str, int]:
+    """`agent -> weight` for one round's pinned voters, per instance.
+
+    ADR-0005 Decision 1: each seated instance carries the same total, divided
+    among its pinned voters. With `n_I` the count of instance `I`'s voters and
+    `L` their least common multiple, each of `I`'s voters carries `L / n_I`, so
+    every instance sums to `L` and every weight is a whole number — fractions
+    being unrepresentable in a signed AFP document, whose numeric profile
+    forbids non-integer numbers.
+
+    Deliberately reimplemented from the spec description rather than shared
+    with `src/instance/src/hub/weights.ts`; the gate diffs the two on the same
+    inputs.
+    """
+    if not voters:
+        return {}
+    counts: dict[str, int] = {}
+    for _, instance in voters:
+        counts[instance] = counts.get(instance, 0) + 1
+    total = 1
+    for instance in sorted(counts):
+        total = lcm(total, counts[instance])
+    return {agent: total // counts[instance] for agent, instance in voters}
+
+
+def check_enroll_authority(report, authority, all_activities: list[dict]) -> None:
+    """ADR-0005 Decision 2 — an Enroll is issued by the enrolled agent's own instance.
+
+    A valid signature proves only that the actor wrote these bytes; it says
+    nothing about whether that actor may enroll anyone. Unchecked, an agent
+    publishes `Enroll{object: self, afp:role: member}` and both implementations
+    agree it belongs — and since the same trail says which operator an agent
+    counts for, a forged issuer forges a seat as well as a role.
+
+    The agent's own actor document names its operator, so this resolves from
+    evidence the replay already loads. An agent whose document names no
+    operator cannot be enrolled by anyone: unbound is not a licence.
+    """
+    for activity in all_activities:
+        if activity.get("type") != "afp:Enroll":
+            continue
+        agent = activity.get("object")
+        if not isinstance(agent, str):
+            continue
+        actor = activity.get("actor")
+        operator = authority.operated_by.get(agent)
+        ok = operator is not None and actor == operator
+        report.record(
+            f"enroll: {agent.split('/')[-1]} enrolled by its own instance",
+            ok,
+            "" if ok else
+            (f"enrolled by {actor!r} but {agent} is operated by {operator!r} (ADR-0005)"
+             if operator is not None else
+             f"{agent} publishes no afp:operatedBy, so no actor is entitled to enroll it"),
+        )
+
+
 def check_decision_record(
     report,
     decision_activity: dict,
@@ -117,10 +203,10 @@ def check_decision_record(
     ):
         return
 
-    voter_weights: dict[str, float] = proposal.get("afp:voterWeights", {})
+    declared_weights: dict[str, float] = proposal.get("afp:voterWeights", {})
     # The pinned set is the explicit voter list (02 "Snapshot-pinning"); the
     # weight map's keys are the fallback when a proposal omits it.
-    pinned_voters = set(proposal.get("afp:voters", []) or voter_weights)
+    pinned_voters = set(proposal.get("afp:voters", []) or declared_weights)
     by_digest = {digest_of(a): a for a in all_activities}
 
     # ADR-0004 Decision 1 — only member-role agents may ever be pinned into a
@@ -128,6 +214,26 @@ def check_decision_record(
     # Enroll trail proves.
     hub_actor = decision.get("afp:hub") or proposal.get("afp:hub") or decision_activity.get("actor")
     roles = enrolled_roles(hub_actor, all_activities)
+    # ADR-0005 Decision 1 — the pinned weights are recomputed, not trusted.
+    # Recorded-so-a-verifier-can-see is not the same as checkable: without
+    # this a hub simply writes the numbers it wants into its own proposal, and
+    # the tally recomputation below would faithfully confirm them.
+    instances = enrolled_instances(hub_actor, all_activities)
+    recomputed = voter_weights(
+        [(v, instances.get(v, v)) for v in sorted(proposal.get("afp:voters", []) or declared_weights)]
+    )
+    weights_match = all(
+        recomputed.get(v, 0) == declared_weights.get(v, 0)
+        for v in set(recomputed) | set(declared_weights)
+    )
+    report.record(
+        f"decision: {label} voter weights recompute per instance",
+        weights_match,
+        "" if weights_match else
+        f"recomputed {recomputed!r} but afp:Proposal declares {declared_weights!r} — each "
+        f"seated instance carries the same total, divided among its pinned voters (ADR-0005)",
+    )
+
     non_member_pinned = sorted(v for v in pinned_voters if roles.get(v, "member") != "member")
     report.record(
         f"decision: {label} pinned voters are member-role agents",
@@ -168,7 +274,7 @@ def check_decision_record(
             continue
 
         value = vote_obj.get("value")
-        tally[value] = tally.get(value, 0) + voter_weights.get(voter, 0)
+        tally[value] = tally.get(value, 0) + declared_weights.get(voter, 0)
         counted_voters.add(voter)
 
     report.record(
@@ -196,7 +302,7 @@ def check_decision_record(
     # lands under "abstain" (04's DecisionRecord example carries that key).
     # Zero-weight entries on either side (an option nobody chose, an explicit
     # abstain: 0) are not a mismatch — compare over the union with default 0.
-    abstain = sum(voter_weights.get(v, 0) for v in pinned_voters - counted_voters)
+    abstain = sum(declared_weights.get(v, 0) for v in pinned_voters - counted_voters)
     if abstain:
         tally["abstain"] = tally.get("abstain", 0) + abstain
     declared_tally = decision.get("afp:weightTally", {})
