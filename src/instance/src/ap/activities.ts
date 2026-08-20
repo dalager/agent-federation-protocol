@@ -134,7 +134,12 @@ export interface ErrorSpec {
   errorId: string;
   correlationId: string;
   reason: string;
-  /** Machine-readable class, e.g. `afp:err:undeliverable`. */
+  /**
+   * Machine-readable class, e.g. `afp:err:undeliverable` — or
+   * `afp:err:insufficient-information` (03, scenario 06 finding 22): the task
+   * as posed cannot be completed, and the thread closes honestly rather than
+   * parking forever on a reply that may never come.
+   */
   code: string;
 }
 

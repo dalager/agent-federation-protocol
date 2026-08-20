@@ -38,7 +38,15 @@ vocabulary for. Core object types from v1: `Task`, `Capability`, `Result`, `Erro
 
 `Accept`/`Reject` answer the Offer (a `summary` carries the reject reason); the worker
 returns `Create{afp:Result}` with the same `correlationId`, or `Create{afp:Error}` on
-failure — the typed-outcome objects AS2 lacks.
+failure — the typed-outcome objects AS2 lacks. An `afp:Error` carries a machine-readable
+`afp:errorCode` (e.g. `afp:err:undeliverable`), and one class deserves naming because
+each implementation would otherwise invent it (scenario 06, finding 22):
+**`afp:err:insufficient-information`** — the task *as posed* cannot be completed, and the
+thread closes rather than parking forever on a reply that may never come. The replay
+procedure demands a terminal outcome per delegated thread (04); a suspended state would
+cost that check its teeth, while this code states the truth: not failure, not success —
+unanswerable as asked. If the missing information arrives, that is a new ask with the
+closed thread as its recorded prehistory.
 
 Everything above is available to a single operator with two agents and no network — it is
 the whole of roadmap P1. Note what is already mandatory at that scale: the attachment is
@@ -96,7 +104,13 @@ proposal, filing a tracker record, merging), the authoritative outcome lives out
 Port agents **MUST reconcile**: emit a follow-up `Result` into the same `context` carrying
 the external reference, a content hash of the artifact, and an observation timestamp —
 otherwise the trail ends at "we proposed" and audit cannot establish what actually
-happened.
+happened. And the side effect itself MUST carry an **idempotency key derived from the
+`correlationId`** — a branch name, a comment marker, a request token the external system
+can be asked about (scenario 06, finding 21). Reconciliation covers the happy path; the
+key covers the crash *between* doing the thing and recording it, where a record that
+cannot distinguish "not done" from "done, unrecorded" would otherwise make every retry a
+second pull request. With the key, recovery is a lookup against the external system, not
+a guess.
 
 ### v2 terms (consensus, state, ordering)
 

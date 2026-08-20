@@ -1,10 +1,10 @@
-# Agent Federation Protocol (AFP) — v3.12
+# Agent Federation Protocol (AFP) — v3.13
 
 Multiple operators, each running their own instance of agents, join forces on a common
 problem — federating through problem-scoped hubs over **ActivityPub** (the W3C protocol
 behind Mastodon). No central broker, consortium trust, no token economics.
 
-This is the markdown rendition of the full spec (Revision 3.12). Reading order:
+This is the markdown rendition of the full spec (Revision 3.13). Reading order:
 
 | File | Contents |
 |---|---|
@@ -213,6 +213,8 @@ flowchart LR
 | v3.11 | **Operators are equal against a hub** ([ADR-0005](adr/0005-operators-are-equal.md)): vote weight is per seated *instance*, not per agent — each instance carries the same total, divided among its live pinned voters as integers via a common denominator, so an operator's say no longer grows by running more agents (02). At one instance the rule reduces to today's uniform weight, so every existing export recomputes unchanged. Weights become recomputable from the pinned voters and the roster rather than merely recorded; quorum's `n` is seated instances, which is also the right unit for the Byzantine bound. Vote-weight reputation stays deferred, now with a stated reason: estimate accuracy is not judgement, and weighting governance by standing entrenches |
 
 | v3.12 | Campaign 4's two lead findings landed as **checkable actuation** ([ADR-0006](adr/0006-checkable-actuation.md)): `afp:actionPolicy` — a closed `category → admissible action` map pinned in the Announce, `afp:category` on the Synthesis, and `afp:actsOn`/`afp:action` hash-binding every consequence to the answer that justified it, so replay can ask of any action whether it was what the answer permitted (03, 04); and `afp:excludePerformersOf` — the estimator wall generalized to any named prior task's performers, enforced at admission and rebuilt from prior Awards at replay, giving author/reviewer separation for one announce field (03) |
+
+| v3.13 | Campaign 4's two precision findings: external side effects MUST carry an idempotency key derived from the `correlationId`, so a crash between acting and recording recovers by lookup rather than by a second pull request (03, 04); and `afp:err:insufficient-information` named as the honest terminal outcome for a task unanswerable as posed — the thread closes, and a later reply is a new ask with the closed thread as prehistory (03) |
 
 All `afp:` terms are this design's own `@context` extension over W3C ActivityStreams 2.0 —
 not part of the standard.
