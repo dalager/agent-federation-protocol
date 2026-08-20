@@ -10,3 +10,6 @@
 .claude-flow
 .swarm
 ruvector.db
+
+# Local MCP server registration — tooling config, not project source
+.mcp.json
