@@ -7,7 +7,9 @@
 > expiry against in-flight work — and the first **two-export replay**, where completeness
 > stops being a single-operator concept. Deliberately refuses to open a shared hub:
 > cross-operator hubs, enrollment seats and CRDT sync are P5's scenario, not this one.
-> Verdict at the end.
+> Verdict at the end. An outside-in companion —
+> [the same events as the people involved tell them](08-the-subcontract-story.md) —
+> carries the human side: how it was sold, what it cost, what was harder than expected.
 
 ## User story
 
