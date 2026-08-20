@@ -78,12 +78,21 @@ a boundary: ADR-0005's issuer binding, and every "whose agent is this" question 
 it, now rests on fetching the counterparty's published documents rather than reading a
 local roster. The trust source does not change; the transport under it does.
 
-**5. The work happens behind Bravo's port, as it always did.** `b-assessor`'s brain runs
-whatever tooling Bravo runs; what crosses back is a signed `Result`: findings document as
-a hash-addressed attachment, `afp:producedBy`, the evidence digests. Nothing in this
-beat is new — which is the beat's finding-shaped non-finding: P1's obligations (signing,
+**5. The work happens behind Bravo's port — and what comes back is not yet trusted.**
+`b-assessor`'s brain runs whatever tooling Bravo runs; what crosses back is a signed
+`Result`: findings document as a hash-addressed attachment, `afp:producedBy`, the
+evidence digests. The *shape* needed nothing new — P1's obligations (signing,
 hash-addressing, visibility, reconciliation) were designed at one operator to be
-boundary-ready, and this is the scenario that collects on that design.
+boundary-ready, and this beat collects on that design. But shape is not safety, and the
+first draft of this scenario conflated them. 04 already imposes a duty written for
+exactly this moment: a cross-operator `Result` ran attacker-controllable instructions in
+*someone else's* environment, so the receiving port **sandboxes the result** — checksum
+verification, content-type sniffing, size limits, isolated execution of anything fetched
+— before anything trusts the attachment. And finding 19's ingestion duty applies with the
+roles shifted: a subcontractor's findings prose is a stranger's text that Alpha's brains
+will reason over, so it enters as hash-addressed evidence, summarized at the port, never
+spliced into a downstream task's `content`. Both duties exist; neither names the
+federated boundary as its site, and the seam between them is finding 30.
 
 **6. The operator watches from a stock Mastodon account.** Alpha's partner follows the
 engagement thread via dual-published shadow Notes; a reply of anything but the
@@ -101,7 +110,27 @@ would turn every agreement's last week into a dead zone; one that admitted new w
 would make expiry meaningless. The record shows both halves: the late Result accepted,
 the post-expiry third Offer refused.
 
-**8. The client replays two exports.** Alpha exports its record; Bravo exports its
+Two edges of this beat are noted and deliberately not exercised. *Whose clock evaluates
+the expiry instant*: each operator's gate runs on its own clock, and a delivery near the
+boundary could be pre-expiry on Bravo's clock and post-expiry on Alpha's — at P4 the
+recipient's gate decides, skew is accepted, and cross-operator clock discipline is
+revisited when P5 gives the record shared state to disagree about. And *whether Bravo may
+correct its findings after expiry* — a post-expiry supersession (ADR-0007) of pre-expiry
+work is neither plainly new work nor plainly in-flight; ADR-0007's own revisit trigger
+names federation-era supersession, and it stays deferred to it rather than half-answered
+here.
+
+**8. The subcontract settles, roles reversed.** Alpha delivered actuals to scenario
+05's practice as a *requester*; here it receives them as one. The assessment's estimate
+(Bravo's quoted effort and window) meets what the engagement actually took, Alpha reports
+the actuals onto the thread, and an `afp:Settlement` lands — ADR-0004's machinery with
+the boundary in the middle. This is what the closing paragraph's "standing subcontracting
+relationship where settlements accumulate into standing" *means* mechanically: without
+this beat the sentence is decoration, and the first draft had exactly that decoration.
+One engagement settles once; the reputation it seeds only matters if there is ever a
+second.
+
+**9. The client replays two exports.** Alpha exports its record; Bravo exports its
 engagement thread (scoped by the agreement — Bravo's other clients are not Alpha's
 business). The auditor replays **both together**, and the verifier meets a situation
 campaigns 1–4 never posed: every completeness rule so far assumes one operator's total
@@ -121,20 +150,27 @@ single-bundle verifier has no vocabulary for any of that.
 | Non-parties cannot confirm a record exists | `parties` visibility → 404, not 403 | Yes (07) |
 | The hop is authenticated; payloads stay portably signed | HTTP Signatures on delivery + `eddsa-jcs-2022` object proofs | **Roadmap wording drift, finding 27** |
 | Cross-boundary identity rests on published documents | Authorized fetch of actor documents; `afp:operatedBy` binding (ADR-0005) | Yes, once fetch is enforced |
+| A counterparty's Result is sandboxed and summarized before anything trusts it | 04's untrusted-result duty + finding 19's ingestion duty, at the boundary | **Sited nowhere — finding 30** |
+| The subcontract settles on the receiving operator's actuals | `afp:Settlement`, roles reversed (ADR-0004) | Yes — exercised in beat 8 |
 | Expiry stalls new work, never in-flight work | Terminal-outcome rule per accepted `correlationId` | **Previously unstated — finding 28** |
 | The operator can watch without joining | Shadow Notes + command grammar + `afp:AuditGrant` | Yes (04/07) |
-| A third party can replay the whole engagement | Two exports, verified together | **Single-domain verifier — finding 29** |
+| A third party can replay the whole engagement | Two exports, verified together | **Single-domain verifier — finding 29a** |
+| A scoped export is distinguishable from a tampered one | Nothing — redaction and deletion currently share a signature | **finding 29b** |
 
 ## Spec verdict
 
 **Held where it matters most.** The deepest result is beat 5: direct cross-operator
-delegation required *no new object, no new field, no new duty* — the P1 flow crossed the
-boundary intact, because signing, hash-addressing and visibility were made mandatory at
-two agents precisely so this day would be an addition, not a migration. The hardening
-paid out too: roles, weights, actuation and supersession all arrive at P4 as settled
-semantics rather than open questions.
+delegation required *no new object and no new field* — the P1 flow crossed the boundary
+intact, because signing, hash-addressing and visibility were made mandatory at two
+agents precisely so this day would be an addition, not a migration. (This verdict's
+first draft claimed *no new duty* either; review caught that as false — see finding 30 —
+and the correction is worth keeping visible: "boundary-ready" and "boundary-safe" are
+different claims.) The hardening paid out too: roles, weights, actuation, settlement and
+supersession all arrive at P4 as settled semantics rather than open questions, and beat
+8 runs ADR-0004's settlement loop across the boundary unchanged.
 
-**Strained — five findings, opening campaign 5:**
+**Strained — seven findings, opening campaign 5** (as sharpened by this scenario's own
+review — the raw walkthrough surfaced five, and the review split one and added one):
 
 25. **The agreement's scope grammar is hub-shaped.** 01's gate wording assumes every
     agreement names a hub; the narrowest real federation — direct delegation on named
@@ -142,30 +178,71 @@ semantics rather than open questions.
     grants (hubs *and/or* capabilities-for-direct-delegation), with the gate checking
     the activity against the grant that admits it.
 26. **Boundary rejection leaves no trace.** A hard-rejected stranger's Offer vanishes;
-    "we refused Mallory" and "Mallory never called" are the same record. The
-    audit-log-at-admission discipline (ADR-0003 D6, ADR-0006) wants a boundary
-    equivalent — local, not federated: the refusing instance logs what it refused and
-    why, so its own audit can answer "were we probed."
-27. **The roadmap's "LD-Signatures" row is pre-ADR-0001 drift.** Object payloads are
-    already portably signed (`eddsa-jcs-2022`); the boundary needs transport
-    authentication of the hop, not a second signature suite with RDF canonicalization.
-    ADR-0008 should restate the P4 obligation as HTTP Signatures for delivery plus the
-    existing object proofs — or argue concretely for more.
+    "we refused Mallory" and "Mallory never called" are the same record. The honest
+    scope must be stated up front: unlike ADR-0003 D6, where the announce's pinned
+    estimator list gives rejection an external commitment point, a stranger appears in
+    no roster and no agreement — **verifiable rejection is impossible in the negative**,
+    and no export can prove the absence of unlogged probes. So the duty is local but
+    stronger than a log: a hash-chained, instance-signed rejection record, tamper-evident
+    and exportable as an assertion — with the prober's own outbox as corroboration if it
+    ever surfaces.
+27. **The "LD-Signatures" wording is pre-ADR-0001 drift — narrower than first thought.**
+    04's security section already fuses the terms ("Linked Data Signatures / Object
+    Integrity Proofs on the object itself; the HTTP-layer signature only authenticates
+    the relaying hop"), which *is* the two-layer model this scenario runs on. What
+    remains is wording cleanup — the roadmap's P4 row and 01's tooling-reuse list both
+    still say "LD-Signatures" bare — plus ADR-0008 confirming explicitly that
+    `eddsa-jcs-2022` satisfies 04's relay obligation. No interop pressure forces RDF
+    canonicalization: Mastodon ignores object proofs it does not understand, and AFP's
+    only Mastodon touchpoint is directly-delivered Notes.
 28. **Agreement death vs in-flight work was unstated.** Ruled here, mirroring the hub
     availability gate: expiry and `afp:Defederate` stall *new* work at the boundary;
-    activities on an already-accepted `correlationId` flow until terminal outcome. Needs
-    spec text, and a gate mutation (a post-expiry Offer accepted = failure).
-29. **Completeness is single-domain; federation makes it per-trust-domain.** The
+    activities on an already-accepted `correlationId` flow until terminal outcome. Replay
+    checks compare three timestamps the record already carries: no cross-boundary Offer
+    `published` after the admitting agreement's expiry, and a late Result admissible only
+    against an Accept published in time. Collusive backdating buys nothing a colluding
+    pair could not get by co-signing a longer agreement — but the check deserves a
+    backstop that pays everywhere: **`published` non-decreasing along each actor's
+    `prevActivity` chain**, so chain position brackets any backdated timestamp. That
+    check is absent from the verifier today and benefits every timestamp-dependent rule,
+    not just this one.
+29a. **Completeness is single-domain; federation makes it per-trust-domain.** The
     verifier's completeness, chain and thread checks all assume one operator's total
     record. A federated replay needs: per-domain completeness (each export answers for
-    its own actors), cross-export reference resolution, and honest attribution of holes
-    to the domain that owns them. The largest verifier change since P1 — and the reason
-    to build the two-export replay *before* P5 multiplies what crosses the boundary.
+    its own actors), cross-export resolution (an activity Alpha holds as received must
+    match, byte for byte, the same activity in Bravo's export), holes attributed to the
+    domain that owns them — and one security rule the review surfaced as the crux:
+    **authority partitioned by `afp:operatedBy`**. Keys for a Bravo-operated actor are
+    believed only from Bravo's export, or one bundle can smuggle forged counterparty
+    actor documents and re-sign "received" activities. The co-signed agreement appears
+    in both exports and must be digest-equal. The largest verifier change since P1 —
+    and the reason to build the two-export replay *before* P5 multiplies the traffic.
+29b. **A scoped export and a tampered one currently share a signature.** Bravo's export
+    is engagement-scoped by right — its other clients are nobody's business — but
+    `afp:prevActivity` chains are contiguous by construction, so a lawfully-withheld
+    activity leaves the same hole a deleted one does: a chain starting mid-stream or
+    gapped, both of which the chain check calls tampering. Deliberate redaction needs a
+    record-level mechanism — candidate: **redaction stubs**, digest-only placeholders
+    that keep the chain linkable while withholding content — and the design must face
+    what a stub still reveals (that something existed) and still hides (everything
+    else). Split from 29a because it is a spec decision about the record, not a
+    verifier architecture question, and merging them would bury it.
 
-**Deferred on purpose:** whether `Accept{Follow}` seat evidence is subsumed by the
-FederationAgreement (ADR-0005's trigger) stays untriggered — nothing enrolled anywhere
-in this scenario, which is precisely its discipline. It fires in P5's scenario, where a
-shared hub exists to have seats.
+30. **Neither ingestion duty names the boundary as its site.** 04's
+    sandbox-untrusted-results duty (checksums, sniffing, size limits, isolated
+    execution) and finding 19's port-ingestion duty (evidence in, port's own summary
+    out) are both written — and beat 5 shows both applying to a subcontractor's Result,
+    with neither saying so. One paragraph siting them at the federated boundary, before
+    an implementer reads "boundary-ready" as "trust the attachment."
+
+
+**Deferred on purpose, and said so:** whether `Accept{Follow}` seat evidence is subsumed
+by the FederationAgreement (ADR-0005's trigger) stays untriggered — nothing enrolled
+anywhere in this scenario, which is precisely its discipline; it fires in P5's scenario,
+where a shared hub exists to have seats. Likewise cross-operator clock discipline and
+post-expiry supersession of pre-expiry work (both noted at beat 7): the first is
+accepted skew until P5 gives the record shared state to disagree about, the second is
+ADR-0007's own named trigger and belongs to it.
 
 **Where AFP is the wrong tool here, stated plainly.** A subcontract between two firms
 that already trust each other's invoices needs email and a PDF. The machinery earns its

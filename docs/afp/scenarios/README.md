@@ -18,7 +18,7 @@ protocol does; that review tested whether the build order still matched it.
 | [05](05-integration-practice.md) | The integration practice: domain intelligence as an internal service | Standing solo instance answering other teams' shape/size/effort asks, requester roles, cross-team asset reuse, settlement on requester-reported actuals | 3 |
 | [06](06-issue-triage-loop.md) | The issue triage loop: from bug tracker to reviewed fix | External system as initiator, untrusted third-party content entering the record, acting on your own classification, idempotent external writes, author/reviewer separation, supersession after review | 6 |
 | [07](07-the-retraction.md) | The retraction: revising an answer the world already acted on | Superseding a ratified Synthesis, the cost of overturning a quorum, dispositions for acted-on justifications | 0 (sharpened 24) |
-| [08](08-the-subcontract.md) | The subcontract: two operators, one boundary, no shared hub | The P4 handshake alone — adversarial probing of the gate, direct cross-boundary delegation, agreement expiry vs in-flight work, two-export replay | 5 |
+| [08](08-the-subcontract.md) | The subcontract: two operators, one boundary, no shared hub | The P4 handshake alone — adversarial probing of the gate, direct cross-boundary delegation, cross-boundary settlement, agreement expiry vs in-flight work, two-export replay | 7 |
 
 ## Findings ledger
 
@@ -102,15 +102,19 @@ closed.
 
 ### Campaign 5 — open
 
-Five findings from [scenario 08](08-the-subcontract.md), the P4 shakedown: the handshake
-exercised alone, with an adversarial prober and a two-export replay. Unresolved;
-candidates are the scenario's own suggestions. ADR-0008 (the P4 stack) is the expected
-landing ground for 25–28; 29 is verifier architecture.
+Seven findings from [scenario 08](08-the-subcontract.md), the P4 shakedown: the
+handshake exercised alone, with an adversarial prober and a two-export replay. The raw
+walkthrough surfaced five; the scenario's own review pass split one and added one, and
+its corrections are folded into the scenario's verdict. Unresolved; candidates are the
+scenario's own suggestions. ADR-0008 (the P4 stack) is the expected landing ground for
+25–28 and 30; 29a/29b are verifier and record architecture.
 
 | # | Finding | Candidate |
 |---|---|---|
 | 25 | The agreement's scope grammar is hub-shaped — the narrowest real federation (direct delegation, no hub) cannot state its own scope | Scope as a set of grants: hubs and/or capabilities-for-direct-delegation, the gate checking each activity against the grant that admits it |
-| 26 | Boundary rejection leaves no trace — a refused stranger and a silent wire are the same record | The admission-audit discipline (ADR-0003 D6, ADR-0006) applied at the boundary: the refusing instance logs what it refused and why, locally |
-| 27 | The roadmap's "LD-Signatures" row predates ADR-0001 and contradicts its canonicalization choice | Restate P4's obligation as HTTP Signatures for the hop plus the existing `eddsa-jcs-2022` object proofs — or argue concretely for more |
-| 28 | Agreement expiry vs in-flight work was unstated | As ruled in the scenario, mirroring the hub-availability gate: expiry stalls new work; an accepted `correlationId` flows to its terminal outcome |
-| 29 | Verifier completeness is single-domain | Per-trust-domain completeness, cross-export reference resolution, holes attributed to the domain that owns them — build the two-export replay before P5 multiplies the traffic |
+| 26 | Boundary rejection leaves no trace — a refused stranger and a silent wire are the same record | Local by necessity (no commitment point exists for a stranger — verifiable rejection is impossible in the negative), but stronger than a log: a hash-chained, instance-signed rejection record, exportable as an assertion |
+| 27 | "LD-Signatures" wording is pre-ADR-0001 drift — in the roadmap's P4 row and 01's tooling list; 04 already fuses the terms into the two-layer model | Wording cleanup plus ADR-0008 confirming `eddsa-jcs-2022` satisfies 04's relay obligation; no interop pressure forces RDF canonicalization |
+| 28 | Agreement expiry vs in-flight work was unstated | As ruled in the scenario: expiry stalls new work, an accepted `correlationId` flows to terminal outcome — plus the backstop that pays everywhere: `published` non-decreasing along each `prevActivity` chain |
+| 29a | Verifier completeness is single-domain | Per-trust-domain completeness, cross-export resolution, holes attributed to their domain — and authority **partitioned by `afp:operatedBy`**, so one bundle cannot smuggle forged counterparty actor documents |
+| 29b | A scoped export and a tampered one share a signature — lawful redaction gaps a `prevActivity` chain exactly as deletion does | A record-level redaction mechanism (digest-only stubs keeping the chain linkable), decided as spec, not patched in the verifier |
+| 30 | Neither ingestion duty names the federated boundary as its site — 04's untrusted-result sandbox and finding 19's port summary both apply to a subcontractor's Result, and neither says so | One paragraph siting both duties at the boundary, before "boundary-ready" gets read as "trust the attachment" |
