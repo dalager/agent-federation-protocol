@@ -151,3 +151,18 @@ story](08-the-subcontract-story.md) could only tell in soft focus. This document
 hard-focus baseline it will be measured against: when the federation build lands, the
 test is whether *its* Tuesday can be written like this one, with every noun pointing at
 a file.
+
+## Postscript: a Tuesday, three months later
+
+P4 landed, and Kasper's day changed in exactly one structural way: something *listens*
+now. The inbox — `POST /actor/inbox` on the same server `serve` always ran — is the
+first resident process in the stack's life, which means it is also the first thing that
+can page him; the no-daemon wart traded itself for an on-call wart, and he is not sure
+he got the better end. What he got in exchange is queryable: `fed_agreements` holds the
+one row that says who the practice federates with and until when, and after the week a
+stranger's validly-signed probes bounced off the gate, "were we probed" stopped being a
+feeling — `sqlite3 data/afp.db "SELECT at, actor, step, reason FROM fed_boundary_log"`
+answers it, each row hash-chained to the last so the log can't be quietly thinned. The
+probes themselves cost the stranger a 401 unsigned and a 403 signed, and cost Kasper
+nothing but the query. The two-bundle audit seam is still the soft part — that one is
+next.

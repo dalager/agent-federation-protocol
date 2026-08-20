@@ -111,8 +111,12 @@ its corrections are folded into the scenario's verdict. Findings 25–28 and 30 
 accepted and built (v3.16): grants, dual-Create activation, the hop's HTTP Signatures
 over the one payload suite, the hash-chained boundary log, expiry semantics with the
 global monotonicity backstop, and both ingestion duties enforced at the receiving port.
-**29a/29b stay open**: verifier and record architecture, deferred by that ADR to their
-own — the campaign closes when they land.
+**29a/29b have a proposed resolution** in
+[ADR-0009](../adr/0009-federated-replay.md) — federated replay as N single-export
+replays plus a cross-check, authority partitioned by `afp:operatedBy`, and redaction as
+an export-time transform emitting digest-only stubs, so discretion is declared and
+deletion is detected. They mark resolved, and the campaign closes, when it is accepted
+and built.
 
 | # | Finding | Candidate |
 |---|---|---|

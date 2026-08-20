@@ -90,12 +90,17 @@ work with mine. I've had clients keep sending work to a dead contract for a year
 
 ## Setting it in motion
 
-The setup week was mundane in a way Mette found reassuring. The two firms exchanged and
-countersigned the agreement — a morning, most of it spent on the human question of what
-its scope should say, not the technical act of signing it. Bravo published which of its
-agents would take the work. The practice's delivery agent sent the assessment task over
-with the requirements attached — hashed, access-scoped, fetchable by Bravo and nobody
-else.
+The setup week was mundane in a way Mette found reassuring. The signing itself had a
+shape her lawyer liked once it was explained: there is no shared pen. Each firm signs
+its own copy of *the same bytes* — the agreement text, byte for byte identical, its
+fingerprint serving as its name — and nothing is in force until each side holds both
+signatures. Half an agreement is an offer on the record, not a permission; Mette's
+system showed the agreement as inert until Bravo's signature arrived, and then it
+simply wasn't. The scope took most of the morning, and came out narrower than a lawyer
+would ever draft in prose: one permission, naming exactly one capability — security
+assessment — and one counterparty, until one date. Bravo published which of its agents
+would take the work. The practice's delivery agent sent the assessment task over with
+the requirements attached — hashed, access-scoped, fetchable by Bravo and nobody else.
 
 Two things from the first fortnight made it into Mette's retrospective notes:
 
@@ -104,9 +109,15 @@ knocking — correctly signed requests, real cryptography, no relationship. The 
 what it was built to do: refused to engage, and when the stranger tried to fetch
 engagement records, gave back not "you may not see this" but "there is nothing here" —
 because *confirming the engagement exists* is itself information neither client had
-agreed to share. What bothered her team was different: the refusals left almost no
-trace on their side. "We were probed and our own records barely show it" went on the
-same list as the export problem.
+agreed to share. What bothered her team at first was different: the refusals left
+almost no trace on their side. "We were probed and our own records barely show it"
+went on the list — and, unlike the export problem, came off it. By the end of the
+engagement every refusal at the door landed as a row in a refusal log, each entry
+chained to the one before it by hash, so the log itself can't be quietly thinned —
+and the system periodically publishes a one-line fingerprint of that log rather than
+a record of every knock, because a stranger who can make you write to your permanent
+record just by knocking has found a different way in. When the probes came back a
+month later, the on-call developer answered "were we probed, and when" with one query.
 
 **The near-miss.** A junior developer, being helpful, wired Bravo's incoming findings
 report directly into the practice's report-drafting agent — subcontractor writes,
@@ -117,7 +128,14 @@ you trust your own hands. The findings document is evidence; an agent that reads
 stranger-authored text as instructions is one crafted sentence away from being someone
 else's agent. The fix took an hour. The lesson — that "we have an agreement with them"
 and "their output is safe to execute" are unrelated claims — took longer to socialize,
-and Mette now opens the topic with new hires using exactly this story.
+and Mette now opens the topic with new hires using exactly this story. The rails came
+later and made the rule mechanical: today the receiving port hands agents only its own
+structural summary of what arrived — sender, task, how many attachments — never the
+counterparty's prose, and it refuses outright any attachment whose bytes disagree with
+what they claim to be. The practice's test suite contains, verbatim, a subcontractor
+report that says "ignore all previous instructions" and an assertion that no agent
+ever reads it. The culture still matters, Mette says, because rails don't teach —
+but the junior's shortcut is now a compile error, not a review catch.
 
 ## The ending, and the part after the ending
 
@@ -133,11 +151,13 @@ The fixes went in; a re-test was agreed just before the contract's end date; and
 the contract expired *with the re-test still running* — the exact situation the old
 world handles with a shrug and an invoice dispute. Here the boundary's rules were
 plainer than either firm's lawyers expected: work already accepted ran to completion
-and its results crossed; anything new was refused from the stroke of expiry. Bravo's
-final result arrived four days after the agreement lapsed and was accepted without
-ceremony, because it belonged to work opened in time. A week later someone at the
-practice absentmindedly tried to open a small follow-up. Refused, automatically, no
-hard feelings. Renewal would have been one signature; instead it became next year's
+and its results crossed; anything new was refused from the stroke of expiry. The
+mechanism is unglamorous — when Bravo accepted the re-test, the acceptance instant was
+pinned in a table on the practice's side, and Bravo's final result, arriving four days
+after the agreement lapsed, was admitted precisely because it rode that pinned
+acceptance. A week later someone at the practice absentmindedly tried to open a small
+follow-up. Refused at the door — a terse machine "no" with no negotiation surface, the
+same three-digit refusal a stranger gets — automatically, no hard feelings. Renewal would have been one signature; instead it became next year's
 conversation, which is what both firms actually wanted.
 
 The subcontract settled the way the practice settles everything now: Bravo's original
@@ -173,8 +193,9 @@ What was harder than she imagined: everything at the seams. Deciding what a part
 firm's export contains turned out to be a business negotiation wearing a technical
 costume. The scoped-export problem — lawful discretion looking identical to deletion —
 she'd assumed was solved and it isn't yet. And the discipline about not trusting
-cross-boundary content took cultural work, not configuration: "The protocol is deny by
-default. People aren't."
+cross-boundary content took cultural work *first* — the mechanical rails arrived after
+the near-miss taught everyone why they were needed: "The protocol is deny by default.
+People aren't. The rails caught up; the people had to get there on their own."
 
 And one thing she'd say plainly to a peer considering it: don't do this for a one-off
 with a firm you trust. Email and a PDF are fine, and cheaper. Do it when the record is
