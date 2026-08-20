@@ -15,6 +15,7 @@ import type { KeyObject } from "node:crypto";
 import type { JsonValue } from "../crypto/jcs.ts";
 import { loadOrCreateKeyPair, publicKeyFromMultibase, type KeyPair } from "../crypto/keys.ts";
 import { attachProof, digestOf, verifyProof } from "../crypto/proof.ts";
+import { instantMillis } from "../crypto/time.ts";
 import type { Db } from "../store/db.ts";
 import { Outbox, type OutboxEntry } from "../store/outbox.ts";
 import { DeliveryQueue, type Transport } from "../store/queue.ts";
@@ -25,12 +26,14 @@ import {
   freezeHub,
   offerProposal,
   type Envelope,
+  type HubRole,
   type Visibility,
 } from "./activities.ts";
-import { GSet, LWWRegister, ORMap, ORSet } from "./crdtAdapter.ts";
-import { CRDTStore } from "../crdt/index.ts";
-import { ensureHubSchema, saveRound, saveVoteReceipt, type RoundRow } from "./store.ts";
+import { LWWRegister, ORMap, ORMapLWW, ORSet } from "./crdtAdapter.ts";
+import { CRDTStore, type LWWState, type ORMapState, type ORSetState } from "../crdt/index.ts";
+import { ensureHubSchema, loadRound, saveRound, saveVoteReceipt, voteReceiptsFor, type RoundRow } from "./store.ts";
 import { Allocator } from "../allocation/allocator.ts";
+import { logAdmission } from "../allocation/store.ts";
 
 export { hubTransport } from "./transport.ts";
 
@@ -57,11 +60,6 @@ export interface HubDeps {
    */
   fetchActor: (actorId: string) => ActorDocument | null;
   now?: () => Date;
-}
-
-interface RoundState {
-  row: RoundRow;
-  votes: Map<string, { actor: string; value: string; digest: string }>;
 }
 
 interface LivenessValue {
@@ -95,8 +93,24 @@ export class Hub {
   private readonly membership = new ORSet<string>();
   private readonly capabilities = new ORMap<string, string>();
   private readonly liveness = new Map<string, LWWRegister<LivenessValue>>();
-  private readonly voteReceipts = new Map<string, GSet<string>>();
-  private readonly rounds = new Map<string, RoundState>();
+  /**
+   * Participation role per agent (ADR-0004 Decision 1): per-agent LWW over the
+   * Enroll trail — latest `published` wins, equal timestamps break by higher
+   * activity digest (the register's nodeId). Re-enrolling with a new role is
+   * the upgrade/downgrade path, on the record.
+   */
+  private readonly roles = new Map<string, LWWRegister<HubRole>>();
+  /**
+   * The asset registry (ADR-0004 Decision 2): a hub-scoped OR-Map
+   * `"assetId@version"` → asset record, fed by signed `Update{afp:Asset}`
+   * activities. One (id, version) is immutable once registered — enforced
+   * here at admission, before the CRDT ever sees a conflicting write.
+   */
+  private readonly assets = new ORMapLWW<string, { [key: string]: JsonValue }>();
+  // Rounds and vote receipts hold no in-memory state: every read goes through
+  // `loadRound`/`voteReceiptsFor` against SQLite, the same fully-stateless
+  // style as the allocator's award sweep — so a restart mid-round needs no
+  // rehydration step (ADR-0004, implementation parity note).
   private readonly seen = new Set<string>();
 
   private status: "active" | "frozen" | "archived" = "active";
@@ -120,9 +134,57 @@ export class Hub {
       actorId: this.actorId,
       db: this.db,
       members: () => this.members(),
+      roleOf: (agent) => this.roleOf(agent),
+      broadcastTargets: () => this.broadcastTargets(),
       now: () => this.now(),
       emit: (to, thread, visibility, build) => this.emit(to, thread, visibility, build),
     });
+
+    this.hydrate();
+  }
+
+  /**
+   * Come back from the store (ADR-0004's parity note: *the whole hub* comes
+   * back, not only its rounds).
+   *
+   * Every view below is written through to `CRDTStore` on each delta, so
+   * startup is a `SELECT` over persisted state, never a replay of the record.
+   * Without this the hub wakes with empty membership — which is not merely an
+   * availability problem: `onUpdateAsset` enforces `(id, version)`
+   * immutability against `this.assets`, so an amnesiac hub would silently
+   * admit a second, conflicting digest for an asset it had already
+   * registered, defeating Decision 2 across any restart.
+   */
+  private hydrate(): void {
+    for (const { crdtId, crdtType } of this.crdt.crdtIds(this.hubId)) {
+      const state = this.crdt.getState(this.hubId, crdtId);
+      if (!state) continue;
+
+      if (crdtId === "membership" && crdtType === "OR_SET") {
+        this.membership.restore(state as ORSetState);
+      } else if (crdtId === "capabilities" && crdtType === "OR_MAP") {
+        this.capabilities.restore(state as ORMapState);
+      } else if (crdtId === "assets" && crdtType === "OR_MAP") {
+        this.assets.restore(state as ORMapState);
+      } else if (crdtId.startsWith("liveness:") && crdtType === "LWW_REGISTER") {
+        const register = new LWWRegister<LivenessValue>();
+        register.restore(state as LWWState<LivenessValue>);
+        this.liveness.set(crdtId.slice("liveness:".length), register);
+      } else if (crdtId.startsWith("role:") && crdtType === "LWW_REGISTER") {
+        const register = new LWWRegister<HubRole>();
+        register.restore(state as LWWState<HubRole>);
+        this.roles.set(crdtId.slice("role:".length), register);
+      }
+    }
+
+    // Lifecycle is recorded, not stored: the hub's own outbox already carries
+    // its afp:Freeze/afp:Archive. Recovering it from there keeps `archived`
+    // genuinely terminal — a restart must not reopen a hub that closed.
+    for (const entry of this.outbox.byActor(this.actorId)) {
+      const type = String(entry.activity.type ?? "");
+      if (type === "afp:Freeze" && this.status === "active") this.status = "frozen";
+      else if (type === "afp:Archive") this.status = "archived";
+    }
   }
 
   actorDocument(): ActorDocument {
@@ -139,6 +201,21 @@ export class Hub {
 
   isLive(agent: string): boolean {
     return this.liveness.get(agent)?.getState()?.value.status === "live";
+  }
+
+  /** ADR-0004 Decision 1: an enrolled agent's role; `null` for the un-enrolled. */
+  roleOf(agent: string): HubRole | null {
+    if (!this.membership.getState().has(agent)) return null;
+    return this.roles.get(agent)?.getState()?.value ?? "member";
+  }
+
+  /**
+   * Role-aware broadcast list (ADR-0004): announces, awards and proposals go
+   * to members and observers; a requester receives only activities on threads
+   * it announced (the allocator adds the counterparty per auction).
+   */
+  broadcastTargets(): string[] {
+    return this.members().filter((agent) => this.roleOf(agent) !== "requester");
   }
 
   // ------------------------------------------------------------------ inbound
@@ -210,6 +287,17 @@ export class Hub {
     if (type === "afp:Enroll") return this.onEnroll(activity);
     if (type === "afp:Unenroll") return this.onUnenroll(activity);
     if (type === "Create" && objectType === "afp:Vote") return this.onVote(activity);
+    // ADR-0004 Decision 1: inbound Announce{afp:Task} is a first-class dispatch
+    // path — a requester's (or member's) signed Announce is admitted by role,
+    // re-fanned out by the hub, and the announcing actor becomes the
+    // settlement's counterparty. An observer cannot announce.
+    if (type === "Announce" && objectType === "afp:Task") return this.allocation.onAnnounce(activity);
+    // A requester reporting observed actuals onto its own thread — the write
+    // that settlement on requester-reported actuals depends on (scenario 05).
+    if (type === "Create" && objectType === "afp:Result") return this.allocation.onActualsReport(activity);
+    // ADR-0004 Decision 2: asset registration rides an ordinary signed
+    // Update{afp:Asset} — on the record, like enrollment, never a side channel.
+    if (type === "Update" && objectType === "afp:Asset") return this.onUpdateAsset(activity);
     // Allocation (ADR-0003 Decision 1): commits, reveals, declines and award
     // Accepts route to the allocator beside the hub. Each handler ignores
     // activities that reference no open auction of ours.
@@ -259,6 +347,19 @@ export class Hub {
       this.actorId,
       this.now(),
     );
+
+    // Role (ADR-0004 Decision 1): LWW over the Enroll trail — timestamp is the
+    // activity's own `published`, tie-break by higher activity digest.
+    const roleValue = String(activity["afp:role"] ?? "member") as HubRole;
+    const role = { value: roleValue, timestamp: instantMillis(activity.published), nodeId: digestOf(activity) };
+    const roleRegister = this.roles.get(agent) ?? new LWWRegister<HubRole>();
+    roleRegister.apply(role);
+    this.roles.set(agent, roleRegister);
+    this.crdt.apply(
+      { hub: this.hubId, crdtId: `role:${agent}`, crdtType: "LWW_REGISTER", delta: role },
+      origin,
+      this.now(),
+    );
   }
 
   private onUnenroll(activity: { [key: string]: JsonValue }): void {
@@ -278,6 +379,7 @@ export class Hub {
       this.now(),
     );
     this.liveness.delete(agent);
+    this.roles.delete(agent);
   }
 
   /**
@@ -288,35 +390,87 @@ export class Hub {
   private onVote(activity: { [key: string]: JsonValue }): void {
     const object = activity.object as Record<string, JsonValue>;
     const round = String(object["afp:round"] ?? "");
-    const state = this.rounds.get(round);
-    if (!state || state.row.status !== "open") return;
+    const row = loadRound(this.db, round);
+    if (!row || row.status !== "open") return;
 
     const actor = String(activity.actor ?? "");
-    if (!state.row.voters.includes(actor)) return; // outside the pinned snapshot — dropped, not tallied
+    if (!row.voters.includes(actor)) return; // outside the pinned snapshot — dropped, not tallied
 
     // A vote must commit to the exact proposal and pinned snapshot it answers:
     // a mismatched afp:proposalHash is a ballot for a different question, and a
     // mismatched afp:quorumSnapshot is a ballot under a different electorate.
     // Both are dropped, not tallied — same treatment as an out-of-snapshot voter.
-    if (String(object["afp:proposalHash"] ?? "") !== state.row.proposalHash) return;
-    if (String(object["afp:quorumSnapshot"] ?? "") !== state.row.quorumSnapshot) return;
+    if (String(object["afp:proposalHash"] ?? "") !== row.proposalHash) return;
+    if (String(object["afp:quorumSnapshot"] ?? "") !== row.quorumSnapshot) return;
 
     const digest = digestOf(activity);
     const value = String(object.value ?? "");
-    state.votes.set(actor, { actor, value, digest });
 
-    let receipts = this.voteReceipts.get(round);
-    if (!receipts) {
-      receipts = new GSet<string>();
-      this.voteReceipts.set(round, receipts);
-    }
-    receipts.apply({ key: actor, value: digest });
     this.crdt.apply(
       { hub: this.hubId, crdtId: `receipts:${round}`, crdtType: "G_SET", delta: { adds: [{ key: actor, value: digest }] } },
       actor,
       this.now(),
     );
     saveVoteReceipt(this.db, round, actor, digest, value);
+  }
+
+  /**
+   * `Update{afp:Asset}` (ADR-0004 Decision 2): any member may register;
+   * `attributedTo` names the steward and the activity's signature is the
+   * accountability. A second Update naming the same (id, version) with a
+   * different digest is rejected — an asset that mutated under its own
+   * version is a claim nothing can resolve. A new version is a new entry.
+   */
+  private onUpdateAsset(activity: { [key: string]: JsonValue }): void {
+    if (this.status !== "active") return;
+    const object = activity.object as { [key: string]: JsonValue };
+    const assetId = String(object.id ?? "");
+    const version = String(object["afp:version"] ?? "");
+    const digest = String(object["afp:digest"] ?? "");
+    const actor = String(activity.actor ?? "");
+    const reject = (reason: string) =>
+      logAdmission(this.db, this.now().toISOString(), assetId, actor, "rejected", reason);
+
+    if (!assetId || !version || !digest) return reject("afp:Asset without id, afp:version or afp:digest");
+    if (this.roleOf(actor) !== "member") {
+      return reject(`asset registration from role ${this.roleOf(actor) ?? "non-enrolled"} — only members register assets (ADR-0004)`);
+    }
+
+    const key = `${assetId}@${version}`;
+    const existing = this.assets.get(key);
+    if (existing && String(existing["afp:digest"]) !== digest) {
+      return reject(
+        `asset ${assetId} version ${version} is immutable once registered (held digest ${String(existing["afp:digest"])}, offered ${digest})`,
+      );
+    }
+
+    const delta = {
+      key,
+      value: { ...object },
+      timestamp: instantMillis(activity.published),
+      nodeId: digestOf(activity),
+    };
+    this.assets.apply(delta);
+    this.crdt.apply(
+      {
+        hub: this.hubId,
+        crdtId: "assets",
+        crdtType: "OR_MAP",
+        delta: { key, fieldType: "LWW_REGISTER", value: delta.value, timestamp: delta.timestamp, nodeId: delta.nodeId },
+      },
+      actor,
+      this.now(),
+    );
+  }
+
+  /** The registered record for one (assetId, version), or null. */
+  assetOf(assetId: string, version: string): { [key: string]: JsonValue } | null {
+    return this.assets.get(`${assetId}@${version}`);
+  }
+
+  /** The whole registry — "assetId@version" → asset record. */
+  assetRegistry(): Map<string, { [key: string]: JsonValue }> {
+    return this.assets.getState();
   }
 
   /** Per-actor delta counts for one hub-scoped store — ADR-0002 Decision 5's P5 seam. */
@@ -366,7 +520,12 @@ export class Hub {
     if (this.status !== "active") {
       throw new Error(`hub is ${this.status} — no new rounds (afp:${this.status === "frozen" ? "Freeze" : "Archive"})`);
     }
-    const voters = [...(options.voters ?? this.members())].filter((agent) => this.isLive(agent));
+    // Snapshot-pinning (ADR-0004 Decision 1): only member-role agents are ever
+    // pinned into afp:voters — a requester or observer can never appear in a
+    // quorum snapshot, and a verifier can prove it from the Enroll trail.
+    const voters = [...(options.voters ?? this.members())].filter(
+      (agent) => this.isLive(agent) && this.roleOf(agent) === "member",
+    );
     const weights: Record<string, number> = {};
     for (const voter of voters) weights[voter] = 1.0; // liveness-gated uniform weight
 
@@ -398,7 +557,6 @@ export class Hub {
       proposalHash: digestOf(entry.activity),
       status: "open",
     };
-    this.rounds.set(options.round, { row, votes: new Map() });
     saveRound(this.db, row, this.now().toISOString());
 
     return entry;
@@ -415,40 +573,42 @@ export class Hub {
    */
   closeRound(round: string): OutboxEntry {
     if (this.status === "archived") throw new Error("hub is archived — terminal, read-only (afp:Archive)");
-    const state = this.rounds.get(round);
-    if (!state) throw new Error(`unknown round ${round}`);
+    const row = loadRound(this.db, round);
+    if (!row) throw new Error(`unknown round ${round}`);
 
-    const tally = this.tally(state);
+    const votes = this.roundVotes(round);
+    const tally = this.tally(row, votes);
     const outcome = Object.entries(tally).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "abstain";
-    const countedVotes = [...state.votes.values()].map((vote) => vote.digest);
+    const countedVotes = votes.map((vote) => vote.digest);
 
-    const entry = this.emit(state.row.voters, state.row.thread, "hub", (envelope) =>
+    const entry = this.emit(row.voters, row.thread, "hub", (envelope) =>
       decisionRecord(envelope, {
         recordId: `${this.actorId}/rounds/${round}/decision`,
         hub: this.actorId,
         round,
         outcome,
-        quorumSnapshot: state.row.quorumSnapshot,
+        quorumSnapshot: row.quorumSnapshot,
         countedVotes,
         weightTally: tally,
       }),
     );
 
-    state.row.status = "closed";
-    saveRound(this.db, state.row, this.now().toISOString());
+    row.status = "closed";
+    saveRound(this.db, row, this.now().toISOString());
     return entry;
   }
 
   /** Recompute the tally the way any third-party verifier must: from the counted votes alone. */
-  tally(state: RoundState): Record<string, number> {
+  tally(row: RoundRow, votes: readonly { actor: string; value: string; digest: string }[]): Record<string, number> {
     const totals: Record<string, number> = {};
-    for (const option of state.row.options) totals[option] = 0;
+    for (const option of row.options) totals[option] = 0;
     totals.abstain = 0;
 
-    for (const voter of state.row.voters) {
-      const weight = state.row.weights[voter] ?? 0;
-      const vote = state.votes.get(voter);
-      const value = vote && state.row.options.includes(vote.value) ? vote.value : "abstain";
+    const byActor = new Map(votes.map((vote) => [vote.actor, vote]));
+    for (const voter of row.voters) {
+      const weight = row.weights[voter] ?? 0;
+      const vote = byActor.get(voter);
+      const value = vote && row.options.includes(vote.value) ? vote.value : "abstain";
       totals[value] = (totals[value] ?? 0) + weight;
     }
     return totals;
@@ -456,11 +616,11 @@ export class Hub {
 
   /** Read-only view for tests/verifiers wanting to recompute independently. */
   roundVotes(round: string): { actor: string; value: string; digest: string }[] {
-    return [...(this.rounds.get(round)?.votes.values() ?? [])];
+    return voteReceiptsFor(this.db, round).map(({ actor, voteDigest, value }) => ({ actor, value, digest: voteDigest }));
   }
 
   roundVoters(round: string): string[] {
-    return [...(this.rounds.get(round)?.row.voters ?? [])];
+    return loadRound(this.db, round)?.voters ?? [];
   }
 
   /** `afp:Freeze` — suspend new work; existing rounds may still close. */

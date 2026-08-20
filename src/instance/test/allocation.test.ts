@@ -14,6 +14,7 @@ import { after, describe, it } from "node:test";
 
 import { runP3Demo, jumpClock } from "../src/demoP3.ts";
 import { runRule, tieBreak, latencySeconds, type RevealedBid } from "../src/allocation/rules.ts";
+import { runReputationRule, type PinnedSettlement } from "../src/allocation/reputation.ts";
 import { bidPayload, commitmentOf } from "../src/allocation/activities.ts";
 import { Allocator, type AllocatorHub } from "../src/allocation/allocator.ts";
 import { openDb } from "../src/store/db.ts";
@@ -42,6 +43,8 @@ function fakeHub(members: string[]) {
     actorId: "https://hub.test/actor",
     db: openDb(join(mkdtempSync(join(tmpdir(), "afp-alloc-")), "alloc.db")),
     members: () => members,
+    roleOf: (agent) => (members.includes(agent) ? "member" : null),
+    broadcastTargets: () => members,
     now: () => new Date((t += 1000)),
     emit: (to, thread, visibility, build) => {
       const activity = build({
@@ -326,5 +329,96 @@ describe("P3 acceptance gate: the auction replays end to end", () => {
     assert.match(withForeignEvidence.output, /FAIL \] award: .*winningBids are the recomputed winners/i);
 
     instance.close();
+  });
+});
+
+// ADR-0004 Decision 3: the divergence-decay derivation — exact rational
+// arithmetic, unit-mismatch skipping, neutral prior, dissent bonus. The same
+// hand-computed expectations are asserted against the Python implementation
+// (reputation.py) — the two must agree bit-for-bit.
+describe("divergence-decay reputation (ADR-0004)", () => {
+  const settlement = (
+    digest: string,
+    published: string,
+    entries: { actor: string; est: unknown; act: unknown }[],
+    vindicated: string[] = [],
+  ): PinnedSettlement => ({
+    digest,
+    published,
+    object: {
+      type: "afp:Settlement",
+      "afp:settles": entries.map((e) => ({
+        actor: e.actor,
+        "afp:estimated": { "afp:estimatedCost": e.est },
+        "afp:actual": e.act,
+      })) as never,
+      ...(vindicated.length ? { "afp:dissentVindicated": vindicated } : {}),
+    },
+  });
+
+  const RULE = { name: "divergence-decay", params: {} };
+  const S1 = settlement("sha256:s1", "2026-01-01T00:00:00Z", [
+    { actor: "X", est: { unit: "EUR", value: 100 }, act: { unit: "EUR", value: 150 } },
+  ]);
+  const S2 = settlement(
+    "sha256:s2",
+    "2026-01-02T00:00:00Z",
+    [{ actor: "X", est: { unit: "EUR", value: 100 }, act: { unit: "EUR", value: 110 } }],
+    ["Z"],
+  );
+
+  it("computes the hand-checked rational: (50·1 + 90·2) / 3 = 76", () => {
+    assert.equal(runReputationRule(RULE, [S1, S2], "X"), 76);
+  });
+
+  it("gives a neutral prior of exactly 50 to a bidder with no history", () => {
+    assert.equal(runReputationRule(RULE, [S1, S2], "Y"), 50);
+  });
+
+  it("credits vindicated dissent with full accuracy", () => {
+    assert.equal(runReputationRule(RULE, [S1, S2], "Z"), 100);
+  });
+
+  it("skips a unit-mismatched entry — never guessed at", () => {
+    const S3 = settlement("sha256:s3", "2026-01-03T00:00:00Z", [
+      { actor: "X", est: { unit: "EUR", value: 100 }, act: { unit: "USD", value: 100 } },
+    ]);
+    assert.equal(runReputationRule(RULE, [S1, S2, S3], "X"), 76, "the mismatched entry contributes nothing");
+  });
+
+  it("orders recency by published, ties by digest — a swapped order changes the score", () => {
+    const tieA = settlement("sha256:aaa", "2026-01-01T00:00:00Z", [
+      { actor: "X", est: { unit: "EUR", value: 100 }, act: { unit: "EUR", value: 200 } }, // a=0
+    ]);
+    const tieB = settlement("sha256:bbb", "2026-01-01T00:00:00Z", [
+      { actor: "X", est: { unit: "EUR", value: 100 }, act: { unit: "EUR", value: 100 } }, // a=100
+    ]);
+    // bbb is newer by digest tie-break: (0·1 + 100·2)/3 = 66 either way the
+    // list is passed in — ordering is the protocol constant, not input order.
+    assert.equal(runReputationRule(RULE, [tieA, tieB], "X"), runReputationRule(RULE, [tieB, tieA], "X"));
+    assert.equal(runReputationRule(RULE, [tieA, tieB], "X"), 66);
+  });
+
+  it("throws on an unknown derivation name — never silently skips", () => {
+    assert.throws(() => runReputationRule({ name: "vibes", params: {} }, [S1], "X"), /unknown reputation rule/);
+  });
+
+  it("feeds the ranking rule's optional reputation weight", () => {
+    const bids: RevealedBid[] = [
+      { bidder: "X", digest: "sha256:bx", capabilityMatch: 50, estimatedCostValue: 0, estimatedLatencySeconds: 0, coverage: {}, reputation: 76 },
+      { bidder: "Y", digest: "sha256:by", capabilityMatch: 60, estimatedCostValue: 0, estimatedLatencySeconds: 0, coverage: {}, reputation: 50 },
+    ];
+    const withRep = runRule(
+      { name: "ranking", params: { weights: { capabilityMatch: 1, reputation: 1 } } as never },
+      "urn:afp:task:rep",
+      bids,
+    );
+    assert.deepEqual(withRep?.performers, ["X"], "126 beats 110 once standing counts");
+    const withoutRep = runRule(
+      { name: "ranking", params: { weights: { capabilityMatch: 1 } } as never },
+      "urn:afp:task:rep",
+      bids,
+    );
+    assert.deepEqual(withoutRep?.performers, ["Y"], "without the weight, raw capabilityMatch decides");
   });
 });

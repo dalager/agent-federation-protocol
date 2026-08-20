@@ -20,12 +20,15 @@ import {
   type AnnounceSpec,
 } from "./activities.ts";
 import { knownRule, latencySeconds, runRule, type RevealedBid, type Selection, type SelectionRule } from "./rules.ts";
+import { knownReputationRule, runReputationRule, type PinnedSettlement } from "./reputation.ts";
 import {
   admissionLog,
+  auctionByThread,
   bidsFor,
   declinesFor,
   deletePendingAccept,
   ensureAllocSchema,
+  hasSettlementRecord,
   loadAuction,
   logAdmission,
   pendingAccepts,
@@ -35,6 +38,9 @@ import {
   savePendingAccept,
   saveReveal,
   saveSettlement,
+  saveSettlementRecord,
+  settlementRecordsBefore,
+  settlementRecordsByDigest,
   type AuctionRow,
   type BidRow,
 } from "./store.ts";
@@ -45,6 +51,10 @@ export interface AllocatorHub {
   actorId: string;
   db: Db;
   members(): string[];
+  /** ADR-0004 Decision 1: an enrolled agent's role; `null` for the un-enrolled. */
+  roleOf(agent: string): "member" | "requester" | "observer" | null;
+  /** Role-aware broadcast list — members and observers; requesters get their own threads only. */
+  broadcastTargets(): string[];
   now(): Date;
   emit(
     to: readonly string[],
@@ -80,12 +90,46 @@ export class Allocator {
 
   // ----------------------------------------------------------------- announce
 
-  /** Broadcast `Announce{afp:Task}` to every enrolled member and open the auction. */
-  announce(spec: AnnounceSpec & { thread: string }): OutboxEntry {
+  /** Fan-out for one auction: members and observers, plus the requester counterparty on its own thread (ADR-0004). */
+  private recipients(auction: Pick<AuctionRow, "requester">): string[] {
+    const targets = this.hub.broadcastTargets();
+    if (auction.requester && !targets.includes(auction.requester)) targets.push(auction.requester);
+    return targets;
+  }
+
+  /** Broadcast `Announce{afp:Task}` to members and observers and open the auction. */
+  announce(spec: AnnounceSpec & { thread: string; requester?: string }): OutboxEntry {
     if (!knownRule(spec.selectionRule.name)) {
       throw new Error(`selection rule ${spec.selectionRule.name} is not in the registry`);
     }
-    const entry = this.hub.emit(this.hub.members(), spec.thread, "hub", (envelope) => announceTask(envelope, spec));
+    // ADR-0004 Decision 3: reputation consumption is opt-in and pinned whole.
+    // A rule without its snapshot — or a reputation weight without a rule —
+    // would be a live number inside a recomputable Award; both are refused.
+    const weights = (spec.selectionRule.params.weights ?? {}) as Record<string, JsonValue>;
+    if (!spec.reputationRule && typeof weights.reputation === "number" && weights.reputation !== 0) {
+      throw new Error("weights.reputation without a pinned afp:reputationRule — no rule, no reputation input");
+    }
+    let snapshot: string[] | null = null;
+    if (spec.reputationRule) {
+      if (!knownReputationRule(spec.reputationRule.name)) {
+        throw new Error(`reputation rule ${spec.reputationRule.name} is not in the registry`);
+      }
+      // The snapshot is exhaustive, not curated: every settlement of this hub
+      // published before the announce, in (published, digest) order.
+      snapshot = settlementRecordsBefore(this.hub.db, this.hub.now().toISOString()).map((r) => r.digest);
+      spec = { ...spec, settlementSnapshot: snapshot };
+    }
+    // One auction per thread (H9). The counterparty check that authorizes an
+    // actuals report resolves the auction *by thread*, so two auctions sharing
+    // one would let a report settle the wrong task.
+    const onThread = auctionByThread(this.hub.db, spec.thread);
+    if (onThread && onThread.taskId !== spec.taskId) {
+      throw new Error(`thread ${spec.thread} already hosts auction ${onThread.taskId} — one auction per thread`);
+    }
+    const requester = spec.requester ?? null;
+    const entry = this.hub.emit(this.recipients({ requester }), spec.thread, "hub", (envelope) =>
+      announceTask(envelope, spec),
+    );
     saveAuction(this.hub.db, {
       taskId: spec.taskId,
       hubId: this.hub.hubId,
@@ -99,8 +143,109 @@ export class Allocator {
       answerSufficiency: { ...spec.answerSufficiency },
       status: "bidding",
       award: null,
+      requester,
+      reputationRule: spec.reputationRule ?? null,
+      settlementSnapshot: snapshot,
     });
     return entry;
+  }
+
+  /**
+   * Inbound `Announce{afp:Task}` (ADR-0004 Decision 1): a requester's (or
+   * member's) signed Announce is admitted by role, re-fanned out by the hub,
+   * and the announcing actor becomes the settlement's counterparty. An
+   * observer (or non-enrolled actor) cannot announce — rejected, audit-logged.
+   */
+  onAnnounce(activity: { [key: string]: JsonValue }): void {
+    const object = activity.object as { [key: string]: JsonValue } | undefined;
+    if (!object || typeof object !== "object") return;
+    const taskId = String(object.id ?? "");
+    const actor = String(activity.actor ?? "");
+    const reject = (reason: string) =>
+      logAdmission(this.hub.db, this.hub.now().toISOString(), taskId, actor, "rejected", reason);
+
+    const role = this.hub.roleOf(actor);
+    if (role !== "member" && role !== "requester") {
+      return reject(`announce from role ${role ?? "non-enrolled"} — only member or requester may announce (afp:role)`);
+    }
+    if (loadAuction(this.hub.db, taskId)) return reject("announce names an already-open auction");
+    const thread = String(activity.context ?? "");
+    const onThread = auctionByThread(this.hub.db, thread);
+    if (onThread) {
+      return reject(`thread ${thread} already hosts auction ${onThread.taskId} — one auction per thread`);
+    }
+
+    const rule = object["afp:selectionRule"] as { name?: string; params?: { [key: string]: JsonValue } } | undefined;
+    const repRule = object["afp:reputationRule"] as { name?: string; params?: { [key: string]: JsonValue } } | undefined;
+    const window = object["afp:bidWindow"] as { opens?: string; closes?: string } | undefined;
+    if (!rule?.name || !knownRule(String(rule.name))) {
+      return reject(`announce names no registered selection rule (${String(rule?.name ?? "none")})`);
+    }
+    if (!window?.opens || !window?.closes) return reject("announce carries no afp:bidWindow");
+    // A window must be able to admit a bid: inverted or already-closed, no
+    // commit can ever land inside it and the auction is dead on arrival (H12).
+    if (String(window.opens) >= String(window.closes)) {
+      return reject(`afp:bidWindow opens ${window.opens} at or after it closes ${window.closes}`);
+    }
+    if (String(window.closes) <= this.hub.now().toISOString()) {
+      return reject(`afp:bidWindow closed at ${window.closes}, before the announce was admitted`);
+    }
+
+    this.announce({
+      taskId,
+      hub: this.hub.actorId,
+      capability: String(object["afp:capability"] ?? ""),
+      content: String(object.content ?? ""),
+      correlationId: String(object["afp:correlationId"] ?? ""),
+      bidWindow: { opens: String(window.opens), closes: String(window.closes) },
+      selectionRule: { name: String(rule.name), params: { ...(rule.params ?? {}) } },
+      answerSufficiency: { ...((object["afp:answerSufficiency"] as { [key: string]: JsonValue }) ?? {}) },
+      estimatorPolicy: object["afp:estimatorPolicy"] === "permit-and-record" ? "permit-and-record" : "exclude",
+      estimators: Array.isArray(object["afp:estimators"]) ? (object["afp:estimators"] as JsonValue[]).map(String) : [],
+      thread,
+      requester: actor,
+      // The hub re-pins its own exhaustive snapshot at re-announce time.
+      reputationRule: repRule?.name ? { name: String(repRule.name), params: { ...(repRule.params ?? {}) } } : undefined,
+    });
+  }
+
+  /**
+   * A requester's `Create{afp:Result}` carrying `afp:actuals` onto its own
+   * thread (ADR-0004, scenario 05 step 5): settlement on requester-reported
+   * actuals. Only the auction's recorded counterparty may report.
+   */
+  onActualsReport(activity: { [key: string]: JsonValue }): void {
+    const object = activity.object as { [key: string]: JsonValue } | undefined;
+    if (!object || typeof object !== "object") return;
+    const actuals = object["afp:actuals"] as { [key: string]: JsonValue } | undefined;
+    if (!actuals || typeof actuals !== "object") return; // an ordinary Result, not an actuals report
+
+    const actor = String(activity.actor ?? "");
+    const thread = String(activity.context ?? "");
+    const auction = auctionByThread(this.hub.db, thread);
+    const reject = (reason: string) =>
+      logAdmission(this.hub.db, this.hub.now().toISOString(), auction?.taskId ?? thread, actor, "rejected", reason);
+
+    if (!auction) return reject("actuals report on a thread with no auction");
+    if (auction.requester !== actor) {
+      return reject("actuals report from an actor that is not this auction's announcing counterparty");
+    }
+    // Actuals settle an award. Reporting before one exists would put a
+    // settlement on the record for work nobody was awarded, and reporting
+    // twice would let the counterparty publish several conflicting "what
+    // actually happened" claims — each a fresh signed Settlement that
+    // `settlementRecordsBefore` then sweeps, exhaustively, into every later
+    // announce's reputation snapshot (ADR-0004 Decision 3).
+    if (auction.status !== "awarded") {
+      return reject(`actuals report for an auction in status '${auction.status}' — settlement follows an award`);
+    }
+    if (hasSettlementRecord(this.hub.db, auction.taskId)) {
+      return reject("actuals already reported for this task — settlement is once per task");
+    }
+    const dissent = Array.isArray(object["afp:dissentVindicated"])
+      ? (object["afp:dissentVindicated"] as JsonValue[]).map(String)
+      : [];
+    this.settle(auction.taskId, actuals, dissent);
   }
 
   // ---------------------------------------------------------------- admission
@@ -122,6 +267,11 @@ export class Allocator {
 
     if (!auction || auction.status !== "bidding") return reject("no open auction for this task");
     if (!this.hub.members().includes(actor)) return reject("bidder is not enrolled in this hub");
+    // ADR-0004 Decision 1: a commit from a non-member role is rejected and
+    // audit-logged, same lane as the estimator wall.
+    if (this.hub.roleOf(actor) !== "member") {
+      return reject(`bidder role is ${this.hub.roleOf(actor)} — only member-role agents may bid (afp:role)`);
+    }
     if (published < auction.windowOpens || published >= auction.windowCloses) {
       return reject(`commit published ${published} outside bid window [${auction.windowOpens}, ${auction.windowCloses})`);
     }
@@ -241,7 +391,27 @@ export class Allocator {
   ): OutboxEntry | null {
     const auction = loadAuction(this.hub.db, taskId);
     if (!auction) throw new Error(`unknown auction ${taskId}`);
-    const bids = this.revealedBids(taskId).filter((bid) => !exclude.includes(bid.bidder));
+    let bids = this.revealedBids(taskId).filter((bid) => !exclude.includes(bid.bidder));
+    // ADR-0004 Decision 3: when the announce pinned a reputation rule, resolve
+    // its settlement snapshot (every digest must resolve — an unresolvable
+    // pinned settlement is a hard error, not a skip) and feed each bidder's
+    // recomputed score into the selection rule.
+    if (auction.reputationRule) {
+      const resolved = settlementRecordsByDigest(this.hub.db, auction.settlementSnapshot ?? []);
+      const missing = (auction.settlementSnapshot ?? []).filter((_, i) => resolved[i] === null);
+      if (missing.length) {
+        throw new Error(`pinned settlement snapshot digests do not resolve: ${missing.join(", ")}`);
+      }
+      const settlements: PinnedSettlement[] = resolved.map((r) => ({
+        object: r!.object,
+        published: r!.published,
+        digest: r!.digest,
+      }));
+      bids = bids.map((bid) => ({
+        ...bid,
+        reputation: runReputationRule(auction.reputationRule!, settlements, bid.bidder),
+      }));
+    }
     const selection = runRule(auction.rule, taskId, bids);
     const insufficient = selection && this.meetsSufficiency(auction, selection, bids);
     if (!selection || insufficient) {
@@ -262,7 +432,7 @@ export class Allocator {
     priorAward?: string,
   ): OutboxEntry {
     const awardId = `${this.hub.actorId}/awards/${auction.correlationId}${priorAward ? "-reauction" : ""}`;
-    const entry = this.hub.emit(this.hub.members(), auction.thread, "hub", (envelope) =>
+    const entry = this.hub.emit(this.recipients(auction), auction.thread, "hub", (envelope) =>
       award(envelope, {
         awardId,
         task: auction.taskId,
@@ -305,7 +475,7 @@ export class Allocator {
       const auction = loadAuction(this.hub.db, pending.taskId)!;
 
       emitted.push(
-        this.hub.emit(this.hub.members(), auction.thread, "hub", (envelope) =>
+        this.hub.emit(this.recipients(auction), auction.thread, "hub", (envelope) =>
           reauction(envelope, {
             task: pending.taskId,
             hub: this.hub.actorId,
@@ -340,6 +510,15 @@ export class Allocator {
   ): OutboxEntry {
     const auction = loadAuction(this.hub.db, taskId);
     if (!auction) throw new Error(`unknown auction ${taskId}`);
+    // The same two invariants the inbound path enforces, held here too: a
+    // programmatic caller must not be able to publish a settlement the
+    // record cannot justify, or a second one that competes with the first.
+    if (auction.status !== "awarded") {
+      throw new Error(`cannot settle auction ${taskId} in status '${auction.status}' — settlement follows an award`);
+    }
+    if (hasSettlementRecord(this.hub.db, taskId)) {
+      throw new Error(`auction ${taskId} is already settled — settlement is once per task`);
+    }
     const now = this.hub.now().toISOString();
 
     const entries = bidsFor(this.hub.db, taskId)
@@ -353,7 +532,7 @@ export class Allocator {
         return { actor: bid.bidder, bid: bid.revealDigest!, estimated, actual: actuals[bid.bidder] };
       });
 
-    return this.hub.emit(this.hub.members(), auction.thread, "hub", (envelope) =>
+    const entry = this.hub.emit(this.recipients(auction), auction.thread, "hub", (envelope) =>
       settlement(envelope, {
         settlementId: `${this.hub.actorId}/settlements/${auction.correlationId}`,
         task: taskId,
@@ -363,6 +542,15 @@ export class Allocator {
         dissentVindicated,
       }),
     );
+    // ADR-0004 Decision 3: record the emitted Settlement by its digest so a
+    // later announce can pin it (exhaustively) and an award can resolve it.
+    saveSettlementRecord(this.hub.db, {
+      digest: digestOf(entry.activity),
+      taskId,
+      published: String(entry.activity.published ?? now),
+      object: entry.activity.object as { [key: string]: JsonValue },
+    });
+    return entry;
   }
 
   /** Digest helper for callers binding Results into a Synthesis. */

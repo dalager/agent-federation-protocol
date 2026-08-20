@@ -213,6 +213,55 @@ somebody else's problem.
 | Settlement snapshots grow past comfortable announce size | The rollup object noted above |
 | Cross-hub asset reference at P5 | Whether the registry needs a resolution protocol beyond digest equality |
 
+## Build status
+
+The three decisions are built and gated; what follows tracks the work to completion,
+including the defects the build's own review surfaced. Task IDs are stable — cite them in
+commits and follow-up ADRs.
+
+**Done**
+
+| ID | Task | Where |
+|---|---|---|
+| **H1** | Decision 1 — roles on enrollment, enforced at snapshot-pinning, bid admission and fan-out; inbound `Announce{afp:Task}` and requester actuals as first-class dispatch paths | `hub/hub.ts`, `allocation/allocator.ts`; verifier `decision.py`, `allocation.py` |
+| **H2** | Decision 2 — `afp:Asset` registry: OR-Map with LWW-valued fields, `(id, version)` immutability at admission, member-only registration, `afp:reuses`/`afp:reused` resolution | `crdt/ormap.ts`, `hub/crdtAdapter.ts`, `hub/hub.ts`; verifier `asset.py` |
+| **H3** | Decision 3 — `divergence-decay`, pinned `afp:reputationRule` + exhaustive `afp:settlementSnapshot`, optional `reputation` weight on `ranking` | `allocation/reputation.ts`; verifier `reputation.py` |
+| **H4** | Decision 4 — the port-boundary paragraph | [06](../06-deployment-profiles.md#where-visibility-ends-the-port-boundary) |
+| **H5** | Parity note — the whole hub comes back from its store: rounds read through SQLite, and membership, capabilities, liveness, roles, assets and lifecycle rehydrate on construction | `hub/hub.ts` `hydrate()`, `crdt/store.ts` `crdtIds()` |
+| **H6** | Settlement follows an award, once per task — the inbound path and the programmatic one both refuse otherwise | `allocation/allocator.ts` |
+| **H7** | Writer/verifier parity restored on wire-value interpretation: integer-valued floats, `published` instants, `afp:dissentVindicated` typing, malformed `afp:settles` entries | `crypto/time.ts` ↔ `decision.py` `instant_millis`; `test/parity.test.ts` |
+| **H8** | The governing Announce must be hub-authored, and exactly one — a replay no longer falls back to whichever candidate came first, nor proceeds when two sets of terms exist | `allocation.py` `check_award` |
+| **H9** | One auction per thread, enforced at announce; the by-thread lookup refuses to guess when a thread is ambiguous rather than settling an arbitrary row | `allocation/allocator.ts`, `allocation/store.ts` |
+| **H10** | One immutability verdict per asset key — the passing record no longer derives from the same first-write-wins data as the failing one | `asset.py` |
+| **H11** | Vote receipts come back ordered, so `afp:countedVotes` is stable across runs and stores | `hub/store.ts` |
+| **H12** | An announced bid window must be able to admit a bid: `opens < closes`, and not already closed | `allocation/allocator.ts` `onAnnounce` |
+| **H13** | The `ALTER TABLE` guard swallows only the already-applied case | `allocation/store.ts` |
+
+**Deferred to its own ADR**
+
+| ID | Task | Why separate |
+|---|---|---|
+| **H14** | Constrain who may issue an `afp:Enroll` for a hub | The trail is trusted by issuer today, so a rostered agent can self-promote. The hole predates this ADR — `enrolled_members` had the identical model — but Decisions 1–3 now hang bid admission, announce authority, asset registration and quorum pinning off it, so the blast radius is materially larger. Fixing it is an authority decision, not a hardening detail |
+
+**A note on the parity work (H7).** Four of the defects this build's review found were the
+same shape, and none were algorithmic: the two implementations disagreed about how to
+*read a value off the wire*. `100.0` is a legal JSON number that the JCS profile accepts
+and canonicalizes to `100` — usable to one side, skipped by the other. `published`
+compared as a string orders a negative UTC offset before a `Z` that it actually follows,
+and makes two spellings of one instant untie. A membership test against a string is a
+substring search in one language and a type error in the other. A malformed entry that
+one side steps over crashes the other, and a crash is a divergence too.
+
+The lesson is about method, not any one bug: a parity check whose cases are *generated*
+in one language cannot find these, because serialization erases the distinctions that
+break parity — a JS-authored `100.0` reaches the verifier as `100`. The cases therefore
+live as raw JSON that both implementations read
+([`test/parity/cases.json`](../../../src/verifier/test/parity/cases.json)), and the
+harness additionally asserts that each case is *discriminating*: an estimate of 100
+against an actual of 150 scores 50 when the entry is usable and 50 as the neutral prior,
+a coincidence that hid one of these defects through a first round of testing. A parity
+harness whose cases cannot tell the two behaviours apart reports agreement forever.
+
 ## References
 
 - [Scenario 05 — the integration practice](../scenarios/05-integration-practice.md), findings 16–18

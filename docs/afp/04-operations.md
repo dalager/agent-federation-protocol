@@ -152,6 +152,11 @@ reputation derivation plus an `afp:settlementSnapshot` — the digests of exactl
 settlements the score is computed over — so selection odds can reflect past accuracy
 while the Award stays a pure function of the record
 ([03 — Consuming reputation, recomputably](03-coordination.md#consuming-reputation-recomputably)).
+That consumer makes settlement's own preconditions load-bearing: a settlement **follows
+an award** and is published **once per task**. Settling work nobody was awarded records
+an outcome with nothing to settle, and a second settlement competes with the first for
+the same snapshot — the exhaustive pinning that stops a hub cherry-picking history would
+otherwise let a counterparty supply several accounts of what actually happened.
 
 ### Outbox integrity: hash-chained logs (`afp:prevActivity`)
 

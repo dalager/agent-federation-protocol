@@ -17,6 +17,7 @@ import {
   joinORMap,
   joinORSet,
   liveElements,
+  lwwFieldOf,
   mergeGSet,
   mergeLWW,
   mergeORMap,
@@ -74,6 +75,11 @@ export class ORSet<T extends string> implements CrdtStore<Set<T>, ORSetDelta<T>>
   has(value: T): boolean {
     return this.tagsFor(value).length > 0;
   }
+
+  /** Rehydrate from persisted `CRDTStore` state — see `Hub`'s startup hydration. */
+  restore(state: ORSetState): void {
+    this.state = state;
+  }
 }
 
 // --------------------------------------------------------------- OR-Map
@@ -124,6 +130,59 @@ export class ORMap<K extends string, V extends string>
     }
     return view;
   }
+
+  /** Rehydrate from persisted `CRDTStore` state — see `Hub`'s startup hydration. */
+  restore(state: ORMapState): void {
+    this.state = state;
+  }
+}
+
+// --------------------------------------------------------- OR-Map (LWW fields)
+
+export interface ORMapLWWDelta<K, V> {
+  key: K;
+  value: V;
+  timestamp: number;
+  nodeId: string;
+}
+
+/**
+ * `OR-Map<K, LWW-Register<V>>` backed by `crdt/ormap.ts` — the ADR-0004 asset
+ * registry: assetId → whole asset record, last-writer-wins per key.
+ */
+export class ORMapLWW<K extends string, V> implements CrdtStore<Map<K, V>, ORMapLWWDelta<K, V>> {
+  private state: ORMapState = emptyORMap();
+
+  apply(delta: ORMapLWWDelta<K, V>): void {
+    this.state = mergeORMap(this.state, {
+      key: delta.key,
+      fieldType: "LWW_REGISTER",
+      value: delta.value,
+      timestamp: delta.timestamp,
+      nodeId: delta.nodeId,
+    });
+  }
+
+  merge(other: this): void {
+    this.state = joinORMap(this.state, other.state);
+  }
+
+  getState(): Map<K, V> {
+    const out = new Map<K, V>();
+    for (const [key, field] of Object.entries(this.state.lwwEntries ?? {})) {
+      out.set(key as K, field.value as V);
+    }
+    return out;
+  }
+
+  get(key: K): V | null {
+    return (lwwFieldOf(this.state, key)?.value as V | undefined) ?? null;
+  }
+
+  /** Rehydrate from persisted `CRDTStore` state — see `Hub`'s startup hydration. */
+  restore(state: ORMapState): void {
+    this.state = state;
+  }
 }
 
 // --------------------------------------------------------------- LWW-Register
@@ -149,6 +208,11 @@ export class LWWRegister<T> implements CrdtStore<LWWValue<T> | null, LWWValue<T>
 
   getState(): LWWValue<T> | null {
     return this.state;
+  }
+
+  /** Rehydrate from persisted `CRDTStore` state — see `Hub`'s startup hydration. */
+  restore(state: LWWState<T>): void {
+    this.state = state;
   }
 }
 

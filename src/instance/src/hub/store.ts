@@ -105,7 +105,10 @@ export function saveVoteReceipt(db: Db, roundId: string, actor: string, voteDige
 
 export function voteReceiptsFor(db: Db, roundId: string): { actor: string; voteDigest: string; value: string }[] {
   const rows = db
-    .prepare("SELECT actor, vote_digest, value FROM hub_vote_receipts WHERE round_id = ?")
+    // Ordered: `closeRound` publishes these digests as `afp:countedVotes`, and
+    // an unordered scan would let the same round sign different bytes on a
+    // different run or a different SQLite build (H11).
+    .prepare("SELECT actor, vote_digest, value FROM hub_vote_receipts WHERE round_id = ? ORDER BY actor")
     .all(roundId) as Record<string, unknown>[];
   return rows.map((row) => ({
     actor: String(row.actor),

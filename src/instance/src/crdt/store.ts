@@ -106,6 +106,18 @@ export class CRDTStore {
     return row?.state_json ? (JSON.parse(row.state_json) as AnyState) : null;
   }
 
+  /**
+   * Every persisted store for one hub. A consumer holding in-memory views
+   * rebuilds them from here on startup — the state was written on every
+   * `apply`, so coming back is a `SELECT`, never a replay of the record.
+   */
+  crdtIds(hubId: string): { crdtId: string; crdtType: CRDTType }[] {
+    const rows = this.db
+      .prepare("SELECT crdt_id, crdt_type FROM crdt_state WHERE hub_id = ? ORDER BY crdt_id")
+      .all(hubId) as { crdt_id: string; crdt_type: string }[];
+    return rows.map((row) => ({ crdtId: String(row.crdt_id), crdtType: String(row.crdt_type) as CRDTType }));
+  }
+
   getCrdtType(hubId: string, crdtId: string): CRDTType | null {
     const row = this.db
       .prepare("SELECT crdt_type FROM crdt_state WHERE hub_id = ? AND crdt_id = ?")

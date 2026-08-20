@@ -388,7 +388,11 @@ alongside v1's flow, it doesn't replace it.
 1. **Announce** — `afp:Announce{Task}` broadcast to the hub: task spec, required
    capabilities, deadline, `afp:hub`, the `afp:bidWindow`, the `afp:answerSufficiency`
    threshold, the hub's `afp:estimatorPolicy`, and — published up front, not decided
-   after the fact — the **`afp:selectionRule`** that will pick the performer(s).
+   after the fact — the **`afp:selectionRule`** that will pick the performer(s). Since a
+   requester may also announce (02, ADR-0004), two activities can name one task: the
+   **hub's own re-fan-out is the governing announce**, and a replay that cannot find one
+   fails rather than falling back to the requester's terms. One task per thread, so that
+   the actuals reported onto a thread settle an unambiguous auction.
 2. **Bid, sealed** — inside `[opens, closes)`, bidders submit only `afp:bidCommit` with
    `afp:commitment = sha256(JCS(bid payload))`; after `closes` they submit
    `afp:BidReveal` carrying the full payload, verified by recomputing the digest.
@@ -564,10 +568,12 @@ pure derivations. An Announce that wants past accuracy in its ranking pins two t
   history, and a bonus for `afp:dissentVindicated` entries — a swarm that penalizes
   accurate minority objections stops producing them (04). Two determinism rules keep it
   identically computable twice: divergence is **relative** (integer percent of the
-  estimate, unit-free — an entry whose estimated/actual units differ is skipped, never
-  guessed at), and decay is **exact rational arithmetic over the recency ordering**
-  (settlements by `published`, ties by digest; per-step decay a ratio of small integers)
-  — never a wall-clock float exponential.
+  estimate, unit-free — an entry is skipped, never guessed at, unless both costs carry
+  the same unit and integer-valued amounts over a positive estimate), and decay is
+  **exact rational arithmetic over the recency ordering** (settlements by `published`
+  compared as an *instant*, not as a string — a numeric UTC offset sorts before the `Z`
+  it actually follows; ties by digest; per-step decay a ratio of small integers) — never
+  a wall-clock float exponential.
 - `afp:settlementSnapshot` — the digests of every `afp:Settlement` the derivation runs
   over, pinned at announce time. The rule computes over evidence the record can produce,
   never over "whatever the hub knew" — no snapshot, no reputation input. The snapshot is

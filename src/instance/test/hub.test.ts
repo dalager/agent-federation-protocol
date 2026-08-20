@@ -83,11 +83,17 @@ function makeHub(instance: AfpInstance, config: ReturnType<typeof loadConfig>, h
 }
 
 /** Enroll one agent: instance-issued `afp:Enroll`, delivered through the shared transport. */
-function enrollAgent(instance: AfpInstance, hub: Hub, hubKeys: Map<string, KeyPair>, name: string) {
+function enrollAgent(
+  instance: AfpInstance,
+  hub: Hub,
+  hubKeys: Map<string, KeyPair>,
+  name: string,
+  role?: "member" | "requester" | "observer",
+) {
   const agentId = instance.actorId(name);
   const hubKey = hubKeys.get(name)!;
   return instance.publishAsInstance([hub.actorId], "urn:afp:thread:enroll", "hub", (envelope: Envelope) =>
-    enroll(envelope, { agent: agentId, hub: hub.actorId, capabilities: ["afp:cap:vote"], hubKey: hubKey.keyId }),
+    enroll(envelope, { agent: agentId, hub: hub.actorId, capabilities: ["afp:cap:vote"], hubKey: hubKey.keyId, role }),
   );
 }
 
@@ -188,6 +194,20 @@ describe("P2 hub: enrollment and an L0 weighted-quorum round", () => {
     assert.deepEqual(decisionObject["afp:weightTally"], { "candidate-7": 2, "candidate-2": 1, abstain: 1 });
     assert.equal((decisionObject["afp:countedVotes"] as string[]).length, 3);
 
+    // The cited evidence is ordered, not whatever the store happened to scan
+    // (H11): the same round must sign the same bytes twice.
+    const counted = hub.roundVotes(round);
+    assert.deepEqual(
+      counted.map((v) => v.actor),
+      [...counted.map((v) => v.actor)].sort(),
+      "vote receipts come back in a defined order",
+    );
+    assert.deepEqual(
+      decisionObject["afp:countedVotes"],
+      counted.map((v) => v.digest),
+      "afp:countedVotes follows that same order",
+    );
+
     // Any verifier recomputes the same tally straight from the counted votes alone.
     const recomputed: Record<string, number> = { "candidate-7": 0, "candidate-2": 0, abstain: 0 };
     for (const voter of hub.roundVoters(round)) {
@@ -238,6 +258,419 @@ describe("P2 hub: enrollment and an L0 weighted-quorum round", () => {
     assert.equal(afterArchive.status, "rejected");
     assert.match((afterArchive as { reason: string }).reason, /archived/);
     assert.throws(() => hub.closeRound(round2), /archived/);
+
+    instance.close();
+  });
+
+  // ADR-0004 implementation parity note: an open round must survive a hub
+  // restart — its row and vote receipts already persist in SQLite, and the
+  // hub reads rounds statelessly from the store, so a fresh Hub over the same
+  // db can keep accepting votes and close the round with the right tally.
+  it("survives a restart mid-round: a fresh Hub over the same store keeps voting and closes correctly", async () => {
+    const { instance, config } = setupInstance();
+    const hubKeys = issueHubKeys(instance, config);
+    const hub = makeHub(instance, config, hubKeys);
+    const transport = hubTransport(hub, instance.localTransport(), (target) => instance.nameOf(target) !== null);
+
+    for (const name of ENROLLED) enrollAgent(instance, hub, hubKeys, name);
+    await instance.run(transport);
+
+    const round = "urn:afp:round:restart-1";
+    const proposalEntry = hub.proposeRound({
+      round,
+      thread: "urn:afp:thread:restart-1",
+      question: "Restart-safe?",
+      options: ["yes", "no"],
+    });
+    const quorumSnapshot = (proposalEntry.activity.object as Record<string, unknown>)["afp:quorumSnapshot"] as string;
+    const proposalDigest = proposalEntry.digest;
+
+    // Two votes land before the "restart".
+    await hub.receive(agentVotes(instance, hub, round, proposalDigest, quorumSnapshot, "a1", "yes").activity);
+    await hub.receive(agentVotes(instance, hub, round, proposalDigest, quorumSnapshot, "a2", "yes").activity);
+
+    // Restart: a brand-new Hub object over the same SQLite db — no carried-over
+    // in-memory state, no explicit rehydration call.
+    const restarted = makeHub(instance, config, hubKeys);
+    assert.equal(restarted.roundVotes(round).length, 2, "pre-restart votes are visible after restart");
+
+    // A third vote is accepted by the restarted hub against the same open round.
+    await restarted.receive(agentVotes(instance, restarted, round, proposalDigest, quorumSnapshot, "a3", "no").activity);
+    assert.equal(restarted.roundVotes(round).length, 3);
+
+    // And the restarted hub closes the round with the full tally.
+    const decision = restarted.closeRound(round);
+    const object = decision.activity.object as Record<string, unknown>;
+    assert.equal(object["afp:outcome"], "yes");
+    assert.deepEqual(object["afp:weightTally"], { yes: 2, no: 1, abstain: 1 });
+    assert.equal((object["afp:countedVotes"] as string[]).length, 3);
+
+    instance.close();
+  });
+
+  // ADR-0004 Decision 1: enrollment carries a role, enforced at
+  // snapshot-pinning, bid admission and fan-out — and the requester write-path
+  // (inbound Announce, actuals report) is narrow but real.
+  it("enforces roles: requester/observer never pinned or bidding; requester announces and settles", async () => {
+    const { instance, config } = setupInstance();
+    const hubKeys = issueHubKeys(instance, config);
+    const hub = makeHub(instance, config, hubKeys);
+    const transport = hubTransport(hub, instance.localTransport(), (target) => instance.nameOf(target) !== null);
+
+    // a1/a2 members, a3 requester, a4 observer.
+    enrollAgent(instance, hub, hubKeys, "a1");
+    enrollAgent(instance, hub, hubKeys, "a2", "member");
+    enrollAgent(instance, hub, hubKeys, "a3", "requester");
+    enrollAgent(instance, hub, hubKeys, "a4", "observer");
+    await instance.run(transport);
+
+    const [a1, a2, a3, a4] = ["a1", "a2", "a3", "a4"].map((n) => instance.actorId(n));
+    assert.equal(hub.roleOf(a1), "member");
+    assert.equal(hub.roleOf(a3), "requester");
+    assert.equal(hub.roleOf(a4), "observer");
+    assert.equal(hub.roleOf(instance.actorId(OUTSIDER)), null);
+    assert.deepEqual(hub.broadcastTargets().sort(), [a1, a2, a4].sort(), "broadcasts go to members and observers");
+
+    // Snapshot-pinning: only member-role agents are ever pinned into voters.
+    const proposal = hub.proposeRound({
+      round: "urn:afp:round:role-1",
+      thread: "urn:afp:thread:role-1",
+      question: "Roles?",
+      options: ["yes", "no"],
+    });
+    const voters = (proposal.activity.object as Record<string, unknown>)["afp:voters"] as string[];
+    assert.deepEqual([...voters].sort(), [a1, a2].sort(), "a requester or observer never appears in a quorum snapshot");
+
+    // Requester announces a task through the inbound dispatch path; the hub
+    // re-fans it out and records the requester as the settlement counterparty.
+    const thread = "urn:afp:thread:req-ask-1";
+    const window = {
+      opens: instance.clock.now().toISOString(),
+      closes: new Date(instance.clock.now().getTime() + 600_000).toISOString(),
+    };
+    const inboundAnnounce = instance.publish("a3", [hub.actorId], thread, "hub", (envelope: Envelope) => ({
+      "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+      id: envelope.activityId,
+      type: "Announce",
+      actor: envelope.actor,
+      to: [...envelope.to],
+      published: envelope.published,
+      context: envelope.thread,
+      "afp:visibility": envelope.visibility,
+      ...(envelope.prevActivity !== null ? { "afp:prevActivity": envelope.prevActivity } : {}),
+      object: {
+        id: "urn:afp:task:req-ask-1",
+        type: "afp:Task",
+        "afp:hub": hub.actorId,
+        "afp:capability": "afp:cap:vote",
+        "afp:correlationId": "req-ask-1",
+        content: "requester-scoped ask",
+        "afp:bidWindow": window,
+        "afp:selectionRule": { name: "ranking", params: { weights: { capabilityMatch: 1 } } },
+        "afp:answerSufficiency": { count: 1 },
+        "afp:estimatorPolicy": "exclude",
+        "afp:estimators": [],
+      },
+    }));
+    const announceOutcome = await hub.receive(inboundAnnounce.activity);
+    assert.equal(announceOutcome.status, "dispatched");
+    const auction = hub.allocation.auction("urn:afp:task:req-ask-1");
+    assert.ok(auction, "the requester's announce opened an auction");
+    assert.equal(auction!.requester, a3, "the announcing actor is the settlement's counterparty");
+
+    // An observer's announce is rejected and audit-logged — never an auction.
+    const observerAnnounce = instance.publish("a4", [hub.actorId], "urn:afp:thread:obs-ask", "hub", (envelope: Envelope) => ({
+      "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+      id: envelope.activityId,
+      type: "Announce",
+      actor: envelope.actor,
+      to: [...envelope.to],
+      published: envelope.published,
+      context: envelope.thread,
+      "afp:visibility": envelope.visibility,
+      ...(envelope.prevActivity !== null ? { "afp:prevActivity": envelope.prevActivity } : {}),
+      object: {
+        id: "urn:afp:task:obs-ask",
+        type: "afp:Task",
+        "afp:hub": hub.actorId,
+        "afp:bidWindow": window,
+        "afp:selectionRule": { name: "ranking", params: {} },
+      },
+    }));
+    await hub.receive(observerAnnounce.activity);
+    assert.equal(hub.allocation.auction("urn:afp:task:obs-ask"), null, "an observer cannot announce");
+    assert.ok(
+      hub.allocation.admissions("urn:afp:task:obs-ask").some((a) => a.outcome === "rejected" && /role/.test(a.reason)),
+      "the observer's announce rejection is audit-logged",
+    );
+
+    // Bid admission: a commit from a non-member role is rejected, audit-logged.
+    const requesterCommit = instance.publish("a3", [hub.actorId], thread, "hub", (envelope: Envelope) => ({
+      "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+      id: envelope.activityId,
+      type: "afp:bidCommit",
+      actor: envelope.actor,
+      to: [...envelope.to],
+      published: envelope.published,
+      context: envelope.thread,
+      "afp:visibility": envelope.visibility,
+      ...(envelope.prevActivity !== null ? { "afp:prevActivity": envelope.prevActivity } : {}),
+      object: "urn:afp:task:req-ask-1",
+      "afp:hub": hub.actorId,
+      "afp:commitment": "sha256:whatever",
+    }));
+    await hub.receive(requesterCommit.activity);
+    assert.equal(hub.allocation.bids("urn:afp:task:req-ask-1").length, 0, "a requester cannot bid");
+    assert.ok(
+      hub.allocation
+        .admissions("urn:afp:task:req-ask-1")
+        .some((a) => a.outcome === "rejected" && /only member-role/.test(a.reason)),
+      "the non-member commit rejection is audit-logged",
+    );
+
+    // The requester reports observed actuals onto its own thread → Settlement.
+    const actualsReport = instance.publish("a3", [hub.actorId], thread, "hub", (envelope: Envelope) => ({
+      "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+      id: envelope.activityId,
+      type: "Create",
+      actor: envelope.actor,
+      to: [...envelope.to],
+      published: envelope.published,
+      context: envelope.thread,
+      "afp:visibility": envelope.visibility,
+      ...(envelope.prevActivity !== null ? { "afp:prevActivity": envelope.prevActivity } : {}),
+      object: {
+        id: "urn:afp:result:req-ask-1-actuals",
+        type: "afp:Result",
+        "afp:actuals": { [a1]: { unit: "EUR", value: 120 } },
+      },
+    }));
+    // ...but settlement follows an *award*. This auction is still in bidding,
+    // so the report is refused and audit-logged rather than putting a
+    // settlement on the record for work nobody was awarded. (The award-then-
+    // settle happy path, and the once-per-task guard, are in adr0004.test.ts.)
+    const before = hub.outbox.nextSeq(hub.actorId);
+    await hub.receive(actualsReport.activity);
+    assert.equal(
+      hub.outbox.nextSeq(hub.actorId),
+      before,
+      "no afp:Settlement is emitted for an auction that was never awarded",
+    );
+    assert.ok(
+      hub.allocation
+        .admissions("urn:afp:task:req-ask-1")
+        .some((a) => a.outcome === "rejected" && /settlement follows an award/.test(a.reason)),
+      "the premature actuals report is rejected on the record",
+    );
+
+    instance.close();
+  });
+
+  // H9/H12: the admission checks that keep the actuals-report authorization
+  // meaningful — one auction per thread, and a bid window that can admit a bid.
+  it("refuses a second auction on one thread, and a window no bid could land in", async () => {
+    const { instance, config } = setupInstance();
+    const hubKeys = issueHubKeys(instance, config);
+    const hub = makeHub(instance, config, hubKeys);
+    const transport = hubTransport(hub, instance.localTransport(), (target) => instance.nameOf(target) !== null);
+    enrollAgent(instance, hub, hubKeys, "a1", "requester");
+    await instance.run(transport);
+
+    const thread = "urn:afp:thread:shared";
+    const now = instance.clock.now();
+    const announceOf = (taskId: string, thread: string, window: { opens: string; closes: string }) =>
+      instance.publish("a1", [hub.actorId], thread, "hub", (envelope: Envelope) => ({
+        "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+        id: envelope.activityId,
+        type: "Announce",
+        actor: envelope.actor,
+        to: [...envelope.to],
+        published: envelope.published,
+        context: envelope.thread,
+        "afp:visibility": envelope.visibility,
+        ...(envelope.prevActivity !== null ? { "afp:prevActivity": envelope.prevActivity } : {}),
+        object: {
+          id: taskId,
+          type: "afp:Task",
+          "afp:hub": hub.actorId,
+          "afp:bidWindow": window,
+          "afp:selectionRule": { name: "ranking", params: { weights: { capabilityMatch: 1 } } },
+          "afp:answerSufficiency": { count: 1 },
+          "afp:estimatorPolicy": "exclude",
+          "afp:estimators": [],
+        },
+      }));
+
+    const open = { opens: now.toISOString(), closes: new Date(now.getTime() + 600_000).toISOString() };
+    await hub.receive(announceOf("urn:afp:task:first", thread, open).activity);
+    assert.ok(hub.allocation.auction("urn:afp:task:first"), "the first auction opens");
+
+    // A second auction on the same thread would make "which auction does this
+    // actuals report settle?" unanswerable.
+    await hub.receive(announceOf("urn:afp:task:second", thread, open).activity);
+    assert.equal(hub.allocation.auction("urn:afp:task:second"), null, "one auction per thread");
+    assert.ok(
+      hub.allocation
+        .admissions("urn:afp:task:second")
+        .some((a) => /one auction per thread/.test(a.reason)),
+      "the collision is rejected on the record",
+    );
+
+    // An inverted window, and one that already closed: no commit could ever
+    // land inside either.
+    await hub.receive(
+      announceOf("urn:afp:task:inverted", "urn:afp:thread:inv", { opens: open.closes, closes: open.opens }).activity,
+    );
+    assert.equal(hub.allocation.auction("urn:afp:task:inverted"), null);
+    assert.ok(hub.allocation.admissions("urn:afp:task:inverted").some((a) => /at or after it closes/.test(a.reason)));
+
+    await hub.receive(
+      announceOf("urn:afp:task:past", "urn:afp:thread:past", {
+        opens: new Date(now.getTime() - 600_000).toISOString(),
+        closes: new Date(now.getTime() - 300_000).toISOString(),
+      }).activity,
+    );
+    assert.equal(hub.allocation.auction("urn:afp:task:past"), null);
+    assert.ok(hub.allocation.admissions("urn:afp:task:past").some((a) => /closed at/.test(a.reason)));
+
+    instance.close();
+  });
+
+  // ADR-0004's parity note in full: the *whole* hub comes back from its store,
+  // not only its rounds. An amnesiac hub is not just unavailable — it would
+  // re-admit a conflicting digest for an asset it had already registered.
+  it("comes back from its store: membership, roles, capabilities, assets and lifecycle survive restart", async () => {
+    const { instance, config } = setupInstance();
+    const hubKeys = issueHubKeys(instance, config);
+    const hub = makeHub(instance, config, hubKeys);
+    const transport = hubTransport(hub, instance.localTransport(), (target) => instance.nameOf(target) !== null);
+
+    enrollAgent(instance, hub, hubKeys, "a1");
+    enrollAgent(instance, hub, hubKeys, "a2", "observer");
+    await instance.run(transport);
+    const [a1, a2] = ["a1", "a2"].map((n) => instance.actorId(n));
+
+    const assetUpdate = (name: string, digest: string) =>
+      instance.publish(name, [hub.actorId], "urn:afp:thread:assets", "hub", (envelope: Envelope) => ({
+        "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+        id: envelope.activityId,
+        type: "Update",
+        actor: envelope.actor,
+        to: [...envelope.to],
+        published: envelope.published,
+        context: envelope.thread,
+        "afp:visibility": envelope.visibility,
+        ...(envelope.prevActivity !== null ? { "afp:prevActivity": envelope.prevActivity } : {}),
+        "afp:hub": hub.actorId,
+        object: {
+          id: "urn:afp:asset:a",
+          type: "afp:Asset",
+          "afp:version": "1.0",
+          "afp:digest": digest,
+          attributedTo: envelope.actor,
+        },
+      }));
+    await hub.receive(assetUpdate("a1", "sha256:original").activity);
+
+    // --- Restart: a brand-new Hub object over the same SQLite file.
+    const restarted = makeHub(instance, config, hubKeys);
+
+    assert.deepEqual([...restarted.members()].sort(), [a1, a2].sort(), "membership survives");
+    assert.equal(restarted.roleOf(a1), "member", "roles survive");
+    assert.equal(restarted.roleOf(a2), "observer", "a non-default role survives");
+    assert.deepEqual(restarted.capabilitiesOf(a1), ["afp:cap:vote"], "capabilities survive");
+    assert.ok(restarted.isLive(a1), "liveness survives");
+    assert.equal(restarted.assetOf("urn:afp:asset:a", "1.0")?.["afp:digest"], "sha256:original", "the registry survives");
+
+    // The point of all that: immutability still holds across the restart.
+    await restarted.receive(assetUpdate("a1", "sha256:rewritten").activity);
+    assert.equal(
+      restarted.assetOf("urn:afp:asset:a", "1.0")?.["afp:digest"],
+      "sha256:original",
+      "a restarted hub still refuses to mutate a registered (id, version)",
+    );
+
+    // And a restarted hub can still open a round — impossible with empty membership.
+    const proposal = restarted.proposeRound({
+      round: "urn:afp:round:after-restart",
+      thread: "urn:afp:thread:after-restart",
+      question: "Still working?",
+      options: ["yes", "no"],
+    });
+    assert.deepEqual(
+      (proposal.activity.object as Record<string, unknown>)["afp:voters"],
+      [a1],
+      "the member is pinned; the observer is not",
+    );
+
+    // Lifecycle is terminal across a restart: an archived hub stays archived.
+    restarted.archive("done");
+    const afterArchive = makeHub(instance, config, hubKeys);
+    const rejected = await afterArchive.receive(assetUpdate("a1", "sha256:post-archive").activity);
+    assert.equal(rejected.status, "rejected");
+    assert.match((rejected as { reason: string }).reason, /archived/);
+
+    instance.close();
+  });
+
+  // ADR-0004 Decision 2: the asset registry — registration on the record,
+  // (id, version) immutability, member-only authority.
+  it("registers assets: member-only, immutable per (id, version), readable back", async () => {
+    const { instance, config } = setupInstance();
+    const hubKeys = issueHubKeys(instance, config);
+    const hub = makeHub(instance, config, hubKeys);
+    const transport = hubTransport(hub, instance.localTransport(), (target) => instance.nameOf(target) !== null);
+
+    enrollAgent(instance, hub, hubKeys, "a1");
+    enrollAgent(instance, hub, hubKeys, "a3", "requester");
+    await instance.run(transport);
+    const a1 = instance.actorId("a1");
+
+    const assetUpdate = (name: string, version: string, digest: string) =>
+      instance.publish(name, [hub.actorId], "urn:afp:thread:assets", "hub", (envelope: Envelope) => ({
+        "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+        id: envelope.activityId,
+        type: "Update",
+        actor: envelope.actor,
+        to: [...envelope.to],
+        published: envelope.published,
+        context: envelope.thread,
+        "afp:visibility": envelope.visibility,
+        ...(envelope.prevActivity !== null ? { "afp:prevActivity": envelope.prevActivity } : {}),
+        "afp:hub": hub.actorId,
+        object: {
+          id: "urn:afp:asset:mitid-broker-adapter",
+          type: "afp:Asset",
+          "afp:version": version,
+          "afp:digest": digest,
+          "afp:sourceUrl": "https://git.example/integrations/mitid-broker-adapter",
+          attributedTo: envelope.actor,
+        },
+      }));
+
+    // A member registers version 3.1.
+    await hub.receive(assetUpdate("a1", "3.1", "sha256:aaa").activity);
+    assert.deepEqual(hub.assetOf("urn:afp:asset:mitid-broker-adapter", "3.1")?.["afp:digest"], "sha256:aaa");
+
+    // A second Update with the same (id, version) but a different digest is rejected.
+    await hub.receive(assetUpdate("a1", "3.1", "sha256:bbb").activity);
+    assert.equal(
+      hub.assetOf("urn:afp:asset:mitid-broker-adapter", "3.1")?.["afp:digest"],
+      "sha256:aaa",
+      "one (id, version) is immutable once registered",
+    );
+
+    // A new version is a new entry.
+    await hub.receive(assetUpdate("a1", "3.2", "sha256:ccc").activity);
+    assert.equal(hub.assetOf("urn:afp:asset:mitid-broker-adapter", "3.2")?.["afp:digest"], "sha256:ccc");
+    assert.equal(hub.assetRegistry().size, 2);
+
+    // A requester cannot register.
+    await hub.receive(assetUpdate("a3", "4.0", "sha256:ddd").activity);
+    assert.equal(hub.assetOf("urn:afp:asset:mitid-broker-adapter", "4.0"), null, "only members register assets");
+
+    // The steward is on the record.
+    assert.equal(hub.assetOf("urn:afp:asset:mitid-broker-adapter", "3.1")?.attributedTo, a1);
 
     instance.close();
   });

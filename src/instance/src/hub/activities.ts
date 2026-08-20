@@ -31,12 +31,17 @@ function base(envelope: Envelope, type: string): { [key: string]: JsonValue } {
 
 // ------------------------------------------------------------------- Enrollment
 
+/** Participation role (02, ADR-0004 Decision 1): default `member` so every existing record reads unchanged. */
+export type HubRole = "member" | "requester" | "observer";
+
 export interface EnrollSpec {
   agent: string;
   hub: string;
   capabilities: readonly string[];
   /** `afp:hubKey` — the per-agent, per-hub verification method (02, ADR-0002 Decision 4). */
   hubKey: string;
+  /** `afp:role` — member | requester | observer (ADR-0004 Decision 1). */
+  role?: HubRole;
 }
 
 /** `afp:Enroll` — instance-issued, agent-level (02 § Enrollment is two-level). */
@@ -48,6 +53,7 @@ export function enroll(envelope: Envelope, spec: EnrollSpec): { [key: string]: J
     "afp:hub": spec.hub,
     "afp:capabilities": [...spec.capabilities],
     "afp:hubKey": spec.hubKey,
+    "afp:role": spec.role ?? "member",
   };
 }
 
@@ -65,6 +71,38 @@ export function unenroll(envelope: Envelope, spec: UnenrollSpec): { [key: string
     target: spec.hub,
     "afp:hub": spec.hub,
     summary: spec.reason,
+  };
+}
+
+// ------------------------------------------------------------------- Assets
+
+/** A reusable component with identity, versions, and provenance (07, ADR-0004 Decision 2). */
+export interface AssetSpec {
+  assetId: string;
+  hub: string;
+  version: string;
+  digest: string;
+  sourceUrl?: string;
+  originContext?: string;
+  /** The steward — the registering activity's signature is the accountability. */
+  attributedTo: string;
+}
+
+/** `Update{afp:Asset}` — registration is on the record, like enrollment, never a side channel. */
+export function updateAsset(envelope: Envelope, spec: AssetSpec): { [key: string]: JsonValue } {
+  const object: { [key: string]: JsonValue } = {
+    id: spec.assetId,
+    type: "afp:Asset",
+    "afp:version": spec.version,
+    "afp:digest": spec.digest,
+    attributedTo: spec.attributedTo,
+  };
+  if (spec.sourceUrl) object["afp:sourceUrl"] = spec.sourceUrl;
+  if (spec.originContext) object["afp:originContext"] = spec.originContext;
+  return {
+    ...base(envelope, "Update"),
+    object,
+    "afp:hub": spec.hub,
   };
 }
 

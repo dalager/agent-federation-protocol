@@ -20,6 +20,11 @@ export interface RevealedBid {
   estimatedLatencySeconds: number;
   /** Declared sub-domain → confidence (03 § Selection rules). */
   coverage: Record<string, number>;
+  /**
+   * The pinned reputation derivation's output for this bidder (ADR-0004
+   * Decision 3) — set by the caller only when the Announce pinned a rule.
+   */
+  reputation?: number;
 }
 
 export interface SelectionRule {
@@ -68,7 +73,11 @@ function ranking(taskId: string, bids: RevealedBid[], params: { [key: string]: J
   const score = (bid: RevealedBid): number =>
     term(weights.capabilityMatch, bid.capabilityMatch) +
     term(weights.cost, bid.estimatedCostValue) +
-    term(weights.latencySeconds, bid.estimatedLatencySeconds);
+    term(weights.latencySeconds, bid.estimatedLatencySeconds) +
+    // ADR-0004 Decision 3: the optional reputation weight — its term is the
+    // pinned derivation's output, never a live number. `coverage` stays
+    // reputation-free at this phase.
+    term(weights.reputation, bid.reputation ?? 0);
 
   // Codepoint comparison on the hex digests — never locale collation, which
   // would make the protocol constant host-dependent.

@@ -102,6 +102,11 @@ export interface ResultSpec {
   /** What produced the content — a model id, a rule-engine version. */
   producedBy?: string;
   attachments?: JsonValue[];
+  /**
+   * ADR-0004 Decision 2: the asset this result started from (id + version) and
+   * the delivered adaptation's own digest — closing the reuse loop.
+   */
+  reused?: { asset: string; version: string; digest: string };
 }
 
 export function createResult(envelope: Envelope, result: ResultSpec): { [key: string]: JsonValue } {
@@ -118,6 +123,9 @@ export function createResult(envelope: Envelope, result: ResultSpec): { [key: st
   // useful externalization there is.
   if (result.producedBy) object["afp:producedBy"] = result.producedBy;
   if (result.attachments?.length) object.attachment = result.attachments;
+  if (result.reused) {
+    object["afp:reused"] = { asset: result.reused.asset, version: result.reused.version, digest: result.reused.digest };
+  }
 
   return { ...base(envelope, "Create"), object };
 }

@@ -10,5 +10,5 @@ export * from "./types.ts";
 export { emptyGSet, mergeGSet, joinGSet } from "./gset.ts";
 export { initialLWW, mergeLWW, joinLWW } from "./lww.ts";
 export { emptyORSet, mergeORSet, joinORSet, liveElements, isMember } from "./orset.ts";
-export { emptyORMap, mergeORMap, joinORMap, fieldOf } from "./ormap.ts";
+export { emptyORMap, mergeORMap, joinORMap, fieldOf, lwwFieldOf } from "./ormap.ts";
 export { CRDTStore, ensureCrdtSchema } from "./store.ts";

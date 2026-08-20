@@ -16,7 +16,37 @@ none (all of P1) runs none of this — backward compatible by construction.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from proof import digest_of, verify_proof
+
+_EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
+
+
+def instant_millis(published) -> int:
+    """`published` as epoch milliseconds — never as a raw string.
+
+    Ordering timestamps by string comparison only matches chronological order
+    when every writer happens to use one representation. It does not: the same
+    instant is legally `2026-01-01T00:00:00Z` or `2026-01-01T00:00:00.000Z`
+    ('.' < 'Z', so the string sort inverts the tie-break), and a negative UTC
+    offset sorts before 'Z' while being chronologically *later*. The writer
+    orders by `Date.parse` instants, so the verifier must too, or the two
+    replay the same trail to different state.
+
+    Mirrors JS `Date.parse(x) || 0`: unparseable -> 0, sub-millisecond
+    precision truncated (integer arithmetic, no float rounding).
+    """
+    if not isinstance(published, str):
+        return 0
+    try:
+        parsed = datetime.fromisoformat(published.replace("Z", "+00:00"))
+    except ValueError:
+        return 0
+    if parsed.tzinfo is None:  # naive: JS Date.parse reads bare ISO as UTC
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    delta = parsed - _EPOCH
+    return delta.days * 86_400_000 + delta.seconds * 1000 + delta.microseconds // 1000
 
 
 def afp_object(activity: dict, afp_type: str) -> dict | None:
@@ -32,6 +62,31 @@ def afp_object(activity: dict, afp_type: str) -> dict | None:
     if isinstance(obj, dict) and obj.get("type") == afp_type:
         return obj
     return None
+
+
+def enrolled_roles(hub_actor: str, all_activities: list[dict]) -> dict[str, str]:
+    """agent -> role for the hub's currently enrolled agents (ADR-0004 Decision 1).
+
+    Replayed from the Enroll/Unenroll trail: role is per-agent last-writer-wins
+    — latest `published` wins, equal timestamps break by higher activity digest.
+    An Enroll without `afp:role` reads as `member`, so every pre-ADR-0004
+    record is unchanged.
+    """
+    roles: dict[str, str] = {}
+    trail = [
+        a
+        for a in all_activities
+        if a.get("type") in ("afp:Enroll", "afp:Unenroll") and a.get("target") == hub_actor
+    ]
+    for activity in sorted(trail, key=lambda a: (instant_millis(a.get("published")), digest_of(a))):
+        agent = activity.get("object")
+        if not isinstance(agent, str):
+            continue
+        if activity.get("type") == "afp:Enroll":
+            roles[agent] = activity.get("afp:role", "member")
+        else:
+            roles.pop(agent, None)
+    return roles
 
 
 def check_decision_record(
@@ -67,6 +122,20 @@ def check_decision_record(
     # weight map's keys are the fallback when a proposal omits it.
     pinned_voters = set(proposal.get("afp:voters", []) or voter_weights)
     by_digest = {digest_of(a): a for a in all_activities}
+
+    # ADR-0004 Decision 1 — only member-role agents may ever be pinned into a
+    # quorum snapshot; a requester or observer in afp:voters is a failure the
+    # Enroll trail proves.
+    hub_actor = decision.get("afp:hub") or proposal.get("afp:hub") or decision_activity.get("actor")
+    roles = enrolled_roles(hub_actor, all_activities)
+    non_member_pinned = sorted(v for v in pinned_voters if roles.get(v, "member") != "member")
+    report.record(
+        f"decision: {label} pinned voters are member-role agents",
+        not non_member_pinned,
+        "" if not non_member_pinned else
+        "afp:voters pins non-member-role agent(s) (ADR-0004): "
+        + ", ".join(f"{v} ({roles.get(v)})" for v in non_member_pinned),
+    )
 
     missing: list[str] = []
     counted_voters: set[str] = set()

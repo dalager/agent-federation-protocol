@@ -52,6 +52,13 @@ export interface AnnounceSpec {
   estimatorPolicy: "exclude" | "permit-and-record";
   estimators: readonly string[];
   deadline?: string;
+  /**
+   * ADR-0004 Decision 3: opt-in reputation consumption. When a rule is pinned
+   * the announce MUST also carry the settlement snapshot — the digests of
+   * every afp:Settlement of this hub published before the announce.
+   */
+  reputationRule?: { name: string; params: { [key: string]: JsonValue } };
+  settlementSnapshot?: readonly string[];
 }
 
 /** `Announce{afp:Task}` — broadcast through the hub to enrolled members. */
@@ -70,6 +77,10 @@ export function announceTask(envelope: Envelope, spec: AnnounceSpec): { [key: st
     "afp:estimators": [...spec.estimators],
   };
   if (spec.deadline) object["afp:deadline"] = spec.deadline;
+  if (spec.reputationRule) {
+    object["afp:reputationRule"] = { name: spec.reputationRule.name, params: { ...spec.reputationRule.params } };
+    object["afp:settlementSnapshot"] = [...(spec.settlementSnapshot ?? [])];
+  }
   return { ...base(envelope, "Announce"), object };
 }
 
@@ -83,6 +94,11 @@ export interface BidFields {
   estimatedCost: { unit: string; value: number };
   estimatedLatency: string;
   coverage?: Readonly<Record<string, number>>;
+  /**
+   * ADR-0004 Decision 2: "my cost is low *because* I start from this" — an
+   * asset reference (id + version) as a claim under the sealed commitment.
+   */
+  reuses?: { asset: string; version: string };
   /** Mandatory (Decision 2): without it a low-entropy bid is enumerable. */
   nonce: string;
 }
@@ -99,6 +115,7 @@ export function bidPayload(fields: BidFields): { [key: string]: JsonValue } {
     nonce: fields.nonce,
   };
   if (fields.coverage) payload["afp:coverage"] = { ...fields.coverage };
+  if (fields.reuses) payload["afp:reuses"] = { asset: fields.reuses.asset, version: fields.reuses.version };
   return payload;
 }
 

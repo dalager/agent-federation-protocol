@@ -74,17 +74,30 @@ export interface ORSetState {
 }
 
 // ---------------------------------------------------------------------------
-// OR-Map<key, OR-Set<capability>> — the capability registry.
+// OR-Map — the capability registry (OR-Set fields) and, since ADR-0004, the
+// asset registry (LWW-Register fields: assetId → whole asset record).
 
-export interface ORMapDelta {
+export interface ORMapORSetDelta {
   key: string;
   fieldType: "OR_SET";
   adds: ORSetAdd[];
   removes: ORSetRemove[];
 }
 
+export interface ORMapLWWDelta<T = unknown> {
+  key: string;
+  fieldType: "LWW_REGISTER";
+  value: T;
+  timestamp: number;
+  nodeId: string;
+}
+
+export type ORMapDelta = ORMapORSetDelta | ORMapLWWDelta;
+
 export interface ORMapState {
   entries: Record<string, ORSetState>;
+  /** LWW-valued fields (ADR-0004 asset registry). Absent on pre-ADR-0004 states. */
+  lwwEntries?: Record<string, LWWState<unknown>>;
 }
 
 export type AnyDelta = GSetDelta<unknown> | LWWDelta<unknown> | ORSetDelta | ORMapDelta;

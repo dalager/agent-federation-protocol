@@ -33,8 +33,9 @@ from __future__ import annotations
 import hashlib
 from datetime import datetime
 
-from decision import afp_object
+from decision import afp_object, enrolled_roles, instant_millis
 from proof import digest_of
+from reputation import REPUTATION_RULES
 
 
 # ------------------------------------------------------------------ helpers
@@ -107,6 +108,9 @@ def select_ranking(task_id: str, params: dict, bids: list[dict]):
                 weights.get("latencySeconds", 0),
                 _parse_duration_seconds(payload.get("afp:estimatedLatency", "")),
             )
+            # ADR-0004 Decision 3: the optional reputation weight — its term is
+            # the pinned derivation's recomputed output for this bidder.
+            + term(weights.get("reputation", 0), bid.get("reputation", 0))
         )
         key = (-score, tie_break_digest(task_id, bid["bidder"]))
         if best_key is None or key < best_key:
@@ -175,21 +179,29 @@ SELECTION_RULES = {
 
 def enrolled_members(hub_actor: str, all_activities: list[dict]) -> set[str]:
     """The hub's membership, replayed from the Enroll/Unenroll trail."""
-    members: set[str] = set()
-    trail = [
-        a
-        for a in all_activities
-        if a.get("type") in ("afp:Enroll", "afp:Unenroll") and a.get("target") == hub_actor
-    ]
-    for activity in sorted(trail, key=lambda a: a.get("published", "")):
-        agent = activity.get("object")
-        if not isinstance(agent, str):
-            continue
-        if activity.get("type") == "afp:Enroll":
-            members.add(agent)
-        else:
-            members.discard(agent)
-    return members
+    return set(enrolled_roles(hub_actor, all_activities))
+
+
+def check_announce_role(report, announce_activity: dict, all_activities: list[dict]) -> None:
+    """ADR-0004 Decision 1 — an observer (or non-enrolled, non-hub actor) cannot
+    announce; only the hub itself, a member, or a requester may. Replayed from
+    the Enroll trail, exactly as membership is."""
+    obj = afp_object(announce_activity, "afp:Task") or {}
+    label = obj.get("id", "<no id>")
+    actor = announce_activity.get("actor")
+    hub_actor = obj.get("afp:hub")
+    if actor == hub_actor:
+        return  # the hub's own (re-)fan-out — always admitted
+    roles = enrolled_roles(hub_actor, all_activities)
+    role = roles.get(actor)
+    ok = role in ("member", "requester")
+    report.record(
+        f"announce: {label} announced by an admissible role",
+        ok,
+        "" if ok else
+        f"Announce{{afp:Task}} from {actor!r} whose role is {role!r} — only the hub, "
+        f"a member, or a requester may announce (ADR-0004)",
+    )
 
 
 # ---------------------------------------------------------------- check_award
@@ -208,30 +220,50 @@ def check_award(report, award_activity: dict, all_activities: list[dict]) -> Non
     task_id = award.get("afp:task")
     hub_actor = award.get("afp:hub") or award_activity.get("actor")
 
-    announce = next(
-        (
-            obj
-            for a in all_activities
-            if (obj := afp_object(a, "afp:Task")) is not None
-            and obj.get("id") == task_id
-        ),
-        None,
-    )
+    candidates = [
+        a
+        for a in all_activities
+        if (obj := afp_object(a, "afp:Task")) is not None and obj.get("id") == task_id
+    ]
+    # A requester's inbound Announce and the hub's re-fan-out (ADR-0004) may
+    # both name the task, and only the hub's own is governing — it carries the
+    # window, the selection rule and the pinned settlement snapshot this whole
+    # check then recomputes against. Falling back to "whichever Announce came
+    # first" would hand all of that to whoever authored it (H8).
+    hub_announces = [a for a in candidates if a.get("actor") == hub_actor]
+    announce_activity = hub_announces[0] if hub_announces else None
+    announce = afp_object(announce_activity, "afp:Task") if announce_activity else None
     if not report.record(
-        f"award: {label} has a matching afp:Announce{{afp:Task}}",
+        f"award: {label} has a matching hub-authored afp:Announce{{afp:Task}}",
         announce is not None,
         "" if announce is not None else
-        f"no afp:Announce{{afp:Task}} for afp:task {task_id!r} — bid window and "
-        f"selection rule are unrecoverable",
+        (f"afp:task {task_id!r} is announced by {sorted({str(a.get('actor')) for a in candidates})} "
+         f"but not by the awarding hub {hub_actor!r} — the terms this award is checked "
+         f"against would be the announcer's, not the hub's"
+         if candidates else
+         f"no afp:Announce{{afp:Task}} for afp:task {task_id!r} — bid window and "
+         f"selection rule are unrecoverable"),
     ):
         return
+    # Two governing announces are two sets of terms; a replay cannot say which
+    # one the award answers.
+    report.record(
+        f"award: {label} has exactly one hub-authored announce",
+        len(hub_announces) == 1,
+        "" if len(hub_announces) == 1 else
+        f"the hub announced afp:task {task_id!r} {len(hub_announces)} times — bid window, "
+        f"selection rule and settlement snapshot are ambiguous",
+    )
 
     bid_window = announce.get("afp:bidWindow", {}) or {}
     opens = _parse_time(bid_window.get("opens"))
     closes = _parse_time(bid_window.get("closes"))
 
     by_digest = {digest_of(a): a for a in all_activities}
-    members = enrolled_members(hub_actor, all_activities)
+    # ADR-0004 Decision 1: pool reconstruction excludes non-member-role reveals
+    # — a requester or observer can never be an admitted bidder.
+    roles = enrolled_roles(hub_actor, all_activities)
+    members = {agent for agent, role in roles.items() if role == "member"}
 
     commits = [a for a in all_activities if a.get("type") == "afp:bidCommit" and a.get("object") == task_id]
     reveals = [
@@ -374,8 +406,95 @@ def check_award(report, award_activity: dict, all_activities: list[dict]) -> Non
         + ", ".join(d[:24] + "…" for d in unresolvable_winners),
     )
 
-    # 3 — selection recomputation over the reconstructed pool.
+    # 3 — reputation (ADR-0004 Decision 3): when the announce pins a rule,
+    # resolve the pinned snapshot, check it exhaustive, recompute the
+    # derivation, and feed it into selection recomputation. When it pins none,
+    # a reputation weight in the selection rule is a live number nothing pinned.
     rule = announce.get("afp:selectionRule", {}) or {}
+    rep_rule = announce.get("afp:reputationRule")
+    weights = (rule.get("params", {}) or {}).get("weights", {}) or {}
+    if rep_rule is None:
+        report.record(
+            f"award: {label} reputation is consumed only when pinned",
+            not weights.get("reputation"),
+            "" if not weights.get("reputation") else
+            "selection weights include 'reputation' but the announce pins no "
+            "afp:reputationRule — a live number inside a recomputable Award (ADR-0004)",
+        )
+    else:
+        snapshot = announce.get("afp:settlementSnapshot")
+        if not report.record(
+            f"award: {label} reputation rule travels with its settlement snapshot",
+            isinstance(snapshot, list),
+            "afp:reputationRule without afp:settlementSnapshot — no snapshot, no "
+            "reputation input (ADR-0004)",
+        ):
+            snapshot = []
+        rep_name = (rep_rule or {}).get("name")
+        rep_fn = REPUTATION_RULES.get(rep_name)
+        report.record(
+            f"award: {label} reputation rule {rep_name!r} is known",
+            rep_fn is not None,
+            "" if rep_fn is not None else
+            f"no verifier implementation for reputation rule {rep_name!r} — an unknown "
+            f"derivation name is a verification failure, not a skip",
+        )
+
+        # Every pinned digest must resolve to a present afp:Settlement.
+        resolved: list[dict] = []
+        missing_settlements: list[str] = []
+        for digest in snapshot:
+            activity = by_digest.get(digest)
+            # Like the Award, an afp:Settlement's outer type matches too —
+            # prefer the object payload, where afp:settles lives.
+            settlement = None
+            if isinstance(activity, dict):
+                obj = activity.get("object")
+                if isinstance(obj, dict) and obj.get("type") == "afp:Settlement":
+                    settlement = obj
+                else:
+                    settlement = afp_object(activity, "afp:Settlement")
+            if settlement is None:
+                missing_settlements.append(str(digest))
+            else:
+                resolved.append({"object": settlement, "published": activity.get("published", ""), "digest": digest})
+        report.record(
+            f"award: {label} pinned settlement snapshot resolves",
+            not missing_settlements,
+            "" if not missing_settlements else
+            "afp:settlementSnapshot names a digest with no present afp:Settlement: "
+            + ", ".join(d[:24] + "…" for d in missing_settlements),
+        )
+
+        # Exhaustive, not curated: every settlement of this hub published
+        # before the announce must be in the snapshot — cherry-picking away a
+        # bidder's bad history is checkable against the hub's own outbox.
+        # Compare instants, not strings: a hub picks its own settlement's
+        # `published` representation, and a numeric UTC offset string-sorts
+        # before 'Z' regardless of chronology — so a string `<` here lets a
+        # hub dodge the comparison and omit an unflattering settlement.
+        announce_published = instant_millis(announce_activity.get("published")) if announce_activity else 0
+        snapshot_set = set(snapshot)
+        omitted = sorted(
+            digest_of(a)[:24] + "…"
+            for a in all_activities
+            if afp_object(a, "afp:Settlement") is not None
+            and a.get("actor") == hub_actor
+            and instant_millis(a.get("published")) < announce_published
+            and digest_of(a) not in snapshot_set
+        )
+        report.record(
+            f"award: {label} settlement snapshot is exhaustive",
+            not omitted,
+            "" if not omitted else
+            "afp:settlementSnapshot omits settlement(s) this hub published before the "
+            "announce (curated, not exhaustive): " + ", ".join(omitted),
+        )
+
+        if rep_fn is not None:
+            for entry in pool:
+                entry["reputation"] = rep_fn((rep_rule or {}).get("params", {}) or {}, resolved, entry["bidder"])
+
     rule_name = rule.get("name")
     rule_fn = SELECTION_RULES.get(rule_name)
     performers = award.get("afp:performers", []) or []

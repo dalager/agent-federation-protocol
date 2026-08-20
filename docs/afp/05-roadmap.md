@@ -141,7 +141,7 @@ Each phase is independently demoable, and earlier phases keep working unmodified
 ones add capability around them.
 
 > **Before P4 opens the federation door**, the solo foundation is hardened per
-> [ADR-0004](adr/0004-solo-foundation-hardening.md): enrollment roles
+> [ADR-0004](adr/0004-solo-foundation-hardening.md) — **built**: enrollment roles
 > (`member`/`requester`/`observer`), `afp:Asset` identity for reusable components, and
 > recomputable reputation consumption (`afp:reputationRule` + `afp:settlementSnapshot`).
 > All three are P1–P3-scoped record extensions that turn into migrations if deferred past

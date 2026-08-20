@@ -41,8 +41,9 @@ The role is folded into the membership state and replayed from the Enroll trail,
 could ask," "who could answer," and "who could decide" are distinguishable in the record
 — enforcement at bid admission and snapshot-pinning, never in workflow code. Role state
 merges deterministically: per-agent last-writer-wins over the Enroll trail (latest
-`published`; equal timestamps break by higher activity digest) — re-enrolling with a new
-role is the upgrade/downgrade path, on the record.
+`published`, compared as an *instant* rather than as a string; equal timestamps break by
+higher activity digest) — re-enrolling with a new role is the upgrade/downgrade path, on
+the record.
 
 ### Hub-scoped state
 

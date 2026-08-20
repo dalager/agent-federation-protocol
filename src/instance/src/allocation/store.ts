@@ -24,7 +24,8 @@ CREATE TABLE IF NOT EXISTS alloc_auctions (
   estimators_json  TEXT NOT NULL,
   sufficiency_json TEXT NOT NULL,
   status         TEXT NOT NULL,         -- bidding | awarded | reauctioned | failed
-  award_json     TEXT
+  award_json     TEXT,
+  requester      TEXT                    -- ADR-0004: the announcing actor when a requester/member announced; the settlement's counterparty
 );
 
 -- Outstanding Accepts per award — the P1 deadline-sweep pattern needs its
@@ -65,6 +66,16 @@ CREATE TABLE IF NOT EXISTS alloc_admissions (
   reason  TEXT NOT NULL
 );
 
+-- One row per emitted afp:Settlement activity: its digest, published time and
+-- full object — what an announce's afp:settlementSnapshot pins and what the
+-- divergence-decay derivation resolves at award time (ADR-0004 Decision 3).
+CREATE TABLE IF NOT EXISTS alloc_settlement_records (
+  digest      TEXT PRIMARY KEY,
+  task_id     TEXT NOT NULL,
+  published   TEXT NOT NULL,
+  object_json TEXT NOT NULL
+);
+
 -- Estimates linked to actuals; divergence visible, consumption deferred (Decision 5).
 CREATE TABLE IF NOT EXISTS alloc_settlements (
   task_id     TEXT NOT NULL,
@@ -79,6 +90,16 @@ CREATE TABLE IF NOT EXISTS alloc_settlements (
 
 export function ensureAllocSchema(db: Db): void {
   db.exec(SCHEMA);
+  // Pre-ADR-0004 databases lack these columns — add them in place. Only the
+  // already-applied case is swallowed: a bare catch here would equally hide a
+  // locked or corrupt store behind a silently missing column (H13).
+  for (const column of ["requester TEXT", "reputation_json TEXT", "snapshot_json TEXT"]) {
+    try {
+      db.exec(`ALTER TABLE alloc_auctions ADD COLUMN ${column}`);
+    } catch (error) {
+      if (!/duplicate column name/i.test((error as Error).message)) throw error;
+    }
+  }
 }
 
 export interface AuctionRow {
@@ -94,14 +115,21 @@ export interface AuctionRow {
   answerSufficiency: { [key: string]: JsonValue };
   status: "bidding" | "awarded" | "reauctioned" | "failed";
   award: { [key: string]: JsonValue } | null;
+  /** ADR-0004: the announcing actor when announced through the inbound path — the settlement's counterparty. */
+  requester: string | null;
+  /** ADR-0004 Decision 3: the pinned reputation derivation, or null when the announce opted out. */
+  reputationRule: { name: string; params: { [key: string]: JsonValue } } | null;
+  /** The settlement digests pinned at announce time — the derivation's whole evidence set. */
+  settlementSnapshot: string[] | null;
 }
 
 export function saveAuction(db: Db, row: AuctionRow): void {
   db.prepare(
     `INSERT INTO alloc_auctions
        (task_id, hub_id, thread, correlation_id, rule_json, window_opens, window_closes,
-        estimator_policy, estimators_json, sufficiency_json, status, award_json)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        estimator_policy, estimators_json, sufficiency_json, status, award_json, requester,
+        reputation_json, snapshot_json)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT (task_id) DO UPDATE SET status = excluded.status, award_json = excluded.award_json`,
   ).run(
     row.taskId,
@@ -116,6 +144,9 @@ export function saveAuction(db: Db, row: AuctionRow): void {
     JSON.stringify(row.answerSufficiency),
     row.status,
     row.award === null ? null : JSON.stringify(row.award),
+    row.requester,
+    row.reputationRule === null ? null : JSON.stringify(row.reputationRule),
+    row.settlementSnapshot === null ? null : JSON.stringify(row.settlementSnapshot),
   );
 }
 
@@ -123,7 +154,25 @@ export function loadAuction(db: Db, taskId: string): AuctionRow | null {
   const row = db.prepare("SELECT * FROM alloc_auctions WHERE task_id = ?").get(taskId) as
     | Record<string, unknown>
     | undefined;
-  if (!row) return null;
+  return row ? auctionFromRow(row) : null;
+}
+
+/**
+ * The auction announced on one thread — the requester's own thread lookup
+ * (ADR-0004). `null` unless exactly one auction claims the thread: this
+ * lookup is what authorizes an actuals report, so on an ambiguous thread it
+ * refuses to guess rather than settling whichever row SQLite returned first
+ * (H9). `announce()` keeps threads unique; this is the second line.
+ */
+export function auctionByThread(db: Db, thread: string): AuctionRow | null {
+  const rows = db.prepare("SELECT * FROM alloc_auctions WHERE thread = ? ORDER BY task_id").all(thread) as Record<
+    string,
+    unknown
+  >[];
+  return rows.length === 1 ? auctionFromRow(rows[0]) : null;
+}
+
+function auctionFromRow(row: Record<string, unknown>): AuctionRow {
   return {
     taskId: String(row.task_id),
     hubId: String(row.hub_id),
@@ -137,7 +186,63 @@ export function loadAuction(db: Db, taskId: string): AuctionRow | null {
     answerSufficiency: JSON.parse(String(row.sufficiency_json)),
     status: String(row.status) as AuctionRow["status"],
     award: row.award_json === null ? null : JSON.parse(String(row.award_json)),
+    requester: row.requester == null ? null : String(row.requester),
+    reputationRule: row.reputation_json == null ? null : JSON.parse(String(row.reputation_json)),
+    settlementSnapshot: row.snapshot_json == null ? null : JSON.parse(String(row.snapshot_json)),
   };
+}
+
+// ---------------------------------------------------------- settlement records
+
+export interface SettlementRecordRow {
+  digest: string;
+  taskId: string;
+  published: string;
+  object: { [key: string]: JsonValue };
+}
+
+export function saveSettlementRecord(db: Db, row: SettlementRecordRow): void {
+  db.prepare(
+    `INSERT INTO alloc_settlement_records (digest, task_id, published, object_json)
+       VALUES (?, ?, ?, ?)
+     ON CONFLICT (digest) DO NOTHING`,
+  ).run(row.digest, row.taskId, row.published, JSON.stringify(row.object));
+}
+
+/** Has this task already been settled? Settlement is once-per-task (ADR-0004). */
+export function hasSettlementRecord(db: Db, taskId: string): boolean {
+  const row = db
+    .prepare("SELECT 1 FROM alloc_settlement_records WHERE task_id = ? LIMIT 1")
+    .get(taskId) as unknown;
+  return row !== undefined && row !== null;
+}
+
+/** Every settlement record published strictly before `before`, in (published, digest) order. */
+export function settlementRecordsBefore(db: Db, before: string): SettlementRecordRow[] {
+  const rows = db
+    .prepare("SELECT * FROM alloc_settlement_records WHERE published < ? ORDER BY published, digest")
+    .all(before) as Record<string, unknown>[];
+  return rows.map((row) => ({
+    digest: String(row.digest),
+    taskId: String(row.task_id),
+    published: String(row.published),
+    object: JSON.parse(String(row.object_json)),
+  }));
+}
+
+/** Resolve pinned digests to their records; a missing digest returns null in place. */
+export function settlementRecordsByDigest(db: Db, digests: readonly string[]): (SettlementRecordRow | null)[] {
+  const stmt = db.prepare("SELECT * FROM alloc_settlement_records WHERE digest = ?");
+  return digests.map((digest) => {
+    const row = stmt.get(digest) as Record<string, unknown> | undefined;
+    if (!row) return null;
+    return {
+      digest: String(row.digest),
+      taskId: String(row.task_id),
+      published: String(row.published),
+      object: JSON.parse(String(row.object_json)),
+    };
+  });
 }
 
 export function saveCommit(db: Db, taskId: string, bidder: string, commitment: string, published: string): void {
