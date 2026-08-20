@@ -1,7 +1,9 @@
 # ADR-0004 — Solo-foundation hardening before federation
 
-- **Status:** Proposed
-- **Date:** 2026-08-19
+- **Status:** Accepted, then **confirmed under implementation** — all four decisions are
+  built and gated; the build's own review forced precision on the determinism rules
+  rather than a change of decision (see [Build status](#build-status))
+- **Date:** 2026-08-19 · built 2026-08-20
 - **Applies to:** the solo profile (P1–P3), as prerequisites hardened before any
   [P4](../05-roadmap.md#p2p7) federation work begins
 - **Builds on:** [ADR-0001](0001-p1-stack.md), [ADR-0002](0002-p2-hub-and-crdt-stack.md),
