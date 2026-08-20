@@ -107,9 +107,11 @@ closed.
 Seven findings from [scenario 08](08-the-subcontract.md), the P4 shakedown: the
 handshake exercised alone, with an adversarial prober and a two-export replay. The raw
 walkthrough surfaced five; the scenario's own review pass split one and added one, and
-its corrections are folded into the scenario's verdict. Unresolved; candidates are the
-scenario's own suggestions. ADR-0008 (the P4 stack) is the expected landing ground for
-25–28 and 30; 29a/29b are verifier and record architecture.
+its corrections are folded into the scenario's verdict. Findings 25–28 and 30 have a proposed resolution in
+[ADR-0008](../adr/0008-p4-federation-stack.md) (the P4 federation stack — grants,
+transport auth, the boundary log, expiry semantics, sited ingestion duties); they mark
+resolved when it is accepted and built. 29a/29b are verifier and record architecture,
+deferred by that ADR to their own.
 
 | # | Finding | Candidate |
 |---|---|---|
