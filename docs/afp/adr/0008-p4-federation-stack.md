@@ -69,6 +69,15 @@ co-signed object in **both** outboxes — and its scope becomes a list of **gran
   (hub-scoped reputation, soft) is **defined as skipped** for direct-delegation
   traffic — there is no hub whose reputation could apply, and an undefined check in a
   hard-gate sequence is how implementations fork.
+- **"Co-signed" means dual-Create, not multi-signature.** `attachProof` is
+  single-proof by construction (ADR-0001), and this ADR does not touch the
+  cryptographic core: each party publishes its **own** signed
+  `Create{afp:FederationAgreement}` wrapping a **byte-identical** agreement object,
+  whose digest is the agreement's identity. The activation rule a gate enforces
+  follows: an agreement is **active** only while the instance holds *both* Creates
+  over digest-equal objects — its own, and the counterparty's received via inbox —
+  and `afp:expires` has not passed. One Create is an offer on the record, not a
+  permission.
 - **Replay recomputes admissibility.** For every cross-boundary activity: a co-signed
   agreement between the two operators, active at the activity's `published` instant,
   holding a grant that covers it — or a named failure that says which grants existed
@@ -99,7 +108,22 @@ before anything else runs, unsigned or invalid deliveries audit-logged and dropp
 ### 3. The boundary gate leaves a trace it can sign
 
 The two-tier gate runs as 01 orders it — agreement → deny-list → `afp:MembershipProof`
-→ reputation-soft — and rejection acquires a record, with its limits stated honestly:
+→ reputation-soft — with two of its inputs given the shapes they never had:
+
+- **Check 3 reduces, at P4a, to the fetched-`operatedBy` binding.** In the pairwise
+  profile there is no shared roster for a proof object to attest against; what the
+  check means here is ADR-0005's issuer rule applied over the wire — the sending
+  agent's actor document (fetched from the counterparty) names an `afp:operatedBy`
+  that is a party to the admitting agreement. A distinct `afp:MembershipProof`
+  *object* is deferred to P5, where hub enrollment gives it content to prove.
+- **`afp:Defederate` is a signed activity in the issuing instance's own outbox** —
+  actor: the instance, object: the counterparty instance, `summary`: the reason —
+  whose local effect is immediate: the agreement is treated as expired *now* and the
+  counterparty enters the deny-list. It is advisory to the other side (which may not
+  even receive it) and load-bearing on one's own: the record shows when and why the
+  door closed, which is what scenario 03 already assumed of it.
+
+Rejection then acquires a record, with its limits stated honestly:
 
 - **Verifiable rejection is impossible in the negative.** ADR-0003 D6 made bid
   rejection checkable because the announce pins who was considered; a boundary stranger
@@ -169,6 +193,27 @@ in order:
   grammar, `afp:AuditGrant` served over authorized fetch. Nothing in P4b gates P4a, and
   the RSA interop wart lives entirely here.
 
+**Runtime shape, mapped to the seams that exist.** The boundary is not a new
+architecture; it is two bounded changes to named files. Sending side: an
+`HttpTransport` implementing the existing `Transport.deliver(target, activity)` port
+(`store/queue.ts`) — the same seam every in-process delivery already crosses, so
+retry, backoff and dead-lettering come along unchanged. Receiving side: an inbox
+`POST` route on `ap/server.ts` (today `GET`-only by design) that runs HTTP-Signature
+verification, then the gate, then hands the activity to the same dispatch the local
+transport feeds. **The bootstrap that makes signed fetch possible**: actor documents
+are `public`, so the unauthenticated fetch of a counterparty's actor document is the
+anchor — its published keys then verify that counterparty's signed requests for
+everything above `public`. The regress terminates by visibility design, and P4
+depends on it staying that way.
+
+**The gate's test harness is two real instances in one test process** — two
+`AfpInstance`s with distinct origins (the ADR-0005 gate already proved that
+construction), real HTTP over ephemeral localhost ports, real signatures, no mocked
+wire. HTTP Signatures themselves need **no Python mirror**: transport authentication
+is ephemeral and never enters the record, so the verifier never sees it — the parity
+clause below deliberately scopes to derivations that land in the record, and that
+asymmetry is correct, not an omission.
+
 Parity discipline is not optional for any of it: every derivation or comparison this
 ADR adds (grant admissibility, expiry instants, boundary-log chaining) lands with
 raw-JSON cases in the shared parity harness before its gate is called done.
@@ -220,12 +265,14 @@ raw-JSON cases in the shared parity harness before its gate is called done.
 ## Build status
 
 Nothing is built. Tasks are staged per Decision 6; the two-export verifier (29a) and
-redaction stubs (29b) are tracked by their own forthcoming ADR, not here.
+redaction stubs (29b) are tracked by their own forthcoming ADR, not here. **F4 first**:
+it is the smallest task, lives entirely inside existing machinery, and its
+monotonicity check hardens everything the rest of the build produces.
 
 | ID | Task | Stage |
 |---|---|---|
 | **F1** | `afp:FederationAgreement` with grants; handshake builders; gate module (agreement → deny-list → proof → soft-reputation, check 4 skipped for direct grants) | P4a |
-| **F2** | Inbox listener: HTTP Signature verification, then the gate, then dispatch — the first resident process | P4a |
+| **F2** | The boundary on the existing seams: `HttpTransport` implementing `Transport.deliver` (send), inbox `POST` on `ap/server.ts` (receive) — signature verification, then the gate, then the same dispatch local transport feeds | P4a |
 | **F3** | Hash-chained boundary log + optional `afp:BoundaryDigest`; rate limiting in front | P4a |
 | **F4** | Expiry semantics at the gate; verifier: grant admissibility, expiry instants, and the global `published`-monotonicity check | P4a |
 | **F5** | Boundary ingestion: sandbox + summarize duties enforced at the receiving port | P4a |
