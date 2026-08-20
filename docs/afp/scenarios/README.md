@@ -102,7 +102,7 @@ v3.12), 21 and 22 as spec precision (v3.13), then 19 as spec text and 24 through
 it into [ADR-0007](../adr/0007-supersession.md)'s three decisions (v3.14). Campaign
 closed.
 
-### Campaign 5 → v3.16 (ADR-0008) — 29a/29b open
+### Campaign 5 → v3.16–v3.17 (ADR-0008, ADR-0009)
 
 Seven findings from [scenario 08](08-the-subcontract.md), the P4 shakedown: the
 handshake exercised alone, with an adversarial prober and a two-export replay. The raw
@@ -111,12 +111,11 @@ its corrections are folded into the scenario's verdict. Findings 25–28 and 30 
 accepted and built (v3.16): grants, dual-Create activation, the hop's HTTP Signatures
 over the one payload suite, the hash-chained boundary log, expiry semantics with the
 global monotonicity backstop, and both ingestion duties enforced at the receiving port.
-**29a/29b have a proposed resolution** in
-[ADR-0009](../adr/0009-federated-replay.md) — federated replay as N single-export
-replays plus a cross-check, authority partitioned by `afp:operatedBy`, and redaction as
-an export-time transform emitting digest-only stubs, so discretion is declared and
-deletion is detected. They mark resolved, and the campaign closes, when it is accepted
-and built.
+**29a/29b are resolved** — [ADR-0009](../adr/0009-federated-replay.md) accepted and
+built (v3.17): federated replay as N single-export replays plus a cross-check, received
+bytes matched against the sender's record, redaction as export-time digest-only stubs
+with declared scope — discretion is declared, deletion is detected, and the auditor's
+two folders are one command. **Campaign closed, 7 for 7.**
 
 | # | Finding | Candidate |
 |---|---|---|

@@ -64,6 +64,24 @@ export class Inbox {
     return { status: "dispatched" };
   }
 
+  /**
+   * Entry for activities the federation boundary has already authenticated
+   * and gated (ADR-0008/0009): the object proof was verified against the
+   * sender's *fetched* actor document and the two-tier gate admitted it, so
+   * the P1 local-roster check does not apply — a foreign actor is exactly
+   * what the boundary exists to admit. Dedupe and audit run unchanged.
+   */
+  async receiveAdmitted(activity: { [key: string]: JsonValue }): Promise<ReceiveOutcome> {
+    const activityId = typeof activity.id === "string" ? activity.id : "";
+    const actorUrl = String(activity.actor ?? "");
+    if (!activityId) return this.dropDelivery("rejected", "", actorUrl, "activity has no id");
+    if (!this.instance.seen.markSeen(activityId, this.instance.clock.now())) {
+      return this.dropDelivery("duplicate", activityId, actorUrl, `activity ${activityId} already delivered`);
+    }
+    await this.dispatch(activity);
+    return { status: "dispatched" };
+  }
+
   /** Record a dropped delivery, then report it. Nothing is discarded silently. */
   dropDelivery(
     outcome: "rejected" | "duplicate",

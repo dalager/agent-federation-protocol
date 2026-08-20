@@ -30,6 +30,7 @@ from __future__ import annotations
 from urllib.parse import urlsplit
 
 from decision import afp_object, instant_millis
+from proof import digest_of
 
 # --------------------------------------------------------------- grant match
 #
@@ -159,6 +160,13 @@ def check_federation(report, all_activities: list[dict], authority) -> None:
 
     cross_boundary: list[tuple[dict, str]] = []  # (activity, foreign target actor)
     for activity in all_activities:
+        # Handshake traffic is grant-exempt by construction (ADR-0008): the
+        # Offer/Create over an afp:FederationAgreement is the door-knock that
+        # establishes what a grant would check — demanding a grant for it
+        # would make every first contact inadmissible.
+        obj = activity.get("object")
+        if isinstance(obj, dict) and obj.get("type") == "afp:FederationAgreement":
+            continue
         for target in _to_list(activity.get("to")):
             if _origin(target) is not None and _origin(target) != instance_origin:
                 cross_boundary.append((activity, target))
@@ -245,4 +253,102 @@ def check_federation(report, all_activities: list[dict], authority) -> None:
                     f"{summary['objectType']} for afp:correlationId {correlation!r} published "
                     f"after every admitting agreement expired, with no in-time Accept on "
                     f"record for the same correlation (ADR-0008 Decision 4)",
+                )
+
+
+def check_joint(report, bundles: list[dict]) -> None:
+    """ADR-0009 phase two — the cross-checks that only make sense over the set.
+
+    Each bundle: {"path": Path, "instance_actor": str, "activities": [...]}.
+    Two checks, both digest arithmetic over evidence already signed:
+
+    - the co-signed agreement appears digest-equal in every party's export —
+      a pair of exports whose agreements differ is not one engagement, it is
+      two stories;
+    - every activity a bundle holds as received-from-a-counterparty resolves,
+      byte for byte, in that counterparty's export — or is covered by a
+      redaction stub declaring its digest. Divergence is surfaced, never
+      averaged: two validly-signed copies of different history is the
+      strongest tampering evidence a replay can produce. An uncovered absence
+      is attributed to the sender — the domain that owns the proof.
+    """
+    import json as _json
+
+    by_actor = {b["instance_actor"]: b for b in bundles if b.get("instance_actor")}
+
+    def digests_of(bundle) -> dict[str, dict]:
+        return {digest_of(a): a for a in bundle["activities"]}
+
+    def stub_digests(bundle) -> set[str]:
+        stubs = set()
+        for outbox_path in sorted((bundle["path"] / "outbox").glob("*.jsonld")):
+            for item in _json.loads(outbox_path.read_text()).get("orderedItems", []):
+                if isinstance(item, dict) and item.get("type") == "afp:Redacted":
+                    stubs.add(str(item.get("afp:digest")))
+        return stubs
+
+    # 1 — agreement digest-equality across every pair that shares parties.
+    for bundle in bundles:
+        for activity in bundle["activities"]:
+            obj = activity.get("object")
+            if not (isinstance(obj, dict) and obj.get("type") == "afp:FederationAgreement"):
+                continue
+            if activity.get("type") != "Create":
+                continue
+            agreement_digest = digest_of(obj)
+            for party in obj.get("afp:parties", []) or []:
+                other = by_actor.get(party)
+                if other is None or other is bundle:
+                    continue
+                held = any(
+                    isinstance(o := a.get("object"), dict)
+                    and o.get("type") == "afp:FederationAgreement"
+                    and digest_of(o) == agreement_digest
+                    for a in other["activities"]
+                )
+                report.record(
+                    f"joint: agreement {agreement_digest[:24]}… digest-equal in both exports",
+                    held,
+                    "" if held else
+                    f"{bundle['instance_actor']} holds an agreement naming {party} that "
+                    f"{party}'s export does not hold — two exports, two stories (ADR-0009)",
+                )
+
+    # 2 — received bytes match sent bytes, or a stub covers them.
+    for bundle in bundles:
+        received_path = bundle["path"] / "received.jsonld"
+        if not received_path.exists():
+            continue
+        for item in _json.loads(received_path.read_text()).get("orderedItems", []):
+            sender_actor = item.get("afp:from")
+            activity = item.get("afp:activity")
+            if not (isinstance(sender_actor, str) and isinstance(activity, dict)):
+                continue
+            sender = by_actor.get(sender_actor)
+            digest = digest_of(activity)
+            label = activity.get("id", digest[:24] + "…")
+            if sender is None:
+                report.record(
+                    f"joint: received {label} has its sender's export in the set",
+                    False,
+                    f"received from {sender_actor}, whose export is not part of this replay",
+                )
+                continue
+            sent = digests_of(sender)
+            if digest in sent:
+                report.record(f"joint: received {label} matches the sender's record", True, "")
+            elif digest in stub_digests(sender):
+                report.record(
+                    f"joint: received {label} covered by the sender's declared redaction",
+                    True,
+                    "",
+                )
+            else:
+                report.record(
+                    f"joint: received {label} matches the sender's record",
+                    False,
+                    f"{bundle['instance_actor']} holds these bytes as received from "
+                    f"{sender_actor}, whose export neither contains them nor declares a "
+                    f"redaction stub for {digest[:24]}… — attributed to the sender, who "
+                    f"owns the proof (ADR-0009)",
                 )

@@ -279,7 +279,7 @@
 
 <div class="page">
   <header class="hero">
-    <p class="eyebrow">Architecture Spec &middot; Multi-Operator Agent Federation &middot; Revision 3.16</p>
+    <p class="eyebrow">Architecture Spec &middot; Multi-Operator Agent Federation &middot; Revision 3.17</p>
     <h1>Agent Federation Protocol</h1>
     <p class="dek">Multiple operators, each running their own instance of agents, join forces on a common problem — federating through problem-scoped hubs over ActivityPub, the W3C protocol behind Mastodon. No central broker, consortium trust, no token economics.</p>
     <div class="callout">
@@ -322,7 +322,7 @@
 
     <main>
       <section id="changelog">
-        <div class="sec-head"><span class="num">&Delta;</span><h2>What changed in v3, v3.4&ndash;3.16</h2></div>
+        <div class="sec-head"><span class="num">&Delta;</span><h2>What changed in v3, v3.4&ndash;3.17</h2></div>
         <div class="table-wrap">
           <table>
             <thead><tr><th>#</th><th>Change</th><th>Why</th></tr></thead>
@@ -394,6 +394,8 @@
               <tr><td>53</td><td>Federation without a hub: P1&rarr;P4, recognition and direct cross-operator delegation, then stop. Everything replay-guaranteed survives the hub&rsquo;s absence, because the hub was never a trust anchor; what the profile gives up is listed in cost order &mdash; the electorate first</td><td>Scenario 08 proved it by walking it, and its boundary is one sentence: a hub is what you call the place where an electorate keeps its membership. The adoption path is the argument &mdash; start pairwise, add a hub the day a decision must bind three parties</td></tr>
               <tr><td colspan="3" style="background:var(--surface-2); font-weight:700;">v3.16 &mdash; P4 built (ADR-0008; campaign 5 findings 25&ndash;28 and 30)</td></tr>
               <tr><td>54</td><td>The handshake is dual-Create over a byte-identical, grants-bearing agreement; the two-tier gate runs at a real HTTP inbox with draft-cavage hop signatures over the one <code>eddsa-jcs-2022</code> payload suite; refusals land in a hash-chained boundary log; expiry stalls new work, never in-flight work, backstopped by chain-wide <code>published</code> monotonicity; both ingestion duties are enforced at the receiving port (&sect;02, &sect;19, &sect;22)</td><td>Gated by the first two-instance test over real localhost HTTP: a validly-signed stranger hard-rejected and logged, 404-not-403, the post-expiry Offer refused while the in-flight Result lands. P4 ends the no-daemon era &mdash; the inbox listener is the first resident process</td></tr>
+              <tr><td colspan="3" style="background:var(--surface-2); font-weight:700;">v3.17 &mdash; federated replay built (ADR-0009; campaign 5 closed, findings 29a/29b)</td></tr>
+              <tr><td>55</td><td>The verifier takes several exports at once: N single-domain replays with domain-labelled findings, then a cross-check &mdash; the co-signed agreement digest-equal in every party's bundle, received bytes matched against the sender's own record, divergence surfaced and absence attributed to the domain that owns it. Redaction is an export-time transform: digest-only <code>afp:Redacted</code> stubs keep chains linkable and <code>afp:exportScope</code> declares omissions</td><td>Scenario 08's last mile &mdash; the auditor with two folders and a checklist &mdash; becomes one command, and 29b's line is drawn: discretion is declared, deletion is detected. Authority stays partitioned by <code>afp:operatedBy</code>, so no bundle can smuggle the counterparty's keys</td></tr>
             </tbody>
           </table>
         </div>

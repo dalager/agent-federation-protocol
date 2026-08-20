@@ -119,6 +119,11 @@ export class AfpInstance {
     return this.inbox.receive(activity);
   }
 
+  /** Boundary-admitted delivery (ADR-0008): trust was established at the gate. */
+  async receiveAdmitted(activity: { [key: string]: JsonValue }): Promise<ReceiveOutcome> {
+    return this.inbox.receiveAdmitted(activity);
+  }
+
   /** The audit log of dropped deliveries, newest last. */
   auditLog(): { at: string; outcome: string; activityId: string | null; reason: string }[] {
     return this.inbox.auditLog();

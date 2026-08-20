@@ -177,7 +177,14 @@ revised. The friction was the seam *between* the bundles: checking that the two 
 records agreed with each other about their shared boundary was partly manual, the
 tooling being built for one firm's records at a time. "The last mile of the audit story
 is a person with two folders and a checklist," Mette's retro notes say. "The whole
-point was to retire that person. Next engagement, that's what we fix."
+point was to retire that person. Next engagement, that's what we fix." (They did: the
+checking tool now takes both folders at once, replays each firm's record on its own
+terms, and then checks the two against each other — that the agreement both signed is
+byte-for-byte the same story in both bundles, and that everything one firm says it
+received is exactly what the other firm's record says it sent. The scoped-export
+problem went with it: Bravo's export now marks each lawfully-withheld entry with a
+sealed placeholder and declares its scope up front, so discretion reads as discretion
+and only deletion reads as deletion.)
 
 ## What she'd tell another practice lead
 
@@ -192,7 +199,8 @@ argument").
 What was harder than she imagined: everything at the seams. Deciding what a partner
 firm's export contains turned out to be a business negotiation wearing a technical
 costume. The scoped-export problem — lawful discretion looking identical to deletion —
-she'd assumed was solved and it isn't yet. And the discipline about not trusting
+she'd assumed was solved, and for a whole engagement it wasn't; the cover-letter patch
+held until the tooling caught up. And the discipline about not trusting
 cross-boundary content took cultural work *first* — the mechanical rails arrived after
 the near-miss taught everyone why they were needed: "The protocol is deny by default.
 People aren't. The rails caught up; the people had to get there on their own."

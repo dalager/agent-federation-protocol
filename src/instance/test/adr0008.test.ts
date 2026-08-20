@@ -83,7 +83,7 @@ async function operator(name: string, agents: readonly string[], clock: ReturnTy
   const server = createHttpServer(instance, {
     inbox: {
       federation,
-      receive: (activity) => instance.receive(activity),
+      receive: (activity) => instance.receiveAdmitted(activity),
       fetchDocument,
     },
   });

@@ -36,7 +36,7 @@ from allocation import check_announce_role, check_award
 from asset import check_assets
 from action import check_actions, check_supersession
 from decision import afp_object, check_decision_record, check_enroll_authority, instant_millis
-from federation import check_federation
+from federation import check_federation, check_joint
 from proof import CRYPTOSUITE, decode_multikey, digest_of, verify_proof
 
 
@@ -223,8 +223,27 @@ def check_chain(report: Report, actor: str, activities: list[dict]) -> None:
     """
     previous_digest: str | None = None
     previous_instant: int | None = None
+    after_stub = False
 
     for index, activity in enumerate(activities):
+        # ADR-0009 Decision 4: a redaction stub stands in chain position for a
+        # lawfully-withheld activity. Its declared digest becomes the link the
+        # next disclosed activity must name; its own backward link is inside
+        # the withheld content and is unverifiable by design. Monotonicity
+        # brackets across it (a stub carries no published).
+        if activity.get("type") == "afp:Redacted":
+            stub_digest = activity.get("afp:digest")
+            report.record(
+                f"chain: {actor}[{index}] redaction stub declares a digest",
+                isinstance(stub_digest, str) and stub_digest.startswith("sha256:"),
+                "" if isinstance(stub_digest, str) and str(stub_digest).startswith("sha256:") else
+                f"afp:Redacted without a well-formed afp:digest ({stub_digest!r}) — a stub "
+                f"that names nothing covers nothing (ADR-0009)",
+            )
+            previous_digest = str(stub_digest) if isinstance(stub_digest, str) else previous_digest
+            after_stub = True
+            continue
+
         label = f"{actor}[{index}] {activity.get('id', '<no id>')}"
         declared = activity.get("afp:prevActivity")
 
@@ -246,6 +265,13 @@ def check_chain(report: Report, actor: str, activities: list[dict]) -> None:
                 "" if declared is None else
                 f"first activity claims a predecessor ({declared}) — the chain does not start here",
             )
+        elif after_stub:
+            report.record(
+                f"chain: {label} links to the declared redaction",
+                declared == previous_digest,
+                "" if declared == previous_digest else
+                f"expected afp:prevActivity {previous_digest} (the stub's declared digest), found {declared}",
+            )
         else:
             report.record(
                 f"chain: {label} links to its predecessor",
@@ -255,6 +281,7 @@ def check_chain(report: Report, actor: str, activities: list[dict]) -> None:
             )
 
         previous_digest = digest_of(activity)
+        after_stub = False
 
 
 def check_attachments(report: Report, export: Path, activity: dict) -> None:
@@ -343,7 +370,7 @@ def outcome_type(activity: dict) -> str:
 # ----------------------------------------------------------------------- main
 
 
-def verify_export(export: Path, thread: str | None, report: Report) -> None:
+def verify_export(export: Path, thread: str | None, report: Report) -> dict:
     manifest_path = export / "MANIFEST.json"
     if not report.record("bundle: MANIFEST.json present", manifest_path.exists()):
         return
@@ -386,6 +413,8 @@ def verify_export(export: Path, thread: str | None, report: Report) -> None:
         )
 
         for index, activity in enumerate(activities):
+            if activity.get("type") == "afp:Redacted":
+                continue  # a stub is a placeholder, not an activity — check_chain owns it
             label = f"{actor}[{index}] {activity.get('id', '<no id>')}"
             reason = verify_proof(activity, keys)
             report.record(f"signature: {label}", reason is None, reason or "")
@@ -428,8 +457,19 @@ def verify_export(export: Path, thread: str | None, report: Report) -> None:
             "present in the bundle but attached to nothing — unbound evidence",
         )
 
-    # A per-actor chain cannot show that a whole participant is missing.
+    # A per-actor chain cannot show that a whole participant is missing — and a
+    # scoped export (ADR-0009 Decision 5) may *declare* an omission, which is
+    # discretion; an undeclared gap remains what it always was.
+    export_scope = manifest.get("afp:exportScope") or {}
+    declared_omissions = set(export_scope.get("afp:omittedActors", []) or [])
     for agent in sorted(authority.rostered):
+        if agent in declared_omissions:
+            report.record(
+                f"completeness: rostered agent {agent.split('/')[-1]} omitted by declared scope",
+                True,
+                "",
+            )
+            continue
         report.record(
             f"completeness: rostered agent {agent.split('/')[-1]} has an outbox",
             agent in seen_actors,
@@ -437,11 +477,23 @@ def verify_export(export: Path, thread: str | None, report: Report) -> None:
             f"{agent} is on the signed roster but contributes no outbox to this bundle",
         )
 
+    received_activities: list[dict] = []
+    received_path = export / "received.jsonld"
+    if received_path.exists():
+        for item in load_json(received_path).get("orderedItems", []):
+            if isinstance(item, dict) and isinstance(item.get("afp:activity"), dict):
+                received_activities.append(item["afp:activity"])
+
+    # A federated thread's terminal outcome may live in the counterparty's
+    # outbox; the receiving side holds those bytes verbatim (ADR-0009), so the
+    # thread replay pools them. Chain, signature and completeness checks never
+    # do — a foreign chain is its own domain's to answer for.
+    thread_pool = all_activities + received_activities
     threads = thread and [thread] or sorted(
-        {a["context"] for a in all_activities if isinstance(a.get("context"), str)}
+        {a["context"] for a in thread_pool if isinstance(a.get("context"), str)}
     )
     for name in threads:
-        check_thread(report, all_activities, name)
+        check_thread(report, thread_pool, name)
 
     # ADR-0005 Decision 2: who was entitled to issue each afp:Enroll. Exports
     # with no enrollment (all of P1) run none of this.
@@ -485,21 +537,48 @@ def verify_export(export: Path, thread: str | None, report: Report) -> None:
     # resolution. Exports with no assets and no reuse claims run none of this.
     check_assets(report, all_activities)
 
+    return {"path": export, "instance_actor": authority.instance_actor, "activities": all_activities}
+
+
+class PrefixedReport:
+    """Domain-labelled findings (ADR-0009 Decision 2's corollary): in a joint
+    replay every check names the export it ran against, so a hole is Bravo's
+    or Alpha's, never "the record's"."""
+
+    def __init__(self, report: Report, prefix: str):
+        self._report = report
+        self._prefix = prefix
+
+    def record(self, name: str, ok: bool, detail: str = "") -> bool:
+        return self._report.record(f"[{self._prefix}] {name}", ok, detail)
+
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Verify an AFP export bundle.")
-    parser.add_argument("export", type=Path, help="export directory")
+    parser = argparse.ArgumentParser(description="Verify one AFP export bundle, or replay several jointly (ADR-0009).")
+    parser.add_argument("exports", type=Path, nargs="+", help="export director(y|ies) — several run the federated joint replay")
     parser.add_argument("--thread", help="only replay this context (default: every thread found)")
     parser.add_argument("-v", "--verbose", action="store_true", help="show passing checks too")
     args = parser.parse_args()
 
-    if not args.export.is_dir():
-        print(f"no such export directory: {args.export}", file=sys.stderr)
-        return 2
+    for export in args.exports:
+        if not export.is_dir():
+            print(f"no such export directory: {export}", file=sys.stderr)
+            return 2
 
     report = Report()
     try:
-        verify_export(args.export, args.thread, report)
+        if len(args.exports) == 1:
+            verify_export(args.exports[0], args.thread, report)
+        else:
+            # ADR-0009 Decision 1: N single-export replays plus a cross-check —
+            # never a forked verifier. Phase one runs today's replay per bundle,
+            # domain-labelled; phase two runs the cross-checks that only make
+            # sense over the set.
+            bundles = []
+            for export in args.exports:
+                domain = export.name or str(export)
+                bundles.append(verify_export(export, args.thread, PrefixedReport(report, domain)))  # type: ignore[arg-type]
+            check_joint(report, bundles)
     except Exception as exc:  # a malformed bundle is a failed audit, not a crash
         report.record("bundle: readable", False, f"{type(exc).__name__}: {exc}")
 

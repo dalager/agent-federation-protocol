@@ -37,6 +37,16 @@ CREATE TABLE IF NOT EXISTS fed_agreements (
   expires           TEXT NOT NULL
 );
 
+-- Admitted cross-boundary activities, verbatim as received (ADR-0009 Decision
+-- 3's precondition): the joint replay checks these bytes against the sender's
+-- own export. Store what you verified, not a re-serialization.
+CREATE TABLE IF NOT EXISTS fed_received (
+  digest        TEXT PRIMARY KEY,
+  from_instance TEXT NOT NULL,
+  at            TEXT NOT NULL,
+  activity_json TEXT NOT NULL
+);
+
 -- Admitted cross-boundary correlations (ADR-0008 Decision 4): the in-time
 -- Accept is what a late outcome rides; the earliest admitted instant wins.
 CREATE TABLE IF NOT EXISTS fed_accepts (
@@ -181,6 +191,24 @@ export class Federation {
       )
       .all(counterparty) as { object_json: string }[];
     return rows.map((row) => JSON.parse(row.object_json) as AgreementObject);
+  }
+
+  /** Store an admitted cross-boundary activity verbatim (ADR-0009). */
+  recordReceived(activity: { [key: string]: JsonValue }, fromInstance: string): void {
+    this.db
+      .prepare(
+        "INSERT INTO fed_received (digest, from_instance, at, activity_json) VALUES (?, ?, ?, ?) ON CONFLICT (digest) DO NOTHING",
+      )
+      .run(digestOf(activity), fromInstance, this.now().toISOString(), JSON.stringify(activity));
+  }
+
+  receivedActivities(): { digest: string; fromInstance: string; activity: { [key: string]: JsonValue } }[] {
+    const rows = this.db.prepare("SELECT * FROM fed_received ORDER BY at, digest").all() as Record<string, unknown>[];
+    return rows.map((row) => ({
+      digest: String(row.digest),
+      fromInstance: String(row.from_instance),
+      activity: JSON.parse(String(row.activity_json)),
+    }));
   }
 
   /** Record an admitted cross-boundary correlation's acceptance instant. */

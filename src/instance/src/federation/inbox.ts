@@ -19,6 +19,7 @@
 import type { KeyObject } from "node:crypto";
 import type { JsonValue } from "../crypto/jcs.ts";
 import { publicKeyFromMultibase } from "../crypto/keys.ts";
+import { verifyProof } from "../crypto/proof.ts";
 import { verifyRequest } from "./httpSig.ts";
 import type { Federation } from "./federation.ts";
 
@@ -91,9 +92,41 @@ export async function handleInboxPost(
     return { status: 400, body: { error: "body is not JSON" } };
   }
 
-  // 2 — resolve the sending agent's operator from its own published document.
+  // 2 — resolve the sending agent's operator from its own published document,
+  // and verify the OBJECT proof against that document's keys: the hop
+  // signature authenticated the delivery, this authenticates the author. Both
+  // run before the gate — the boundary never gates an unverified claim.
   const actor = String(activity.actor ?? "");
   const actorDoc = actor ? await deps.fetchDocument(actor) : null;
+  const proofVerifies = (doc: { [key: string]: JsonValue } | null): boolean => {
+    const methods = Array.isArray(doc?.assertionMethod) ? (doc!.assertionMethod as JsonValue[]) : [];
+    for (const entry of methods) {
+      if (entry && typeof entry === "object" && !Array.isArray(entry)) {
+        const method = entry as { publicKeyMultibase?: JsonValue };
+        if (typeof method.publicKeyMultibase === "string") {
+          try {
+            if (verifyProof(activity, publicKeyFromMultibase(method.publicKeyMultibase)).ok) return true;
+          } catch {
+            /* try the next published key */
+          }
+        }
+      }
+    }
+    return false;
+  };
+  // Under instance custody (P1's model, carried across the boundary) the
+  // instance signs on the agent's behalf and afp:actingAs names the agent —
+  // so the proof verifies against the *operator's* published keys, and the
+  // actingAs binding must name the actor or attribution is unbound.
+  let objectProofOk = proofVerifies(actorDoc);
+  if (!objectProofOk && typeof activity["afp:actingAs"] === "string" && activity["afp:actingAs"] === actor) {
+    const operator = actorDoc && typeof actorDoc["afp:operatedBy"] === "string" ? String(actorDoc["afp:operatedBy"]) : null;
+    const operatorDoc = operator ? await deps.fetchDocument(operator) : null;
+    objectProofOk = proofVerifies(operatorDoc);
+  }
+  if (!objectProofOk) {
+    return { status: 401, body: { error: "object proof does not verify against the author's published keys" } };
+  }
   const docType = actorDoc?.type;
   const isInstanceActor =
     docType === "Application" || (Array.isArray(docType) && (docType as JsonValue[]).includes("afp:Instance"));
@@ -113,6 +146,7 @@ export async function handleInboxPost(
       const object = activity.object as { [key: string]: JsonValue };
       deps.federation.recordTheirCreate(object, activity);
     }
+    if (operatedBy) deps.federation.recordReceived(activity, operatedBy);
     await deps.receive(activity);
     return { status: 202, body: { accepted: true } };
   }
@@ -136,6 +170,7 @@ export async function handleInboxPost(
       (objectType === "afp:Result" || objectType === "afp:Error") &&
       deps.federation.lateOutcomeAdmissible(operatedBy, deps.federation.acceptPublishedFor(correlation))
     ) {
+      deps.federation.recordReceived(activity, operatedBy);
       await deps.receive(activity);
       return { status: 202, body: { accepted: true } };
     }
@@ -150,6 +185,7 @@ export async function handleInboxPost(
     if (correlation) deps.federation.recordAccept(correlation, operatedBy, String(activity.published ?? ""));
   }
 
+  if (operatedBy) deps.federation.recordReceived(activity, operatedBy);
   await deps.receive(activity);
   return { status: 202, body: { accepted: true } };
 }

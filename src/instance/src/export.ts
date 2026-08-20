@@ -20,6 +20,22 @@ import { join } from "node:path";
 import type { AfpInstance } from "./instance.ts";
 import { AFP_CONTEXTS } from "./ap/documents.ts";
 import type { JsonValue } from "./crypto/jcs.ts";
+import { digestOf } from "./crypto/proof.ts";
+
+/**
+ * A scoped export (ADR-0009 Decisions 4–5). Redaction is an export-time
+ * transform — the record is never touched: an activity outside the scope's
+ * threads is replaced in chain position by a digest-only stub, 1:1 and
+ * deliberately so (a mechanism that hides scale is the launderer's feature
+ * request), and an actor omitted entirely is a *declared* omission in the
+ * manifest. Discretion is declared; deletion is detected.
+ */
+export interface ExportScope {
+  /** Threads this bundle answers for; activities on other threads become stubs. */
+  threads: readonly string[];
+  /** Agents whose whole chain is withheld — declared, never silently absent. */
+  omitActors?: readonly string[];
+}
 
 export interface ExportSummary {
   dir: string;
@@ -35,7 +51,17 @@ export interface ExportableHub {
   outbox: { byActor(actorUrl: string): { activity: { [key: string]: JsonValue } }[] };
 }
 
-export function exportBundle(instance: AfpInstance, dir: string, hubs: ExportableHub[] = []): ExportSummary {
+export interface ReceivedSource {
+  receivedActivities(): { digest: string; fromInstance: string; activity: { [key: string]: JsonValue } }[];
+}
+
+export function exportBundle(
+  instance: AfpInstance,
+  dir: string,
+  hubs: ExportableHub[] = [],
+  scope?: ExportScope,
+  received?: ReceivedSource,
+): ExportSummary {
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(join(dir, "actors"), { recursive: true });
   mkdirSync(join(dir, "outbox"), { recursive: true });
@@ -47,16 +73,29 @@ export function exportBundle(instance: AfpInstance, dir: string, hubs: Exportabl
   let activities = 0;
   const actorNames: string[] = [];
 
+  const inScope = (activity: { [key: string]: JsonValue }): boolean =>
+    !scope || scope.threads.includes(String(activity.context ?? ""));
+
   const writeOutbox = (file: string, actorUrl: string): void => {
     const entries = instance.outbox.byActor(actorUrl);
     activities += entries.length;
+    // ADR-0009 Decision 4: out-of-scope activities are replaced in chain
+    // position by digest-only stubs — the following activity's afp:prevActivity
+    // still resolves, contiguity is preserved, content is not disclosed.
+    const items = entries.map((entry) =>
+      inScope(entry.activity)
+        ? entry.activity
+        : ({ type: "afp:Redacted", "afp:digest": digestOf(entry.activity), "afp:visibility": "out-of-scope" } as {
+            [key: string]: JsonValue;
+          }),
+    );
     writeJson(join(dir, "outbox", `${file}.jsonld`), {
       "@context": AFP_CONTEXTS,
       id: `${actorUrl}/outbox`,
       type: "OrderedCollection",
       attributedTo: actorUrl,
-      totalItems: entries.length,
-      orderedItems: entries.map((entry) => entry.activity),
+      totalItems: items.length,
+      orderedItems: items,
     });
   };
 
@@ -65,7 +104,9 @@ export function exportBundle(instance: AfpInstance, dir: string, hubs: Exportabl
   // *how they got there* (01 § Vouch / disown).
   writeOutbox("instance", String(instance.instanceDocument().id));
 
+  const omitted = new Set(scope?.omitActors ?? []);
   for (const spec of instance.specs) {
+    if (omitted.has(spec.name)) continue; // declared in the manifest, not silently absent
     actorNames.push(spec.name);
     writeJson(join(dir, "actors", `${spec.name}.jsonld`), instance.agentDocument(spec.name));
     writeOutbox(spec.name, instance.actorId(spec.name));
@@ -93,6 +134,21 @@ export function exportBundle(instance: AfpInstance, dir: string, hubs: Exportabl
     });
   }
 
+  // ADR-0009 Decision 3: what this instance received across the boundary,
+  // verbatim — the bytes the joint replay checks against the sender's export.
+  if (received) {
+    const items = received.receivedActivities();
+    if (items.length) {
+      writeJson(join(dir, "received.jsonld"), {
+        "@context": AFP_CONTEXTS,
+        id: `${String(instance.instanceDocument().id)}/received`,
+        type: "OrderedCollection",
+        totalItems: items.length,
+        orderedItems: items.map((item) => ({ "afp:from": item.fromInstance, "afp:activity": item.activity })),
+      });
+    }
+  }
+
   const artifacts = instance.artifacts.all();
   for (const ref of artifacts) {
     // Raw bytes on purpose: the verifier's job is to notice when they no longer
@@ -109,6 +165,14 @@ export function exportBundle(instance: AfpInstance, dir: string, hubs: Exportabl
     activities,
     artifacts: artifacts.length,
     cryptosuite: "eddsa-jcs-2022",
+    ...(scope
+      ? {
+          "afp:exportScope": {
+            "afp:threads": [...scope.threads],
+            "afp:omittedActors": [...(scope.omitActors ?? [])].map((name) => instance.actorId(name)),
+          },
+        }
+      : {}),
   });
 
   return { dir, actors: actorNames.length, activities, artifacts: artifacts.length };

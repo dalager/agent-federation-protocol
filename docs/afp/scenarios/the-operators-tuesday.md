@@ -164,5 +164,10 @@ stranger's validly-signed probes bounced off the gate, "were we probed" stopped 
 feeling — `sqlite3 data/afp.db "SELECT at, actor, step, reason FROM fed_boundary_log"`
 answers it, each row hash-chained to the last so the log can't be quietly thinned. The
 probes themselves cost the stranger a 401 unsigned and a 403 signed, and cost Kasper
-nothing but the query. The two-bundle audit seam is still the soft part — that one is
-next.
+nothing but the query. The two-bundle audit seam got fixed the way everything here gets
+fixed — it became a command: `afp_verify.py export-a export-b` runs each firm's replay
+and then checks the pair against each other, findings labelled with whose domain they
+belong to. Kasper's contribution to that was one flag on the export and a list of thread
+IDs; the redactions come out as digest-only stubs and the manifest says what was left
+out on purpose, so his other clients stay his business without his export looking
+tampered with.

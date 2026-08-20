@@ -1,6 +1,7 @@
 # ADR-0009 — Federated replay: two exports, one engagement, and lawful redaction
 
-- **Status:** Proposed
+- **Status:** Accepted, and **built** — gated by the first joint replay: two real
+  instances, two exports (one scoped, with stubs and a declared omission), one command
 - **Date:** 2026-08-20
 - **Applies to:** verification of any engagement spanning trust domains — load-bearing
   from P4 (the boundary exists and is built, ADR-0008), unavoidable at P5
@@ -180,13 +181,13 @@ must survive them before a join means anything), then the partition, then the jo
 
 | ID | Task | Stage |
 |---|---|---|
-| **V1** | Redaction stubs in `exportBundle` (scope option: threads / visibility floor / agreement); stub-aware `check_chain` + monotonicity bracketing | 1 |
-| **V2** | `afp:exportScope` in the manifest; scoped completeness (declared omissions vs silent holes) | 1 |
-| **V3** | Partitioned `build_authority` over an export set; agreement digest-equality; domain-labelled findings | 2 |
-| **V4** | Cross-export resolution: received-bytes digest match, divergence and absence findings with attribution | 2 |
-| **V5** | The joint entry point (`afp_verify.py` accepting multiple exports, or a thin `fed_verify.py` orchestrating phase one per export + phase two) | 2 |
-| **V6** | Gate: the two-instance flow of `test/adr0008.test.ts` extended to export both sides and joint-verify — clean pass, then mutations: forged counterparty actor doc (partition catches), re-signed received activity (divergence), silent gap vs stubbed gap (deletion fails, discretion passes), mismatched agreement objects | 2 |
-| **V7** | Parity cases for stub-aware chain walking and the digest-match rule, in the raw-JSON harness | 1–2 |
+| **V1** ✅ | Redaction stubs in `exportBundle` (scope option: threads / visibility floor / agreement); stub-aware `check_chain` + monotonicity bracketing | 1 |
+| **V2** ✅ | `afp:exportScope` in the manifest; scoped completeness (declared omissions vs silent holes) | 1 |
+| **V3** ✅ | Partitioned `build_authority` over an export set; agreement digest-equality; domain-labelled findings | 2 |
+| **V4** ✅ | Cross-export resolution: received-bytes digest match, divergence and absence findings with attribution | 2 |
+| **V5** ✅ | The joint entry point (`afp_verify.py` accepting multiple exports, or a thin `fed_verify.py` orchestrating phase one per export + phase two) | 2 |
+| **V6** ✅ | Gate: the two-instance flow of `test/adr0008.test.ts` extended to export both sides and joint-verify — clean pass, then mutations: forged counterparty actor doc (partition catches), re-signed received activity (divergence), silent gap vs stubbed gap (deletion fails, discretion passes), mismatched agreement objects | 2 |
+| **V7** — | Parity cases: none needed — no shared derivation exists (see the note above); covered by V6's mutations | — |
 
 ## References
 
