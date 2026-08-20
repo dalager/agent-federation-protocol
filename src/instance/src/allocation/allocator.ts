@@ -119,6 +119,15 @@ export class Allocator {
       snapshot = settlementRecordsBefore(this.hub.db, this.hub.now().toISOString()).map((r) => r.digest);
       spec = { ...spec, settlementSnapshot: snapshot };
     }
+    // ADR-0006 Decision 2: the performer wall resolves through prior Awards,
+    // so a listed task must already hold one — an exclusion that cannot be
+    // reconstructed excludes nobody, and the verifier will say so anyway.
+    for (const prior of spec.excludePerformersOf ?? []) {
+      const priorAuction = loadAuction(this.hub.db, prior);
+      if (!priorAuction?.award) {
+        throw new Error(`afp:excludePerformersOf names ${prior}, which has no Award to exclude performers of`);
+      }
+    }
     // One auction per thread (H9). The counterparty check that authorizes an
     // actuals report resolves the auction *by thread*, so two auctions sharing
     // one would let a report settle the wrong task.
@@ -146,6 +155,7 @@ export class Allocator {
       requester,
       reputationRule: spec.reputationRule ?? null,
       settlementSnapshot: snapshot,
+      excludePerformersOf: spec.excludePerformersOf?.length ? [...spec.excludePerformersOf] : null,
     });
     return entry;
   }
@@ -206,6 +216,14 @@ export class Allocator {
       requester: actor,
       // The hub re-pins its own exhaustive snapshot at re-announce time.
       reputationRule: repRule?.name ? { name: String(repRule.name), params: { ...(repRule.params ?? {}) } } : undefined,
+      // ADR-0006 pins travel with the requester's ask into the re-fan-out.
+      actionPolicy:
+        object["afp:actionPolicy"] && typeof object["afp:actionPolicy"] === "object" && !Array.isArray(object["afp:actionPolicy"])
+          ? Object.fromEntries(Object.entries(object["afp:actionPolicy"] as Record<string, JsonValue>).map(([k, v]) => [k, String(v)]))
+          : undefined,
+      excludePerformersOf: Array.isArray(object["afp:excludePerformersOf"])
+        ? (object["afp:excludePerformersOf"] as JsonValue[]).map(String)
+        : undefined,
     });
   }
 
@@ -277,6 +295,14 @@ export class Allocator {
     }
     if (auction.estimatorPolicy === "exclude" && auction.estimators.includes(actor)) {
       return reject("estimator excluded from bidding on execution of work it estimated (afp:estimatorPolicy=exclude)");
+    }
+    // ADR-0006 Decision 2: the estimator wall generalized — a performer of a
+    // task this announce lists is excluded the same way, same audit lane.
+    for (const prior of auction.excludePerformersOf ?? []) {
+      const performers = (loadAuction(this.hub.db, prior)?.award?.["afp:performers"] as JsonValue[] | undefined) ?? [];
+      if (performers.includes(actor)) {
+        return reject(`performer of ${prior} excluded from this auction (afp:excludePerformersOf)`);
+      }
     }
     if (!commitment) return reject("commit carries no afp:commitment");
     // One sealed commitment per bidder. A second, *different* commitment is a

@@ -34,6 +34,7 @@ from pathlib import Path
 
 from allocation import check_announce_role, check_award
 from asset import check_assets
+from action import check_actions
 from decision import afp_object, check_decision_record, check_enroll_authority
 from proof import CRYPTOSUITE, decode_multikey, digest_of, verify_proof
 
@@ -439,6 +440,10 @@ def verify_export(export: Path, thread: str | None, report: Report) -> None:
     for activity in all_activities:
         if activity.get("type") == "Announce" and afp_object(activity, "afp:Task") is not None:
             check_announce_role(report, activity, all_activities)
+
+    # ADR-0006 Decision 1: every action hash-binds to the Synthesis that
+    # justified it, and did what the pinned policy said that answer permits.
+    check_actions(report, all_activities)
 
     # ADR-0004 Decision 2: the asset registry replays from Update{afp:Asset};
     # (id, version) immutability, member-role registration, and reuse-reference

@@ -158,6 +158,10 @@ happened.
 | `afp:reuses` / `afp:reused` | Properties (Bid / Result) | An asset-reuse claim under the sealed commitment, and its delivered closure — both resolvable at replay |
 | `afp:reputationRule` | Property (announced Task) | `{name, params}` — a named pure derivation over settlements, from a small registry; pinned before any bid (ADR-0004) |
 | `afp:settlementSnapshot` | Property (announced Task) | Digests of every `afp:Settlement` the reputation derivation runs over — pinned at announce time, like `afp:quorumSnapshot` pins voters |
+| `afp:actionPolicy` | Property (announced Task) | Closed map `category → admissible action`, pinned before any answer exists — what may be *done* about the answer, recomputable at replay (ADR-0006) |
+| `afp:category` | Property (Synthesis) | The answer's category — MUST be a key of the announce's pinned `afp:actionPolicy` when one exists |
+| `afp:actsOn`, `afp:action` | Properties (any acting activity) | Digest of the Synthesis this action acts on, and the action name it claims — the consequence hash-bound to its cause, checked against the pinned policy |
+| `afp:excludePerformersOf` | Property (announced Task) | Prior task ids whose Award performers are excluded from this auction — the estimator wall generalized to any earlier task (ADR-0006) |
 
 > **Numeric profile.** Signed AFP documents carry **integers only** — the JCS
 > canonicalization this profile signs over ([01](01-foundations.md)) rejects non-integer
@@ -404,6 +408,11 @@ alongside v1's flow, it doesn't replace it.
    **reveals land after the window closes**, or the bid showed its hand to later
    bidders. A commit from a non-`member` role (a requester or observer — 02, ADR-0004) is
    rejected at admission the same way, and the verifier's pool reconstruction excludes it.
+   So is a commit from any performer of a task the announce lists under
+   `afp:excludePerformersOf` (ADR-0006) — the estimator wall generalized: "the agent that
+   wrote it may not review it" is the same separation as "the agent that scoped it may
+   not bid on it," bound to a named prior task's Award instead of to a scoping role, and
+   the excluded set is rebuilt from those Awards at replay rather than taken on trust.
 3. **Award** — the announcer (or the pre-published deterministic rule) emits `afp:Award`
    naming the winning payload digests (`afp:winningBids`), the `afp:performers`, the
    `afp:synthesizer` where the rule awards several, and `afp:acceptBy`. Anyone

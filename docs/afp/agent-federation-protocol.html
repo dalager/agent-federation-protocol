@@ -279,7 +279,7 @@
 
 <div class="page">
   <header class="hero">
-    <p class="eyebrow">Architecture Spec &middot; Multi-Operator Agent Federation &middot; Revision 3.11</p>
+    <p class="eyebrow">Architecture Spec &middot; Multi-Operator Agent Federation &middot; Revision 3.12</p>
     <h1>Agent Federation Protocol</h1>
     <p class="dek">Multiple operators, each running their own instance of agents, join forces on a common problem — federating through problem-scoped hubs over ActivityPub, the W3C protocol behind Mastodon. No central broker, consortium trust, no token economics.</p>
     <div class="callout">
@@ -322,7 +322,7 @@
 
     <main>
       <section id="changelog">
-        <div class="sec-head"><span class="num">&Delta;</span><h2>What changed in v3, v3.4&ndash;3.11</h2></div>
+        <div class="sec-head"><span class="num">&Delta;</span><h2>What changed in v3, v3.4&ndash;3.12</h2></div>
         <div class="table-wrap">
           <table>
             <thead><tr><th>#</th><th>Change</th><th>Why</th></tr></thead>
@@ -381,6 +381,9 @@
               <tr><td>44</td><td>Vote weight is per seated <em>instance</em>, not per agent (&sect;05): each instance carries the same total, divided among its live pinned voters as integers via a common denominator. Quorum&rsquo;s <code>n</code> is seated instances</td><td>Uniform per-agent weight let an operator&rsquo;s say grow with headcount — the cheapest attack on a consortium, needing no reasoning. At one instance the rule reduces to today&rsquo;s weight of 1, so existing exports recompute unchanged</td></tr>
               <tr><td>45</td><td><code>afp:voterWeights</code> is recomputable from the pinned voters and the roster, not merely recorded (&sect;05)</td><td>Otherwise a proposer writes whatever numbers it wants; this is the discipline every other recomputable field already carries</td></tr>
               <tr><td>46</td><td>Vote-weight reputation stays deferred, with a stated reason (&sect;05)</td><td>Estimate accuracy is not judgement, and weighting governance by past standing entrenches early winners while raising the payoff for gaming the inputs</td></tr>
+              <tr><td colspan="3" style="background:var(--surface-2); font-weight:700;">v3.12 &mdash; checkable actuation (ADR-0006, scenario 06 findings 20 and 23)</td></tr>
+              <tr><td>47</td><td><code>afp:actionPolicy</code> pinned in the Announce — a closed <code>category &rarr; admissible action</code> map; the Synthesis carries <code>afp:category</code>, and every acting activity hash-binds itself to its justification via <code>afp:actsOn</code>/<code>afp:action</code> (&sect;09, &sect;16)</td><td>The first scenario where the swarm acts on its own conclusion found that a port agent obeying triage and one ignoring it were the same activities on the record — the &ldquo;enforcement that leaves no trace&rdquo; problem, relocated from admission to consequence</td></tr>
+              <tr><td>48</td><td><code>afp:excludePerformersOf</code> on the Announce (&sect;09): performers of named prior tasks are excluded at admission, and the excluded set is rebuilt from those tasks&rsquo; Awards at replay</td><td>&ldquo;The author of a fix may not review it&rdquo; is the estimator wall&rsquo;s exact shape; generalizing the wall makes the estimator case one instance of a pattern instead of the only one</td></tr>
             </tbody>
           </table>
         </div>

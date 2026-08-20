@@ -96,7 +96,13 @@ forecast, an assessment, assembled from several agents' partial answers. Collaps
 into a single figure destroys the uncertainty and disagreement a requester most needs.
 
 `afp:Synthesis` is the artifact for those. It is emitted by the synthesizer named in the
-Award (03 — Selection rules) and binds the answer to its inputs:
+Award (03 — Selection rules) and binds the answer to its inputs. Where the announce
+pinned an `afp:actionPolicy` (ADR-0006), the Synthesis MUST also carry `afp:category` —
+one of the policy's keys — because downstream *actions* are checked against
+`policy[category]`, and an answer outside the closed set would constrain nothing. The
+activity that then acts on the answer hash-binds itself to it (`afp:actsOn`,
+`afp:action`), so a replay can ask of any consequence: was this what the answer
+permitted? Its fields:
 
 ```json
 {

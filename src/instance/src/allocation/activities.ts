@@ -59,6 +59,17 @@ export interface AnnounceSpec {
    */
   reputationRule?: { name: string; params: { [key: string]: JsonValue } };
   settlementSnapshot?: readonly string[];
+  /**
+   * ADR-0006 Decision 1: what may be *done* about the answer — a closed map
+   * `category → admissible action`, pinned before the answer exists. Opt-in;
+   * an announce that pins none constrains no actions.
+   */
+  actionPolicy?: Readonly<Record<string, string>>;
+  /**
+   * ADR-0006 Decision 2: the estimator wall generalized — performers of these
+   * prior tasks' Awards are excluded from this auction at admission.
+   */
+  excludePerformersOf?: readonly string[];
 }
 
 /** `Announce{afp:Task}` — broadcast through the hub to enrolled members. */
@@ -81,6 +92,8 @@ export function announceTask(envelope: Envelope, spec: AnnounceSpec): { [key: st
     object["afp:reputationRule"] = { name: spec.reputationRule.name, params: { ...spec.reputationRule.params } };
     object["afp:settlementSnapshot"] = [...(spec.settlementSnapshot ?? [])];
   }
+  if (spec.actionPolicy) object["afp:actionPolicy"] = { ...spec.actionPolicy };
+  if (spec.excludePerformersOf?.length) object["afp:excludePerformersOf"] = [...spec.excludePerformersOf];
   return { ...base(envelope, "Announce"), object };
 }
 
@@ -221,6 +234,8 @@ export interface SynthesisSpec {
   /** First-class, never a footnote (04) — present even when empty. */
   dissent: readonly { [key: string]: JsonValue }[];
   supersededInputs?: readonly string[];
+  /** ADR-0006: the answer's category — MUST be a key of the announce's pinned afp:actionPolicy when one exists. */
+  category?: string;
 }
 
 /** `Create{afp:Synthesis}` — emitted by the synthesizer the Award names. */
@@ -238,6 +253,7 @@ export function createSynthesis(envelope: Envelope, spec: SynthesisSpec): { [key
     attributedTo: envelope.actor,
   };
   if (spec.supersededInputs?.length) object["afp:supersededInputs"] = [...spec.supersededInputs];
+  if (spec.category) object["afp:category"] = spec.category;
   return { ...base(envelope, "Create"), object };
 }
 

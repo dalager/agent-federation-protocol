@@ -93,7 +93,7 @@ export function ensureAllocSchema(db: Db): void {
   // Pre-ADR-0004 databases lack these columns — add them in place. Only the
   // already-applied case is swallowed: a bare catch here would equally hide a
   // locked or corrupt store behind a silently missing column (H13).
-  for (const column of ["requester TEXT", "reputation_json TEXT", "snapshot_json TEXT"]) {
+  for (const column of ["requester TEXT", "reputation_json TEXT", "snapshot_json TEXT", "excluded_prior_json TEXT"]) {
     try {
       db.exec(`ALTER TABLE alloc_auctions ADD COLUMN ${column}`);
     } catch (error) {
@@ -121,6 +121,8 @@ export interface AuctionRow {
   reputationRule: { name: string; params: { [key: string]: JsonValue } } | null;
   /** The settlement digests pinned at announce time — the derivation's whole evidence set. */
   settlementSnapshot: string[] | null;
+  /** ADR-0006: prior task ids whose Award performers are excluded from this auction. */
+  excludePerformersOf: string[] | null;
 }
 
 export function saveAuction(db: Db, row: AuctionRow): void {
@@ -128,8 +130,8 @@ export function saveAuction(db: Db, row: AuctionRow): void {
     `INSERT INTO alloc_auctions
        (task_id, hub_id, thread, correlation_id, rule_json, window_opens, window_closes,
         estimator_policy, estimators_json, sufficiency_json, status, award_json, requester,
-        reputation_json, snapshot_json)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        reputation_json, snapshot_json, excluded_prior_json)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT (task_id) DO UPDATE SET status = excluded.status, award_json = excluded.award_json`,
   ).run(
     row.taskId,
@@ -147,6 +149,7 @@ export function saveAuction(db: Db, row: AuctionRow): void {
     row.requester,
     row.reputationRule === null ? null : JSON.stringify(row.reputationRule),
     row.settlementSnapshot === null ? null : JSON.stringify(row.settlementSnapshot),
+    row.excludePerformersOf === null ? null : JSON.stringify(row.excludePerformersOf),
   );
 }
 
@@ -189,6 +192,7 @@ function auctionFromRow(row: Record<string, unknown>): AuctionRow {
     requester: row.requester == null ? null : String(row.requester),
     reputationRule: row.reputation_json == null ? null : JSON.parse(String(row.reputation_json)),
     settlementSnapshot: row.snapshot_json == null ? null : JSON.parse(String(row.snapshot_json)),
+    excludePerformersOf: row.excluded_prior_json == null ? null : JSON.parse(String(row.excluded_prior_json)),
   };
 }
 

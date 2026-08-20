@@ -86,11 +86,13 @@ it. Unresolved; candidates below are the scenario's own suggestions, not decisio
 | # | Finding | Candidate |
 |---|---|---|
 | 19 | Content ingested through a port is untrusted in a way the spec never names — 04 covers fediverse command injection and untrusted *results*, but not a task description arriving from an external system | State the port agent's duty positively: third-party content enters as hash-addressed evidence with a declared content type; the task text an agent acts on is the port's own summary |
-| 20 | Nothing binds an action to the answer that justified it — selection and reputation have pinned named rules, actuation has none | `afp:actionPolicy` in the Announce: a closed category set and a pure function from category to admissible action, recomputed at replay |
+| 20 | Nothing binds an action to the answer that justified it — selection and reputation have pinned named rules, actuation has none | **Resolved** ([ADR-0006](../adr/0006-checkable-actuation.md)): `afp:actionPolicy` pinned in the Announce, `afp:category` on the Synthesis, `afp:actsOn`/`afp:action` hash-binding every consequence to its cause — recomputed at replay (03, 04) |
 | 21 | 03's reconciliation duty stops short of idempotence — a crash between doing the external thing and recording it is indistinguishable from not having done it | Require an idempotency key derived from the `correlationId` on the external side effect, so reconciliation after a crash is a lookup |
 | 22 | A task that cannot be answered *as posed* has no honest terminal outcome, and the replay procedure demands one | A machine-readable `afp:err:insufficient-information`, closing the thread rather than parking it |
-| 23 | Separation of duties is specified once, for one pair (estimator/bidder); "the author of a fix may not review it" is the same shape with no mechanism | Generalize the wall to an exclusion bound to a named prior task's performers, of which the estimator case is one instance |
+| 23 | Separation of duties is specified once, for one pair (estimator/bidder); "the author of a fix may not review it" is the same shape with no mechanism | **Resolved** ([ADR-0006](../adr/0006-checkable-actuation.md)): `afp:excludePerformersOf` on the Announce — the excluded set rebuilt from prior Awards at replay, enforced at admission in the estimator wall's lane (03) |
 | 24 | Supersession revises an answer that has already been acted on — and nothing says who may supersede a ratified Synthesis, or makes the withdrawn justification visible | Wants its own scenario, where revision is the point rather than a consequence |
 
-Ranked in the scenario's verdict: 20 and 23 are the ones to fight for, 19 is what bites an
-implementer first, 21 and 22 are precision on existing duties, 24 needs a scenario of its own.
+Ranked in the scenario's verdict: 20 and 23 were the ones to fight for, and landed first
+([ADR-0006](../adr/0006-checkable-actuation.md), spec v3.12); 19 is what bites an
+implementer first, 21 and 22 are precision on existing duties, 24 needs a scenario of its
+own. The campaign stays open on those four.

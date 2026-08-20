@@ -1,10 +1,10 @@
-# Agent Federation Protocol (AFP) — v3.11
+# Agent Federation Protocol (AFP) — v3.12
 
 Multiple operators, each running their own instance of agents, join forces on a common
 problem — federating through problem-scoped hubs over **ActivityPub** (the W3C protocol
 behind Mastodon). No central broker, consortium trust, no token economics.
 
-This is the markdown rendition of the full spec (Revision 3.11). Reading order:
+This is the markdown rendition of the full spec (Revision 3.12). Reading order:
 
 | File | Contents |
 |---|---|
@@ -16,7 +16,7 @@ This is the markdown rendition of the full spec (Revision 3.11). Reading order:
 | [06-deployment-profiles.md](06-deployment-profiles.md) | Solo/airgapped vs. federated profiles · the "consortium of one" · sneakernet federation |
 | [07-visibility-and-artifacts.md](07-visibility-and-artifacts.md) | Audience & visibility classes · authorized fetch · auditor grants · hash-addressed artifacts · hub lifecycle |
 | [scenarios/](scenarios/) | Spec-test scenarios — each walks a real workload end to end and ends with a verdict of what held and what strained |
-| [adr/](adr/) | Architecture decision records — [ADR-0001](adr/0001-p1-stack.md): the P1 technology stack · [ADR-0002](adr/0002-p2-hub-and-crdt-stack.md): the P2 hub & CRDT stack · [ADR-0003](adr/0003-p3-allocation-stack.md): the P3 allocation stack · [ADR-0004](adr/0004-solo-foundation-hardening.md) (built): solo-foundation hardening before federation · [ADR-0005](adr/0005-operators-are-equal.md) (accepted): operators are equal against a hub |
+| [adr/](adr/) | Architecture decision records — [ADR-0001](adr/0001-p1-stack.md): the P1 technology stack · [ADR-0002](adr/0002-p2-hub-and-crdt-stack.md): the P2 hub & CRDT stack · [ADR-0003](adr/0003-p3-allocation-stack.md): the P3 allocation stack · [ADR-0004](adr/0004-solo-foundation-hardening.md) (built): solo-foundation hardening before federation · [ADR-0005](adr/0005-operators-are-equal.md) (accepted): operators are equal against a hub · [ADR-0006](adr/0006-checkable-actuation.md) (built): checkable actuation |
 
 ## Where to start building
 
@@ -211,6 +211,8 @@ flowchart LR
 | v3.10 | ADR-0004 built, and the precision the build forced: `published` is ordered as an *instant*, never as a string, wherever ordering decides recorded state (role LWW in 02, settlement recency in 03) — a numeric UTC offset sorts before the `Z` it follows; `divergence-decay`'s usability rule stated as same-unit, integer-valued amounts over a positive estimate (03); the hub's own re-fan-out named as the governing announce now that requesters announce too, one task per thread (03); settlement's preconditions — follows an award, once per task — made explicit now that a reputation snapshot consumes it (04) |
 
 | v3.11 | **Operators are equal against a hub** ([ADR-0005](adr/0005-operators-are-equal.md)): vote weight is per seated *instance*, not per agent — each instance carries the same total, divided among its live pinned voters as integers via a common denominator, so an operator's say no longer grows by running more agents (02). At one instance the rule reduces to today's uniform weight, so every existing export recomputes unchanged. Weights become recomputable from the pinned voters and the roster rather than merely recorded; quorum's `n` is seated instances, which is also the right unit for the Byzantine bound. Vote-weight reputation stays deferred, now with a stated reason: estimate accuracy is not judgement, and weighting governance by standing entrenches |
+
+| v3.12 | Campaign 4's two lead findings landed as **checkable actuation** ([ADR-0006](adr/0006-checkable-actuation.md)): `afp:actionPolicy` — a closed `category → admissible action` map pinned in the Announce, `afp:category` on the Synthesis, and `afp:actsOn`/`afp:action` hash-binding every consequence to the answer that justified it, so replay can ask of any action whether it was what the answer permitted (03, 04); and `afp:excludePerformersOf` — the estimator wall generalized to any named prior task's performers, enforced at admission and rebuilt from prior Awards at replay, giving author/reviewer separation for one announce field (03) |
 
 All `afp:` terms are this design's own `@context` extension over W3C ActivityStreams 2.0 —
 not part of the standard.

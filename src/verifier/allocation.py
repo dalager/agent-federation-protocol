@@ -363,6 +363,32 @@ def check_award(report, award_activity: dict, all_activities: list[dict]) -> Non
     # failed winners a reauction Award names (bound to the prior Award).
     estimators = set(announce.get("afp:estimators", []) or [])
     policy = announce.get("afp:estimatorPolicy")
+
+    # ADR-0006 Decision 2: the estimator wall generalized. The announce may
+    # exclude the performers of named prior tasks; the excluded set is rebuilt
+    # from those tasks' Awards on the record, never taken on trust — and a
+    # listed task with no resolvable Award is itself a failure, because an
+    # exclusion you cannot reconstruct excludes nobody.
+    prior_excluded: set[str] = set()
+    for prior_task in announce.get("afp:excludePerformersOf", []) or []:
+        prior_award = next(
+            (
+                o
+                for a in all_activities
+                if isinstance(o := a.get("object"), dict)
+                and o.get("type") == "afp:Award"
+                and o.get("afp:task") == prior_task
+            ),
+            None,
+        )
+        report.record(
+            f"award: {label} prior-task exclusion {prior_task} resolves to an Award",
+            prior_award is not None,
+            "" if prior_award is not None else
+            f"afp:excludePerformersOf names {prior_task!r}, which has no Award in the "
+            f"record — an exclusion that cannot be reconstructed (ADR-0006)",
+        )
+        prior_excluded.update((prior_award or {}).get("afp:performers", []) or [])
     excluded = set(award.get("afp:excludedBidders", []) or [])
     prior_award_id = award.get("afp:priorAward")
     if excluded or prior_award_id:
@@ -392,6 +418,7 @@ def check_award(report, award_activity: dict, all_activities: list[dict]) -> Non
         if e["bidder"] in members
         and e["bidder"] not in excluded
         and not (policy == "exclude" and e["bidder"] in estimators)
+        and e["bidder"] not in prior_excluded
     ]
     pool_digests = {b["digest"] for b in pool}
 
@@ -604,6 +631,17 @@ def check_award(report, award_activity: dict, all_activities: list[dict]) -> Non
                 dissent_ok,
                 "" if dissent_ok else "afp:dissent is missing or not a list",
             )
+
+    # 5b — prior-performer separation (ADR-0006), whenever an exclusion is pinned.
+    if announce.get("afp:excludePerformersOf"):
+        offending_prior = [p for p in performers if p in prior_excluded]
+        report.record(
+            f"award: {label} respects prior-performer separation",
+            not offending_prior,
+            "" if not offending_prior else
+            "afp:excludePerformersOf is pinned but the award names a performer of an "
+            "excluded prior task: " + ", ".join(offending_prior),
+        )
 
     # 5 — estimator separation, only under "exclude" policy.
     if policy == "exclude":
