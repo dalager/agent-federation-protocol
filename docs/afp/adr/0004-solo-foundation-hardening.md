@@ -243,7 +243,7 @@ commits and follow-up ADRs.
 
 | ID | Task | Why separate |
 |---|---|---|
-| **H14** | Constrain who may issue an `afp:Enroll` for a hub | The trail is trusted by issuer today, so a rostered agent can self-promote. The hole predates this ADR — `enrolled_members` had the identical model — but Decisions 1–3 now hang bid admission, announce authority, asset registration and quorum pinning off it, so the blast radius is materially larger. Fixing it is an authority decision, not a hardening detail |
+| **H14** | Constrain who may issue an `afp:Enroll` for a hub — [ADR-0005](0005-enrollment-authority.md) (proposed) | The trail is trusted by issuer today, so a rostered agent can self-promote. The hole predates this ADR — `enrolled_members` had the identical model — but Decisions 1–3 now hang bid admission, announce authority, asset registration and quorum pinning off it, so the blast radius is materially larger. Fixing it is an authority decision, not a hardening detail |
 
 **A note on the parity work (H7).** Four of the defects this build's review found were the
 same shape, and none were algorithmic: the two implementations disagreed about how to
