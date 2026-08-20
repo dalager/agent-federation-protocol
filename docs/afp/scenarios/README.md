@@ -20,6 +20,7 @@ protocol does; that review tested whether the build order still matched it.
 | [07](07-the-retraction.md) | The retraction: revising an answer the world already acted on | Superseding a ratified Synthesis, the cost of overturning a quorum, dispositions for acted-on justifications | 0 (sharpened 24) |
 | [08](08-the-subcontract.md) | The subcontract: two operators, one boundary, no shared hub | The P4 handshake alone — adversarial probing of the gate, direct cross-boundary delegation, cross-boundary settlement, agreement expiry vs in-flight work, two-export replay | 7 |
 | [08 · story](08-the-subcontract-story.md) | The same subcontract, outside-in | A first: the scenario retold through its human actors — the double sale, the near-miss, the seams. No findings machinery; a readability check on the whole design | — |
+| [· tuesday](the-operators-tuesday.md) | The operator's Tuesday | The built stack's ordinary day, every noun pointing at a file — commands, tables, outputs and warts of the solo profile as it runs today; the hard-focus baseline the P4 build will be measured against | — |
 
 ## Findings ledger
 
