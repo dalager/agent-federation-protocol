@@ -1,10 +1,10 @@
-# Agent Federation Protocol (AFP) — v3.10
+# Agent Federation Protocol (AFP) — v3.11
 
 Multiple operators, each running their own instance of agents, join forces on a common
 problem — federating through problem-scoped hubs over **ActivityPub** (the W3C protocol
 behind Mastodon). No central broker, consortium trust, no token economics.
 
-This is the markdown rendition of the full spec (Revision 3.10). Reading order:
+This is the markdown rendition of the full spec (Revision 3.11). Reading order:
 
 | File | Contents |
 |---|---|
@@ -209,6 +209,8 @@ flowchart LR
 | v3.8 | P1–P3 built and the spec changes implementation + review forced: the integer-only JCS numeric profile stated (03), commit-reveal hardened (mandatory `nonce`, one commitment per bidder, reveals after close, payload names its signer), the announce's pinned fields named (`afp:bidWindow`, `afp:selectionRule`, `afp:answerSufficiency`, `afp:estimatorPolicy`), reauction pools bound to the prior award, the tie-break constant made ambiguity-free; data-model and pattern diagrams in 03; scenario 05 (domain intelligence as an internal service) opens campaign 3: `afp:Asset` identity, requester/observer roles, the reputation-consumption trigger |
 | v3.9 | Campaign 3 landed as the **solo-foundation hardening** before federation ([ADR-0004](adr/0004-solo-foundation-hardening.md)): `afp:role` on the Enroll (`member`/`requester`/`observer`, enforced at bid admission and snapshot-pinning); `afp:Asset` identity for reusable components with `afp:reuses`/`afp:reused` claims resolvable at replay (07); reputation consumption via a named derivation registry — `afp:reputationRule` + `afp:settlementSnapshot` pinned in the Announce, `divergence-decay` first (03) — keeping the Award a pure function of the record; the port-boundary confidentiality residue stated in 06 |
 | v3.10 | ADR-0004 built, and the precision the build forced: `published` is ordered as an *instant*, never as a string, wherever ordering decides recorded state (role LWW in 02, settlement recency in 03) — a numeric UTC offset sorts before the `Z` it follows; `divergence-decay`'s usability rule stated as same-unit, integer-valued amounts over a positive estimate (03); the hub's own re-fan-out named as the governing announce now that requesters announce too, one task per thread (03); settlement's preconditions — follows an award, once per task — made explicit now that a reputation snapshot consumes it (04) |
+
+| v3.11 | **Operators are equal against a hub** ([ADR-0005](adr/0005-operators-are-equal.md)): vote weight is per seated *instance*, not per agent — each instance carries the same total, divided among its live pinned voters as integers via a common denominator, so an operator's say no longer grows by running more agents (02). At one instance the rule reduces to today's uniform weight, so every existing export recomputes unchanged. Weights become recomputable from the pinned voters and the roster rather than merely recorded; quorum's `n` is seated instances, which is also the right unit for the Byzantine bound. Vote-weight reputation stays deferred, now with a stated reason: estimate accuracy is not judgement, and weighting governance by standing entrenches |
 
 All `afp:` terms are this design's own `@context` extension over W3C ActivityStreams 2.0 —
 not part of the standard.

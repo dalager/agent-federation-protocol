@@ -279,7 +279,7 @@
 
 <div class="page">
   <header class="hero">
-    <p class="eyebrow">Architecture Spec &middot; Multi-Operator Agent Federation &middot; Revision 3.10</p>
+    <p class="eyebrow">Architecture Spec &middot; Multi-Operator Agent Federation &middot; Revision 3.11</p>
     <h1>Agent Federation Protocol</h1>
     <p class="dek">Multiple operators, each running their own instance of agents, join forces on a common problem — federating through problem-scoped hubs over ActivityPub, the W3C protocol behind Mastodon. No central broker, consortium trust, no token economics.</p>
     <div class="callout">
@@ -322,7 +322,7 @@
 
     <main>
       <section id="changelog">
-        <div class="sec-head"><span class="num">&Delta;</span><h2>What changed in v3, v3.4&ndash;3.10</h2></div>
+        <div class="sec-head"><span class="num">&Delta;</span><h2>What changed in v3, v3.4&ndash;3.11</h2></div>
         <div class="table-wrap">
           <table>
             <thead><tr><th>#</th><th>Change</th><th>Why</th></tr></thead>
@@ -377,6 +377,10 @@
               <tr><td>41</td><td><code>divergence-decay</code>&rsquo;s usability rule stated (&sect;09): same unit, integer-valued amounts, positive estimate; anything else is skipped, never guessed at</td><td>JSON draws no int/float line and the JCS profile accepts <code>100.0</code>, canonicalizing it to <code>100</code> — a rule phrased as &ldquo;numeric&rdquo; left the two implementations scoring one settlement differently</td></tr>
               <tr><td>42</td><td>The hub&rsquo;s own re-fan-out is the <strong>governing announce</strong>, and one task per thread (&sect;09)</td><td>Requesters announce too now, so two activities can name one task; and the counterparty check that authorizes an actuals report resolves its auction by thread</td></tr>
               <tr><td>43</td><td>Settlement <strong>follows an award</strong> and is published <strong>once per task</strong> (&sect;16)</td><td>A reputation snapshot consumes settlements exhaustively, so an unguarded counterparty could supply several competing accounts of what actually happened</td></tr>
+              <tr><td colspan="3" style="background:var(--surface-2); font-weight:700;">v3.11 &mdash; operators are equal against a hub (ADR-0005)</td></tr>
+              <tr><td>44</td><td>Vote weight is per seated <em>instance</em>, not per agent (&sect;05): each instance carries the same total, divided among its live pinned voters as integers via a common denominator. Quorum&rsquo;s <code>n</code> is seated instances</td><td>Uniform per-agent weight let an operator&rsquo;s say grow with headcount — the cheapest attack on a consortium, needing no reasoning. At one instance the rule reduces to today&rsquo;s weight of 1, so existing exports recompute unchanged</td></tr>
+              <tr><td>45</td><td><code>afp:voterWeights</code> is recomputable from the pinned voters and the roster, not merely recorded (&sect;05)</td><td>Otherwise a proposer writes whatever numbers it wants; this is the discipline every other recomputable field already carries</td></tr>
+              <tr><td>46</td><td>Vote-weight reputation stays deferred, with a stated reason (&sect;05)</td><td>Estimate accuracy is not judgement, and weighting governance by past standing entrenches early winners while raising the payoff for gaming the inputs</td></tr>
             </tbody>
           </table>
         </div>
@@ -954,9 +958,9 @@ sequenceDiagram
         <div class="sec-head"><span class="num">13</span><h2>Membership &amp; dynamic quorum</h2></div>
         <p>Hub membership is an explicit <code>OR-Set&lt;AgentRef&gt;</code> (join-epoch tagged), fed by enrollment (&sect;05): <strong>join</strong> = instance <code>Follow</code> + <code>afp:Enroll</code>; <strong>leave</strong> = <code>afp:Unenroll</code> / <code>Undo{Follow}</code>; <strong>failure</strong> = gossip heartbeat staleness marks an agent <em>suspected</em> without removing it — excluded from live-weight calculations, retained for accountability.</p>
         <ul>
-          <li><strong>Byzantine minimum</strong> — <code>floor(2n/3) + 1</code> over live weighted membership, for L1 rounds.</li>
+          <li><strong>Byzantine minimum</strong> — <code>floor(2n/3) + 1</code> over live <em>seated instances</em>, for L1 rounds — the right unit, since two agents of one operator are not independent failure domains.</li>
           <li><strong>Partition-aware minimum</strong> — <code>floor((n &minus; maxExpectedPartitionSize)/2) + 1</code> for L0, from recent connectivity/staleness observations.</li>
-          <li><strong>Weight, not headcount</strong> — vote weight derives from liveness plus hub-scoped reputation (&sect;04); quorum is a weight-sum threshold.</li>
+          <li><strong>Weight, not headcount</strong> — and not agent-count either: each seated instance carries the same total, divided among its live pinned voters, so an operator's say does not grow by running more agents (ADR-0005). Quorum is a weight-sum threshold; weight is liveness-gated only, with hub-scoped reputation deliberately not a term in it.</li>
         </ul>
         <p><strong>Snapshot-pinning.</strong> At round start the proposer hashes the merged membership CRDT and embeds it (<code>afp:quorumSnapshot</code>) plus the explicit voter list — only <code>member</code>-role enrollees are eligible (ADR-0004) — in the proposal. Votes are validated against the pinned set: an agent enrolled <em>after</em> round start simply isn't in it. This closes late-join tally skew and the mid-round Sybil attack — and in the multi-operator setting it's what stops an operator from bulk-enrolling agents mid-vote to swing a governance decision, which is why it lands with the cross-operator phases (P5/P6) in the roadmap.</p>
       </section>

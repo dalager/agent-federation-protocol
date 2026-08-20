@@ -172,6 +172,13 @@ votes.
 - Within one operator, an agent's individual weight now depends on how many of its
   siblings are live in the round. Accepted: the alternative is letting that same count
   change the operator's total say, which is the thing being fixed.
+- A consequence of that: **agent-level sanctions no longer reduce an operator's weight.**
+  Zeroing an equivocator's vote (10) removes that agent from the division, and its
+  siblings absorb the share — the operator's total stays one seat's worth. Accepted, and
+  arguably the honest reading: scenario 03's drill already held that the instance-level
+  consequence is *not* automatic, and that forced or voluntary action against the
+  *operator* is the real lever. Per-instance weight makes that separation exact rather
+  than incidental.
 - Decision 3 adds an obligation instances must satisfy before P4 — publishing a seat they
   currently hold implicitly. Accepted, and cheaper now than as a retrofit.
 - A hub cannot distinguish a thoughtful operator from a careless one by weight alone.

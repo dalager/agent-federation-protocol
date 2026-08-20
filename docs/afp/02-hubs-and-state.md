@@ -172,23 +172,30 @@ Hub membership is an explicit `OR-Set<AgentRef>` (join-epoch tagged), fed by enr
   excluded from live-weight calculations, retained for accountability. Avoids thrashing on
   transient network blips.
 
-Quorum size is computed, not configured, over live (non-suspected) weighted membership `n`:
+Quorum size is computed, not configured, over the live (non-suspected) **seated
+instances** `n` — one operator, one weight (ADR-0005), which is also the right unit for
+the Byzantine bound, since two agents of one operator are not independent failure domains:
 
 - **Byzantine minimum** — `floor(2n/3) + 1`, for L1 rounds
 - **Partition-aware minimum** — `floor((n − maxExpectedPartitionSize)/2) + 1` for L0,
   from recent connectivity/staleness observations
-- **Weight, not headcount** — vote weight derives from liveness plus hub-scoped reputation;
-  quorum is a weight-sum threshold
+- **Weight, not headcount** — and not agent-count either: each seated instance carries the
+  same total, divided among its live pinned voters, so an operator's say does not grow by
+  running more agents. Quorum is a weight-sum threshold. Weight is liveness-gated only —
+  hub-scoped reputation is deliberately *not* a term in it (ADR-0005 Decision 4)
 
 **Snapshot-pinning.** At round start the proposer hashes the merged membership CRDT and
 embeds it (`afp:quorumSnapshot`) plus the explicit voter list (`afp:voters`) — only
 `member`-role enrollees are eligible (ADR-0004) — and the
 per-voter weights (`afp:voterWeights`) in the proposal — recorded explicitly so tally
-recomputation never depends on state a verifier can't see. Votes are
-validated against the pinned set: an agent enrolled *after* round start simply isn't in it.
-This closes late-join tally skew and the mid-round Sybil attack — in the multi-operator
-setting, it's what stops an operator from bulk-enrolling agents mid-vote to swing a
-governance decision.
+recomputation never depends on state a verifier can't see, and *recomputable* from the
+pinned voters and the roster, so a proposer cannot simply write the numbers it wants.
+Votes are validated against the pinned set: an agent enrolled *after* round start simply
+isn't in it. This closes late-join tally skew and the mid-round Sybil attack — in the
+multi-operator setting, it's what stops an operator from bulk-enrolling agents mid-vote to
+swing a governance decision. Pinning closes only that mid-round variant; bulk-enrolling
+*between* rounds is closed by the weighting itself, which is why the two rules are one
+design (ADR-0005).
 
 ## Causal ordering
 
