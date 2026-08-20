@@ -39,8 +39,13 @@ vocabulary for. Core object types from v1: `Task`, `Capability`, `Result`, `Erro
 `Accept`/`Reject` answer the Offer (a `summary` carries the reject reason); the worker
 returns `Create{afp:Result}` with the same `correlationId`, or `Create{afp:Error}` on
 failure — the typed-outcome objects AS2 lacks. An `afp:Error` carries a machine-readable
-`afp:errorCode` (e.g. `afp:err:undeliverable`), and one class deserves naming because
-each implementation would otherwise invent it (scenario 06, finding 22):
+`afp:errorCode`. The codes are open vocabulary, not a closed registry — but the ones the
+spec and reference implementation between them already use are named here, so the two
+cannot drift on which strings exist: **`afp:err:undeliverable`** (delivery exhausted its
+attempts), **`afp:err:deadline-missed`** (the pending-task sweep fired), and
+**`afp:err:brain-failed`** (the agent's brain errored on an accepted task). A fourth
+deserves naming because each implementation would otherwise invent it (scenario 06,
+finding 22):
 **`afp:err:insufficient-information`** — the task *as posed* cannot be completed, and the
 thread closes rather than parking forever on a reply that may never come. The replay
 procedure demands a terminal outcome per delegated thread (04); a suspended state would
