@@ -61,6 +61,41 @@ reaching a decision. What an auditor asks, and the record that answers it:
 | Did the estimate prove right? | `afp:Settlement`, if and when actuals exist |
 | Human-readable trail? | Dual-publish shadow Notes, followable from Mastodon |
 
+### Federated replay & lawful redaction (ADR-0009)
+
+When an engagement spans trust domains, the audit takes **every party's export at
+once** and stays one verifier: N single-domain replays — each bundle answering for its
+own roster, every finding labelled with its domain — plus a cross-check over the set.
+Three rules carry the join:
+
+- **Authority is partitioned by `afp:operatedBy`.** The keys that verify a domain's
+  actors are believed only from that domain's own export. A copy of the counterparty's
+  actor document found in the other bundle is evidence it was fetched, never authority
+  — else one operator smuggles forged keys and re-signs "received" history.
+- **The agreement must be digest-equal in every party's bundle.** Each side's signed
+  `Create{afp:FederationAgreement}` wraps the byte-identical object; a pair of exports
+  whose agreements differ is not one engagement but two stories.
+- **A received activity must be the same bytes its sender recorded.** Each bundle
+  carries what crossed its boundary inbound (`received.jsonld`), and every entry must
+  resolve by digest to the same activity in the sender's export — a mismatch is a
+  named divergence, an absence is attributed to the sender. Obligation this creates:
+  **store what you verified, not a re-serialization.**
+
+Lawful redaction is an **export-time transform** — the record is never mutated, an
+export is a view of it. A scoped export replaces each withheld activity, 1:1, with a
+digest-only stub in chain position:
+
+```json
+{ "type": "afp:Redacted", "afp:digest": "sha256:…", "afp:visibility": "internal" }
+```
+
+The chain check accepts a stub as a link (the neighbours' digests must agree with what
+it declares), and the chain-wide `published` monotonicity backstop brackets across stub
+runs. The manifest's `afp:exportScope` declares the threads the bundle answers for and
+the roster entries it deliberately omits; completeness checks the declared scope. An
+undeclared gap remains what it always was — tampering. The line this draws is the
+point: **discretion is declared; deletion is detected.**
+
 ### Decision records (`afp:DecisionRecord`)
 
 Every voting round — L0 or L1 — closes with a first-class outcome artifact. Without it, an

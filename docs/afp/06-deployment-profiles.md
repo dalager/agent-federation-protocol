@@ -110,8 +110,11 @@ What the profile gives up, in order of how much it hurts:
    firewalled instances often have no inbound path to each other and hub relay is the
    answer. A "dumb relay" fix is a hub with fewer features.
 5. **The canonical case file.** Archive-as-record (07) has no single home; an
-   engagement's history is two half-views permanently — the two-export problem
-   (finding 29a) as a way of life rather than a transition.
+   engagement's history is two half-views permanently. The federated replay
+   (ADR-0009) makes the pair *jointly checkable* — agreement digest-equal, received
+   bytes matched, findings attributed per domain — so the two-export problem
+   (finding 29a) costs verification nothing; what remains lost is the single
+   canonical archive a hub would host.
 
 What it gains: no hub host and none of the hosting politics (scenario 03's "hosted on
 Alpha's infrastructure" is a soft power position); agreements that map one-to-one onto

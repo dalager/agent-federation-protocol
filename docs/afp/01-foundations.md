@@ -120,6 +120,9 @@ Declared per agent via `afp:keyCustody` on the roster entry:
 
 - `self` — the agent holds its own keypair (v1/v2 model).
 - `instance` — the instance signs on the agent's behalf, tagging `afp:actingAs`.
+  Verifiers — including a peer's boundary at P4 — check the proof against the
+  **operator's** published keys (the `afp:operatedBy` actor document), never the
+  agent's: the activity says whose work it is; the proof says whose key vouched.
 
 Rationale: many operators run large, low-autonomy fleets where individually rotating N keys
 is pure overhead. Trade-off stated honestly: instance-custodied signatures push misbehavior
@@ -229,6 +232,17 @@ Inbox / vote / bid acceptance policy, evaluated in order:
    direct-delegation traffic** (no hub, no reputation to weigh; an undefined check in a
    hard-gate sequence is how implementations fork — ADR-0008) → else **soft degrade**: accept,
    but discount vote/bid weight. Unset reputation defaults neutral.
+
+> **Found by building it.** Admission must reach all the way in. The first P4
+> implementation ran this gate correctly and then handed the admitted activity to the
+> *internal* receive path, whose own roster check — built when every sender was local —
+> rejected any foreign actor; and its boundary proof check verified instance-custody
+> activities against the *agent's* keys instead of the operator's (`afp:actingAs`,
+> 01 — Key custody), 401-ing legitimate traffic. Both failures were masked by honest
+> machinery: the dead-letter produced a signed `afp:Error` that closed the thread
+> plausibly, and the record verified green. The rule the fix generalizes: a
+> gate-admitted foreign actor is exactly what the boundary exists to admit — checks
+> downstream of the gate must distinguish "unknown locally" from "unauthorized."
 
 Instance and roster checks are hard gates; reputation is a soft weight. This applies
 uniformly to task activities *and* to L1 votes — a vote from a barely-federated,
