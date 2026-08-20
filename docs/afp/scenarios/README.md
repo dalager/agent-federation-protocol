@@ -17,6 +17,7 @@ protocol does; that review tested whether the build order still matched it.
 | [04](04-federated-estimation.md) | A question pushed to the hub: federated estimation | Unknown-arity allocation, partial answers, reconciliation, unverifiable deliverables | 6 |
 | [05](05-integration-practice.md) | The integration practice: domain intelligence as an internal service | Standing solo instance answering other teams' shape/size/effort asks, requester roles, cross-team asset reuse, settlement on requester-reported actuals | 3 |
 | [06](06-issue-triage-loop.md) | The issue triage loop: from bug tracker to reviewed fix | External system as initiator, untrusted third-party content entering the record, acting on your own classification, idempotent external writes, author/reviewer separation, supersession after review | 6 |
+| [07](07-the-retraction.md) | The retraction: revising an answer the world already acted on | Superseding a ratified Synthesis, the cost of overturning a quorum, dispositions for acted-on justifications | 0 (sharpened 24) |
 
 ## Findings ledger
 
@@ -77,7 +78,7 @@ Keep the format: user story → cast → walkthrough → acceptance criteria map
 mechanisms → verdict with findings. Be willing to conclude that something strained; a
 scenario that finds nothing has usually been written to flatter the spec.
 
-### Campaign 4 — open
+### Campaign 4 → v3.12–v3.14 (ADR-0006, ADR-0007)
 
 Six findings from [scenario 06](06-issue-triage-loop.md), the first scenario where the
 swarm *acts* on its own conclusion inside an external system rather than only recording
@@ -85,15 +86,15 @@ it. Unresolved; candidates below are the scenario's own suggestions, not decisio
 
 | # | Finding | Candidate |
 |---|---|---|
-| 19 | Content ingested through a port is untrusted in a way the spec never names — 04 covers fediverse command injection and untrusted *results*, but not a task description arriving from an external system | State the port agent's duty positively: third-party content enters as hash-addressed evidence with a declared content type; the task text an agent acts on is the port's own summary |
+| 19 | Content ingested through a port is untrusted in a way the spec never names — 04 covers fediverse command injection and untrusted *results*, but not a task description arriving from an external system | **Resolved** (v3.14): the port duty stated positively in [03](../03-coordination.md#external-systems-keep-the-firehose-behind-the-port) — third-party content enters as hash-addressed evidence; the task text is the port's own bounded summary |
 | 20 | Nothing binds an action to the answer that justified it — selection and reputation have pinned named rules, actuation has none | **Resolved** ([ADR-0006](../adr/0006-checkable-actuation.md)): `afp:actionPolicy` pinned in the Announce, `afp:category` on the Synthesis, `afp:actsOn`/`afp:action` hash-binding every consequence to its cause — recomputed at replay (03, 04) |
 | 21 | 03's reconciliation duty stops short of idempotence — a crash between doing the external thing and recording it is indistinguishable from not having done it | **Resolved** (v3.13): the side effect MUST carry an idempotency key derived from the `correlationId` — [03](../03-coordination.md#external-systems-keep-the-firehose-behind-the-port), mirrored in 04's trail-edges table |
 | 22 | A task that cannot be answered *as posed* has no honest terminal outcome, and the replay procedure demands one | **Resolved** (v3.13): `afp:err:insufficient-information` named in [03](../03-coordination.md#task-delegation--the-v1-baseline-flow-unchanged) — the thread closes; a later reply is a new ask with the closed thread as prehistory |
 | 23 | Separation of duties is specified once, for one pair (estimator/bidder); "the author of a fix may not review it" is the same shape with no mechanism | **Resolved** ([ADR-0006](../adr/0006-checkable-actuation.md)): `afp:excludePerformersOf` on the Announce — the excluded set rebuilt from prior Awards at replay, enforced at admission in the estimator wall's lane (03) |
-| 24 | Supersession revises an answer that has already been acted on — and nothing says who may supersede a ratified Synthesis, or makes the withdrawn justification visible | Wants its own scenario, where revision is the point rather than a consequence |
+| 24 | Supersession revises an answer that has already been acted on — and nothing says who may supersede a ratified Synthesis, or makes the withdrawn justification visible | **Resolved** ([scenario 07](07-the-retraction.md) → [ADR-0007](../adr/0007-supersession.md)): `afp:supersedes` distinct from input-level `supersededInputs`; ratification parity — a quorum's answer retracted only by a quorum; `afp:disposes` for every action whose justification was withdrawn (04) |
 
-Ranked in the scenario's verdict: 20 and 23 were the ones to fight for, and landed first
-([ADR-0006](../adr/0006-checkable-actuation.md), spec v3.12); 21 and 22 followed as
-spec precision (v3.13), no ADR needed. The campaign stays open on 19 — the port-ingestion
-duty, what bites an implementer first — and 24, which wants a scenario built around
-revision.
+Landed in three moves: 20 and 23 first ([ADR-0006](../adr/0006-checkable-actuation.md),
+v3.12), 21 and 22 as spec precision (v3.13), then 19 as spec text and 24 through
+[scenario 07](07-the-retraction.md) — the scenario finding 24 asked for, which sharpened
+it into [ADR-0007](../adr/0007-supersession.md)'s three decisions (v3.14). Campaign
+closed.

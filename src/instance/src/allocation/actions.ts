@@ -49,3 +49,21 @@ export function actionStamp(
   }
   return { "afp:action": action, "afp:actsOn": synthesisDigest };
 }
+
+/**
+ * The disposition edge (ADR-0007 Decision 3): when an answer is superseded,
+ * every action that cited it gets dealt with on the record. The disposing
+ * activity names the action it disposes of and acts on the *superseding*
+ * Synthesis — the actuation loop run once more, under the same pinned policy.
+ */
+export function dispositionStamp(
+  action: string,
+  disposedActionDigest: string,
+  supersedingSynthesisDigest: string,
+  policyCheck?: { policy: ActionPolicy; category: string },
+): { [key: string]: JsonValue } {
+  return {
+    ...actionStamp(action, supersedingSynthesisDigest, policyCheck),
+    "afp:disposes": disposedActionDigest,
+  };
+}

@@ -129,7 +129,8 @@ Required properties and why each exists:
 | `afp:contributingResults` | Hashes of every input Result — binds the answer to its exact evidence, as `countedVotes` does for decisions |
 | `afp:assumptions` | The premises the answer rests on; two partial answers built on contradictory assumptions must be reconciled before combination, not summed |
 | `afp:dissent` | **First-class, never a footnote.** An objection that cannot be expressed numerically — "infeasible at any price" — survives to the reader intact |
-| `afp:supersededInputs` | Revisions made during reconciliation stay in the record rather than vanishing |
+| `afp:supersededInputs` | Revisions made during reconciliation stay in the record rather than vanishing — **input-level** only: a Result was updated, the conclusion stands |
+| `afp:supersedes` | **Answer-level** retraction (ADR-0007): the digest of the Synthesis activity this one withdraws. A ratified answer is superseded only by a ratified one — a quorum is not un-decided by a signature — and every activity that acted on the withdrawn answer (`afp:actsOn`, ADR-0006) must be disposed of on the record (`afp:disposes`, acting on the superseding answer). Supersession is an edge, never an erasure |
 
 Synthesis and DecisionRecord are complementary, not alternatives. Because a synthesizer
 exercises discretion — choosing a method, adjudicating conflicting assumptions — hub

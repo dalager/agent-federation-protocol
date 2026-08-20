@@ -142,3 +142,86 @@ def check_actions(report, all_activities: list[dict]) -> None:
             f"afp:action is {claimed!r}, but the pinned policy admits {admissible!r} for "
             f"category {category!r} (ADR-0006)",
         )
+
+
+def check_supersession(report, all_activities: list[dict]) -> None:
+    """ADR-0007 — answer-level supersession, checkable end to end.
+
+    Three claims, each a digest-walk over the export: the revision names what
+    it withdraws (afp:supersedes resolves, same context); a quorum's answer is
+    retracted only by a quorum (ratification parity over DecisionRecords); and
+    every action whose justification was withdrawn has a recorded disposition
+    (afp:disposes + afp:actsOn on the superseding answer). Exports with no
+    afp:supersedes run none of this.
+    """
+    by_digest = {digest_of(a): a for a in all_activities}
+
+    def ratified(synthesis: dict) -> bool:
+        target = synthesis.get("id")
+        return any(
+            (o := afp_object(a, "afp:DecisionRecord")) is not None and o.get("afp:outcome") == target
+            for a in all_activities
+        )
+
+    for activity in all_activities:
+        superseding = _synthesis_of(activity)
+        if superseding is None:
+            continue
+        supersedes = superseding.get("afp:supersedes")
+        if not isinstance(supersedes, str):
+            continue
+        label = superseding.get("id", "<no id>")
+
+        target_activity = by_digest.get(supersedes)
+        superseded = _synthesis_of(target_activity) if isinstance(target_activity, dict) else None
+        if not report.record(
+            f"supersession: {label} retracts a producible Synthesis",
+            superseded is not None,
+            "" if superseded is not None else
+            f"afp:supersedes names {supersedes[:24]}…, which resolves to no present "
+            f"afp:Synthesis — a retraction of nothing (ADR-0007)",
+        ):
+            continue
+
+        same_context = activity.get("context") == target_activity.get("context")
+        report.record(
+            f"supersession: {label} retracts an answer on its own thread",
+            same_context,
+            "" if same_context else
+            f"the superseding Synthesis is on {activity.get('context')!r} but the "
+            f"superseded one is on {target_activity.get('context')!r} — a revision that "
+            f"answers a different thread retracts nothing",
+        )
+
+        # Decision 2 — overturning a decision costs what the decision cost.
+        if ratified(superseded):
+            report.record(
+                f"supersession: {label} ratified, as the answer it retracts was",
+                ratified(superseding),
+                "" if ratified(superseding) else
+                "the superseded Synthesis was ratified by a DecisionRecord, the "
+                "superseding one is not — a quorum's answer retracted without a quorum "
+                "(ADR-0007)",
+            )
+
+        # Decision 3 — actions on the withdrawn answer are dealt with.
+        superseding_digest = digest_of(activity)
+        for actor_activity in all_activities:
+            if actor_activity.get("afp:actsOn") != supersedes:
+                continue
+            if "afp:disposes" in actor_activity:
+                continue  # dispositions of earlier actions are not themselves orphaned
+            action_digest = digest_of(actor_activity)
+            action_label = actor_activity.get("id", "<no id>")
+            disposed = any(
+                a.get("afp:disposes") == action_digest and a.get("afp:actsOn") == superseding_digest
+                for a in all_activities
+            )
+            report.record(
+                f"supersession: {action_label} disposed of after its justification was withdrawn",
+                disposed,
+                "" if disposed else
+                f"{action_label} acted on the retracted answer and no activity disposes "
+                f"of it (afp:disposes + afp:actsOn the superseding Synthesis) — an "
+                f"orphaned consequence (ADR-0007)",
+            )

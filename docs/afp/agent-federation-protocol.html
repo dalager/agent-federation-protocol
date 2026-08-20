@@ -279,7 +279,7 @@
 
 <div class="page">
   <header class="hero">
-    <p class="eyebrow">Architecture Spec &middot; Multi-Operator Agent Federation &middot; Revision 3.13</p>
+    <p class="eyebrow">Architecture Spec &middot; Multi-Operator Agent Federation &middot; Revision 3.14</p>
     <h1>Agent Federation Protocol</h1>
     <p class="dek">Multiple operators, each running their own instance of agents, join forces on a common problem — federating through problem-scoped hubs over ActivityPub, the W3C protocol behind Mastodon. No central broker, consortium trust, no token economics.</p>
     <div class="callout">
@@ -322,7 +322,7 @@
 
     <main>
       <section id="changelog">
-        <div class="sec-head"><span class="num">&Delta;</span><h2>What changed in v3, v3.4&ndash;3.13</h2></div>
+        <div class="sec-head"><span class="num">&Delta;</span><h2>What changed in v3, v3.4&ndash;3.14</h2></div>
         <div class="table-wrap">
           <table>
             <thead><tr><th>#</th><th>Change</th><th>Why</th></tr></thead>
@@ -387,6 +387,9 @@
               <tr><td colspan="3" style="background:var(--surface-2); font-weight:700;">v3.13 &mdash; two precision findings from scenario 06 (21 and 22)</td></tr>
               <tr><td>49</td><td>An external side effect MUST carry an idempotency key derived from the <code>correlationId</code> — a branch name, a comment marker, a token the external system can be asked about (&sect;08, &sect;16)</td><td>Reconciliation covers the happy path; the key covers the crash between doing the thing and recording it, where every retry would otherwise be a second pull request</td></tr>
               <tr><td>50</td><td><code>afp:err:insufficient-information</code> named as the honest terminal outcome for a task unanswerable as posed — and the error-code vocabulary the spec and reference implementation already use is named alongside it (<code>undeliverable</code>, <code>deadline-missed</code>, <code>brain-failed</code>), open vocabulary but no silent drift (&sect;08)</td><td>The replay procedure demands a terminal outcome per delegated thread; a task parked forever awaiting a reply that may never come is neither a Result nor an Error, and each implementation would otherwise invent its own code</td></tr>
+              <tr><td colspan="3" style="background:var(--surface-2); font-weight:700;">v3.14 &mdash; campaign 4 closed (findings 19 and 24; scenario 07, ADR-0007)</td></tr>
+              <tr><td>51</td><td>The port&rsquo;s ingestion duty stated positively (&sect;08): third-party content enters as a hash-addressed artifact with a declared content type; the task text agents act on is the port&rsquo;s own bounded summary</td><td>A bug report is arbitrary text from whoever could file it, and a port that splices it into a Task&rsquo;s <code>content</code> has handed a stranger the prompt — the third injection door, beside fediverse commands and untrusted results</td></tr>
+              <tr><td>52</td><td><code>afp:supersedes</code> for answer-level retraction, distinct from input-level <code>supersededInputs</code>; ratification parity; and <code>afp:disposes</code> for every action whose justification was withdrawn (&sect;16, ADR-0007)</td><td>Scenario 07: an advisory acted on, then proven wrong — a quorum&rsquo;s answer must not be un-decided by one signature, and the acted-on consequence must be visibly dealt with, not orphaned. Supersession is an edge, never an erasure</td></tr>
             </tbody>
           </table>
         </div>

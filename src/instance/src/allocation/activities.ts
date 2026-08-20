@@ -236,6 +236,12 @@ export interface SynthesisSpec {
   supersededInputs?: readonly string[];
   /** ADR-0006: the answer's category — MUST be a key of the announce's pinned afp:actionPolicy when one exists. */
   category?: string;
+  /**
+   * ADR-0007: answer-level supersession — the digest of the Synthesis
+   * *activity* this one retracts. Distinct from supersededInputs, which is
+   * input-level revision during reconciliation.
+   */
+  supersedes?: string;
 }
 
 /** `Create{afp:Synthesis}` — emitted by the synthesizer the Award names. */
@@ -254,6 +260,7 @@ export function createSynthesis(envelope: Envelope, spec: SynthesisSpec): { [key
   };
   if (spec.supersededInputs?.length) object["afp:supersededInputs"] = [...spec.supersededInputs];
   if (spec.category) object["afp:category"] = spec.category;
+  if (spec.supersedes) object["afp:supersedes"] = spec.supersedes;
   return { ...base(envelope, "Create"), object };
 }
 

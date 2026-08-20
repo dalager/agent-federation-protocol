@@ -104,6 +104,18 @@ AFP is a coordination protocol, **not** an event bus. High-frequency external si
 aggregated by its brain; only decision-worthy events cross the port as activities. Piping
 a raw stream into an inbox defeats retry queues, dedupe stores, and audit replay alike.
 
+Volume is not the only thing the port holds back — **authorship** is the other (scenario
+06, finding 19). Content arriving from an external system is written by whoever could
+write there: a bug report, a form submission, a document is arbitrary third-party text,
+and a port agent that splices it into a Task's `content` has handed a stranger the
+prompt every downstream brain reasons over. 04 treats fediverse command parsing as an
+injection surface and sandboxes untrusted *results*; ingested task *descriptions* are
+the third door, and the duty is stated positively: third-party content enters the record
+as a **hash-addressed artifact with a declared content type** (07) — evidence the record
+carries — and the task text agents act on is the **port's own bounded summary**, in the
+port's own words. The reporter's prose is what the investigation is *about*, never what
+it is *asked to do*.
+
 Conversely, for side effects an agent executes in an external system (opening a change
 proposal, filing a tracker record, merging), the authoritative outcome lives outside AFP.
 Port agents **MUST reconcile**: emit a follow-up `Result` into the same `context` carrying
