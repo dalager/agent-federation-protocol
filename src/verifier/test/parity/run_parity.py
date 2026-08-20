@@ -25,6 +25,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))  # -> src/verifier
 
 from decision import instant_millis, voter_weights
 from reputation import REPUTATION_RULES
+from federation import admitting_grant
 
 
 def main() -> int:
@@ -43,6 +44,14 @@ def main() -> int:
         key = f"weights:{case['name']}"
         try:
             results[key] = voter_weights([(a, i) for a, i in case["voters"]])
+        except Exception as error:
+            results[key] = f"THREW: {type(error).__name__}"
+
+    for case in cases.get("grants", []):
+        key = f"grants:{case['name']}"
+        try:
+            grant = admitting_grant(case["agreement"], case["summary"])
+            results[key] = grant.get("afp:grantType") if grant else None
         except Exception as error:
             results[key] = f"THREW: {type(error).__name__}"
 

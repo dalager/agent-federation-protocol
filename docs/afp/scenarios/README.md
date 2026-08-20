@@ -102,16 +102,17 @@ v3.12), 21 and 22 as spec precision (v3.13), then 19 as spec text and 24 through
 it into [ADR-0007](../adr/0007-supersession.md)'s three decisions (v3.14). Campaign
 closed.
 
-### Campaign 5 — open
+### Campaign 5 → v3.16 (ADR-0008) — 29a/29b open
 
 Seven findings from [scenario 08](08-the-subcontract.md), the P4 shakedown: the
 handshake exercised alone, with an adversarial prober and a two-export replay. The raw
 walkthrough surfaced five; the scenario's own review pass split one and added one, and
-its corrections are folded into the scenario's verdict. Findings 25–28 and 30 have a proposed resolution in
-[ADR-0008](../adr/0008-p4-federation-stack.md) (the P4 federation stack — grants,
-transport auth, the boundary log, expiry semantics, sited ingestion duties); they mark
-resolved when it is accepted and built. 29a/29b are verifier and record architecture,
-deferred by that ADR to their own.
+its corrections are folded into the scenario's verdict. Findings 25–28 and 30 are **resolved** — [ADR-0008](../adr/0008-p4-federation-stack.md)
+accepted and built (v3.16): grants, dual-Create activation, the hop's HTTP Signatures
+over the one payload suite, the hash-chained boundary log, expiry semantics with the
+global monotonicity backstop, and both ingestion duties enforced at the receiving port.
+**29a/29b stay open**: verifier and record architecture, deferred by that ADR to their
+own — the campaign closes when they land.
 
 | # | Finding | Candidate |
 |---|---|---|

@@ -27,6 +27,7 @@ import { describe, it } from "node:test";
 import { runReputationRule, type PinnedSettlement } from "../src/allocation/reputation.ts";
 import { instantMillis } from "../src/crypto/time.ts";
 import { voterWeights } from "../src/hub/weights.ts";
+import { admittingGrant } from "../src/federation/grants.ts";
 
 const PARITY_DIR = join(import.meta.dirname, "..", "..", "verifier", "test", "parity");
 const CASES_PATH = join(PARITY_DIR, "cases.json");
@@ -35,6 +36,7 @@ interface Cases {
   reputation: { name: string; bidder: string; settlements: PinnedSettlement[] }[];
   instants: string[];
   weights: { name: string; voters: [string, string][] }[];
+  grants: { name: string; agreement: never; summary: never; admits: string | null }[];
 }
 
 /** The TypeScript side's answers, keyed exactly as the Python runner keys its own. */
@@ -56,6 +58,15 @@ function typescriptResults(cases: Cases): Record<string, unknown> {
     const key = `weights:${testCase.name}`;
     try {
       results[key] = voterWeights(testCase.voters.map(([agent, instance]) => ({ agent, instance })));
+    } catch (error) {
+      results[key] = `THREW: ${(error as Error).constructor.name}`;
+    }
+  }
+  for (const testCase of cases.grants) {
+    const key = `grants:${testCase.name}`;
+    try {
+      const grant = admittingGrant(testCase.agreement, testCase.summary);
+      results[key] = grant ? ((grant as Record<string, unknown>)["afp:grantType"] as string) : null;
     } catch (error) {
       results[key] = `THREW: ${(error as Error).constructor.name}`;
     }
@@ -100,7 +111,7 @@ describe("cross-implementation parity (writer vs verifier)", () => {
       0,
       `the two implementations disagree on ${divergent.length} case(s):\n${divergent.join("\n")}`,
     );
-    assert.ok(keys.length >= cases.reputation.length + cases.instants.length + cases.weights.length);
+    assert.ok(keys.length >= cases.reputation.length + cases.instants.length + cases.weights.length + cases.grants.length);
   });
 
   // A parity harness that silently compares nothing would be worse than none:

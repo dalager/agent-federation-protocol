@@ -279,10 +279,11 @@ state machine idempotent, order-tolerant, and timeout-driven.
   activities are audit-logged and dropped, never processed.
 - **The two-tier gate** runs on every task-relevant activity: FederationAgreement →
   deny-list → roster/MembershipProof as hard gates, reputation as a soft weight.
-- **Payload integrity across relays** — everything routed through a hub needs Linked Data
-  Signatures / Object Integrity Proofs on the object itself; the HTTP-layer signature only
-  authenticates the relaying hop. Required from roadmap P4 onward (P5 makes it
-  load-bearing, when payloads start crossing a hub).
+- **Payload integrity across relays** — the `eddsa-jcs-2022` object-integrity proof every
+  activity has carried since P1 *is* this requirement (ADR-0008: there is no second
+  payload-signature suite); the HTTP-layer signature only authenticates the relaying
+  hop. Load-bearing from roadmap P4 onward (P5 more so, when payloads start crossing a
+  hub).
 - **Byzantine accountability** — equivocation is cryptographically provable; agent-level
   weight-zeroing is automatic, instance-level consequences are governance decisions;
   snapshot-pinned membership blocks mid-round Sybil enrollment.

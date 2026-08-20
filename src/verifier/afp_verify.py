@@ -35,7 +35,8 @@ from pathlib import Path
 from allocation import check_announce_role, check_award
 from asset import check_assets
 from action import check_actions, check_supersession
-from decision import afp_object, check_decision_record, check_enroll_authority
+from decision import afp_object, check_decision_record, check_enroll_authority, instant_millis
+from federation import check_federation
 from proof import CRYPTOSUITE, decode_multikey, digest_of, verify_proof
 
 
@@ -105,6 +106,9 @@ class Authority:
     # actor URL -> the instance its own document names as operator
     # (`afp:operatedBy`) — who is entitled to enroll it (ADR-0005 Decision 2)
     operated_by: dict[str, str] = field(default_factory=dict)
+    # this export's own instance actor id, from instance.jsonld — the origin
+    # a cross-boundary activity is measured against (ADR-0008 Decision 1)
+    instance_actor: str | None = None
 
 
 def build_authority(export: Path) -> Authority:
@@ -132,6 +136,7 @@ def build_authority(export: Path) -> Authority:
 
     instance_doc = export / "instance.jsonld"
     instance_id = load_json(instance_doc).get("id") if instance_doc.exists() else None
+    authority.instance_actor = instance_id
 
     roster_path = export / "roster.jsonld"
     if not roster_path.exists():
@@ -207,12 +212,32 @@ def check_authority(report: Report, authority: Authority, label: str, activity: 
 
 
 def check_chain(report: Report, actor: str, activities: list[dict]) -> None:
-    """Walk one actor's hash chain: no gap, no fork, correct start."""
+    """Walk one actor's hash chain: no gap, no fork, correct start — and
+    non-decreasing `published` along it (ADR-0008 Decision 4's backstop).
+
+    The monotonicity check is what makes backdating detectable anywhere: a
+    timestamp-dependent rule (agreement expiry, settlement recency, role LWW)
+    compares instants the actor itself wrote, and chain position brackets any
+    backdated value between its honestly-dated neighbors — rewriting the
+    bracket means rewriting the signed chain tail.
+    """
     previous_digest: str | None = None
+    previous_instant: int | None = None
 
     for index, activity in enumerate(activities):
         label = f"{actor}[{index}] {activity.get('id', '<no id>')}"
         declared = activity.get("afp:prevActivity")
+
+        instant = instant_millis(activity.get("published"))
+        if previous_instant is not None:
+            report.record(
+                f"chain: {label} published does not decrease",
+                instant >= previous_instant,
+                "" if instant >= previous_instant else
+                f"published {activity.get('published')!r} precedes its chain "
+                f"predecessor's — a backdated timestamp inside a signed chain (ADR-0008)",
+            )
+        previous_instant = instant
 
         if index == 0:
             report.record(
@@ -447,6 +472,13 @@ def verify_export(export: Path, thread: str | None, report: Report) -> None:
     # ADR-0007: answer-level supersession — resolution, ratification parity,
     # and dispositions for actions whose justification was withdrawn.
     check_supersession(report, all_activities)
+
+    # ADR-0008 Decision 1/4: every cross-boundary activity in this export
+    # rides a co-signed afp:FederationAgreement, active with an admitting
+    # grant, at its published instant. Single-export replay only — the
+    # two-export replay against a counterparty's own export (29a/29b) is a
+    # later ADR. Exports with no cross-boundary activity run none of this.
+    check_federation(report, all_activities, authority)
 
     # ADR-0004 Decision 2: the asset registry replays from Update{afp:Asset};
     # (id, version) immutability, member-role registration, and reuse-reference

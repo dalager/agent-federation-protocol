@@ -1,6 +1,7 @@
 # ADR-0008 — The P4 federation stack: recognition, the boundary, and its record
 
-- **Status:** Proposed
+- **Status:** Accepted, and **built** — P4a and P4b, gated by the first two-instance
+  test over real HTTP (see [Build status](#build-status))
 - **Date:** 2026-08-20
 - **Applies to:** P4 — the federation handshake and the instance boundary. Shared hubs,
   cross-operator CRDT sync and enrollment seats stay P5.
@@ -264,21 +265,22 @@ raw-JSON cases in the shared parity harness before its gate is called done.
 
 ## Build status
 
-Nothing is built. Tasks are staged per Decision 6; the two-export verifier (29a) and
-redaction stubs (29b) are tracked by their own forthcoming ADR, not here. **F4 first**:
-it is the smallest task, lives entirely inside existing machinery, and its
-monotonicity check hardens everything the rest of the build produces.
+All eight tasks are built; the two-export verifier (29a) and redaction stubs (29b)
+remain tracked by their own forthcoming ADR. The gate is `test/adr0008.test.ts` — two
+real `AfpInstance`s with distinct origins over ephemeral localhost HTTP, real
+signatures, no mocked wire — running scenario 08's shape end to end, plus
+`test/adr0008b.test.ts` for P4b.
 
 | ID | Task | Stage |
 |---|---|---|
-| **F1** | `afp:FederationAgreement` with grants; handshake builders; gate module (agreement → deny-list → proof → soft-reputation, check 4 skipped for direct grants) | P4a |
-| **F2** | The boundary on the existing seams: `HttpTransport` implementing `Transport.deliver` (send), inbox `POST` on `ap/server.ts` (receive) — signature verification, then the gate, then the same dispatch local transport feeds | P4a |
-| **F3** | Hash-chained boundary log + optional `afp:BoundaryDigest`; rate limiting in front | P4a |
-| **F4** | Expiry semantics at the gate; verifier: grant admissibility, expiry instants, and the global `published`-monotonicity check | P4a |
-| **F5** | Boundary ingestion: sandbox + summarize duties enforced at the receiving port | P4a |
-| **F6** | Spec text: 01/03/04 amendments, roadmap-row and 01:13 wording cleanup, error codes named per the house rule | P4a |
-| **F7** | Parity cases for every new derivation, in the raw-JSON harness | P4a |
-| **F8** | Shadow Notes, command grammar, `afp:AuditGrant` over authorized fetch; the RSA interop wart | P4b |
+| **F1** ✅ | `afp:FederationAgreement` with grants; handshake builders; gate module (agreement → deny-list → proof → soft-reputation, check 4 skipped for direct grants) | P4a |
+| **F2** ✅ | The boundary on the existing seams: `HttpTransport` implementing `Transport.deliver` (send), inbox `POST` on `ap/server.ts` (receive) — signature verification, then the gate, then the same dispatch local transport feeds | P4a |
+| **F3** ✅ | Hash-chained boundary log + optional `afp:BoundaryDigest`; rate limiting in front | P4a |
+| **F4** ✅ | Expiry semantics at the gate; verifier: grant admissibility, expiry instants, and the global `published`-monotonicity check | P4a |
+| **F5** ✅ | Boundary ingestion: sandbox + summarize duties enforced at the receiving port | P4a |
+| **F6** ✅ | Spec text: 01/03/04 amendments, roadmap-row and 01:13 wording cleanup, error codes named per the house rule | P4a |
+| **F7** ✅ | Parity cases for every new derivation, in the raw-JSON harness | P4a |
+| **F8** ✅ | Shadow Notes, command grammar, `afp:AuditGrant` over authorized fetch; the RSA interop wart | P4b |
 
 ## References
 

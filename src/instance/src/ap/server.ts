@@ -12,10 +12,16 @@
 
 import { createServer, type Server } from "node:http";
 import type { AfpInstance } from "../instance.ts";
+import { handleInboxPost, type InboxDeps } from "../federation/inbox.ts";
 
 const AP_CONTENT_TYPE = "application/activity+json";
 
-export function createHttpServer(instance: AfpInstance): Server {
+export interface ServerOptions {
+  /** ADR-0008: when present, POST {actor}/inbox is live — the boundary's receiving half. */
+  inbox?: Omit<InboxDeps, "selfOrigin" | "now">;
+}
+
+export function createHttpServer(instance: AfpInstance, options: ServerOptions = {}): Server {
   return createServer((req, res) => {
     const url = new URL(req.url ?? "/", instance.config.origin);
     const path = url.pathname;
@@ -26,6 +32,28 @@ export function createHttpServer(instance: AfpInstance): Server {
       res.end(payload);
     };
     const notFound = (): void => send(404, { error: "not found" }, "application/json");
+
+    if (req.method === "POST" && options.inbox && (path === "/actor/inbox" || /^\/agents\/[\w-]+\/inbox$/.test(path))) {
+      const chunks: Buffer[] = [];
+      req.on("data", (chunk) => chunks.push(chunk));
+      req.on("end", () => {
+        const body = Buffer.concat(chunks).toString("utf8");
+        handleInboxPost(
+          { ...options.inbox!, selfOrigin: instance.config.origin, now: () => instance.clock.now() },
+          path,
+          {
+            host: String(req.headers.host ?? ""),
+            date: String(req.headers.date ?? ""),
+            digest: String(req.headers.digest ?? ""),
+            signature: String(req.headers.signature ?? ""),
+          },
+          body,
+        )
+          .then((outcome) => send(outcome.status, outcome.body, "application/json"))
+          .catch(() => send(500, { error: "internal" }, "application/json"));
+      });
+      return;
+    }
 
     if (req.method !== "GET") return notFound();
 

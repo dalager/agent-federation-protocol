@@ -10,7 +10,8 @@ central auth service.
 
 Reusing ActivityPub means: no message broker to operate, no required central registry,
 per-message (not per-connection) authentication so agents can be hosted anywhere, and a
-decade of federation tooling — WebFinger, HTTP Signatures, Linked Data Signatures, retry
+decade of federation tooling — WebFinger, HTTP Signatures, object-integrity proofs (the
+Data Integrity successor to Linked Data Signatures), retry
 semantics, and interop with generic ActivityPub clients (including a human watching an
 agent's outbox from Mastodon). In v3 each agent additionally declares which instance
 administers it (`afp:operatedBy`).
@@ -186,10 +187,21 @@ trust is established before anything flows (the inverse of Mastodon's
 open-by-default-then-defederate):
 
 ```
-Offer{afp:FederationAgreement}   Alpha → Beta   (terms + scope + expiry)
+Offer{afp:FederationAgreement}   Alpha → Beta   (parties + grants + expiry)
         → CounterSign            Beta
         → Create{afp:FederationAgreement}   published to both outboxes — the trust anchor
 ```
+
+"Countersign" is **dual-Create, not multi-signature** (ADR-0008): each party publishes
+its *own* signed `Create` over a byte-identical agreement object, whose digest is the
+agreement's identity. An agreement is **active** only while an instance holds both
+Creates over digest-equal objects and `afp:expires` has not passed — one Create is an
+offer on the record, not a permission. The agreement's scope is a list of **grants**:
+a `hub` grant admits traffic addressed to the named hub, a `direct-delegation` grant
+admits the P1 delegation flow on named capabilities, and grants never cross-admit —
+the gate checks each activity against the grant that admits it, never "some grant
+exists." The narrowest real federation — one counterparty, named capabilities, no hub
+— states its own scope (scenario 08, finding 25).
 
 `afp:Defederate` is unilateral and immediate at the sender's own inbox policy — either
 party can exit at will; the hub treats it as advisory and cannot force reinstatement.
@@ -206,13 +218,16 @@ authoritative nowhere.
 
 Inbox / vote / bid acceptance policy, evaluated in order:
 
-1. Sender's instance holds an active, unexpired `FederationAgreement` scoped to this hub
-   → else **hard reject** (instance gate)
+1. An active, unexpired `FederationAgreement` with the sender's instance holds a
+   **grant admitting this activity** (hub grant for hub traffic, delegation grant for
+   direct delegation — ADR-0008) → else **hard reject** (instance gate)
 2. Sender's instance is not explicitly deny-listed → else **hard reject** (a blocklist
    overrides an agreement, e.g. after `Defederate`)
 3. Sender agent's roster membership / `MembershipProof` is valid and unexpired
    → else **hard reject**
-4. Sender agent's hub-scoped reputation ≥ policy floor → else **soft degrade**: accept,
+4. Sender agent's hub-scoped reputation ≥ policy floor — **defined as skipped for
+   direct-delegation traffic** (no hub, no reputation to weigh; an undefined check in a
+   hard-gate sequence is how implementations fork — ADR-0008) → else **soft degrade**: accept,
    but discount vote/bid weight. Unset reputation defaults neutral.
 
 Instance and roster checks are hard gates; reputation is a soft weight. This applies

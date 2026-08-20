@@ -591,5 +591,260 @@
         ]
       ]
     }
+  ],
+  "grants": [
+    {
+      "name": "delegation grant admits an Offer on a granted capability",
+      "agreement": {
+        "type": "afp:FederationAgreement",
+        "afp:parties": [
+          "https://a/actor",
+          "https://b/actor"
+        ],
+        "afp:grants": [
+          {
+            "afp:grantType": "direct-delegation",
+            "afp:capabilities": [
+              "afp:cap:assess"
+            ]
+          }
+        ],
+        "afp:expires": "2027-01-01T00:00:00Z"
+      },
+      "summary": {
+        "type": "Offer",
+        "objectType": "afp:Task",
+        "capability": "afp:cap:assess",
+        "hub": null
+      },
+      "admits": "direct-delegation"
+    },
+    {
+      "name": "an Offer on an ungranted capability is refused",
+      "agreement": {
+        "type": "afp:FederationAgreement",
+        "afp:parties": [
+          "https://a/actor",
+          "https://b/actor"
+        ],
+        "afp:grants": [
+          {
+            "afp:grantType": "direct-delegation",
+            "afp:capabilities": [
+              "afp:cap:assess"
+            ]
+          }
+        ],
+        "afp:expires": "2027-01-01T00:00:00Z"
+      },
+      "summary": {
+        "type": "Offer",
+        "objectType": "afp:Task",
+        "capability": "afp:cap:build",
+        "hub": null
+      },
+      "admits": null
+    },
+    {
+      "name": "a response rides the relationship without re-matching capability",
+      "agreement": {
+        "type": "afp:FederationAgreement",
+        "afp:parties": [
+          "https://a/actor",
+          "https://b/actor"
+        ],
+        "afp:grants": [
+          {
+            "afp:grantType": "direct-delegation",
+            "afp:capabilities": [
+              "afp:cap:assess"
+            ]
+          }
+        ],
+        "afp:expires": "2027-01-01T00:00:00Z"
+      },
+      "summary": {
+        "type": "Create",
+        "objectType": "afp:Result",
+        "capability": null,
+        "hub": null
+      },
+      "admits": "direct-delegation"
+    },
+    {
+      "name": "hub-addressed traffic never rides a delegation grant",
+      "agreement": {
+        "type": "afp:FederationAgreement",
+        "afp:parties": [
+          "https://a/actor",
+          "https://b/actor"
+        ],
+        "afp:grants": [
+          {
+            "afp:grantType": "direct-delegation",
+            "afp:capabilities": [
+              "afp:cap:assess"
+            ]
+          }
+        ],
+        "afp:expires": "2027-01-01T00:00:00Z"
+      },
+      "summary": {
+        "type": "Offer",
+        "objectType": "afp:Task",
+        "capability": "afp:cap:assess",
+        "hub": "https://a/hubs/x"
+      },
+      "admits": null
+    },
+    {
+      "name": "a hub grant admits traffic for its hub",
+      "agreement": {
+        "type": "afp:FederationAgreement",
+        "afp:parties": [
+          "https://a/actor",
+          "https://b/actor"
+        ],
+        "afp:grants": [
+          {
+            "afp:grantType": "hub",
+            "afp:hub": "https://a/hubs/x"
+          }
+        ],
+        "afp:expires": "2027-01-01T00:00:00Z"
+      },
+      "summary": {
+        "type": "Announce",
+        "objectType": "afp:Task",
+        "capability": null,
+        "hub": "https://a/hubs/x"
+      },
+      "admits": "hub"
+    },
+    {
+      "name": "a hub grant refuses a different hub",
+      "agreement": {
+        "type": "afp:FederationAgreement",
+        "afp:parties": [
+          "https://a/actor",
+          "https://b/actor"
+        ],
+        "afp:grants": [
+          {
+            "afp:grantType": "hub",
+            "afp:hub": "https://a/hubs/x"
+          }
+        ],
+        "afp:expires": "2027-01-01T00:00:00Z"
+      },
+      "summary": {
+        "type": "Announce",
+        "objectType": "afp:Task",
+        "capability": null,
+        "hub": "https://a/hubs/y"
+      },
+      "admits": null
+    },
+    {
+      "name": "an unknown grant type admits nothing",
+      "agreement": {
+        "type": "afp:FederationAgreement",
+        "afp:parties": [
+          "https://a/actor",
+          "https://b/actor"
+        ],
+        "afp:grants": [
+          {
+            "afp:grantType": "everything",
+            "afp:capabilities": [
+              "afp:cap:assess"
+            ]
+          }
+        ],
+        "afp:expires": "2027-01-01T00:00:00Z"
+      },
+      "summary": {
+        "type": "Offer",
+        "objectType": "afp:Task",
+        "capability": "afp:cap:assess",
+        "hub": null
+      },
+      "admits": null
+    },
+    {
+      "name": "first matching grant wins, in agreement order",
+      "agreement": {
+        "type": "afp:FederationAgreement",
+        "afp:parties": [
+          "https://a/actor",
+          "https://b/actor"
+        ],
+        "afp:grants": [
+          {
+            "afp:grantType": "hub",
+            "afp:hub": "https://a/hubs/x"
+          },
+          {
+            "afp:grantType": "direct-delegation",
+            "afp:capabilities": [
+              "afp:cap:assess"
+            ]
+          }
+        ],
+        "afp:expires": "2027-01-01T00:00:00Z"
+      },
+      "summary": {
+        "type": "Offer",
+        "objectType": "afp:Task",
+        "capability": "afp:cap:assess",
+        "hub": null
+      },
+      "admits": "direct-delegation"
+    },
+    {
+      "name": "no grants, no admission",
+      "agreement": {
+        "type": "afp:FederationAgreement",
+        "afp:parties": [
+          "https://a/actor",
+          "https://b/actor"
+        ],
+        "afp:grants": [],
+        "afp:expires": "2027-01-01T00:00:00Z"
+      },
+      "summary": {
+        "type": "Offer",
+        "objectType": "afp:Task",
+        "capability": "afp:cap:assess",
+        "hub": null
+      },
+      "admits": null
+    },
+    {
+      "name": "an Announce with no hub is not delegation traffic",
+      "agreement": {
+        "type": "afp:FederationAgreement",
+        "afp:parties": [
+          "https://a/actor",
+          "https://b/actor"
+        ],
+        "afp:grants": [
+          {
+            "afp:grantType": "direct-delegation",
+            "afp:capabilities": [
+              "afp:cap:assess"
+            ]
+          }
+        ],
+        "afp:expires": "2027-01-01T00:00:00Z"
+      },
+      "summary": {
+        "type": "Announce",
+        "objectType": "afp:Task",
+        "capability": "afp:cap:assess",
+        "hub": null
+      },
+      "admits": null
+    }
   ]
 }
