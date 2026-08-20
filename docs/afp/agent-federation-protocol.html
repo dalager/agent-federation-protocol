@@ -1071,7 +1071,8 @@ sequenceDiagram
               <tr><td><code>afp:contributingResults</code></td><td>Hashes of every input Result — binds the answer to its exact evidence, as <code>countedVotes</code> does for decisions</td></tr>
               <tr><td><code>afp:assumptions</code></td><td>The premises the answer rests on; two partial answers built on contradictory assumptions must be reconciled before combination, not summed</td></tr>
               <tr><td><code>afp:dissent</code></td><td><strong>First-class, never a footnote.</strong> An objection that cannot be expressed numerically — &ldquo;infeasible at any price&rdquo; — survives to the reader intact</td></tr>
-              <tr><td><code>afp:supersededInputs</code></td><td>Revisions made during reconciliation stay in the record rather than vanishing</td></tr>
+              <tr><td><code>afp:supersededInputs</code></td><td>Revisions made during reconciliation stay in the record rather than vanishing — <strong>input-level</strong> only: a Result was updated, the conclusion stands</td></tr>
+              <tr><td><code>afp:supersedes</code></td><td><strong>Answer-level</strong> retraction (ADR-0007): the digest of the Synthesis activity this one withdraws. A ratified answer is superseded only by a ratified one, and every activity that acted on the withdrawn answer must be disposed of on the record (<code>afp:disposes</code>). An edge, never an erasure</td></tr>
             </tbody>
           </table>
         </div>

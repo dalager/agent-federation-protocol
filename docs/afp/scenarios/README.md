@@ -55,9 +55,8 @@ Six findings from scenario 04. Two are protocol additions, not conventions:
 Useful scenarios stress an axis the existing ones don't. Untested so far: three or more
 operators (real Byzantine tolerance, coalition dynamics at n≥4), long-lived hubs with heavy
 membership churn, sneakernet/airgapped federation, an adversarial operator rather than a
-merely buggy one, and a task whose answer must be revised after the fact
-(retraction/supersession of a published Synthesis) — brushed by scenario 06's review step,
-which found two gaps in it, but not yet exercised by a scenario built around the revision. Client/observer participation was
+merely buggy one, and a task whose answer must be revised after the fact — exercised by
+[scenario 07](07-the-retraction.md) and resolved in [ADR-0007](../adr/0007-supersession.md). Client/observer participation was
 exercised by scenario 05 — and strained into finding 2 (requester roles).
 
 ### Campaign 3 → v3.9 (ADR-0004)

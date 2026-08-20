@@ -112,7 +112,9 @@ missing field, which silently adopts the four-month-old documentation change as 
 product's contract. `analyst-docs` was right.
 
 **7. The triage was wrong, and the record says so.** A second `afp:Synthesis` lands on the
-same `context` naming the first in `afp:supersededInputs` and reclassifying the issue as
+same `context` naming the first (via what ADR-0007 later carved out as `afp:supersedes` —
+this scenario reached for `afp:supersededInputs`, which 04 scopes to input-level
+revision, and that mismatch became part of finding 24) and reclassifying the issue as
 `needs-elevation`: the question is not "is this a crash" but "which contract is the
 product's," and no agent may decide that. The action policy admits assignment; `issue-scribe`
 assigns the issue to the team and comments with the thread reference. **The pull request

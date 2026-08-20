@@ -193,6 +193,8 @@ a guess.
 | `afp:category` | Property (Synthesis) | The answer's category — MUST be a key of the announce's pinned `afp:actionPolicy` when one exists |
 | `afp:actsOn`, `afp:action` | Properties (any acting activity) | Digest of the Synthesis this action acts on, and the action name it claims — the consequence hash-bound to its cause, checked against the pinned policy |
 | `afp:excludePerformersOf` | Property (announced Task) | Prior task ids whose Award performers are excluded from this auction — the estimator wall generalized to any earlier task (ADR-0006) |
+| `afp:supersedes` | Property (Synthesis) | Answer-level retraction: the digest of the Synthesis activity withdrawn — distinct from input-level `afp:supersededInputs`; a ratified answer is superseded only by a ratified one (04, ADR-0007) |
+| `afp:disposes` | Property (any acting activity) | The digest of an action whose justification was withdrawn — paired with `afp:actsOn` on the superseding answer, so no acted-on retraction leaves an orphaned consequence (ADR-0007) |
 
 > **Numeric profile.** Signed AFP documents carry **integers only** — the JCS
 > canonicalization this profile signs over ([01](01-foundations.md)) rejects non-integer

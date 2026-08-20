@@ -145,7 +145,11 @@ ones add capability around them.
 > (`member`/`requester`/`observer`), `afp:Asset` identity for reusable components, and
 > recomputable reputation consumption (`afp:reputationRule` + `afp:settlementSnapshot`).
 > All three are P1–P3-scoped record extensions that turn into migrations if deferred past
-> the point where two operators share the state.
+> the point where two operators share the state. Three further ADRs — likewise built —
+> complete the hardening: [ADR-0005](adr/0005-operators-are-equal.md) (one operator, one
+> weight), [ADR-0006](adr/0006-checkable-actuation.md) (actions checkable against the
+> answers that justified them), [ADR-0007](adr/0007-supersession.md) (retraction with
+> ratification parity and dispositions).
 
 | Phase | Scope | Demo | Gate |
 |---|---|---|---|

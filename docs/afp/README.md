@@ -50,18 +50,24 @@ wall enforced at bid admission. Both rule families are independently reimplement
 verifier, which rebuilds the admitted bid pool from the record alone. The same auction
 also runs with real model-written answers (`npm run demo:p3:llm`) — the record's shape,
 and the verifier's verdict, are identical either way. That completes the **solo profile**
-(P1→P3); the next phase is P4's federation handshake.
+(P1→P3) — since **hardened before federation** by four further ADRs, each built and gated:
+roles, assets and recomputable reputation ([ADR-0004](adr/0004-solo-foundation-hardening.md)),
+per-operator vote weight ([ADR-0005](adr/0005-operators-are-equal.md)), checkable actuation
+([ADR-0006](adr/0006-checkable-actuation.md)), and supersession
+([ADR-0007](adr/0007-supersession.md)). The next phase is P4's federation handshake.
 
 | | |
 |---|---|
 | [`src/instance/`](../../src/instance/) | The instance — no dependencies, no build step. `npm run demo`, `demo:p2`, `demo:p3`, `npm run gate`. Brains run on any OpenAI-compatible endpoint (a local Qwen by default) |
 | [`src/verifier/`](../../src/verifier/) | `afp_verify.py` — replays an export with no access to the instance |
 
-All [acceptance-gate](05-roadmap.md#acceptance-gate) checks pass across the three built
-phases, including the ten deliberate mutations — four P1 (flipped evidence byte, removed
-activity, re-signed tail, deleted outbox), three P2 (DecisionRecord attacks), three P3
-(deleted winning reveal, swapped performer set, mismatched winning-bid evidence) — each
-failing the replay with a specific pointer.
+All [acceptance-gate](05-roadmap.md#acceptance-gate) checks pass across the built phases,
+including deliberate mutations at every gate — the original ten across P1–P3 (flipped
+evidence byte, removed activity, re-signed tail, deleted outbox; DecisionRecord attacks;
+deleted winning reveal, swapped performer set, mismatched winning-bid evidence), and the
+hardening gates' beyond them (ADR-0004–0007), which break roles, asset immutability,
+reputation snapshots, voter weights, action policies and supersession one named check at
+a time — each failing the replay with a specific pointer.
 
 ## The multi-operator model
 
