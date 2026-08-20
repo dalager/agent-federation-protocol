@@ -16,6 +16,7 @@ protocol does; that review tested whether the build order still matched it.
 | [03](03-co-staffed-project.md) | Two consultancies co-staffing a project | Federation, cross-operator governance, shared state, co-work, billing evidence | 4 + 2 recurring |
 | [04](04-federated-estimation.md) | A question pushed to the hub: federated estimation | Unknown-arity allocation, partial answers, reconciliation, unverifiable deliverables | 6 |
 | [05](05-integration-practice.md) | The integration practice: domain intelligence as an internal service | Standing solo instance answering other teams' shape/size/effort asks, requester roles, cross-team asset reuse, settlement on requester-reported actuals | 3 |
+| [06](06-issue-triage-loop.md) | The issue triage loop: from bug tracker to reviewed fix | External system as initiator, untrusted third-party content entering the record, acting on your own classification, idempotent external writes, author/reviewer separation, supersession after review | 6 |
 
 ## Findings ledger
 
@@ -54,7 +55,8 @@ Useful scenarios stress an axis the existing ones don't. Untested so far: three 
 operators (real Byzantine tolerance, coalition dynamics at n≥4), long-lived hubs with heavy
 membership churn, sneakernet/airgapped federation, an adversarial operator rather than a
 merely buggy one, and a task whose answer must be revised after the fact
-(retraction/supersession of a published Synthesis). Client/observer participation was
+(retraction/supersession of a published Synthesis) — brushed by scenario 06's review step,
+which found two gaps in it, but not yet exercised by a scenario built around the revision. Client/observer participation was
 exercised by scenario 05 — and strained into finding 2 (requester roles).
 
 ### Campaign 3 → v3.9 (ADR-0004)
@@ -74,3 +76,21 @@ Scenario 05's minor precision also landed:
 Keep the format: user story → cast → walkthrough → acceptance criteria mapped to spec
 mechanisms → verdict with findings. Be willing to conclude that something strained; a
 scenario that finds nothing has usually been written to flatter the spec.
+
+### Campaign 4 — open
+
+Six findings from [scenario 06](06-issue-triage-loop.md), the first scenario where the
+swarm *acts* on its own conclusion inside an external system rather than only recording
+it. Unresolved; candidates below are the scenario's own suggestions, not decisions.
+
+| # | Finding | Candidate |
+|---|---|---|
+| 19 | Content ingested through a port is untrusted in a way the spec never names — 04 covers fediverse command injection and untrusted *results*, but not a task description arriving from an external system | State the port agent's duty positively: third-party content enters as hash-addressed evidence with a declared content type; the task text an agent acts on is the port's own summary |
+| 20 | Nothing binds an action to the answer that justified it — selection and reputation have pinned named rules, actuation has none | `afp:actionPolicy` in the Announce: a closed category set and a pure function from category to admissible action, recomputed at replay |
+| 21 | 03's reconciliation duty stops short of idempotence — a crash between doing the external thing and recording it is indistinguishable from not having done it | Require an idempotency key derived from the `correlationId` on the external side effect, so reconciliation after a crash is a lookup |
+| 22 | A task that cannot be answered *as posed* has no honest terminal outcome, and the replay procedure demands one | A machine-readable `afp:err:insufficient-information`, closing the thread rather than parking it |
+| 23 | Separation of duties is specified once, for one pair (estimator/bidder); "the author of a fix may not review it" is the same shape with no mechanism | Generalize the wall to an exclusion bound to a named prior task's performers, of which the estimator case is one instance |
+| 24 | Supersession revises an answer that has already been acted on — and nothing says who may supersede a ratified Synthesis, or makes the withdrawn justification visible | Wants its own scenario, where revision is the point rather than a consequence |
+
+Ranked in the scenario's verdict: 20 and 23 are the ones to fight for, 19 is what bites an
+implementer first, 21 and 22 are precision on existing duties, 24 needs a scenario of its own.

@@ -10,7 +10,7 @@
   [ADR-0003](0003-p3-allocation-stack.md) — everything all three decided is inherited
   unchanged; this ADR only covers what the hardening adds
 - **Driven by:** the three open findings of
-  [scenario 05 / campaign 3](../scenarios/README.md#campaign-3--open) (16–18), plus the
+  [scenario 05 / campaign 3](../scenarios/README.md#campaign-3--v39-adr-0004) (16–18), plus the
   scenario's minor precision on the port boundary
 
 ## Context
