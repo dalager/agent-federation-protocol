@@ -1,10 +1,11 @@
 # ADR-0014 — The P5 shared-hub stack: the hub is somebody's server
 
-- **Status:** Accepted, and **built** through M5 (2026-08-21): the proof and the widened
-  read predicate, the priorThread reconciliation edge, the hub's anchorable chain head,
-  and silent-vs-declined on the DecisionRecord — each gated with discriminating
-  mutations. M6, the full three-instance HTTP gate, remains open and is what P5's
-  integration demo owes
+- **Status:** Accepted, and **built** (2026-08-21) — gated per decision with
+  discriminating mutations, and end-to-end by M6: three operators over real sockets, the
+  proof verified against a hub document fetched from a third party, the host partitioned
+  and the read surviving from the requester's pocket, the mesh carrying real delegation
+  through the real inbox gate, and a post-partition round telling a recorded decline from
+  two silences
 - **Date:** 2026-08-21
 - **Applies to:** P5 — every deployment where more than one operator shares a hub, which
   is the first configuration where the hub stops being an implementation detail of one
@@ -247,7 +248,7 @@ until a member can prove membership to a peer.
 | **M3** ✅ | Degraded mode: the mesh fallback and the recorded reconciliation on the hub's return | 2 |
 | **M4** ✅ | Hub-observed order; hub chain-head anchoring on a cadence (reusing ADR-0012's carrier) | 2 |
 | **M5** ✅ | Silent-vs-declined on the `DecisionRecord`; verifier check that the two are distinguishable and consistent with the snapshot | 2 |
-| **M6** | Gate: three instances, one hub — a member reads a peer's hub activity under a proof; an expired proof is refused; the host partitions and the mesh carries the work; the reconciliation is visible on return; a round with one member silent records it as silent, not as an abstention | 3 |
+| **M6** ✅ | Gate: three instances, one hub — a member reads a peer's hub activity under a proof; an expired proof is refused; the host partitions and the mesh carries the work; the reconciliation is visible on return; a round with one member silent records it as silent, not as an abstention | 3 |
 
 ## References
 

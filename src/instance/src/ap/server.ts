@@ -37,6 +37,14 @@ export interface ServerOptions {
   read?: ReadGateDeps & {
     onGrantedFetch?: (info: { grant: string; auditor: string; path: string; at: Date }) => void;
   };
+  /**
+   * Hubs hosted here, for serving their actor documents at GET /hubs/:id —
+   * the route ADR-0002 described ("the hub is a route mounted next to the
+   * agent actors") and nothing had needed until ADR-0014: a peer verifying a
+   * presented membership proof resolves the hub's key from this document, so
+   * it is public for the same bootstrap reason every actor document is.
+   */
+  hubs?: readonly { hubId: string; actorDocument(): { [key: string]: JsonValue } }[];
 }
 
 /** Every outbox entry, anywhere, whose activity JSON mentions this digest — the artifact-visibility query, resource-agnostic. */
@@ -122,6 +130,13 @@ export function createHttpServer(instance: AfpInstance, options: ServerOptions =
         // routes, so gating them would make every signature unverifiable in
         // one move. This is not an oversight — it is load-bearing.
         if (path === "/actor") return send(200, instance.instanceDocument());
+
+        const hubMatch = path.match(/^\/hubs\/([\w-]+)$/);
+        if (hubMatch) {
+          const hub = options.hubs?.find((h) => h.hubId === hubMatch[1]);
+          if (!hub) return notFound();
+          return send(200, hub.actorDocument());
+        }
         if (path === "/roster") return send(200, instance.rosterDocument());
 
         const agentMatch = path.match(/^\/agents\/([\w-]+)$/);
