@@ -31,6 +31,14 @@ export interface InboxDeps {
   receive: (activity: { [key: string]: JsonValue }) => Promise<unknown>;
   /** Unauthenticated GET of a remote JSON document (actor documents are public). */
   fetchDocument: (url: string) => Promise<{ [key: string]: JsonValue } | null>;
+  /**
+   * ADR-0016 Decision 2: the hub inbox's fourth check — admission by the
+   * receiving hub's own enrollment record, run after the boundary gate and
+   * before dispatch. Refusal is the gate's own opaque 403: "not a member" and
+   * "not admitted" must be indistinguishable to a probe. Absent on the
+   * instance/agent inboxes, whose admission the gate alone decides.
+   */
+  admitWrite?: (actor: string, activity: { [key: string]: JsonValue }) => boolean;
 }
 
 /**
@@ -157,6 +165,11 @@ export async function handleInboxPost(
     if (operatedBy && deps.federation.isDenylisted(operatedBy)) {
       return { status: 403, body: { error: "refused" } };
     }
+    // A hub inbox takes no handshakes — agreements are between operators, and
+    // the operator's own inbox is where that door-knock lands (ADR-0016 D2).
+    if (deps.admitWrite && !deps.admitWrite(actor, activity)) {
+      return { status: 403, body: { error: "refused" } };
+    }
     if (activity.type === "Create") {
       const object = activity.object as { [key: string]: JsonValue };
       deps.federation.recordTheirCreate(object, activity);
@@ -183,12 +196,21 @@ export async function handleInboxPost(
       operatedBy &&
       correlation &&
       (objectType === "afp:Result" || objectType === "afp:Error") &&
-      deps.federation.lateOutcomeAdmissible(operatedBy, deps.federation.acceptPublishedFor(correlation))
+      deps.federation.lateOutcomeAdmissible(operatedBy, deps.federation.acceptPublishedFor(correlation)) &&
+      (!deps.admitWrite || deps.admitWrite(actor, activity))
     ) {
       deps.federation.recordReceived(activity, operatedBy);
       await deps.receive(activity);
       return { status: 202, body: { accepted: true } };
     }
+    return { status: 403, body: { error: "refused" } };
+  }
+
+  // ADR-0016 Decision 2, the fourth check: enrollment at the receiving hub.
+  // After the gate (an agreement never substitutes for a seat), before
+  // dispatch, and refusing with the gate's own opaque body — the door does
+  // not distinguish "not a member" from "not admitted".
+  if (deps.admitWrite && !deps.admitWrite(actor, activity)) {
     return { status: 403, body: { error: "refused" } };
   }
 

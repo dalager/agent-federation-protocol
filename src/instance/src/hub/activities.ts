@@ -146,6 +146,14 @@ export interface VoteSpec {
   proposalHash: string;
   quorumSnapshot: string;
   value: string;
+  /**
+   * ADR-0016: the hub the vote is cast into. Optional for in-process votes
+   * (the round already knows its hub), required in practice for a vote that
+   * crosses a boundary — the gate's `hub` grant matches on `afp:hub`, and a
+   * vote that does not say which hub it belongs to is not admissible under a
+   * grant that names one.
+   */
+  hub?: string;
 }
 
 /** `Create{afp:Vote}` — a point-to-point L0 vote (03 § 8c). */
@@ -155,6 +163,7 @@ export function castVote(envelope: Envelope, spec: VoteSpec): { [key: string]: J
     object: {
       id: spec.voteId,
       type: "afp:Vote",
+      ...(spec.hub ? { "afp:hub": spec.hub } : {}),
       "afp:round": spec.round,
       "afp:proposalHash": spec.proposalHash,
       "afp:quorumSnapshot": spec.quorumSnapshot,
@@ -206,6 +215,52 @@ export function decisionRecord(envelope: Envelope, spec: DecisionRecordSpec): { 
     object["afp:uncounted"] = spec.uncounted.map((u) => ({ agent: u.agent, "afp:status": u.status }));
   }
   return { ...base(envelope, "Create"), object };
+}
+
+// ------------------------------------------------------------------- Anti-entropy (ADR-0016)
+
+export interface DigestSpec {
+  hub: string;
+  /** Per-store, per-origin provenance counts — `crdtId → actor → count`. */
+  versionVectors: Readonly<Record<string, Readonly<Record<string, number>>>>;
+}
+
+/** `Offer{afp:Digest}` — "here is what I hold" (02 § Gossip & anti-entropy, ADR-0016 Decision 4). */
+export function offerDigest(envelope: Envelope, spec: DigestSpec): { [key: string]: JsonValue } {
+  return {
+    ...base(envelope, "Offer"),
+    object: {
+      type: "afp:Digest",
+      "afp:hub": spec.hub,
+      "afp:versionVector": Object.fromEntries(
+        Object.entries(spec.versionVectors).map(([crdtId, vv]) => [crdtId, { ...vv }]),
+      ),
+    },
+  };
+}
+
+export interface StateDeltasSpec {
+  hub: string;
+  /** The Offer{afp:Digest} this answers. */
+  inReplyTo: string;
+  /**
+   * ADR-0016 Decision 3: the signed activities that moved the stores — never
+   * bare deltas. Empty if already converged.
+   */
+  activities: readonly { [key: string]: JsonValue }[];
+}
+
+/** `Accept{afp:StateDeltas}` — the pull's answer: what the digest showed missing. */
+export function acceptStateDeltas(envelope: Envelope, spec: StateDeltasSpec): { [key: string]: JsonValue } {
+  return {
+    ...base(envelope, "Accept"),
+    inReplyTo: spec.inReplyTo,
+    object: {
+      type: "afp:StateDeltas",
+      "afp:hub": spec.hub,
+      "afp:activities": spec.activities.map((activity) => ({ ...activity })),
+    },
+  };
 }
 
 // ------------------------------------------------------------------- Lifecycle

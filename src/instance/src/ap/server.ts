@@ -21,6 +21,7 @@ import type { AfpInstance } from "../instance.ts";
 import { handleInboxPost, type InboxDeps } from "../federation/inbox.ts";
 import { authorizeRead, type ReadAuthorization, type ReadGateDeps } from "../federation/readGate.ts";
 import type { OutboxEntry } from "../store/outbox.ts";
+import type { JsonValue } from "../crypto/jcs.ts";
 
 const AP_CONTENT_TYPE = "application/activity+json";
 
@@ -44,7 +45,14 @@ export interface ServerOptions {
    * presented membership proof resolves the hub's key from this document, so
    * it is public for the same bootstrap reason every actor document is.
    */
-  hubs?: readonly { hubId: string; actorDocument(): { [key: string]: JsonValue } }[];
+  hubs?: readonly {
+    hubId: string;
+    actorDocument(): { [key: string]: JsonValue };
+    /** ADR-0016 Decision 1: when present (with `inbox`), POST /hubs/:id/inbox is live. */
+    receive?(activity: { [key: string]: JsonValue }): Promise<unknown>;
+    /** ADR-0016 Decision 2: the write door — admission by the hub's own enrollment record. */
+    writeAdmitted?(actor: string, activity: { [key: string]: JsonValue }): boolean;
+  }[];
 }
 
 /** Every outbox entry, anywhere, whose activity JSON mentions this digest — the artifact-visibility query, resource-agnostic. */
@@ -85,13 +93,32 @@ export function createHttpServer(instance: AfpInstance, options: ServerOptions =
       res.setHeader("Vary", "Signature");
     };
 
-    if (req.method === "POST" && options.inbox && (path === "/actor/inbox" || /^\/agents\/[\w-]+\/inbox$/.test(path))) {
+    // ADR-0016 Decision 1: the hub's inbox is this same receiving
+    // implementation with `receive` bound to the hub — not a second front
+    // door. The boundary's checks run identically; Decision 2's enrollment
+    // door (`admitWrite`) is the one addition, and only here.
+    const hubInboxMatch = req.method === "POST" && options.inbox ? path.match(/^\/hubs\/([\w-]+)\/inbox$/) : null;
+    const inboxHub = hubInboxMatch ? options.hubs?.find((h) => h.hubId === hubInboxMatch[1] && h.receive) : undefined;
+
+    if (req.method === "POST" && options.inbox && (inboxHub || path === "/actor/inbox" || /^\/agents\/[\w-]+\/inbox$/.test(path))) {
       const chunks: Buffer[] = [];
       req.on("data", (chunk) => chunks.push(chunk));
       req.on("end", () => {
         const body = Buffer.concat(chunks).toString("utf8");
         handleInboxPost(
-          { ...options.inbox!, selfOrigin: instance.config.origin, now: () => instance.clock.now() },
+          {
+            ...options.inbox!,
+            ...(inboxHub
+              ? {
+                  receive: (activity: { [key: string]: JsonValue }) => inboxHub.receive!(activity),
+                  ...(inboxHub.writeAdmitted
+                    ? { admitWrite: (actor: string, activity: { [key: string]: JsonValue }) => inboxHub.writeAdmitted!(actor, activity) }
+                    : {}),
+                }
+              : {}),
+            selfOrigin: instance.config.origin,
+            now: () => instance.clock.now(),
+          },
           path,
           {
             host: String(req.headers.host ?? ""),

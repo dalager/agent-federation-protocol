@@ -21,9 +21,11 @@ import { Outbox, type OutboxEntry } from "../store/outbox.ts";
 import { DeliveryQueue, type Transport } from "../store/queue.ts";
 import { hubActor, hubActorId } from "../ap/documents.ts";
 import {
+  acceptStateDeltas,
   archiveHub,
   decisionRecord,
   freezeHub,
+  offerDigest,
   offerProposal,
   type Envelope,
   type HubRole,
@@ -61,6 +63,22 @@ export interface HubDeps {
    */
   fetchActor: (actorId: string) => ActorDocument | null;
   now?: () => Date;
+  /**
+   * ADR-0016 Decision 4: resolve an activity id from the record — own outbox
+   * or received bytes. The provenance table holds ids, never bytes; this is
+   * the pointer dereference an `Accept{afp:StateDeltas}` needs to carry the
+   * signed activities themselves. Absent on a hub that never syncs.
+   */
+  resolveActivity?: (activityId: string) => { [key: string]: JsonValue } | null;
+  /**
+   * ADR-0016 Decision 4/5: when set, this hub is a replica of the named hub
+   * actor — 02's recovery story ("stand up a replacement hub actor, replay
+   * CRDT deltas") given a switch. Sync traffic names the replicated identity
+   * (`afp:hub`), and inbound activities addressed to it are applied here.
+   * Transport-level only: whether a migrated host is the same hub remains
+   * ADR-0014's open revisit trigger, deliberately untouched.
+   */
+  replicaOf?: string;
 }
 
 interface LivenessValue {
@@ -82,7 +100,10 @@ export class Hub {
   private readonly instanceActorId: string;
   private readonly key: KeyPair;
   private readonly fetchActor: HubDeps["fetchActor"];
+  private readonly resolveActivity: (activityId: string) => { [key: string]: JsonValue } | null;
   private readonly now: () => Date;
+  /** The hub actor sync traffic names: `replicaOf` when set, else self. */
+  private readonly hubIdentity: string;
 
   /**
    * The persisted CRDT store (ADR-0002 Decision 5): every delta the hub folds
@@ -131,8 +152,10 @@ export class Hub {
     this.db = deps.db;
     this.instanceActorId = deps.instanceActorId;
     this.fetchActor = deps.fetchActor;
+    this.resolveActivity = deps.resolveActivity ?? (() => null);
     this.now = deps.now ?? (() => new Date());
     this.actorId = hubActorId(deps.origin, deps.hubId);
+    this.hubIdentity = deps.replicaOf ?? this.actorId;
 
     ensureHubSchema(this.db);
     this.crdt = new CRDTStore(this.db);
@@ -203,7 +226,7 @@ export class Hub {
   }
 
   actorDocument(): ActorDocument {
-    return hubActor(this.origin, this.hubId, this.key);
+    return hubActor(this.origin, this.hubId, this.key, this.instanceActorId);
   }
 
   /**
@@ -292,6 +315,35 @@ export class Hub {
   }
 
   /**
+   * ADR-0016 Decision 2: the write door. Admission only, never authority —
+   * whether the sender may cross at all, decided from the hub's own record of
+   * its own enrollment; what the write may *do* stays in the handlers, where
+   * 02 puts it ("at bid admission and snapshot-pinning, never in workflow
+   * code"). No membership proof is consulted: the proof exists for whoever
+   * cannot ask the hub, and the hub can always ask itself.
+   *
+   * Enrollment-class and anti-entropy traffic crosses on the strength of the
+   * boundary gate alone — the door-knock analog of the handshake bypass in
+   * `handleInboxPost`: an `afp:Enroll` names an agent that is by definition
+   * not yet enrolled (its own handler enforces ADR-0005's issuer binding),
+   * and a digest exchange is transport-level traffic between replicas, the
+   * class of thing 02 sanctions the hub key itself to sign.
+   */
+  writeAdmitted(actor: string, activity: { [key: string]: JsonValue }): boolean {
+    const type = String(activity.type ?? "");
+    if (type === "afp:Enroll" || type === "afp:Unenroll") return true;
+    const object = activity.object;
+    const objectType =
+      object && typeof object === "object" && !Array.isArray(object)
+        ? String((object as Record<string, JsonValue>).type ?? "")
+        : "";
+    if ((type === "Offer" && objectType === "afp:Digest") || (type === "Accept" && objectType === "afp:StateDeltas")) {
+      return true;
+    }
+    return this.roleOf(actor) !== null;
+  }
+
+  /**
    * Role-aware broadcast list (ADR-0004): announces, awards and proposals go
    * to members and observers; a requester receives only activities on threads
    * it announced (the allocator adds the counterparty per auction).
@@ -369,6 +421,15 @@ export class Hub {
     if (type === "afp:Enroll") return this.onEnroll(activity);
     if (type === "afp:Unenroll") return this.onUnenroll(activity);
     if (type === "Create" && objectType === "afp:Vote") return this.onVote(activity);
+    // ADR-0016 Decision 4: the anti-entropy exchange, activity-shaped like
+    // everything else. Both branch on objectType before the allocation
+    // fallthroughs below, because an Accept is also the award path's verb.
+    if (type === "Offer" && objectType === "afp:Digest") return this.onDigestOffer(activity);
+    if (type === "Accept" && objectType === "afp:StateDeltas") return this.onStateDeltas(activity);
+    // ADR-0016 Decision 3, the second population: an application-defined
+    // store's mutation is an explicit signed Update{afp:CRDTDelta} (02),
+    // applied here with the activity itself as provenance.
+    if (type === "Update" && objectType === "afp:CRDTDelta") return this.onCrdtDelta(activity);
     // ADR-0004 Decision 1: inbound Announce{afp:Task} is a first-class dispatch
     // path — a requester's (or member's) signed Announce is admitted by role,
     // re-fanned out by the hub, and the announcing actor becomes the
@@ -434,6 +495,7 @@ export class Hub {
       { hub: this.hubId, crdtId: "membership", crdtType: "OR_SET", delta: { adds: [{ element: agent, tag }], removes: [] } },
       origin,
       this.now(),
+      String(activity.id),
     );
     for (const capability of capabilities) {
       this.capabilities.apply({ key: agent, set: { op: "add", value: capability, tag } });
@@ -446,6 +508,7 @@ export class Hub {
         },
         origin,
         this.now(),
+        String(activity.id),
       );
     }
     const liveness = { value: { status: "live", load: 0 }, timestamp: this.now().getTime(), nodeId: this.actorId };
@@ -469,6 +532,7 @@ export class Hub {
       { hub: this.hubId, crdtId: `role:${agent}`, crdtType: "LWW_REGISTER", delta: role },
       origin,
       this.now(),
+      String(activity.id),
     );
 
     // The operator this agent counts for when a round is weighted (ADR-0005).
@@ -480,6 +544,7 @@ export class Hub {
       { hub: this.hubId, crdtId: `instance:${agent}`, crdtType: "LWW_REGISTER", delta: seat },
       origin,
       this.now(),
+      String(activity.id),
     );
   }
 
@@ -503,6 +568,7 @@ export class Hub {
       },
       String(activity.actor ?? ""),
       this.now(),
+      String(activity.id),
     );
     this.liveness.delete(agent);
     this.roles.delete(agent);
@@ -536,6 +602,7 @@ export class Hub {
       { hub: this.hubId, crdtId: `receipts:${round}`, crdtType: "G_SET", delta: { adds: [{ key: actor, value: digest }] } },
       actor,
       this.now(),
+      String(activity.id),
     );
     saveVoteReceipt(this.db, round, actor, digest, value);
   }
@@ -586,6 +653,87 @@ export class Hub {
       },
       actor,
       this.now(),
+      String(activity.id),
+    );
+  }
+
+  /**
+   * `Update{afp:CRDTDelta}` (ADR-0016 Decision 3, second population): an
+   * application-defined store mutated by its own explicit signed activity,
+   * exactly as 02's worked example shows. Protocol stores are refused —
+   * they are moved only by their governing activities, or membership would
+   * gain a second writer beside `afp:Enroll`. The `app:` prefix is 02's own
+   * collision rule, enforced rather than advised.
+   */
+  private onCrdtDelta(activity: { [key: string]: JsonValue }): void {
+    if (this.status !== "active") return;
+    const object = activity.object as { [key: string]: JsonValue };
+    if (String(object["afp:hub"] ?? "") !== this.hubIdentity) return;
+    const crdtId = String(object["afp:crdtId"] ?? "");
+    if (!crdtId.startsWith("app:")) return; // protocol stores have exactly one writer each
+    const crdtType = String(object["afp:crdtType"] ?? "");
+    if (!["G_SET", "LWW_REGISTER", "OR_SET", "OR_MAP"].includes(crdtType)) return;
+    const actor = String(activity.actor ?? "");
+    // Authority, in the handler where it belongs (Decision 2): an observer
+    // reads at hub visibility and never writes shared state.
+    const role = this.roleOf(actor);
+    if (role === null || role === "observer") return;
+    this.crdt.apply(
+      { hub: this.hubId, crdtId, crdtType: crdtType as never, delta: object["afp:delta"] as never },
+      actor,
+      this.now(),
+      String(activity.id),
+    );
+  }
+
+  /**
+   * `Offer{afp:Digest}` (ADR-0016 Decision 4): a replica says what it holds;
+   * this side answers with the signed activities past its counts. The reply
+   * is an ordinary emitted activity — signed by the hub key, which 02
+   * sanctions for exactly this (message forwarding, state attestation) and
+   * nothing more. An id the record cannot resolve is skipped, never invented:
+   * the pointer table is derivable from the record, not the other way round.
+   */
+  private onDigestOffer(activity: { [key: string]: JsonValue }): void {
+    const object = activity.object as { [key: string]: JsonValue };
+    if (String(object["afp:hub"] ?? "") !== this.hubIdentity) return;
+    const remote = (object["afp:versionVector"] ?? {}) as Record<string, Record<string, number>>;
+    const missing = this.crdt
+      .activitiesBehind(this.hubId, remote)
+      .map((id) => this.resolveActivity(id))
+      .filter((a): a is { [key: string]: JsonValue } => a !== null);
+    this.emit([String(activity.actor ?? "")], String(activity.context ?? "urn:afp:thread:anti-entropy"), "hub", (envelope) =>
+      acceptStateDeltas(envelope, { hub: this.hubIdentity, inReplyTo: String(activity.id), activities: missing }),
+    );
+  }
+
+  /**
+   * `Accept{afp:StateDeltas}`: the pulled activities, dispatched through the
+   * same `receive` everything crosses — each one signature-verified against
+   * its author's document and re-derived into local state. Replay is
+   * re-merge (ADR-0002's phrase, in the built sense): convergence never
+   * learns a second way to change state.
+   */
+  private async onStateDeltas(activity: { [key: string]: JsonValue }): Promise<void> {
+    const object = activity.object as { [key: string]: JsonValue };
+    if (String(object["afp:hub"] ?? "") !== this.hubIdentity) return;
+    const carried = Array.isArray(object["afp:activities"]) ? (object["afp:activities"] as JsonValue[]) : [];
+    for (const entry of carried) {
+      if (entry && typeof entry === "object" && !Array.isArray(entry)) {
+        await this.receive(entry as { [key: string]: JsonValue });
+      }
+    }
+  }
+
+  /** Per-store, per-origin provenance counts — the digest's payload (ADR-0016 Decision 4). */
+  syncVector(): Record<string, Record<string, number>> {
+    return this.crdt.syncVector(this.hubId);
+  }
+
+  /** Open one anti-entropy round toward `target`: an emitted `Offer{afp:Digest}` over this replica's counts. */
+  offerSync(target: string, thread = "urn:afp:thread:anti-entropy"): OutboxEntry {
+    return this.emit([target], thread, "hub", (envelope) =>
+      offerDigest(envelope, { hub: this.hubIdentity, versionVectors: this.syncVector() }),
     );
   }
 

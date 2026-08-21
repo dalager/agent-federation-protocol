@@ -464,8 +464,13 @@ state machine idempotent, order-tolerant, and timeout-driven.
 
 - **HTTP Signature verification is mandatory** on every inbox POST — unsigned or invalid
   activities are audit-logged and dropped, never processed.
-- **The two-tier gate** runs on every task-relevant activity: FederationAgreement →
-  deny-list → roster/MembershipProof as hard gates, reputation as a soft weight.
+- **The two-tier gate** runs on every task-relevant activity, in the executed order:
+  operated-by → deny-list → FederationAgreement as hard gates, reputation as a soft weight
+  (ADR-0016 Decision 2). `afp:MembershipProof` widens only the *read* path — a third party
+  asking whether an agent is enrolled ([07](07-visibility-and-artifacts.md#authorized-fetch),
+  ADR-0014 Decision 1). On writes the hub answers enrollment from its own record and no
+  proof is consulted; the hub is the authority on its own membership and needs no bearer
+  artifact to ask itself (ADR-0016 Decision 2).
 - **Payload integrity across relays** — the `eddsa-jcs-2022` object-integrity proof every
   activity has carried since P1 *is* this requirement (ADR-0008: there is no second
   payload-signature suite); the HTTP-layer signature only authenticates the relaying

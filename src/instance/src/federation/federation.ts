@@ -10,7 +10,7 @@
  * `afp:expires` has not passed — one Create is an offer on the record, not a
  * permission.
  *
- * The gate runs 01's order — agreement → deny-list → operated-by → soft
+ * The gate runs — operated-by → deny-list → agreement → soft
  * reputation (defined skipped for direct grants) — and every refusal lands in
  * a hash-chained, instance-signed boundary log (Decision 3): tamper-evident,
  * local by necessity, never per-probe outbox activities (a stranger who can
@@ -240,8 +240,9 @@ export class Federation {
   // ------------------------------------------------------------------ gate
 
   /**
-   * The two-tier gate (01, amended by ADR-0008): agreement grant → deny-list
-   * → operated-by binding. Check 4 (hub-scoped reputation, soft) is defined
+   * The two-tier gate (01, amended by ADR-0008; order stated as executed per
+   * ADR-0016 T6e): operated-by binding → deny-list → agreement grant.
+   * Check 4 (hub-scoped reputation, soft) is defined
    * skipped for direct-delegation traffic — no hub, no reputation to weigh.
    *
    * `operatedBy` is the sending agent's `afp:operatedBy`, resolved by the

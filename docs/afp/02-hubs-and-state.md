@@ -47,11 +47,13 @@ the record.
 
 ### Hub-scoped state
 
-v2's capability registry and membership set stop being global: every
-`Update{afp:CRDTDelta}` carries a required `afp:hub` field, and stores are keyed
-`(hubId, crdtType)`. The alternative — namespacing `crdtId` itself — was rejected: deltas
-already travel as discrete signed activities, a field is trivially filterable/routable, and
-it lets one gossip batch carry deltas for several hubs a peer shares without ambiguity.
+v2's capability registry and membership set stop being global: every hub-scoped store is
+keyed `(hubId, crdtType)`, and both the explicit `Update{afp:CRDTDelta}` activities that
+move application-defined stores and the governing activities that move the protocol's own
+stores carry a required `afp:hub` field. The alternative — namespacing `crdtId` itself —
+was rejected: what moves a store is already a discrete signed activity either way (ADR-0016
+Decision 3), a field is trivially filterable/routable, and it lets one gossip batch carry
+deltas for several hubs a peer shares without ambiguity.
 
 ### Governance concentration, kept accountable
 
@@ -81,11 +83,16 @@ Explicit state types with defined merge rules. In v3 **every store is keyed
 | Vote tallies (L0) / vote receipts (L1) | `G-Counter` / `G-Set` of signed receipts | monotonic sum / set union |
 | Reputation inputs | `G-Set` of signed events (completions, strikes) | set union; score derived locally |
 
-Every mutation travels as `Update{afp:CRDTDelta}` with a required `afp:hub` field. CRDT
-merges are commutative, associative, idempotent — receivers apply deltas on arrival with no
-ordering requirement, and duplicates are free. This eliminates reordering as a concern for
-this entire state class; task execution, which has real side effects, uses causal ordering
-instead (below).
+Two populations move this state, both by signed activity, neither by a bare unsigned delta
+(ADR-0016 Decision 3). Application-defined stores mutate via an explicit
+`Update{afp:CRDTDelta}` with a required `afp:hub` field, exactly as the worked example
+below shows. The protocol's own stores — membership, capabilities, roles, seats, vote
+receipts, assets — are moved by their governing activities (`afp:Enroll`,
+`Create{afp:Vote}`, `Update{afp:Asset}`, …), from which each replica derives its own deltas
+locally; those deltas never travel on their own. CRDT merges are commutative, associative,
+idempotent — receivers apply deltas on arrival with no ordering requirement, and duplicates
+are free. This eliminates reordering as a concern for this entire state class; task
+execution, which has real side effects, uses causal ordering instead (below).
 
 ### Application-defined stores
 
@@ -160,7 +167,13 @@ with decaying-fanout rumor spreading instead of waiting for the next pull cycle.
 ```
 
 Reply: an `Accept` referencing the `Offer` id, whose object is an `afp:StateDeltas` array
-of the missing `CRDTDelta`s — empty if already converged.
+carrying the signed activities that moved the stores — explicit delta activities for
+application-defined stores, governing activities for protocol stores — or their digests to
+be pulled; empty if already converged. The receiver dispatches them through the hub's
+ordinary receive path and re-derives its own state; replay is re-merge (ADR-0016 Decision
+3). Hub-generated liveness registers are excluded from the sync set: liveness is ephemeral,
+re-observed per replica, and a stale liveness value asserts reachability exactly when the
+assertion is wrong (ADR-0016 Decision 3).
 
 ## Membership & dynamic quorum
 

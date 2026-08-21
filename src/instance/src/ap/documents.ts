@@ -109,6 +109,7 @@ export function hubActor(
   origin: string,
   hubId: string,
   key: KeyPair,
+  operatedBy?: string,
 ): { [key: string]: JsonValue } {
   const id = hubActorId(origin, hubId);
   return {
@@ -119,6 +120,11 @@ export function hubActor(
     inbox: `${id}/inbox`,
     outbox: `${id}/outbox`,
     "afp:visibility": "public",
+    // ADR-0016: the shared hub is one member's server (ADR-0014's headline),
+    // and the document now says whose — which is also what lets hub-authored
+    // transport traffic (the anti-entropy exchange) cross a boundary gate
+    // that judges operators.
+    ...(operatedBy ? { "afp:operatedBy": operatedBy } : {}),
     assertionMethod: [multikey(key)],
   };
 }

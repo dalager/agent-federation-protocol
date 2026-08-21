@@ -157,7 +157,7 @@ finding 41).
 | `afp:EquivocationProof` | `Announce` object | Pair of conflicting signed votes as verifiable proof |
 | `afp:crdtId`, `afp:crdtType`, `afp:delta` | `afp:CRDTDelta` in `Update` | CRDT delta-state sync |
 | `afp:merkleRoot`, `afp:versionVector` | `afp:Digest` in `Offer` | Gossip anti-entropy digest exchange |
-| `afp:StateDeltas` | `Accept` object | Response to a digest pull |
+| `afp:StateDeltas` | `Accept` object | Response to a digest pull: the signed activities that moved the stores (ADR-0016) |
 | `afp:seq`, `afp:vclock` | any causal-workflow activity | Causal ordering / gap detection |
 
 ### v3 terms (federation, hubs, bidding, accounting)

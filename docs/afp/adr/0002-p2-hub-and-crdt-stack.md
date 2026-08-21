@@ -170,6 +170,14 @@ free), and a per-store version vector maintained on write (so the P5 digest is a
 not a migration). The `Offer{afp:Digest}` / `Accept{afp:StateDeltas}` exchange itself
 waits for P5, where divergent replicas actually exist.
 
+*(Amended by [ADR-0016](0016-p5-transport.md): P5 built a narrower shape for the
+protocol's own stores than "deltas as discrete signed activities" promised above. Their
+deltas are derived hub-side from governing activities (`afp:Enroll`, `Create{afp:Vote}`,
+`Update{afp:Asset}`, …) and are not themselves signed activities that leave the hub;
+application-defined stores keep the shape as written, moving via an explicit signed
+`Update{afp:CRDTDelta}`. The promise holds in the corrected sense: replay of the governing
+activities is re-merge, for the population that has them (ADR-0016 Decision 3).)*
+
 **We adopt:** direct delta delivery to the hub for P2; version vectors maintained from
 the first delta; the reconciliation exchange deferred to P5.
 
