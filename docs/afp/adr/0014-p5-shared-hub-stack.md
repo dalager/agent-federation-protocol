@@ -1,6 +1,8 @@
 # ADR-0014 — The P5 shared-hub stack: the hub is somebody's server
 
-- **Status:** Proposed
+- **Status:** Proposed — **Decision 1 built** (M1–M2, 2026-08-21): the proof, its
+  verification, and the widened read predicate are live and gated. Decisions 2–4 remain
+  open
 - **Date:** 2026-08-21
 - **Applies to:** P5 — every deployment where more than one operator shares a hub, which
   is the first configuration where the hub stops being an implementation detail of one
@@ -69,7 +71,34 @@ portable.
 
 This is what widens ADR-0013's `hub` predicate from "a hub I host" to "a hub whose proof I
 can verify". The predicate's shape is unchanged — an active agreement, not deny-listed, and
-enrolled — but the third clause is now answerable by a third party.
+enrolled — but the third clause is now answerable by a third party:
+`roleOf(hub, agent) !== null` **or** a valid presented proof. The deny-list and agreement
+stages run before either, exactly as before; a proof widens the enrollment clause and
+nothing else, for the same reason ADR-0013 held that a grant never lifts a deny-listing.
+
+Four mechanical rulings an implementer meets immediately, decided here:
+
+- **The fetcher presents the proof; the server never fetches it.** It travels as a request
+  header (`afp-membership-proof`, base64url of the signed JSON) on the signed `GET`. This
+  is finding 44 shaping Decision 1: the hub is unreachable exactly when coordination
+  matters most, so a design where the *server* asks the hub "is this agent a member" fails
+  with the host — while a proof in the requester's pocket keeps working for its lifetime.
+- **The header is deliberately outside the HTTP signature's covered set.** The covered set
+  is derived from the method and must stay that way — ADR-0013's downgrade lesson — and
+  nothing is lost: the proof is not a bearer credential for the request, it is a
+  hub-signed statement *about an agent*, and the gate requires the named agent to equal
+  the requester the HTTP signature already authenticated. Stripping the header in transit
+  denies rights; presenting someone else's proof names someone else and admits nothing.
+- **Verification resolves the hub's key the way every key resolves**: an unauthenticated
+  fetch of the hub's actor document (the bootstrap invariant), then the proof's
+  `DataIntegrityProof` against its published key. The document is cacheable and members
+  already hold it — they resolved it to enroll — so verification, like presentation,
+  survives the hub's partition. Expiry bounds the staleness that caching buys.
+- **The proof is transport machinery and never enters the record**, exactly parallel to
+  the hop signature: reads leave no trace (ADR-0013 Decision 5), so the credential that
+  admitted one leaves none either, and the Python verifier has no surface here. The
+  *enrollment* the proof attests to is already on the record — the `Enroll` trail is the
+  authority, and the proof is that authority made portable, not a second copy of it.
 
 **It expires, and expiry is the point.** Membership churns; a proof that outlived its
 subject's enrollment would be a capability nobody can revoke. Short-lived and re-issued is
@@ -172,13 +201,13 @@ difference shows.
 
 ## Build status
 
-Nothing is built. Staging follows the dependency: nothing about a shared hub is testable
+Staging follows the dependency: nothing about a shared hub is testable
 until a member can prove membership to a peer.
 
 | ID | Task | Stage |
 |---|---|---|
-| **M1** | `afp:MembershipProof`: issuance at the hub, the signed shape, expiry | 1 |
-| **M2** | Verification at the serving instance; ADR-0013's `hub` predicate widened from locally-hosted to proof-bearing | 1 |
+| **M1** ✅ | `afp:MembershipProof`: issuance at the hub, the signed shape, expiry | 1 |
+| **M2** ✅ | Verification at the serving instance; ADR-0013's `hub` predicate widened from locally-hosted to proof-bearing | 1 |
 | **M3** | Degraded mode: the mesh fallback and the recorded reconciliation on the hub's return | 2 |
 | **M4** | Hub-observed order; hub chain-head anchoring on a cadence (reusing ADR-0012's carrier) | 2 |
 | **M5** | Silent-vs-declined on the `DecisionRecord`; verifier check that the two are distinguishable and consistent with the snapshot | 2 |

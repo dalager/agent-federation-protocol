@@ -107,6 +107,11 @@ export function createHttpServer(instance: AfpInstance, options: ServerOptions =
       host: String(req.headers.host ?? ""),
       date: String(req.headers.date ?? ""),
       signature: String(req.headers.signature ?? ""),
+      // ADR-0014: a presented membership proof — outside the signature's
+      // covered set on purpose (the set is method-derived and stays that way);
+      // the proof is hub-signed and names its agent, so it needs no binding to
+      // this particular request to be safe.
+      "afp-membership-proof": String(req.headers["afp-membership-proof"] ?? "") || undefined,
     };
 
     (async () => {

@@ -216,6 +216,37 @@ export class Hub {
     return keyHistory(this.keyDir, `hub-${this.hubId}`, this.actorId);
   }
 
+  /**
+   * ADR-0014 Decision 1: the hub vouches for a member, portably.
+   *
+   * A signed, expiring statement naming one agent, this hub, and the agent's
+   * role — what lets a member prove its enrollment to a peer that does not
+   * host this hub, verified against the hub's published key the peer already
+   * holds. Transport machinery, never an activity: reads leave no record
+   * (ADR-0013 Decision 5), so neither does the credential that admits one.
+   * The Enroll trail remains the authority; this is that authority made
+   * portable for its TTL, not a second copy of it.
+   *
+   * Returns null for the un-enrolled — a hub does not sign statements about
+   * strangers, not even negative ones.
+   */
+  membershipProof(agent: string, ttlMs = 15 * 60 * 1000): { [key: string]: JsonValue } | null {
+    const role = this.roleOf(agent);
+    if (role === null) return null;
+    const statement: { [key: string]: JsonValue } = {
+      type: "afp:MembershipProof",
+      "afp:hub": this.actorId,
+      agent,
+      "afp:role": role,
+      "afp:expires": new Date(this.now().getTime() + ttlMs).toISOString(),
+    };
+    return attachProof(statement, {
+      privateKey: this.key.privateKey,
+      verificationMethod: this.key.keyId,
+      created: this.now().toISOString(),
+    });
+  }
+
   members(): string[] {
     return [...this.membership.getState()];
   }

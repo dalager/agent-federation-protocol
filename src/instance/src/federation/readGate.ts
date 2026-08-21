@@ -34,6 +34,8 @@ import type { KeyObject } from "node:crypto";
 import type { JsonValue } from "../crypto/jcs.ts";
 import { publicKeyFromMultibase } from "../crypto/keys.ts";
 import { verifyRequest } from "./httpSig.ts";
+import { verifyProof } from "../crypto/proof.ts";
+import { instantMillis } from "../crypto/time.ts";
 import { admittingGrant, type ActivitySummary } from "./grants.ts";
 import { grantAdmits } from "./visibility.ts";
 
@@ -157,7 +159,7 @@ function hubOf(activity: { [key: string]: JsonValue }): string | null {
  * admit that hub (reusing `admittingGrant` with a read-shaped summary), AND
  * the requesting agent holds any role in that hub — enrollment is
  * answerable only for hubs this instance hosts (`roleOf`'s scope). */
-function admitsHub(deps: ReadGateDeps, requester: Requester, activity: { [key: string]: JsonValue }): boolean {
+function admitsHub(deps: ReadGateDeps, requester: Requester, activity: { [key: string]: JsonValue }, provenHubs: ReadonlySet<string>): boolean {
   const hub = hubOf(activity);
   if (hub === null) return false;
   if (deps.isDenylisted(requester.operatedBy)) return false;
@@ -167,7 +169,11 @@ function admitsHub(deps: ReadGateDeps, requester: Requester, activity: { [key: s
   const grantAdmitsHub = active.some((agreement) => admittingGrant(agreement, summary) !== null);
   if (!grantAdmitsHub) return false;
 
-  return deps.roleOf(hub, requester.agent) !== null;
+  // ADR-0014 Decision 1: enrollment is answerable locally OR by a presented
+  // proof — the widening that lets a shared hub's members read each other's
+  // work. Only this clause widens; deny-list and agreement ran above,
+  // unchanged, for the same reason a grant never lifts a deny-listing.
+  return deps.roleOf(hub, requester.agent) !== null || provenHubs.has(hub);
 }
 
 /** Decision 3's `parties` row: the requester's agent is named in `to`/`cc`,
@@ -192,13 +198,74 @@ function admitsParties(deps: ReadGateDeps, requester: Requester, activity: { [ke
   return deps.activeAgreementsWith(requester.operatedBy, deps.now()).length > 0;
 }
 
+/**
+ * ADR-0014 Decision 1 — the presented `afp:MembershipProof`, verified.
+ *
+ * Returns the hub the proof vouches membership in, or null. Every failure —
+ * undecodable header, wrong type, a proof naming somebody else, expiry, an
+ * unresolvable hub document, a signature that does not verify against the
+ * hub's published key — yields null, never an exception: like a bad request
+ * signature, a bad proof is a requester with fewer rights.
+ *
+ * The agent-match is the load-bearing line: the proof is a statement *about*
+ * an agent, not a bearer credential, so it admits only the requester the HTTP
+ * signature already authenticated as that agent. Presenting someone else's
+ * proof names someone else.
+ */
+async function provenHub(
+  deps: ReadGateDeps,
+  requester: Requester,
+  header: string | undefined,
+): Promise<string | null> {
+  if (!header) return null;
+  let statement: { [key: string]: JsonValue };
+  try {
+    statement = JSON.parse(Buffer.from(header, "base64url").toString("utf8"));
+  } catch {
+    return null;
+  }
+  if (statement?.type !== "afp:MembershipProof") return null;
+  if (statement.agent !== requester.agent) return null;
+  const expires = statement["afp:expires"];
+  if (typeof expires !== "string" || instantMillis(expires) <= deps.now().getTime()) return null;
+
+  const hub = typeof statement["afp:hub"] === "string" ? String(statement["afp:hub"]) : null;
+  if (!hub) return null;
+  const hubDoc = await deps.fetchDocument(hub);
+  if (!hubDoc) return null;
+  const proof = statement.proof as { verificationMethod?: string } | undefined;
+  const methods = Array.isArray(hubDoc.assertionMethod) ? (hubDoc.assertionMethod as JsonValue[]) : [];
+  for (const entry of methods) {
+    if (entry && typeof entry === "object" && !Array.isArray(entry)) {
+      const method = entry as { id?: JsonValue; publicKeyMultibase?: JsonValue };
+      if (method.id === proof?.verificationMethod && typeof method.publicKeyMultibase === "string") {
+        try {
+          const key = publicKeyFromMultibase(method.publicKeyMultibase);
+          if (verifyProof(statement, key).ok) return hub;
+        } catch {
+          /* undecodable key: fall through to null */
+        }
+      }
+    }
+  }
+  return null;
+}
+
 // -------------------------------------------------------------- gate
 
 export async function authorizeRead(
   deps: ReadGateDeps,
-  request: { path: string; headers: { host?: string; date?: string; signature?: string } },
+  request: {
+    path: string;
+    headers: { host?: string; date?: string; signature?: string; "afp-membership-proof"?: string };
+  },
 ): Promise<ReadAuthorization> {
   const requester = await resolveRequester(deps, request.path, request.headers);
+  const provenHubs = new Set<string>();
+  if (requester !== null) {
+    const hub = await provenHub(deps, requester, request.headers["afp-membership-proof"]);
+    if (hub !== null) provenHubs.add(hub);
+  }
 
   const authorization: ReadAuthorization = {
     requester,
@@ -214,7 +281,7 @@ export async function authorizeRead(
     if (visibility === "internal") return false;
     if (requester === null) return false;
 
-    if (visibility === "hub" && admitsHub(deps, requester, activity)) return true;
+    if (visibility === "hub" && admitsHub(deps, requester, activity, provenHubs)) return true;
     if (visibility === "parties" && admitsParties(deps, requester, activity)) return true;
 
     // A4/A5: a live afp:AuditGrant widens admission for hub/parties classes
