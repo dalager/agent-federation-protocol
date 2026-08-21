@@ -52,6 +52,15 @@ exist carrying `afp:disposes` — that action's digest — and `afp:actsOn` nami
 action for the new category. An acted-on retraction with no disposition is a named
 failure — the half of finding 24 ADR-0006 could not reach.
 
+*(Amended by [ADR-0011](0011-supersession-meets-the-irreversible-world.md): this decision
+assumed the world would accept the disposition. Where the action's name was declared
+irrevocable at pin time, the disposition MAY instead be `afp:disposition: "annotate"` —
+which commands nothing and is checked against that declaration rather than against
+`policy[category]`. The existence check above is unchanged; what changed is that an honest
+deployment whose external system offers no undo can now satisfy it. ADR-0011 also requires
+a superseding ratification to name the electorate it overturns, which is why this ADR's own
+gate now carries `afp:priorQuorumSnapshot`.)*
+
 ## Options considered
 
 | Option | Rejected because |

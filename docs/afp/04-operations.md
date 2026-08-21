@@ -179,6 +179,25 @@ Required properties and why each exists:
 | `afp:dissent` | **First-class, never a footnote.** An objection that cannot be expressed numerically — "infeasible at any price" — survives to the reader intact |
 | `afp:supersededInputs` | Revisions made during reconciliation stay in the record rather than vanishing — **input-level** only: a Result was updated, the conclusion stands |
 | `afp:supersedes` | **Answer-level** retraction (ADR-0007): the digest of the Synthesis activity this one withdraws. A ratified answer is superseded only by a ratified one — a quorum is not un-decided by a signature — and every activity that acted on the withdrawn answer (`afp:actsOn`, ADR-0006) must be disposed of on the record (`afp:disposes`, acting on the superseding answer). Supersession is an edge, never an erasure |
+| `afp:absentInputs` | The legs that contributed no Result, declared rather than dropped — see 03 (ADR-0010) |
+
+Two things the world imposes on that discipline (ADR-0011). **A consequence may not be
+recallable.** Where the pinned `afp:irrevocableActions` names the action that was taken,
+its disposition MAY be an `afp:disposition: "annotate"` — binding the withdrawn
+justification to the standing consequence and commanding nothing. The disposition duty is
+unchanged; what changes is that the honest answer *"we cannot undo this, and here is the
+record saying so"* can now satisfy it, where before only a re-actuation could. Annotation
+is available only where irreversibility was declared in advance, by someone who did not
+yet know they would want it.
+
+**And the panel may have changed.** A `DecisionRecord` ratifying a superseding Synthesis
+carries `afp:priorQuorumSnapshot`, the electorate of the ratification it overturns — so a
+re-decision by the same panel and one by a materially different panel stop being
+indistinguishable. What that difference *means* is hub policy, not protocol; the record's
+job is that it shows. It also settles who may answer a thread after the panel moves: the
+pinned `afp:synthesizer` (ADR-0010) binds every Synthesis on the thread **unless the
+superseding one is ratified**, where the convened quorum is the stronger authority — an
+unratified answer keeps its pin, or anyone could supersede by being someone else.
 
 Synthesis and DecisionRecord are complementary, not alternatives. Because a synthesizer
 exercises discretion — choosing a method, adjudicating conflicting assumptions — hub

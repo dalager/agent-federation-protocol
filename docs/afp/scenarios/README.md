@@ -153,8 +153,11 @@ are spec-precision edits (no ADR needed); 32's remainder is 06 deployment guidan
 resting on ADR-0012 Decision 4. ADR-0010 is **Accepted and built** — findings 34, 35
 and 37 are closed, and the build corrected three of its own rulings on the way (the
 sequential-thread ordering rule, an unconditional outcome check that would have failed
-every governance vote, and the leg partition's scope). ADR-0011 and ADR-0012 remain
-Proposed and unbuilt.
+every governance vote, and the leg partition's scope). [ADR-0011](../adr/0011-supersession-meets-the-irreversible-world.md) is **Accepted and
+built** too — findings 38 and 39 closed, with declared irreversibility, the `annotate`
+disposition, the panel delta, and `afp:priorThread`; its build turned ADR-0007's own gate
+red, which was the requirement working rather than a regression. ADR-0012 remains Proposed
+and unbuilt.
 
 | # | Finding | Candidate |
 |---|---|---|

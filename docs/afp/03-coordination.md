@@ -197,6 +197,10 @@ a guess.
 | `afp:actsOn`, `afp:action` | Properties (any acting activity) | Digest of the Synthesis this action acts on — or of a `DecisionRecord` whose `afp:outcome` names one, resolved by the verifier in exactly one hop so a ratifying deployment can bind to the artifact it actually ratified — and the action name it claims, checked against the pinned policy (ADR-0006, ADR-0010) |
 | `afp:excludePerformersOf` | Property (announced Task) | Prior task ids whose Award performers are excluded from this auction — the estimator wall generalized to any earlier task (ADR-0006) |
 | `afp:supersedes` | Property (Synthesis) | Answer-level retraction: the digest of the Synthesis activity withdrawn — distinct from input-level `afp:supersededInputs`; a ratified answer is superseded only by a ratified one (04, ADR-0007) |
+| `afp:irrevocableActions` | Property (task-bearing activity) | Action names, drawn from the pinned policy's own values, whose external effect cannot be recalled — declared before any answer exists, and part of the pin set, so the escape hatch it opens is not negotiable after the answers are in (ADR-0011) |
+| `afp:disposition` | Property (a disposing activity) | `annotate` — the disposition form for a consequence that can only be acknowledged. Carries no `afp:action`, because it commands nothing; replay checks instead that the *disposed* action was declared irrevocable on its own thread (ADR-0011) |
+| `afp:priorQuorumSnapshot` | Property (DecisionRecord) | On a record ratifying a *superseding* Synthesis: the `afp:quorumSnapshot` of the record that ratified the answer being withdrawn. Makes a changed panel visible rather than implied — same electorate or not is a digest comparison (ADR-0011) |
+| `afp:priorThread` | Property (task-bearing activity) | The closed thread this ask continues, when the claim is new information rather than that the old answer was wrong on what it saw. Beside the pins, deliberately not among them; an unresolvable one is an out-of-scope reference under a scoped export, not tampering (ADR-0011) |
 | `afp:disposes` | Property (any acting activity) | The digest of an action whose justification was withdrawn — paired with `afp:actsOn` on the superseding answer, so no acted-on retraction leaves an orphaned consequence (ADR-0007) |
 
 > **Numeric profile.** Signed AFP documents carry **integers only** — the JCS
@@ -237,6 +241,8 @@ classDiagram
         afp:actionPolicy?
         afp:answerSufficiency?
         afp:synthesizer?
+        afp:irrevocableActions[]?
+        afp:priorThread?: prehistory, not a pin
         content
         attachment[]
     }
@@ -282,6 +288,7 @@ classDiagram
         afp:round
         afp:outcome
         afp:quorumSnapshot
+        afp:priorQuorumSnapshot?: when ratifying a retraction
         afp:countedVotes[]: vote digests
         afp:weightTally
     }
