@@ -463,3 +463,93 @@ describe("ADR-0010 gate: pins on the direct Offer replay end to end", () => {
     instance.close();
   });
 });
+
+describe("ADR-0010 Decision 5: an answer may not be disclosed without its pins", () => {
+  it("a bundle whose pins were redacted out from under its answer fails by name", async () => {
+    const { instance, config } = setupPlain(["coordinator", "s1"]);
+    const thread = "urn:afp:thread:redacted-pins";
+    const pins: TaskPins = { actionPolicy: POLICY, synthesizer: instance.actorId("coordinator") };
+
+    instance.delegate({
+      from: "coordinator",
+      to: "s1",
+      capability: CAPABILITY,
+      content: "assess",
+      thread,
+      correlationId: "leg-r",
+      pins,
+    });
+    const result = instance.publish("s1", [], thread, "parties", (envelope) =>
+      createResult(envelope, { resultId: "urn:afp:result:r", correlationId: "leg-r", content: "clears" }),
+    );
+    instance.publish("coordinator", [], thread, "parties", (envelope) =>
+      createSynthesis(envelope, {
+        synthesisId: "urn:afp:synthesis:r",
+        method: "panel",
+        answer: "cleared",
+        confidence: 90,
+        contributingResults: [digestOf(result.activity)],
+        assumptions: [],
+        dissent: [],
+        category: "afp:screen-ok",
+      }),
+    );
+
+    const exported = exportBundle(instance, config.exportDir);
+    assert.equal(runVerifier(VERIFIER, exported.dir, thread).code, 0, "the intact bundle verifies");
+
+    // Redact the pin-bearing Offer the way a visibility-floor scope would — a
+    // digest-only stub in chain position, exactly ADR-0009's shape — and leave
+    // the Synthesis. Before Decision 5 this replayed clean: every pin check is
+    // conditional on the pins being resolvable, so withholding them silenced
+    // all of them at once.
+    const stubbed = mutate(exported.dir, thread, "coordinator", (outbox) => {
+      outbox.orderedItems = outbox.orderedItems.map((activity) => {
+        const object = activity.object as Record<string, unknown> | undefined;
+        const isTask = (activity.type === "Offer" || activity.type === "Announce") && object?.type === "afp:Task";
+        return isTask
+          ? { type: "afp:Redacted", "afp:digest": "sha256:" + "0".repeat(64), "afp:visibility": "out-of-scope" }
+          : activity;
+      });
+    });
+    assert.notEqual(stubbed.code, 0);
+    assert.match(stubbed.output, /FAIL \] pins: .*discloses an answer with the pins it was judged under/);
+
+    instance.close();
+  });
+
+  it("a thread that simply pins nothing is untouched — the opt-in reading still holds", async () => {
+    // The discriminating control. Decision 5 keys on the *carrier* being
+    // absent, never on the pins being absent — otherwise it would fail every
+    // unpinned P1 thread ever written, which is most of them.
+    const { instance, config } = setupPlain(["coordinator", "s1"]);
+    const thread = "urn:afp:thread:unpinned";
+    instance.delegate({
+      from: "coordinator",
+      to: "s1",
+      capability: CAPABILITY,
+      content: "assess",
+      thread,
+      correlationId: "leg-u",
+    });
+    const result = instance.publish("s1", [], thread, "parties", (envelope) =>
+      createResult(envelope, { resultId: "urn:afp:result:u", correlationId: "leg-u", content: "clears" }),
+    );
+    instance.publish("coordinator", [], thread, "parties", (envelope) =>
+      createSynthesis(envelope, {
+        synthesisId: "urn:afp:synthesis:u",
+        method: "panel",
+        answer: "cleared",
+        confidence: 90,
+        contributingResults: [digestOf(result.activity)],
+        assumptions: [],
+        dissent: [],
+      }),
+    );
+    exportBundle(instance, config.exportDir);
+    const clean = runVerifier(VERIFIER, config.exportDir, thread, ["--verbose"]);
+    assert.equal(clean.code, 0, `an unpinned thread must still verify:\n${clean.output}`);
+    assert.doesNotMatch(clean.output, /discloses an answer with the pins/);
+    instance.close();
+  });
+});

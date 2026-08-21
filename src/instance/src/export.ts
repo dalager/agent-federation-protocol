@@ -114,6 +114,48 @@ export function exportBundle(
   const inScope = (activity: { [key: string]: JsonValue }): boolean =>
     !scope || scope.threads.includes(String(activity.context ?? ""));
 
+  /**
+   * ADR-0010 Decision 5: pins are frame, not content. An export MUST NOT
+   * withhold a thread's task-bearing activity while disclosing an answer on
+   * that same thread — the answer would replay clean with the rules it was
+   * judged under missing, and every pin, synthesizer, sufficiency and leg
+   * check on it silently skipped.
+   *
+   * Today's scope grammar cannot produce that bundle: it scopes by *thread*,
+   * so a thread is wholly in or wholly out. The guard is written against the
+   * shape of the rule rather than the shape of today's scope, so the
+   * visibility-floor and agreement-grant scoping ADR-0009 specifies inherits
+   * the invariant instead of rediscovering the defect.
+   *
+   * Refusing rather than auto-disclosing is deliberate. A task activity
+   * carries `content` and attachments, which may be exactly what the scope
+   * was protecting; widening it is a decision the exporter must take with
+   * knowledge the bundle does not contain.
+   */
+  const assertPinsTravelWithAnswers = (all: { [key: string]: JsonValue }[]): void => {
+    if (!scope) return;
+    const withheldTaskThreads = new Set<string>();
+    const disclosedAnswerThreads = new Set<string>();
+    for (const activity of all) {
+      const thread = String(activity.context ?? "");
+      const object = activity.object as { [key: string]: JsonValue } | undefined;
+      const objectType = object && typeof object === "object" && !Array.isArray(object) ? String(object.type ?? "") : "";
+      const isTask = (activity.type === "Offer" || activity.type === "Announce") && objectType === "afp:Task";
+      const isAnswer = objectType === "afp:Synthesis" || typeof activity["afp:actsOn"] === "string";
+      if (isTask && !inScope(activity)) withheldTaskThreads.add(thread);
+      if (isAnswer && inScope(activity)) disclosedAnswerThreads.add(thread);
+    }
+    for (const thread of disclosedAnswerThreads) {
+      if (withheldTaskThreads.has(thread)) {
+        throw new Error(
+          `export scope discloses an answer on ${thread} while withholding that thread's ` +
+            `pins — widen the scope to include its task-bearing activity, or drop the thread ` +
+            `(ADR-0010 Decision 5)`,
+        );
+      }
+    }
+  };
+
   const writeOutbox = (file: string, actorUrl: string): void => {
     const entries = instance.outbox.byActor(actorUrl);
     activities += entries.length;
@@ -141,6 +183,14 @@ export function exportBundle(
   // The instance's own outbox carries the Vouch/Disown trail the roster is
   // derived from. Without it a reader can verify *who* is on the roster but not
   // *how they got there* (01 § Vouch / disown).
+  // ADR-0010 Decision 5, before a single byte is written: a bundle that would
+  // disclose an answer without its pins is refused, not emitted and explained.
+  assertPinsTravelWithAnswers([
+    ...instance.outbox.byActor(String(instance.instanceDocument().id)).map((e) => e.activity),
+    ...instance.specs.flatMap((spec) => instance.outbox.byActor(instance.actorId(spec.name)).map((e) => e.activity)),
+    ...hubs.flatMap((hub) => hub.outbox.byActor(hub.actorId).map((e) => e.activity)),
+  ]);
+
   writeOutbox("instance", String(instance.instanceDocument().id));
 
   const omitted = new Set(scope?.omitActors ?? []);

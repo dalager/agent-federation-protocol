@@ -211,8 +211,10 @@ forces rather than by the subject it touches:
   bundle that checked nothing cannot pass as a clean one.
 - **An amendment to [ADR-0010](../adr/0010-pinning-without-an-auction.md)** for the first
   half of 48 — its own open question, that a redacted pin-bearing `Offer` leaves a thread
-  whose pins resolve to nothing. That is a live hole *today* at N=1, not a P5 problem, and
-  it wants closing before P5 widens the redaction surface rather than after.
+  whose pins resolve to nothing. A live hole *today* at N=1, not a P5 problem. **Done:**
+  ADR-0010 Decision 5, built and gated — the export refuses to emit such a bundle, and
+  replay names one arriving from elsewhere. Closed before P5 widens the redaction surface,
+  which was the point of triaging it separately.
 
 Build order follows the dependencies rather than the numbering: the ADR-0010 amendment
 first (small, and it is a correctness hole in shipped code), then ADR-0014 with finding 43
@@ -227,5 +229,5 @@ replay.
 | 45 | Three clocks, one timeline, no comparison — `published` is self-asserted and monotonicity is chain-local, while "who knew what when" is the audit's first question | The hub SHOULD anchor its own chain head on a cadence (ADR-0012's mechanism); cross-operator ordering claims SHOULD be relative to hub-observed order |
 | 46 | An unreachable member is not an abstention, and a `DecisionRecord` cannot tell them apart — liveness registers, which would, live on the partitioned hub | Record the snapshot members from whom no vote was counted, distinguishing a recorded `Reject` from silence |
 | 47 | The case file omits the state the operators worked from: ADR-0012 keeps CRDT state out of the export correctly, and at P5 that state *is* the coordinated timeline | Make ADR-0012's own revisit trigger concrete — `afp:Archive` carries the final converged state into the record as an activity, once, when it stops changing |
-| 48 | A no-op check hides better in three bundles than in one — ADR-0010's unresolved redaction question means a stubbed pin-bearing `Offer` leaves checks silently passing, and per-domain phase one makes that indistinguishable from clean | Resolve ADR-0010's open question before P5 widens the redaction surface; have the joint replay report a per-domain check census, so a bundle that checked nothing is visible |
+| 48 | *(first half **closed** — ADR-0010 Decision 5)* A no-op check hides better in three bundles than in one — ADR-0010's unresolved redaction question means a stubbed pin-bearing `Offer` leaves checks silently passing, and per-domain phase one makes that indistinguishable from clean | Resolve ADR-0010's open question before P5 widens the redaction surface; have the joint replay report a per-domain check census, so a bundle that checked nothing is visible |
 | 49 | ADR-0009's join was specified for a pair — received bytes resolve against *the* sender, agreements are digest-equal across *two* copies — and at N=3 a party can observe a divergence between two others | State the join as all-pairs, and decide whether a divergence between two domains is reported to the third |

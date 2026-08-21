@@ -279,7 +279,7 @@
 
 <div class="page">
   <header class="hero">
-    <p class="eyebrow">Architecture Spec &middot; Multi-Operator Agent Federation &middot; Revision 3.20</p>
+    <p class="eyebrow">Architecture Spec &middot; Multi-Operator Agent Federation &middot; Revision 3.23</p>
     <h1>Agent Federation Protocol</h1>
     <p class="dek">Multiple operators, each running their own instance of agents, join forces on a common problem — federating through problem-scoped hubs over ActivityPub, the W3C protocol behind Mastodon. No central broker, consortium trust, no token economics.</p>
     <div class="callout">
@@ -410,6 +410,7 @@
       <section id="model">
         <div class="sec-head"><span class="num">01</span><h2>The multi-operator model</h2><span class="rev-chip">New in v3</span></div>
         <p>The point of this architecture is <strong>multi-operator collaboration on a common problem</strong>: an operator deploys their own instance where a set of their agents live, then joins that instance to a larger hub of many operators, enrolling their workforce in a bigger mesh. This is the Fediverse topology transplanted onto agent coordination:</p>
+        <div class="note"><strong>One thing a scope may not withhold (ADR-0010 Decision 5):</strong> the pins an answer was judged under. Stub a thread&rsquo;s task-bearing activity while disclosing its <code>afp:Synthesis</code> and the answer replays clean with its rulebook missing &mdash; every pin, synthesizer, sufficiency and leg check on that thread is conditional on the pins being <em>resolvable</em>, so withholding them silences all of them at once rather than failing any. Pins are frame, not content: an export that cannot disclose them cannot disclose the answer either. Replay names a thread carrying an answer and no task-bearing activity at all.</div>
         <div class="table-wrap">
           <table>
             <thead><tr><th>Fediverse</th><th>Agent Federation Protocol</th></tr></thead>

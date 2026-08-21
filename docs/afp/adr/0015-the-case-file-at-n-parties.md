@@ -7,8 +7,8 @@
 - **Builds on:** [ADR-0009](0009-federated-replay.md) (the joint replay this generalizes
   past a pair), [ADR-0012](0012-the-long-horizon.md) (the manifest, the content inventory,
   and the CRDT-state exclusion whose consequence lands here),
-  [ADR-0010](0010-pinning-without-an-auction.md) (whose open question this makes visible
-  rather than solves)
+  [ADR-0010](0010-pinning-without-an-auction.md) (whose open question is now closed at
+  source by its Decision 5 — what remains here is the general shape of that defect)
 - **Driven by:** [scenario 10 / campaign 7](../scenarios/README.md#campaign-7--open),
   findings 47, 49, and the second half of 48
 
@@ -31,8 +31,12 @@ excludes hub CRDT state from an export, correctly and for good reasons — and a
 state *is* the coordinated timeline the operators actually worked from, so the case file
 handed to a regulator contains everyone's activities and not the thing they agreed on.
 And ADR-0010's open question — a redacted pin-bearing `Offer` leaving a thread whose pins
-resolve to nothing — becomes materially harder to notice when there are three bundles and
-the vacuous pass is in only one of them.
+resolve to nothing — was materially harder to notice with three bundles, because the
+vacuous pass is in only one of them. That defect is now **closed at source** (ADR-0010
+Decision 5, built): the rule and its check live where the rule was decided. What remains
+here is the general form, which outlives that one instance — *any* check that becomes
+conditional and then never fires reads as a pass, and only a census can tell the
+difference.
 
 The inherited constraint, from the ADR this extends: **one implementation, one meaning, run
 N times plus a join.** Nothing below forks the verifier; the join gets bigger and more

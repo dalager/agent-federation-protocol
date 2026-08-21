@@ -136,6 +136,16 @@ the roster entries it deliberately omits; completeness checks the declared scope
 undeclared gap remains what it always was — tampering. The line this draws is the
 point: **discretion is declared; deletion is detected.**
 
+One thing a scope may **not** withhold: **the pins an answer was judged under**
+(ADR-0010 Decision 5). Stub a thread's task-bearing activity while disclosing its
+`Synthesis`, and the answer replays clean with its rulebook missing — every pin,
+synthesizer, sufficiency and leg check on that thread is conditional on the pins being
+*resolvable*, so withholding them silences all of them at once rather than failing any.
+Pins are frame, not content: an export that cannot disclose them cannot disclose the
+answer either, and must widen its scope or drop the thread. Replay names a thread that
+carries an answer and no task-bearing activity at all — which in an unredacted record
+cannot happen, because something opened every thread.
+
 ### Decision records (`afp:DecisionRecord`)
 
 Every voting round — L0 or L1 — closes with a first-class outcome artifact. Without it, an

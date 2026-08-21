@@ -1,6 +1,6 @@
 # ADR-0010 — Pinning without an auction: checkability in the direct flow
 
-- **Status:** Accepted, and **built** — gated by a direct fan-out replayed clean and
+- **Status:** Accepted, and **built** — including Decision 5, added and built 2026-08-21 to close this ADR's own open question. Gated by a direct fan-out replayed clean and
   broken one named check at a time, and by the root-parity case that holds the two
   resolution roots to one meaning
 - **Date:** 2026-08-21
@@ -266,47 +266,77 @@ claim onto the `Result` and pinning the threshold beside the sufficiency; that i
 real design with a real cost, and it belongs to the scenario that needs it (revisit
 trigger below), not to this one.
 
-## Open questions this ADR does not close
+### 5. An answer may not be disclosed without the pins it was judged under
 
-Two questions surfaced in review that this ADR is the wrong place to answer — each is
-co-owned with another ADR, and deciding it here would decide it twice. Named rather than
-left implicit, because both are load-bearing for the deployment that drove the campaign.
+*(Added 2026-08-21, closing this ADR's own open question — campaign 7, finding 48.)*
 
-**A pin can be redacted out from under the answers it governs.** Under ADR-0009 a scoped
-export replaces withheld activities with digest-only stubs. A pin-bearing `Offer`
-published at a lower visibility than the Synthesis it governs therefore yields, in a
-lawful audit export, a thread with **no resolvable governing pins** — and every check
-this ADR adds silently no-ops, in precisely scenario 09's audit deliverable. The
-candidate rule is one line — *a pin-bearing task activity MUST be at least as visible as
-the answers it governs*, enforced at export — but it is a constraint on ADR-0009's
-export-time transform, not on this ADR's pin, and it wants deciding alongside the
-content-inventory question ADR-0012 already has open. **Reopened by campaign 7 (2026-08-21), and now scheduled rather than merely noted.**
-Scenario 10 met this again at three parties and found it gets *harder* to see, not easier:
-phase one of a joint replay is per-domain, so a bundle whose pin checks all no-opped reads
-exactly like one whose checks all passed, with two clean bundles' output filling the
-report around it. [ADR-0015](0015-the-case-file-at-n-parties.md) Decision 2 adds the
-per-domain check census that makes the silence visible — but a census reports the hole, it
-does not close it. Closing it is an amendment to *this* ADR, and it is a correctness
-defect at N=1 today, not a P5 problem: the fix belongs where the rule was decided, and it
-should land before P5 widens the redaction surface. Campaign 7 triages it as its own track
-for that reason.
+A scoped export (ADR-0009) replaces withheld activities with digest-only stubs. Stub the
+task activity that carries a thread's pins and the thread still has its answer, but the
+rules that answer was judged under are gone — and the verifier does not complain, because
+every pin check is conditional on pins being *resolvable*. `check_pins` iterates threads
+that have task-bearing activities, so a thread whose Offers are all stubs is not iterated
+at all; the category check, the synthesizer check, the sufficiency check and the leg
+partition all skip in silence. A bundle that disclosed a verdict while withholding the
+rulebook would replay clean.
 
-**The gate does not cover this, deliberately and visibly.** A test asserting the desired
-behaviour would fail, because the behaviour is not built: stub the pin-bearing `Offer` and
-the thread simply has no task activity, so the pins resolve to nothing and every check
-here silently no-ops — which is the hole, not a bug to be caught. Writing a test that
-encoded *today's* vacuous pass as expected would be worse than none. So the gap is
-recorded here and left uncovered until the rule is decided, rather than papered over with
-a green test that proves the wrong thing.
+Two halves, because a rule and a check protect against different people.
 
-**A pinned synthesizer and a changed panel.** Decision 2 pins one synthesizer for the
-thread; ADR-0007 puts a superseding Synthesis on that same `context`, and ADR-0011's
-panel-delta work contemplates the ratifying membership having materially changed in the
-meantime. Read strictly, a legitimate panel change makes every superseding Synthesis
-inadmissible under the original pin. The plausible resolutions — the pin binds only the
-original answer, or a superseding answer may re-pin as part of the supersession record —
-are both really answers about *what a supersession may change*, which is ADR-0011's
-subject. Decided there, cross-referenced here.
+**The rule, at export time: pins are frame, not content.** An export MUST NOT redact a
+task-bearing activity while disclosing a `Synthesis` or an acting activity on the same
+thread. If the scope excludes the pins, it excludes the answer — widen the scope
+deliberately, or drop the thread. An exporter that cannot satisfy that **fails rather than
+emitting the bundle**, in the same spirit as a writer refusing to emit an action its own
+policy made inadmissible: the tool does not produce a record it knows to be silently
+unverifiable.
+
+Note what this is *not*: an instruction to auto-disclose the Offer. A task activity carries
+`content` and attachments, which may be exactly what the scope was protecting. The
+resolution is the exporter's to make with knowledge the verifier does not have.
+
+**The check, at replay time: a disclosed answer with unresolvable pins is a named
+finding.** The rule binds this implementation; the check binds every bundle, including
+those written by software that never read this ADR — which is the only kind of protection
+a verifier can actually offer. So: a thread that discloses a `Create{afp:Synthesis}` or an
+activity carrying `afp:actsOn`, and carries **no task-bearing activity at all**, fails by
+name.
+
+The precision that makes it safe is distinguishing two silences that look identical from
+inside a conditional check:
+
+- **A thread whose task activities are present and pin nothing** is ADR-0006's opt-in
+  reading, untouched. It constrains no actions, it never did, and it passes.
+- **A thread with no task activity at all, yet carrying an answer**, is a thread whose
+  opening act is missing. In an unredacted record that cannot happen — something opened
+  every thread — so it means redaction, a malformed bundle, or a counterparty's Offer that
+  should have been carried as received bytes. All three deserve a name.
+
+Today's scope grammar cannot produce the bad bundle: `exportBundle` scopes by *thread*, so
+a thread is wholly in or wholly out. The hole is **latent**, waiting for the visibility-floor
+and agreement-grant scoping ADR-0009 specifies and nobody has built. That is precisely why
+the export-side guard is written now, against the shape of the rule rather than the shape
+of today's scope: the next scope grammar inherits the invariant instead of rediscovering
+the defect.
+
+## Questions this ADR deferred — and where each was answered
+
+Both are now closed. Kept here rather than deleted, because *when* a question got answered
+and by which decision is the part a later reader cannot reconstruct.
+
+**A pin could be redacted out from under the answers it governs.** Open from the day this
+ADR was written; found again by campaign 7 at three parties, where it hides better because
+phase one of a joint replay is per-domain and a bundle whose checks all no-opped reads like
+one whose checks all passed. **Closed by Decision 5** (above), as a correctness defect at
+N=1 rather than a P5 problem: the export refuses to emit such a bundle, and replay names one
+that arrives from anywhere else.
+
+**A pinned synthesizer met a changed panel.** Decision 2 pins one synthesizer for a thread,
+and ADR-0007 puts a superseding Synthesis on that same `context` — so read strictly, a
+legitimate panel change made every superseding Synthesis inadmissible. Deferred here
+because it was really a question about what a supersession may change. **Closed by
+[ADR-0011](0011-supersession-meets-the-irreversible-world.md) Decision 3**: the pin binds
+every Synthesis on the thread *unless the superseding one is ratified*, because a convened
+quorum outranks a pin written before the panel changed, while an unratified answer keeps
+its pin — or anyone supersedes by simply being somebody else.
 
 ## Options considered
 
@@ -409,6 +439,7 @@ above.
 | **X4** ✅ | `actsOn` zero-or-one-hop resolution through a `Create{afp:DecisionRecord}` (digest → outcome id → Synthesis) at `action.py:115`, reusing the id-lookup already in `ratified()`; two-hop failure; `afp:outcome`-resolves finding in `check_decision_record`; `check_supersession`'s orphan scan resolved through the same hop | `action.py`, `decision.py` | 2 |
 | **X5** ✅ | `afp:no-verdict`: a `validateActionPolicy` beside `admissibleAction` (`allocation/actions.ts:25`), called from both pin paths, and a verifier check naming a pinned policy that lacks it; `afp:absentInputs` on `SynthesisSpec` + the leg-partition check; sufficiency's answer-side `count` reading with the `afp:no-verdict` escape, kept distinct from the Award-scoped count check (`allocation.py:562`) and `meetsSufficiency` (`allocator.ts:389`), plus the named finding for a `coverage` key pinned on a direct `Offer`; the leg partition per Decision 4's definition (distinct `afp:correlationId`, `Reject` counted absent, dedupe collapsed). Fixture sweep for the retroactive MUST — `adr0006.test.ts`'s `POLICY`, `adr0007.test.ts`, `hub.test.ts`, and the P3 demo paths all pin policies and go red on the day this lands | `allocation/actions.ts`, `allocation/activities.ts`, `action.py` | 3 |
 | **X6** ✅ | Gate: a P1-shaped direct fan-out (four Offers, one thread, pinned policy/sufficiency/synthesizer) replayed clean; then the mutations — divergent pins across Offers, an unpinned fifth Offer, a pin published after the first Result, a Synthesis from an unnamed actor, an action on an unadmitted category, an `actsOn` through a DecisionRecord (passes) and through two (fails), a partial panel closing `afp:no-verdict` with `afp:absentInputs` (passes) and without (fails), a sub-delegating Offer inheriting the pin set (passes) and omitting it (fails) | `test/adr0010.test.ts` | 3 |
+| **X8** ✅ | Decision 5: the export refuses to disclose an answer whose thread's pins it withholds; replay names a thread carrying an answer and no task-bearing activity, with an unpinned thread as the discriminating control | `export.ts`, `pins.py`, `test/adr0010.test.ts` | 4 |
 | **X7** ✅ | Parity: the same thread run through the auction flow — Award-derived synthesizer and Announce-pinned policy — must produce identical action-check verdicts, so the fallback is a second root and not a second meaning | `test/adr0010-parity.test.ts` | 3 |
 
 Named checks follow the existing `report.record(name, ok, detail)` convention, prefixed

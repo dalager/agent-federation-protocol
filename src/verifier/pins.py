@@ -111,6 +111,51 @@ def _outcome_type(activity: dict) -> str:
     return obj.get("type", "") if isinstance(obj, dict) else ""
 
 
+def check_disclosed_answers_keep_their_pins(report, thread_pool: list[dict]) -> None:
+    """ADR-0010 Decision 5 — an answer may not be disclosed without the pins it
+    was judged under.
+
+    Every other pin check is conditional on the pins being *resolvable*, which
+    makes them all silent on the one bundle that withheld them: redact a
+    thread's task-bearing activities and `check_pins` never iterates that
+    thread, `_governing_pins` resolves nothing, and a disclosed verdict replays
+    clean with its rulebook missing.
+
+    So this check runs the other way round — it starts from the answer, not
+    from the pins. A thread carrying a Synthesis or an acting activity and *no*
+    task-bearing activity at all has lost its opening act: in an unredacted
+    record that cannot happen, because something opened every thread. Redaction,
+    a malformed bundle, or a counterparty's Offer that should have travelled as
+    received bytes — all three deserve a name rather than a silence.
+
+    Deliberately NOT the same as "the thread pins nothing": a thread whose task
+    activities are present and carry no pins is ADR-0006's opt-in reading and
+    passes untouched. The distinction is presence of the carrier, never presence
+    of the pins.
+    """
+    with_tasks = set(task_activities_by_context(thread_pool))
+    answered: dict[str, str] = {}
+    for activity in thread_pool:
+        context = activity.get("context")
+        if not isinstance(context, str) or context in with_tasks or context in answered:
+            continue
+        if _synthesis_payload(activity) is not None:
+            answered[context] = "a Synthesis"
+        elif isinstance(activity.get("afp:actsOn"), str):
+            answered[context] = "an activity carrying afp:actsOn"
+
+    for thread, what in sorted(answered.items()):
+        report.record(
+            f"pins: {thread} discloses an answer with the pins it was judged under",
+            False,
+            f"the thread carries {what} but no task-bearing activity at all — the rules "
+            f"the answer was judged under are not in this bundle, so every pin, "
+            f"synthesizer, sufficiency and leg check on it is silently skipped. An export "
+            f"MUST NOT withhold a thread's pins while disclosing its answer (ADR-0010 "
+            f"Decision 5)",
+        )
+
+
 def check_pins(report, thread_pool: list[dict]) -> None:
     """Thread-level pin checks, over the thread pool (own activities plus
     received foreign bytes) — the same pool `check_thread` runs over, because

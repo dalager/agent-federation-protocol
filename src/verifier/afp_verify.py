@@ -43,7 +43,7 @@ from keys import (
     history_keys,
     parse_key_history,
 )
-from pins import check_pins, check_prior_thread
+from pins import check_disclosed_answers_keep_their_pins, check_pins, check_prior_thread
 from proof import CRYPTOSUITE, decode_multikey, digest_of, verify_proof
 
 
@@ -666,6 +666,7 @@ def verify_export(export: Path, thread: str | None, report: Report) -> dict:
     # thread pool — the same pool `check_thread` runs over, because a
     # delegated thread's opening Offer may be authored by the counterparty.
     check_pins(report, thread_pool)
+    check_disclosed_answers_keep_their_pins(report, thread_pool)
     # ADR-0011 Decision 4: afp:priorThread resolves to a closed, unretracted
     # thread when present; an absent one is a lawfully scoped omission.
     check_prior_thread(report, thread_pool)

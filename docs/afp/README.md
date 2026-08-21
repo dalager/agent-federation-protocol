@@ -1,10 +1,10 @@
-# Agent Federation Protocol (AFP) — v3.22
+# Agent Federation Protocol (AFP) — v3.23
 
 Multiple operators, each running their own instance of agents, join forces on a common
 problem — federating through problem-scoped hubs over **ActivityPub** (the W3C protocol
 behind Mastodon). No central broker, consortium trust, no token economics.
 
-This is the markdown rendition of the full spec (Revision 3.22). Reading order:
+This is the markdown rendition of the full spec (Revision 3.23). Reading order:
 
 | File | Contents |
 |---|---|
@@ -244,6 +244,8 @@ flowchart LR
 | v3.21 | **Authorized fetch built** ([ADR-0013](adr/0013-authorized-fetch.md)): the read half of the two-tier gate, and the first ADR here driven by an audit rather than a scenario. A `GET` for a non-`public` resource resolves its requester from the signature and runs the same deny-list and agreement stages the inbox runs; `internal` is refused to everyone including grant holders, and an unsigned request is anonymous rather than an error — it sees what it always saw. The covered-header set is derived from the request *method*, never from what a `Signature` header claims about itself, because honouring that claim would let a POST be downgraded to an unauthenticated body. Stated plainly in 04: authentication is symmetric but accountability is not — the record proves what was published, never who read it, so visibility classes are access control rather than an audit trail |
 
 | v3.22 | **Campaign 6's last five findings written into the spec body**, after a roadmap review caught that "triaged as needing no ADR" had been recorded as "resolved" — the two are not the same, and the ledger said the second while the spec showed neither. 04 gains the presentation convention for renderings (a rendering SHOULD be derived from a verified export and carry its digest and verdict), `afp:producedBy`'s definition as a resolvable *versioned* brain configuration, and the replay guarantee's boundary: replay proves what was said over which bytes under which pinned rules, never that a rerun would agree. 03 states that an external system emitting activities is modelled as rostered port agents — with the read/write split RECOMMENDED where input is hostile — and extends the reconciliation duty to the human disposition a flagged outcome hands off to. The roadmap gains campaign 6's ADRs, ADR-0013, and the two blockers standing in front of P5 (findings 31, 33, 36, 41, 42) |
+
+| v3.23 | **ADR-0010 Decision 5** — an answer may not be disclosed without the pins it was judged under, closing this ADR's own open question: opened the day it was written, found again by campaign 7 at three parties where it hides better. Stub a thread's task-bearing activity and every pin, synthesizer, sufficiency and leg check on it goes silent, because each is conditional on the pins being *resolvable* — withholding them fails nothing and silences everything. Two halves, because a rule and a check protect against different people: the export refuses to emit such a bundle, and replay names one arriving from software that never read this spec. The distinction that makes it safe is presence of the *carrier*, never of the pins — a thread whose task activities are present and pin nothing is ADR-0006's opt-in reading and passes untouched (finding 48, first half) |
 
 All `afp:` terms are this design's own `@context` extension over W3C ActivityStreams 2.0 —
 not part of the standard.
