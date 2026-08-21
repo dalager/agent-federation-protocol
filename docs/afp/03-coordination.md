@@ -129,6 +129,26 @@ cannot distinguish "not done" from "done, unrecorded" would otherwise make every
 second pull request. With the key, recovery is a lookup against the external system, not
 a guess.
 
+**An external system that emits activities is modeled as one or more port agents**, on
+the roster and vouched like any other, in `instance` custody (scenario 09, finding 36).
+There is no third kind of participant: 04's rule is that a valid signature from a key
+with no authority over its actor is a forgery, and replay accounts for every rostered
+agent — so an "external initiator" with no actor is an author the replay cannot account
+for. Where the ingested input is hostile, splitting the port into **separate read and
+write agents is RECOMMENDED**, so the seat that parses a stranger's prose is not the seat
+that can act on the outside world. That split is blast radius, not ceremony: scenario 06
+did it for its tracker port, and scenario 09 declined to and said so.
+
+**Where an outcome hands off to a human, reconcile the human's disposition too.** The
+duty above is written for effects the swarm caused; the same argument covers the decision
+it hands upward. A verdict of "flagged for review" is not the end of the story — a person
+then accepts, overrides, or does nothing, and under a statutory oversight duty that step
+is the one being asked about. The port SHOULD emit a follow-up `Result` onto the **same
+`context`** recording the disposition and whether it overrode the swarm's answer, for the
+same reason an unreconciled external write is a claim rather than an outcome: otherwise
+the record shows what was recommended and is silent on what was decided (scenario 09,
+finding 41).
+
 ### v2 terms (consensus, state, ordering)
 
 | Term | Attached to | Purpose |

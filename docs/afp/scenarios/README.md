@@ -149,7 +149,11 @@ declared irreversibility, the `annotate` disposition, panel deltas,
 [ADR-0012](../adr/0012-the-long-horizon.md) (40 + the sharp half of 32 — key
 history in the manifest, rotation vs revocation, conditional retention MUSTs, the
 bundle's content inventory with CRDT state excluded). Findings 31, 33, 36, 41, 42
-are spec-precision edits (no ADR needed); 32's remainder is 06 deployment guidance
+are spec-precision edits (no ADR needed) — **written into the spec body at v3.22**, after
+a roadmap review caught that "triaged as needing no ADR" had been quietly recorded as
+"resolved": the presentation convention for renderings and `afp:producedBy`'s definition
+in 04, port agents and the human-disposition reconciliation in 03, and the replay
+guarantee's boundary in 04's replay procedure. 32's remainder is 06 deployment guidance
 resting on ADR-0012 Decision 4. ADR-0010 is **Accepted and built** — findings 34, 35
 and 37 are closed, and the build corrected three of its own rulings on the way (the
 sequential-thread ordering rule, an unconditional outcome check that would have failed

@@ -1,10 +1,10 @@
-# Agent Federation Protocol (AFP) — v3.21
+# Agent Federation Protocol (AFP) — v3.22
 
 Multiple operators, each running their own instance of agents, join forces on a common
 problem — federating through problem-scoped hubs over **ActivityPub** (the W3C protocol
 behind Mastodon). No central broker, consortium trust, no token economics.
 
-This is the markdown rendition of the full spec (Revision 3.21). Reading order:
+This is the markdown rendition of the full spec (Revision 3.22). Reading order:
 
 | File | Contents |
 |---|---|
@@ -242,6 +242,8 @@ flowchart LR
 | v3.20 | **The long horizon built** ([ADR-0012](adr/0012-the-long-horizon.md)), closing campaign 6: an export now outlives the key that signed it. The manifest becomes a signed document carrying `afp:keyHistory` — every key that signed anything in the bundle, with its interval and whether it left service by rotation or revocation — and a signature resolves against the key valid *at its `published` instant*, so a routine rotation stops silently stranding the corpus signed before it. Rotation archives and revocation cuts; 01 said to treat a rotated key as revoked, which was the bug. `afp:members` enumerates what a bundle contains, checked both ways, and CRDT state is stated to be outside it — anything that must ever be disclosed, redacted or replayed has to live in activities. Retention duties are declared rather than guessed (`afp:retentionDuty`), and declaring one turns on the anchoring and byte-retention MUSTs; anchors are checked for coherence and never dereferenced, because the verifier reaches no network by design (finding 40, and the sharp half of 32) |
 
 | v3.21 | **Authorized fetch built** ([ADR-0013](adr/0013-authorized-fetch.md)): the read half of the two-tier gate, and the first ADR here driven by an audit rather than a scenario. A `GET` for a non-`public` resource resolves its requester from the signature and runs the same deny-list and agreement stages the inbox runs; `internal` is refused to everyone including grant holders, and an unsigned request is anonymous rather than an error — it sees what it always saw. The covered-header set is derived from the request *method*, never from what a `Signature` header claims about itself, because honouring that claim would let a POST be downgraded to an unauthenticated body. Stated plainly in 04: authentication is symmetric but accountability is not — the record proves what was published, never who read it, so visibility classes are access control rather than an audit trail |
+
+| v3.22 | **Campaign 6's last five findings written into the spec body**, after a roadmap review caught that "triaged as needing no ADR" had been recorded as "resolved" — the two are not the same, and the ledger said the second while the spec showed neither. 04 gains the presentation convention for renderings (a rendering SHOULD be derived from a verified export and carry its digest and verdict), `afp:producedBy`'s definition as a resolvable *versioned* brain configuration, and the replay guarantee's boundary: replay proves what was said over which bytes under which pinned rules, never that a rerun would agree. 03 states that an external system emitting activities is modelled as rostered port agents — with the read/write split RECOMMENDED where input is hostile — and extends the reconciliation duty to the human disposition a flagged outcome hands off to. The roadmap gains campaign 6's ADRs, ADR-0013, and the two blockers standing in front of P5 (findings 31, 33, 36, 41, 42) |
 
 All `afp:` terms are this design's own `@context` extension over W3C ActivityStreams 2.0 —
 not part of the standard.

@@ -146,10 +146,28 @@ ones add capability around them.
 > recomputable reputation consumption (`afp:reputationRule` + `afp:settlementSnapshot`).
 > All three are P1–P3-scoped record extensions that turn into migrations if deferred past
 > the point where two operators share the state. Three further ADRs — likewise built —
-> complete the hardening: [ADR-0005](adr/0005-operators-are-equal.md) (one operator, one
+> complete that first round: [ADR-0005](adr/0005-operators-are-equal.md) (one operator, one
 > weight), [ADR-0006](adr/0006-checkable-actuation.md) (actions checkable against the
 > answers that justified them), [ADR-0007](adr/0007-supersession.md) (retraction with
 > ratification parity and dispositions).
+>
+> **A second round followed, and it is the more instructive one.** Campaign 6 found that
+> the machinery above had anchored itself to the `Announce`/`Award` pair, so the
+> *degenerate* direct flow — the one this spec tells deployments to use whenever the
+> target is known — silently lost all of it.
+> [ADR-0010](adr/0010-pinning-without-an-auction.md) gave the pins a second carrier and
+> replay a second root; [ADR-0011](adr/0011-supersession-meets-the-irreversible-world.md)
+> gave supersession an honest form where the world offers no undo, and settled who may
+> answer after a panel changes; [ADR-0012](adr/0012-the-long-horizon.md) stopped a routine
+> key rotation from stranding every export signed before it. All three are built.
+> [ADR-0013](adr/0013-authorized-fetch.md) then built the read half of the P4 gate — and
+> is the first ADR here driven by an **audit** rather than a scenario, because the spec had
+> described that mechanism as working since v3.4 and no code performed it.
+>
+> The pattern worth carrying into P5: every one of these was a mechanism attached to the
+> wrong thing, invisible until something was built on top of it. P5 introduces the richest
+> set of new anchoring choices yet — remote hubs, relayed state, cross-instance enrollment
+> — so the same class of defect should be expected there, and a scenario should go first.
 
 | Phase | Scope | Demo | Gate |
 |---|---|---|---|
@@ -178,6 +196,25 @@ without adopting the rest of P4 — publishing Notes to an external follower req
 agreement, and it is the cheapest way to anchor outbox chain heads outside a trust domain
 where the operator holds every key
 ([06](06-deployment-profiles.md#keep-signing-everything--the-sneakernet-property)).
+
+## Known blockers before P5 opens
+
+Recorded here rather than rediscovered: both are things a P5 plan will hit in its first
+week, and neither is visible from the phase table above.
+
+- **`afp:MembershipProof` exists in prose only.** P5's row promises `hub` visibility
+  enforced across the boundary, and [ADR-0013](adr/0013-authorized-fetch.md) deliberately
+  scoped its `hub` predicate to hubs *this instance hosts*, because nothing lets a server
+  verify enrollment in a hub somebody else runs. Grep the implementation and the type does
+  not appear. So P5 does not begin with hub reads; it begins with designing the proof that
+  makes them decidable — who signs it, what it binds, and how it expires.
+- **A scoped export can silently disarm the pin checks.** [ADR-0010](adr/0010-pinning-without-an-auction.md)
+  names this in its open questions: redact a pin-bearing `Offer` under ADR-0009 and the
+  thread has no task activity left, so the governing pins resolve to nothing and every
+  actuation check no-ops — in exactly the subject-scoped audit bundle scenario 09 exists to
+  produce. It is documented and deliberately uncovered by any gate, because a test
+  asserting today's vacuous pass would encode the bug. It wants deciding before P5 adds
+  more redaction surface, not after.
 
 ## Open questions
 

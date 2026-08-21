@@ -83,6 +83,24 @@ A deployment whose threat model includes its own operator disclosing data by rea
 needs controls this protocol does not offer, and should not read the audit table above as
 though it did.
 
+### Renderings: what the human actually reads
+
+Nobody audits a bundle. An auditor, an applicant, a regulator reads a **rendering** — a
+narrative assembled from the record — and the spec's only human-facing surfaces are the
+shadow Note (operational, tied to integrity by nothing but a link) and the verifier's
+pass/fail. Between them sits the document people actually act on, unconstrained.
+
+The convention that closes it: **a rendering SHOULD be derived mechanically from a
+verified export, and SHOULD carry the bundle digest and the verifier's result alongside
+the narrative** — so a reader can check the story against the record it claims to
+summarize, and a rendering of a bundle that does not verify announces that fact instead of
+reading identically to one that does (scenario 09, finding 31).
+
+This generalizes a rule the spec already has in one place: dissent "SHOULD travel with the
+answer all the way to any human notification, not be summarized away en route". That is
+the right anti-omission instinct aimed at one channel; a rendering is the channel that
+matters most, and the same instinct belongs there.
+
 ### Federated replay & lawful redaction (ADR-0009)
 
 When an engagement spans trust domains, the audit takes **every party's export at
@@ -279,6 +297,14 @@ convention, not machinery:
 - Votes SHOULD carry a rationale in `content`.
 - Policy evaluation SHOULD run as `Task`/`Result` pairs per candidate, so each agent's
   assessment becomes a signed `Result` entered into evidence *before* the vote.
+- **`afp:producedBy` SHOULD identify a resolvable, versioned brain configuration** —
+  model *and* prompt-pack revision, tooling, guardrails — not a bare model name. It is
+  the cheapest externalization available: one field saying what made this claim. Under a
+  regulatory duty "gpt-x" is not an answer, because the same model with a different prompt
+  pack is a different assessor. Kept **non-normative for replay** on purpose: ADR-0001
+  keeps verification independent of sampling, so a verifier never re-runs a brain and
+  never checks this field's contents. It is evidence for a reader, not an input to a
+  check (scenario 09, finding 33).
 
 ### What closes the trail at the edges
 
@@ -338,6 +364,22 @@ An activity bearing a valid signature from a key with no authority over its acto
 A gap in any chain, a digest mismatch, an activity signed by a key with no authority over
 its actor, a rostered agent with no outbox, or a counted vote you cannot produce is a
 failed audit.
+
+**What a passing replay does and does not prove.** It proves *these actors said these
+things, over these exact bytes, under the rules pinned before they said them* — signatures,
+chains, digests, tallies, selection rules, policy branches, all recomputed from the bundle
+alone. It does **not** prove that re-running the work would produce the same answer. A
+brain is non-deterministic by nature; replay never re-executes one and never reads a
+`Result`'s `content` as anything but bytes to hash. The record is the thing that holds
+still, and that is the whole claim (scenario 09, finding 42).
+
+Two consequences worth stating where a regulator will ask. Provenance stops at the
+agent–instance port, so *why* an agent answered as it did is outside the guarantee unless
+the workflow externalized it (below). And the dedupe rule is quietly load-bearing here:
+an agent already holding a `correlationId` replays its **cached** `Result` rather than
+re-deciding, which is what makes a non-deterministic brain's verdict single-valued across
+retries. It is framed in 03 as a duplicate-execution control; it is also the reason a
+retried task cannot quietly acquire a second, different answer.
 
 ### The manifest, and what a bundle contains (ADR-0012)
 
