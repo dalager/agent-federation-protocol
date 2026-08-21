@@ -33,7 +33,7 @@
 import type { KeyObject } from "node:crypto";
 import type { JsonValue } from "../crypto/jcs.ts";
 import { publicKeyFromMultibase } from "../crypto/keys.ts";
-import { verifyRequest } from "./httpSig.ts";
+import { extractKeyId, verifyRequest, type RequestAuthHeaders } from "./httpSig.ts";
 import { verifyProof } from "../crypto/proof.ts";
 import { instantMillis } from "../crypto/time.ts";
 import { admittingGrant, type ActivitySummary } from "./grants.ts";
@@ -85,9 +85,9 @@ export interface ReadGateDeps {
 async function resolveRequester(
   deps: ReadGateDeps,
   path: string,
-  headers: { host?: string; date?: string; signature?: string },
+  headers: RequestAuthHeaders,
 ): Promise<Requester | null> {
-  const keyId = /keyId="([^"]+)"/.exec(headers.signature ?? "")?.[1] ?? null;
+  const keyId = extractKeyId(headers);
   if (!keyId) return null;
 
   const controller = keyId.split("#")[0];
@@ -257,7 +257,7 @@ export async function authorizeRead(
   deps: ReadGateDeps,
   request: {
     path: string;
-    headers: { host?: string; date?: string; signature?: string; "afp-membership-proof"?: string };
+    headers: RequestAuthHeaders & { "afp-membership-proof"?: string };
   },
 ): Promise<ReadAuthorization> {
   const requester = await resolveRequester(deps, request.path, request.headers);

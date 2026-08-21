@@ -40,11 +40,24 @@ The most substantive finding.
 
 **Fix directions:** publish a real, resolvable `@context` document on a real domain with one canonical prefix mapping; prefix or define every invented property; *or* normatively declare that AFP documents are plain JSON in a fixed compacted form and JSON-LD processing is out of scope (several fediverse projects do exactly this — but it must be said).
 
-### 1.2 Internal contradiction on HTTP signatures — `status: open`
+### 1.2 Internal contradiction on HTTP signatures — `status: fixed-spec` + `fixed-code`
+
+**Resolution (2026-08-21, ADR-0017 Decision 2):** RFC 9421 is now the native scheme in
+`httpSig.ts` (structured `Signature-Input`/`Signature`, Ed25519, RFC 9530
+`Content-Digest`, `created`/`expires`), draft-cavage survives as the verify-side shim
+and double-knock fallback. `01-foundations.md:281` and ADR-0008 (amended in place) now
+agree with each other and with the code. Original finding follows.
 
 `01-foundations.md:281` says "**HTTP Signature** (RFC 9421; draft-cavage for legacy peers)". ADR-0008 (accepted, `adr/0008-p4-federation-stack.md:98-101`) decides the opposite — draft-cavage *instead of* RFC 9421 — and the code implements only draft-cavage (`federation/httpSig.ts`). Line 281 is stale relative to the accepted ADR and the built code.
 
-### 1.3 The cavage rationale is self-defeating as built — `status: open`
+### 1.3 The cavage rationale is self-defeating as built — `status: fixed-code` (partially; RSA/Mastodon interop still future)
+
+**Resolution (2026-08-21, ADR-0017 Decision 2):** the rationale inversion is resolved by
+inverting the scheme — RFC 9421 native, cavage as shim, double-knocking with per-origin
+preference cache in `transport.ts`. The covered-set discipline is preserved in both
+schemes (restated against 9421's component model). Point (b) — RSA keys for actual
+Mastodon interop — remains future work, tied to Decision 4's Mastodon-facing stage.
+Original finding follows.
 
 ADR-0008 chose draft-cavage *for Mastodon compatibility*, but:
 
@@ -124,7 +137,11 @@ Never acknowledged in the docs:
 - `urn:afp:*` (`urn:afp:thread:*`, `urn:afp:round:*`, `urn:afp:incident:*`, `urn:afp:asset:*`) — RFC 8141 requires IANA registration of URN NIDs. (A `tag:` URI or an `https:` URI namespace avoids the problem entirely.)
 - `afp-membership-proof` request header (`ap/server.ts:145-149`, ADR-0014) — unregistered, and deliberately outside the signature's covered set.
 
-### 3.6 Legacy `Digest` header — `status: open`
+### 3.6 Legacy `Digest` header — `status: fixed-code`
+
+**Resolution (2026-08-21):** the native scheme sends RFC 9530 `Content-Digest`; the
+legacy `Digest` header now appears only in the cavage shim, where it belongs. Original
+finding follows.
 
 `Digest: SHA-256=<base64>` (RFC 3230, `httpSig.ts:84`) rather than RFC 9530 `Content-Digest`. Consistent with draft-cavage, but dated; resolves itself with an RFC 9421 migration.
 

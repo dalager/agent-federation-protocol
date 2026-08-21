@@ -260,7 +260,7 @@ export async function runP4Demo(options: { rootDir?: string; exportRoot?: string
     if (as !== null) {
       const key = as.operator.instance.key(as.agent);
       const signed = signRequest("GET", url.pathname, url.host, "", key.keyId, key.privateKey, clock.now());
-      headers = { ...headers, host: signed.host, date: signed.date, signature: signed.signature };
+      headers = { ...headers, ...signed };
     }
     const response = await fetch(target, { headers });
     const body = (await response.json()) as { orderedItems?: unknown[] };

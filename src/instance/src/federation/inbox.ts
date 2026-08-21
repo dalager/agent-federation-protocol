@@ -20,7 +20,7 @@ import type { KeyObject } from "node:crypto";
 import type { JsonValue } from "../crypto/jcs.ts";
 import { publicKeyFromMultibase } from "../crypto/keys.ts";
 import { verifyProof } from "../crypto/proof.ts";
-import { verifyRequest } from "./httpSig.ts";
+import { extractKeyId, verifyRequest, type RequestAuthHeaders } from "./httpSig.ts";
 import type { Federation } from "./federation.ts";
 
 export interface InboxDeps {
@@ -75,7 +75,7 @@ function isHandshake(activity: { [key: string]: JsonValue }): boolean {
 export async function handleInboxPost(
   deps: InboxDeps,
   path: string,
-  headers: { host?: string; date?: string; digest?: string; signature?: string },
+  headers: RequestAuthHeaders,
   body: string,
 ): Promise<InboxOutcome> {
   // 1 — transport authentication, before any parsing beyond the envelope.
@@ -83,7 +83,7 @@ export async function handleInboxPost(
   const resolveKey = (keyId: string): KeyObject | null => resolvedKeys.get(keyId) ?? null;
 
   // Resolve the keyId's controller document once, unauthenticated (public).
-  const keyId = /keyId="([^"]+)"/.exec(headers.signature ?? "")?.[1] ?? null;
+  const keyId = extractKeyId(headers);
   if (keyId) {
     const controller = keyId.split("#")[0];
     const doc = await deps.fetchDocument(controller);

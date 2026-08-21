@@ -118,10 +118,7 @@ async function postToHubInbox(
     method: "POST",
     headers: {
       "content-type": "application/activity+json",
-      host: signed.host,
-      date: signed.date,
-      digest: signed.digest,
-      signature: signed.signature,
+      ...signed,
       ...extraHeaders,
     },
     body,

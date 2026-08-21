@@ -123,7 +123,9 @@ export function createHttpServer(instance: AfpInstance, options: ServerOptions =
           {
             host: String(req.headers.host ?? ""),
             date: String(req.headers.date ?? ""),
-            digest: String(req.headers.digest ?? ""),
+            digest: String(req.headers.digest ?? "") || undefined,
+            "content-digest": String(req.headers["content-digest"] ?? "") || undefined,
+            "signature-input": String(req.headers["signature-input"] ?? "") || undefined,
             signature: String(req.headers.signature ?? ""),
           },
           body,
@@ -141,6 +143,7 @@ export function createHttpServer(instance: AfpInstance, options: ServerOptions =
     const readHeaders = {
       host: String(req.headers.host ?? ""),
       date: String(req.headers.date ?? ""),
+      "signature-input": String(req.headers["signature-input"] ?? "") || undefined,
       signature: String(req.headers.signature ?? ""),
       // ADR-0014: a presented membership proof — outside the signature's
       // covered set on purpose (the set is method-derived and stays that way);

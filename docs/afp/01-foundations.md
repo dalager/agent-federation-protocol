@@ -278,7 +278,7 @@ v3, to the instance standing behind it via `afp:operatedBy`.
 
 | Mechanism | Authenticates | Lives |
 |---|---|---|
-| **HTTP Signature** (RFC 9421; draft-cavage for legacy peers) | One hop — method, path, `Date`, `Digest`, `Host` | Consumed on receipt; never appears in an outbox |
+| **HTTP Signature** (RFC 9421 native — `Signature-Input`/`Signature`, Ed25519, `Content-Digest`; draft-cavage emitted only as the double-knock fallback for legacy peers, ADR-0017 Decision 2) | One hop — method, authority, path, `Date`, and the body digest for requests that carry one | Consumed on receipt; never appears in an outbox |
 | **Object integrity proof** (FEP-8b32, `eddsa-jcs-2022`) | The activity itself | Travels with the activity permanently, including through export |
 
 The distinction decides what a *replay* can check. A third party handed an exported outbox

@@ -97,7 +97,10 @@ before anything else runs, unsigned or invalid deliveries audit-logged and dropp
 
 - HTTP Signatures follow **fediverse practice (draft-cavage)** rather than RFC 9421,
   because the staged Mastodon-facing half (Decision 6) has no choice, and running one
-  scheme is cheaper than two. Known wart, recorded here: Mastodon's implementation
+  scheme is cheaper than two. **Amended by [ADR-0017](0017-standards-conformance.md)
+  Decision 2:** this ADR's own revisit trigger — fediverse migration toward RFC 9421 —
+  has fired (Mastodon 4.7, Fedify), so the scheme inverted: RFC 9421 is native,
+  draft-cavage survives as the double-knock fallback for legacy peers. Known wart, recorded here: Mastodon's implementation
   expects RSA keys for HTTP Signatures, while AFP actors publish Ed25519 multikeys —
   the Mastodon-facing delivery path may need an RSA key alongside, on the actor
   document, when that stage lands. The AFP-to-AFP path uses Ed25519 throughout.

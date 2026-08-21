@@ -1,6 +1,9 @@
 # ADR-0017 — Standards conformance: making the compatibility claim true
 
-- **Status:** Proposed — drafted from
+- **Status:** Accepted in progress — Decision 1 **built** (context live at the
+  canonical URL, served as `application/ld+json` with CORS), Decision 2 **built**
+  (RFC 9421 native in `httpSig.ts`, cavage shim, double-knocking in `transport.ts`);
+  Decisions 3–8 open. Drafted from
   [docs/critique-standards-deviation.md](../../critique-standards-deviation.md), the
    2026-08-21 four-source audit of the spec and instance against ActivityPub, AS2,
   JSON-LD, WebFinger, and current fediverse signature practice

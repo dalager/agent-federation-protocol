@@ -247,8 +247,7 @@ describe("ADR-0014 M6: three operators, one hub, one partition", () => {
       const response = await fetch(`${gamma.origin}${outboxPath}`, {
         headers: {
           accept: "application/activity+json",
-          date: signed.date,
-          signature: signed.signature,
+          ...signed,
           ...(proofHeader ? { "afp-membership-proof": proofHeader } : {}),
         },
       });
