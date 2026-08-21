@@ -210,12 +210,13 @@ now closed, and is kept below with its resolution rather than deleted, because a
 that quietly disappears teaches a later reader nothing: both are things a P5 plan will hit in its first
 week, and neither is visible from the phase table above.
 
-- **`afp:MembershipProof` exists in prose only.** P5's row promises `hub` visibility
-  enforced across the boundary, and [ADR-0013](adr/0013-authorized-fetch.md) deliberately
-  scoped its `hub` predicate to hubs *this instance hosts*, because nothing lets a server
-  verify enrollment in a hub somebody else runs. Grep the implementation and the type does
-  not appear. So P5 does not begin with hub reads; it begins with designing the proof that
-  makes them decidable — who signs it, what it binds, and how it expires.
+- ~~**`afp:MembershipProof` exists in prose only.**~~ **Closed** — [ADR-0014](adr/0014-p5-shared-hub-stack.md)
+  Decision 1, built and gated: the hub issues a signed, expiring statement naming agent,
+  hub and role; the fetcher presents it on the signed `GET`; the serving instance verifies
+  it against the hub's published key and requires the named agent to equal the requester
+  it already authenticated. ADR-0013's `hub` predicate is widened from "a hub I host" to
+  "a hub whose proof I can verify" — deny-list and agreement stages unchanged. P5's hub
+  reads are unblocked; what remains of ADR-0014 is Decisions 2–4.
 - ~~**A scoped export can silently disarm the pin checks.**~~ **Closed** —
   [ADR-0010](adr/0010-pinning-without-an-auction.md) Decision 5, built at v3.23. Redacting
   a pin-bearing `Offer` left the thread with no task activity, so the governing pins

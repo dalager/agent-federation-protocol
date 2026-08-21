@@ -2,7 +2,8 @@
 
 - **Status:** Accepted, and **built** for the P4 shape — gated by admission-by-class at
   the gate itself, and by the covered-header discipline that makes a body-less signature
-  safe. Remote-hub enrollment stays P5's problem (Decision 3)
+  safe. Remote-hub enrollment, deferred here as P5's problem, is since answered by
+  [ADR-0014](0014-p5-shared-hub-stack.md) Decision 1's presented proof
 - **Date:** 2026-08-21
 - **Applies to:** every deployment that serves anything over HTTP — acute from P4, where
   a second operator exists to be entitled to something, and unavoidable at P5, where a
@@ -143,10 +144,12 @@ wish:
 - **Enrollment is answerable here only for hubs this instance hosts.** `Hub.roleOf` reads
   local hub state, and it answers correctly for *foreign* agents too, because enrolling a
   foreign agent is already a recorded act gated by `afp:operatedBy` (ADR-0005). What it
-  cannot answer is enrollment in a hub somebody else hosts — there is no
-  `afp:MembershipProof` in the codebase; it exists only in prose. So this ADR's `hub`
-  predicate is **scoped to locally-hosted hubs**, which is exactly the whole of P4, and
-  the remote case is named as P5's problem rather than half-built here.
+  cannot answer is enrollment in a hub somebody else hosts — at the time this was
+  written there was no `afp:MembershipProof` in the codebase. So this ADR's `hub`
+  predicate was **scoped to locally-hosted hubs**, the whole of P4, and the remote case
+  named as P5's problem rather than half-built here. *(That problem is now solved where
+  it was named: [ADR-0014](0014-p5-shared-hub-stack.md) Decision 1 widened the clause to
+  roleOf-or-presented-proof, leaving every other stage of this gate untouched.)*
 
 `internal` is absolute deliberately. 07 already says a grant never unlocks it, and this
 ADR declines to add the one exception that would eventually be asked for: a class whose
@@ -322,7 +325,7 @@ somebody who has another way to ask, and the permissive one can only ever over-d
 | P5 shared hubs where the hub relays reads on members' behalf | Whether the hub can admit on a member's behalf, and what that does to the two-tier identity |
 | Probing at scale (an adversary enumerating thread ids) | Whether rate limiting and `404` discipline need to be specified rather than left to deployment |
 | A one-off share with a party outside any agreement | Whether capability URLs earn their keep for a bounded case, having been rejected as a general mechanism |
-| P5 hubs hosted by another operator | `afp:MembershipProof` — the mechanism that would let this instance verify enrollment in a hub it does not host. It exists in prose only, and A3's `hub` predicate is scoped to locally-hosted hubs until it exists |
+| ~~P5 hubs hosted by another operator~~ | Fired: [ADR-0014](0014-p5-shared-hub-stack.md) Decision 1 built `afp:MembershipProof` and widened A3's `hub` predicate to roleOf-or-presented-proof |
 | Read volume making per-request gating the bottleneck | Whether an admission decision may be cached per (requester, class, scope), and for how long |
 
 ## Build status

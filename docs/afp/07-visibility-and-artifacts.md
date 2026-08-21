@@ -55,9 +55,12 @@ every class above `public`.
 > anonymous, and anonymous still sees exactly what it saw before, which is how a server
 > with no gate configured stays byte-identical to the old one.
 >
-> Two limits worth knowing rather than discovering. Enrollment is answerable only for
-> hubs **this instance hosts**: `afp:MembershipProof` does not exist yet, so a hub
-> someone else hosts is P5's problem. And `parties` admits the agent the addressing
+> Two limits worth knowing rather than discovering. Enrollment in a hub this instance
+> does not host is answered by a **presented `afp:MembershipProof`** ([ADR-0014](adr/0014-p5-shared-hub-stack.md)
+> Decision 1, built): a hub-signed, expiring statement in the requester's pocket, verified
+> against the hub's published key — so the answer survives the hub's own partition, which
+> is when it matters. Without one, the predicate still refuses, exactly as before. And
+> `parties` admits the agent the addressing
 > *names* — being the operator of a named agent is not admission, because at P4 that
 > activity was already delivered to that operator anyway.
 
