@@ -323,20 +323,23 @@ An export's manifest is a **signed document**, not a note attached to one: it ca
 export's self-description under the same `DataIntegrityProof` as everything else, so the
 one part of a bundle that used to be freely editable no longer is.
 
-- **`afp:keyHistory`** — every key that signed anything in the bundle, per actor, with its
-  validity interval and how it left service (`afp:retiredBy: "rotation" | "revocation"`).
+- **`afp:keyHistory`** — every key that signed anything in the bundle, per actor: its
+  `id`, its `publicKeyMultibase`, its validity interval (`afp:validFrom` /
+  `afp:validUntil`) and how it left service (`afp:retiredBy: "rotation" | "revocation"`).
   A signature resolves against the key valid *at its `published` instant*, so a rotation
-  stops stranding the corpus signed before it. An absent `afp:validFrom` means unbounded
-  below — a first key's start was often never recorded, and inventing one would fail
+  stops stranding the corpus signed before it. An absent `afp:validUntil` means the key is
+  still active; an absent `afp:validFrom` means unbounded below — a first key's start was often never recorded, and inventing one would fail
   exactly the old exports this exists to keep verifiable. Intervals bind per key: a
   `verificationMethod` the history does not declare resolves from the actor documents as
   it always has.
 - **`afp:members`** — every file the bundle contains, relative to its root. Checked both
   ways: an undeclared file is something that travelled without being admitted to, a
   declared-but-absent one is the hole ADR-0009 already names.
-- **`afp:retentionDuty`** and **`afp:anchors`** — a declared duty (horizon and basis) and
-  the external anchoring that backs it. Declaring the duty is what turns its obligations
-  on; a verifier cannot know from bytes whether a statute applies. Anchors are checked for
+- **`afp:retentionDuty`** and **`afp:anchors`** — a declared duty
+  (`{afp:horizon, afp:basis}`, e.g. `P5Y` and the statute it rests on) and the external
+  anchoring that backs it (`{afp:actor, afp:head, afp:instant, afp:anchorRef}` per entry).
+  Declaring the duty is what turns its obligations on; a verifier cannot know from bytes
+  whether a statute applies. Anchors are checked for
   coherence — every anchored digest must be a chain head the bundle contains — and are
   never dereferenced: the verifier reaches no network by design, so confirming the
   timestamp itself is the auditor's step, not the replay's.

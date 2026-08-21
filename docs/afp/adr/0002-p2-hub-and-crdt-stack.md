@@ -158,7 +158,7 @@ the OR-Set like any other removal.
 
 ### 5. Gossip / anti-entropy: deferred until it's needed
 
-[02](../02-hubs-and-state.md#state-sync-gossip--anti-entropy) describes digest exchange
+[02](../02-hubs-and-state.md#gossip--anti-entropy) describes digest exchange
 (Merkle root or version-vector) for converging CRDT state across *multiple instances*.
 At P2, one operator, this degenerates: there is exactly one writer per agent and the hub
 sees every delta directly, so a reconciliation loop has no P2 caller and could not be

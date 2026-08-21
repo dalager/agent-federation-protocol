@@ -8,7 +8,7 @@
 
 ## Context
 
-P3 adds **allocation**: `afp:Announce{Task}` to the hub, sealed commit-reveal bidding,
+P3 adds **allocation**: `Announce{afp:Task}` to the hub, sealed commit-reveal bidding,
 a published deterministic selection rule producing an `afp:Award` (one performer, or a
 coalition plus a named synthesizer), `afp:Reauction`, `afp:Synthesis`, `afp:Settlement`,
 and the estimator/bidder separation of duties ([03 § Bidding & allocation](../03-coordination.md#bidding--allocation)).

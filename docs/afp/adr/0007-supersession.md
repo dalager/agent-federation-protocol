@@ -7,7 +7,7 @@
 - **Builds on:** [ADR-0006](0006-checkable-actuation.md), whose `afp:actsOn` hash-binding
   is what makes Decision 3 expressible at all
 - **Driven by:** [scenario 07](../scenarios/07-the-retraction.md), which sharpened
-  [campaign 4](../scenarios/README.md#campaign-4--open)'s finding 24 into the three
+  [campaign 4](../scenarios/README.md#campaign-4--v312v314-adr-0006-adr-0007)'s finding 24 into the three
   decisions below
 
 ## Context

@@ -9,7 +9,7 @@
   duplicate), [ADR-0005](0005-operators-are-equal.md) (whose `afp:operatedBy` binding
   becomes fetch-dependent here), [ADR-0006](0006-checkable-actuation.md)/[0007](0007-supersession.md)
   (whose disciplines recur at the boundary)
-- **Driven by:** [scenario 08 / campaign 5](../scenarios/README.md#campaign-5--open),
+- **Driven by:** [scenario 08 / campaign 5](../scenarios/README.md#campaign-5--v316v317-adr-0008-adr-0009),
   findings 25–28 and 30 — as sharpened by the scenario's own review pass
 - **Explicitly not here:** findings 29a/29b (the two-export verifier and redaction
   stubs) are verifier and record architecture, deferred to their own ADR — deciding them

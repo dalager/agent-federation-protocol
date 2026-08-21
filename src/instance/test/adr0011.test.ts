@@ -232,6 +232,10 @@ describe("ADR-0011 gate: the irreversible world, on the record", () => {
       estimatorPolicy: "exclude",
       estimators: [],
       actionPolicy: POLICY,
+      // ADR-0010 Decision 2 pins the synthesizer; the ranking rule derives
+      // none, so the pin governs alone (absent is not unequal). That is what
+      // makes the substitution below a real test of ADR-0011 Decision 3.
+      synthesizer: deps,
     });
     const payload = bidPayload({
       task,
@@ -251,8 +255,8 @@ describe("ADR-0011 gate: the irreversible world, on the record", () => {
     const award = hub.allocation.closeAuction(task, new Date(clock.now().getTime() + 3600_000).toISOString())!;
     const awardId = (award.activity.object as Record<string, unknown>).id as string;
 
-    const synth = (id: string, category: string, answer: string, supersedes?: string) =>
-      toHub("deps", {
+    const synth = (id: string, category: string, answer: string, supersedes?: string, author = "deps") =>
+      toHub(author, {
         type: "Create",
         object: {
           id,
@@ -266,7 +270,7 @@ describe("ADR-0011 gate: the irreversible world, on the record", () => {
           "afp:dissent": [],
           "afp:category": category,
           ...(supersedes ? { "afp:supersedes": supersedes } : {}),
-          attributedTo: deps,
+          attributedTo: instance.actorId(author),
         },
       });
 
@@ -301,7 +305,12 @@ describe("ADR-0011 gate: the irreversible world, on the record", () => {
     });
 
     const revisedId = "urn:afp:synthesis:panel-revised";
-    const revised = synth(revisedId, "assess-flag", "the evidence was misread", firstDigest);
+    // ADR-0011 Decision 3: the superseding answer is emitted by `sec`, NOT the
+    // pinned synthesizer. It is admissible only because the round below
+    // ratifies it — a convened quorum outranks a pin written before the panel
+    // changed, while an unratified answer keeps its pin or anyone supersedes
+    // by simply being somebody else.
+    const revised = synth(revisedId, "assess-flag", "the evidence was misread", firstDigest, "sec");
     const revisedDigest = digestOf(revised.activity);
     await ratify("urn:afp:round:panel-revised", revisedId, ratified.snapshot);
 
@@ -331,6 +340,26 @@ describe("ADR-0011 gate: the irreversible world, on the record", () => {
     const clean = runVerifier(VERIFIER, config.exportDir, thread, ["--verbose"]);
     assert.equal(clean.code, 0, `verifier failed:\n${clean.output}`);
     assert.match(clean.output, /supersession: .*names the electorate that ratified the answer it retracts/);
+    // The substitution itself: `sec` is not the pinned synthesizer, and the
+    // Synthesis it emitted is admissible anyway because a quorum ratified it.
+    // This branch is the whole of Decision 3's second half, so it is asserted
+    // as a *passing* check rather than inferred from the bundle being clean.
+    assert.match(clean.output, /ok.*\] synthesis: .*is emitted by the pinned synthesizer/);
+
+    // 3 — the same substitution, un-ratified: strip the outcome that makes the
+    // superseding answer a quorum's. Without the quorum behind it, a Synthesis
+    // from an unpinned actor is just someone else answering the thread, which
+    // is what the pin exists to refuse.
+    const unratifiedSubstitution = mutate(exported.dir, thread, `hub-assess`, (outbox) => {
+      for (const activity of outbox.orderedItems) {
+        const object = activity.object as Record<string, unknown> | undefined;
+        if (object?.type === "afp:DecisionRecord" && object["afp:outcome"] === revisedId) {
+          object["afp:outcome"] = "reject";
+        }
+      }
+    });
+    assert.notEqual(unratifiedSubstitution.code, 0);
+    assert.match(unratifiedSubstitution.output, /FAIL \] synthesis: .*is emitted by the pinned synthesizer/);
 
     // 4 — the superseding ratification declares no prior electorate: continuity
     // asserted by silence, which is what Decision 3 refuses.

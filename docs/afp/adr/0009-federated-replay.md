@@ -9,7 +9,7 @@
   generalizes), [ADR-0005](0005-operators-are-equal.md) (the `afp:operatedBy` binding
   that becomes the partition key), [ADR-0008](0008-p4-federation-stack.md) (which built
   the boundary and refused, by name, to decide these two questions in its margins)
-- **Driven by:** [scenario 08 / campaign 5](../scenarios/README.md#campaign-5--v316-adr-0008--29a29b-open),
+- **Driven by:** [scenario 08 / campaign 5](../scenarios/README.md#campaign-5--v316v317-adr-0008-adr-0009),
   findings 29a and 29b — the campaign's last two open items
 
 ## Context

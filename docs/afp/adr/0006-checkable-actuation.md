@@ -7,7 +7,7 @@
 - **Builds on:** [ADR-0003](0003-p3-allocation-stack.md) Decisions 3 and 6 — the two
   patterns reapplied here — and [ADR-0004](0004-solo-foundation-hardening.md), whose
   requester write-path is what lets a port agent act at all
-- **Driven by:** [scenario 06 / campaign 4](../scenarios/README.md#campaign-4--open),
+- **Driven by:** [scenario 06 / campaign 4](../scenarios/README.md#campaign-4--v312v314-adr-0006-adr-0007),
   findings 20 and 23
 
 ## Context

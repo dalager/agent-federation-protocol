@@ -38,6 +38,24 @@ stranger, so probing yields nothing).
 This is the same mechanism Mastodon calls *authorized fetch*; AFP makes it mandatory for
 every class above `public`.
 
+> **Specified, not yet built.** The reference implementation enforces only the *closed*
+> half of this rule: `ap/server.ts` serves activities and artifacts whose class is
+> `public` and returns `404` for everything else, to everyone, without reading a
+> signature on the request. No `GET` path verifies an HTTP Signature or runs the two-tier
+> gate, and `grantAdmits` — the admission logic that would decide these cases — is
+> reached only by the `afp:AuditGrant` flow.
+>
+> So a federated peer that *is* entitled to a `parties` or `hub` activity is refused
+> exactly as a stranger is. That satisfies P4's gate check (which asks that a non-named
+> peer get `404` rather than `403`) while leaving the other half of the mechanism —
+> admitting the peer who *should* be served — unimplemented. The full record travels by
+> export today, under the operator's control, which is why nothing in the built phases
+> has needed the open half yet.
+>
+> Stated here rather than left as a pleasant assumption: an implementer reading the
+> paragraph above would otherwise conclude that a signed `GET` from an agreed instance
+> fetches a hub-visibility activity, and it does not.
+
 ### The auditor role
 
 Audit needs read access that is broad, time-bounded, and recorded. An instance MAY grant

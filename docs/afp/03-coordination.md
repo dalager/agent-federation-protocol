@@ -443,7 +443,7 @@ task-bearing activities MUST agree on the whole set of them, so a fan-out of Off
 one story or a named finding. Skipping the ceremony costs nothing checkable; it once
 cost all of it (ADR-0010).
 
-1. **Announce** — `afp:Announce{Task}` broadcast to the hub: task spec, required
+1. **Announce** — `Announce{afp:Task}` broadcast to the hub: task spec, required
    capabilities, deadline, `afp:hub`, the `afp:bidWindow`, the `afp:answerSufficiency`
    threshold, the hub's `afp:estimatorPolicy`, and — published up front, not decided
    after the fact — the **`afp:selectionRule`** that will pick the performer(s). Since a

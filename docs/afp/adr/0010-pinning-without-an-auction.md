@@ -280,9 +280,13 @@ this ADR adds silently no-ops, in precisely scenario 09's audit deliverable. The
 candidate rule is one line — *a pin-bearing task activity MUST be at least as visible as
 the answers it governs*, enforced at export — but it is a constraint on ADR-0009's
 export-time transform, not on this ADR's pin, and it wants deciding alongside the
-content-inventory question ADR-0012 already has open. Until it is decided, X6 should
-carry a case that fails loudly rather than passing vacuously, so the hole is visible in
-the gate rather than in an audit.
+content-inventory question ADR-0012 already has open. **The gate does not cover this, deliberately and visibly.** A test asserting the desired
+behaviour would fail, because the behaviour is not built: stub the pin-bearing `Offer` and
+the thread simply has no task activity, so the pins resolve to nothing and every check
+here silently no-ops — which is the hole, not a bug to be caught. Writing a test that
+encoded *today's* vacuous pass as expected would be worse than none. So the gap is
+recorded here and left uncovered until the rule is decided, rather than papered over with
+a green test that proves the wrong thing.
 
 **A pinned synthesizer and a changed panel.** Decision 2 pins one synthesizer for the
 thread; ADR-0007 puts a superseding Synthesis on that same `context`, and ADR-0011's
@@ -393,8 +397,8 @@ above.
 | **X3** ✅ | `afp:synthesizer` on `AnnounceSpec`/`announceTask` and on the pinned `Offer`; admissibility check (`actor`/`attributedTo` equals the pin); Award-precedence rule and the disagreement finding beside the recomputed-synthesizer check (`allocation.py:535`); the pin added to the requester re-fan-out passthrough (`allocator.ts:220`) or it is silently dropped | `allocation/activities.ts`, `allocator.ts`, `action.py`, `allocation.py` | 2 |
 | **X4** ✅ | `actsOn` zero-or-one-hop resolution through a `Create{afp:DecisionRecord}` (digest → outcome id → Synthesis) at `action.py:115`, reusing the id-lookup already in `ratified()`; two-hop failure; `afp:outcome`-resolves finding in `check_decision_record`; `check_supersession`'s orphan scan resolved through the same hop | `action.py`, `decision.py` | 2 |
 | **X5** ✅ | `afp:no-verdict`: a `validateActionPolicy` beside `admissibleAction` (`allocation/actions.ts:25`), called from both pin paths, and a verifier check naming a pinned policy that lacks it; `afp:absentInputs` on `SynthesisSpec` + the leg-partition check; sufficiency's answer-side `count` reading with the `afp:no-verdict` escape, kept distinct from the Award-scoped count check (`allocation.py:562`) and `meetsSufficiency` (`allocator.ts:389`), plus the named finding for a `coverage` key pinned on a direct `Offer`; the leg partition per Decision 4's definition (distinct `afp:correlationId`, `Reject` counted absent, dedupe collapsed). Fixture sweep for the retroactive MUST — `adr0006.test.ts`'s `POLICY`, `adr0007.test.ts`, `hub.test.ts`, and the P3 demo paths all pin policies and go red on the day this lands | `allocation/actions.ts`, `allocation/activities.ts`, `action.py` | 3 |
-| **X6** ✅ | Gate: a P1-shaped direct fan-out (four Offers, one thread, pinned policy/sufficiency/synthesizer) replayed clean; then the mutations — divergent pins across Offers, an unpinned fifth Offer, a pin published after the first Result, a Synthesis from an unnamed actor, an action on an unadmitted category, an `actsOn` through a DecisionRecord (passes) and through two (fails), a partial panel closing `afp:no-verdict` with `afp:absentInputs` (passes) and without (fails), a sub-delegating Offer inheriting the pin set (passes) and omitting it (fails), and — for the redaction open question — a scoped export whose pin-bearing Offer is stubbed, asserted to *fail* rather than pass vacuously | `test/adr0010.test.ts` | 3 |
-| **X7** ✅ | Parity: the same thread run through the auction flow — Award-derived synthesizer and Announce-pinned policy — must produce identical action-check verdicts, so the fallback is a second root and not a second meaning | `test/parity.test.ts` | 3 |
+| **X6** ✅ | Gate: a P1-shaped direct fan-out (four Offers, one thread, pinned policy/sufficiency/synthesizer) replayed clean; then the mutations — divergent pins across Offers, an unpinned fifth Offer, a pin published after the first Result, a Synthesis from an unnamed actor, an action on an unadmitted category, an `actsOn` through a DecisionRecord (passes) and through two (fails), a partial panel closing `afp:no-verdict` with `afp:absentInputs` (passes) and without (fails), a sub-delegating Offer inheriting the pin set (passes) and omitting it (fails) | `test/adr0010.test.ts` | 3 |
+| **X7** ✅ | Parity: the same thread run through the auction flow — Award-derived synthesizer and Announce-pinned policy — must produce identical action-check verdicts, so the fallback is a second root and not a second meaning | `test/adr0010-parity.test.ts` | 3 |
 
 Named checks follow the existing `report.record(name, ok, detail)` convention, prefixed
 by their subject: `pins: <thread> …` for Decision 1, `action: <label> …` for Decisions
