@@ -20,7 +20,8 @@ import { join } from "node:path";
 import type { AfpInstance } from "./instance.ts";
 import { AFP_CONTEXTS } from "./ap/documents.ts";
 import type { JsonValue } from "./crypto/jcs.ts";
-import { digestOf } from "./crypto/proof.ts";
+import { attachProof, digestOf } from "./crypto/proof.ts";
+import { keyHistory, type KeyHistoryEntry } from "./crypto/keys.ts";
 
 /**
  * A scoped export (ADR-0009 Decisions 4–5). Redaction is an export-time
@@ -49,10 +50,37 @@ export interface ExportableHub {
   actorId: string;
   actorDocument(): { [key: string]: JsonValue };
   outbox: { byActor(actorUrl: string): { activity: { [key: string]: JsonValue } }[] };
+  /**
+   * ADR-0012 Decision 1: the hub's own signing-key history. Optional so a
+   * federated hub that exports separately can decline to hand it over —
+   * where it is absent the hub's chain resolves as it always did, against the
+   * current document.
+   */
+  keyHistory?(): KeyHistoryEntry[];
 }
 
 export interface ReceivedSource {
   receivedActivities(): { digest: string; fromInstance: string; activity: { [key: string]: JsonValue } }[];
+}
+
+/** ADR-0012 Decision 3: `afp:retentionDuty` — present only when a caller declares one. */
+export interface RetentionDuty {
+  horizon: string; // e.g. "P5Y"
+  basis: string; // e.g. "EU AI Act Art. 12"
+}
+
+/** One `afp:anchors` entry — an external anchor for one actor's chain head. */
+export interface Anchor {
+  actor: string;
+  head: string;
+  instant: string;
+  anchorRef: string;
+}
+
+/** The two ADR-0012 Decision 3 fields — both optional, both off unless supplied. */
+export interface ExportExtras {
+  retentionDuty?: RetentionDuty;
+  anchors?: readonly Anchor[];
 }
 
 export function exportBundle(
@@ -61,14 +89,24 @@ export function exportBundle(
   hubs: ExportableHub[] = [],
   scope?: ExportScope,
   received?: ReceivedSource,
+  extras?: ExportExtras,
 ): ExportSummary {
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(join(dir, "actors"), { recursive: true });
   mkdirSync(join(dir, "outbox"), { recursive: true });
   mkdirSync(join(dir, "artifacts"), { recursive: true });
 
+  // ADR-0012 Decision 4: afp:members — every file path this export writes,
+  // relative to the bundle root, MANIFEST.json itself excluded. Tracked as
+  // paths are written rather than reconstructed from a directory listing
+  // after the fact, so the declaration can never drift from what actually
+  // landed on disk.
+  const members: string[] = [];
+
   writeJson(join(dir, "instance.jsonld"), instance.instanceDocument());
+  members.push("instance.jsonld");
   writeJson(join(dir, "roster.jsonld"), instance.rosterDocument() as unknown as JsonValue);
+  members.push("roster.jsonld");
 
   let activities = 0;
   const actorNames: string[] = [];
@@ -97,6 +135,7 @@ export function exportBundle(
       totalItems: items.length,
       orderedItems: items,
     });
+    members.push(`outbox/${file}.jsonld`);
   };
 
   // The instance's own outbox carries the Vouch/Disown trail the roster is
@@ -109,6 +148,7 @@ export function exportBundle(
     if (omitted.has(spec.name)) continue; // declared in the manifest, not silently absent
     actorNames.push(spec.name);
     writeJson(join(dir, "actors", `${spec.name}.jsonld`), instance.agentDocument(spec.name));
+    members.push(`actors/${spec.name}.jsonld`);
     writeOutbox(spec.name, instance.actorId(spec.name));
   }
 
@@ -122,6 +162,7 @@ export function exportBundle(
     const name = `hub-${hub.actorId.split("/").pop() ?? hub.actorId}`;
     actorNames.push(name);
     writeJson(join(dir, "actors", `${name}.jsonld`), hub.actorDocument());
+    members.push(`actors/${name}.jsonld`);
     const entries = hub.outbox.byActor(hub.actorId);
     activities += entries.length;
     writeJson(join(dir, "outbox", `${name}.jsonld`), {
@@ -132,6 +173,7 @@ export function exportBundle(
       totalItems: entries.length,
       orderedItems: entries.map((entry) => entry.activity),
     });
+    members.push(`outbox/${name}.jsonld`);
   }
 
   // ADR-0009 Decision 3: what this instance received across the boundary,
@@ -146,6 +188,7 @@ export function exportBundle(
         totalItems: items.length,
         orderedItems: items.map((item) => ({ "afp:from": item.fromInstance, "afp:activity": item.activity })),
       });
+      members.push("received.jsonld");
     }
   }
 
@@ -154,10 +197,45 @@ export function exportBundle(
     // Raw bytes on purpose: the verifier's job is to notice when they no longer
     // match their digest, so the export must not quietly refuse to carry them.
     const bytes = instance.artifacts.getRaw(ref.digest);
-    if (bytes) writeFileSync(join(dir, "artifacts", ref.digest.replace(":", "-")), bytes);
+    if (bytes) {
+      const file = ref.digest.replace(":", "-");
+      writeFileSync(join(dir, "artifacts", file), bytes);
+      members.push(`artifacts/${file}`);
+    }
   }
 
-  writeJson(join(dir, "MANIFEST.json"), {
+  // ADR-0012 Decision 1: afp:keyHistory — every key that signed anything in
+  // this bundle, oldest first: the instance actor, each in-scope agent, and
+  // each hub whose outbox travels here. A hub signs its own activities, so
+  // omitting its keys would leave the one chain in the bundle still resolvable
+  // only against a current document — the exact gap this ADR closes.
+  const keyHistoryEntries: JsonValue[] = [];
+  const pushHistoryEntry = (controller: string, entry: KeyHistoryEntry): void => {
+    keyHistoryEntries.push({
+      "afp:actor": controller,
+      id: entry.keyId,
+      publicKeyMultibase: entry.publicKeyMultibase,
+      ...(entry.validFrom !== undefined ? { "afp:validFrom": entry.validFrom } : {}),
+      ...(entry.validUntil !== undefined ? { "afp:validUntil": entry.validUntil } : {}),
+      ...(entry.retiredBy !== undefined ? { "afp:retiredBy": entry.retiredBy } : {}),
+    });
+  };
+  const collectKeyHistory = (name: string, controller: string): void => {
+    for (const entry of keyHistory(instance.config.keyDir, name, controller)) {
+      pushHistoryEntry(controller, entry);
+    }
+  };
+  collectKeyHistory("instance", String(instance.instanceDocument().id));
+  for (const spec of instance.specs) {
+    if (omitted.has(spec.name)) continue; // no chain in the bundle, so no history to vouch for
+    collectKeyHistory(spec.name, instance.actorId(spec.name));
+  }
+  for (const hub of hubs) {
+    for (const entry of hub.keyHistory?.() ?? []) pushHistoryEntry(hub.actorId, entry);
+  }
+
+  const manifest: { [key: string]: JsonValue } = {
+    "@context": AFP_CONTEXTS,
     format: "afp-export/1",
     instance: String(instance.instanceDocument().id),
     exportedAt: new Date().toISOString(),
@@ -165,6 +243,8 @@ export function exportBundle(
     activities,
     artifacts: artifacts.length,
     cryptosuite: "eddsa-jcs-2022",
+    "afp:keyHistory": keyHistoryEntries,
+    "afp:members": [...members].sort(),
     ...(scope
       ? {
           "afp:exportScope": {
@@ -173,7 +253,35 @@ export function exportBundle(
           },
         }
       : {}),
-  });
+    ...(extras?.retentionDuty
+      ? {
+          "afp:retentionDuty": {
+            "afp:horizon": extras.retentionDuty.horizon,
+            "afp:basis": extras.retentionDuty.basis,
+          },
+        }
+      : {}),
+    ...(extras?.anchors && extras.anchors.length > 0
+      ? {
+          "afp:anchors": extras.anchors.map((anchor) => ({
+            "afp:actor": anchor.actor,
+            "afp:head": anchor.head,
+            "afp:instant": anchor.instant,
+            "afp:anchorRef": anchor.anchorRef,
+          })),
+        }
+      : {}),
+  };
+
+  // ADR-0012 Decision 1: the manifest becomes a signed document — the same
+  // DataIntegrityProof and JCS canonicalization as everything else, from the
+  // instance's *current* key, so the export's self-description stops being
+  // the one part of a bundle anybody could edit freely.
+  const instanceKey = instance.key("@instance");
+  writeJson(
+    join(dir, "MANIFEST.json"),
+    attachProof(manifest, { privateKey: instanceKey.privateKey, verificationMethod: instanceKey.keyId }),
+  );
 
   return { dir, actors: actorNames.length, activities, artifacts: artifacts.length };
 }

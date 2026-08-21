@@ -37,6 +37,12 @@ from asset import check_assets
 from action import check_actions, check_supersession
 from decision import afp_object, check_decision_record, check_enroll_authority, instant_millis
 from federation import check_federation, check_joint
+from keys import (
+    check_key_intervals,
+    check_manifest_key_history,
+    history_keys,
+    parse_key_history,
+)
 from pins import check_pins, check_prior_thread
 from proof import CRYPTOSUITE, decode_multikey, digest_of, verify_proof
 
@@ -73,13 +79,20 @@ def load_json(path: Path) -> dict:
         return json.load(handle)
 
 
-def collect_public_keys(export: Path) -> dict[str, bytes]:
-    """Map every published verification method id to its raw key bytes."""
+def collect_public_keys(export: Path, history: list | None = None) -> dict[str, bytes]:
+    """Map every published verification method id to its raw key bytes.
+
+    A rotated-out key's bytes live only in `afp:keyHistory` — the current
+    actor document no longer carries them — so `verify_proof`'s flat lookup
+    stays correct for old signatures once `history` (ADR-0012) is folded in.
+    An absent history contributes nothing, which is exactly today's map.
+    """
     keys: dict[str, bytes] = {}
     for path in actor_documents(export):
         for method in load_json(path).get("assertionMethod", []):
             if isinstance(method, dict) and "publicKeyMultibase" in method:
                 keys[method["id"]] = decode_multikey(method["publicKeyMultibase"])
+    keys.update(history_keys(history))
     return keys
 
 
@@ -112,7 +125,7 @@ class Authority:
     instance_actor: str | None = None
 
 
-def build_authority(export: Path) -> Authority:
+def build_authority(export: Path, history: list | None = None) -> Authority:
     """Derive signing authority from the roster plus the actor documents."""
     authority = Authority()
 
@@ -134,6 +147,17 @@ def build_authority(export: Path) -> Authority:
         operator = doc.get("afp:operatedBy")
         if isinstance(operator, str):
             authority.operated_by[actor] = operator
+
+    # ADR-0012: a rotated-out key is retired, not disowned — it remains part
+    # of its actor's authority so an activity it signed in-interval still
+    # resolves. Revoked keys stay in `controlled` too; the interval check
+    # (keys.py) is what makes a post-revocation signature fail, not authority.
+    if history:
+        for record in history:
+            if not record.actor or not record.key_id:
+                continue
+            controlled.setdefault(record.actor, set()).add(record.key_id)
+            authority.keys_for_actor.setdefault(record.actor, set()).add(record.key_id)
 
     instance_doc = export / "instance.jsonld"
     instance_id = load_json(instance_doc).get("id") if instance_doc.exists() else None
@@ -285,6 +309,123 @@ def check_chain(report: Report, actor: str, activities: list[dict]) -> None:
         after_stub = False
 
 
+def chain_head_digest(activities: list[dict]) -> str | None:
+    """The digest a next activity on this chain would have to name — the
+    stub's declared digest when the chain currently ends on a redaction
+    (ADR-0009 Decision 4), otherwise the last activity's own digest."""
+    if not activities:
+        return None
+    last = activities[-1]
+    if last.get("type") == "afp:Redacted":
+        digest = last.get("afp:digest")
+        return digest if isinstance(digest, str) else None
+    return digest_of(last)
+
+
+def check_members(report: Report, export: Path, manifest: dict) -> None:
+    """ADR-0012 Decision 4: every file present is declared in `afp:members`,
+    and every declared member is present. A manifest with no `afp:members` is
+    pre-inventory and this check does not run at all (Compatibility) — it is
+    never failed for lacking a field that did not exist when it was written.
+    """
+    members = manifest.get("afp:members")
+    if not isinstance(members, list):
+        return
+    declared = {m for m in members if isinstance(m, str)}
+    present = {
+        path.relative_to(export).as_posix()
+        for path in export.rglob("*")
+        if path.is_file() and path.name != "MANIFEST.json"
+    }
+
+    undeclared = sorted(present - declared)
+    report.record(
+        "bundle: every file present is declared in afp:members",
+        not undeclared,
+        "" if not undeclared else
+        f"{len(undeclared)} file(s) travel with this bundle but afp:members does not "
+        f"admit to carrying them: {', '.join(undeclared[:5])}"
+        + (", …" if len(undeclared) > 5 else ""),
+    )
+
+    missing = sorted(declared - present)
+    report.record(
+        "bundle: every declared member is present",
+        not missing,
+        "" if not missing else
+        f"afp:members declares {len(missing)} file(s) not found in the bundle: "
+        f"{', '.join(missing[:5])}" + (", …" if len(missing) > 5 else ""),
+    )
+
+
+def check_retention(
+    report: Report,
+    export: Path,
+    manifest: dict,
+    all_activities: list[dict],
+    chain_heads: dict[str, str],
+) -> None:
+    """ADR-0012 Decision 3, scoped to a declared `afp:retentionDuty`: at least
+    one anchor exists, every anchor names a chain head this bundle actually
+    contains, and every artifact a retained activity references keeps its
+    bytes — not merely its digest. A bundle with no declared duty runs none
+    of this (Compatibility): it is held to the SHOULDs as before.
+
+    Never dereferences `afp:anchorRef` — the verifier reaches no network by
+    design, and that seam is the auditor's (ADR-0012).
+    """
+    duty = manifest.get("afp:retentionDuty")
+    if not isinstance(duty, dict):
+        return
+
+    anchors = manifest.get("afp:anchors")
+    anchors = [a for a in anchors if isinstance(a, dict)] if isinstance(anchors, list) else []
+    report.record(
+        "retention: the declared duty is backed by an anchor",
+        bool(anchors),
+        "" if anchors else
+        f"afp:retentionDuty declares {duty.get('afp:horizon')!r} but afp:anchors is "
+        f"empty — a declared duty with no anchor (ADR-0012)",
+    )
+
+    heads = set(chain_heads.values())
+    unresolved = sorted(
+        {
+            a.get("afp:actor", "<unknown>")
+            for a in anchors
+            if a.get("afp:head") not in heads
+        }
+    )
+    report.record(
+        "retention: every anchor names a chain head this bundle contains",
+        not unresolved,
+        "" if not unresolved else
+        f"anchor(s) for {', '.join(unresolved)} name a digest that is not a chain head "
+        f"this bundle contains (ADR-0012)",
+    )
+
+    missing_bytes = []
+    for activity in all_activities:
+        obj = activity.get("object")
+        attachments = obj.get("attachment", []) if isinstance(obj, dict) else []
+        for link in attachments:
+            if not isinstance(link, dict):
+                continue
+            digest = link.get("afp:digest")
+            if not isinstance(digest, str):
+                continue
+            if not (export / "artifacts" / digest.replace(":", "-")).exists():
+                missing_bytes.append(digest[:24])
+    report.record(
+        "retention: artifacts referenced by retained activities keep their bytes",
+        not missing_bytes,
+        "" if not missing_bytes else
+        f"{len(missing_bytes)} artifact(s) referenced by a retained activity are absent "
+        f"from artifacts/ — the retention duty requires the bytes themselves, not only "
+        f"the digest (07's federation floor is not a retention policy) (ADR-0012)",
+    )
+
+
 def check_attachments(report: Report, export: Path, activity: dict) -> None:
     """Every attachment must carry a digest, and the bytes must match it."""
     obj = activity.get("object")
@@ -382,7 +523,13 @@ def verify_export(export: Path, thread: str | None, report: Report) -> dict:
         f"manifest says {manifest.get('cryptosuite')!r}",
     )
 
-    keys = collect_public_keys(export)
+    # ADR-0012 Decision 1: the manifest's own key history, when it carries
+    # one. `history` is None for every export written before this ADR, and
+    # everything downstream that consults it is a no-op on None.
+    history = parse_key_history(manifest)
+    check_manifest_key_history(report, manifest, history)
+
+    keys = collect_public_keys(export, history)
     report.record("keys: actor documents publish verification keys", bool(keys),
                   "no assertionMethod entries found in any actor document")
 
@@ -393,10 +540,12 @@ def verify_export(export: Path, thread: str | None, report: Report) -> dict:
         # Gate check 9: the roster verifies as a whole from a cached copy.
         report.record("roster: signature verifies from the cached copy", reason is None, reason or "")
 
-    authority = build_authority(export)
+    authority = build_authority(export, history)
 
     all_activities: list[dict] = []
     seen_actors: set[str] = set()
+    labeled_activities: list[tuple[str, dict]] = []
+    chain_heads: dict[str, str] = {}
 
     for outbox_path in sorted((export / "outbox").glob("*.jsonld")):
         outbox = load_json(outbox_path)
@@ -417,6 +566,7 @@ def verify_export(export: Path, thread: str | None, report: Report) -> dict:
             if activity.get("type") == "afp:Redacted":
                 continue  # a stub is a placeholder, not an activity — check_chain owns it
             label = f"{actor}[{index}] {activity.get('id', '<no id>')}"
+            labeled_activities.append((label, activity))
             reason = verify_proof(activity, keys)
             report.record(f"signature: {label}", reason is None, reason or "")
 
@@ -435,6 +585,22 @@ def verify_export(export: Path, thread: str | None, report: Report) -> dict:
             check_attachments(report, export, activity)
 
         check_chain(report, actor, activities)
+        head = chain_head_digest(activities)
+        if head is not None:
+            chain_heads[actor_url] = head
+
+    # ADR-0012 Decision 1/2: interval-aware key resolution, over every
+    # signature collected above — a no-op when this bundle carries no
+    # afp:keyHistory (Compatibility).
+    check_key_intervals(report, history, labeled_activities)
+
+    # ADR-0012 Decision 4: the content inventory — a no-op when this
+    # manifest carries no afp:members (Compatibility).
+    check_members(report, export, manifest)
+
+    # ADR-0012 Decision 3: the declared-duty obligations — a no-op when this
+    # manifest carries no afp:retentionDuty (Compatibility).
+    check_retention(report, export, manifest, all_activities, chain_heads)
 
     # Evidence in the bundle that no activity points at is unbound: it proves
     # nothing and cannot be checked, so it should not be travelling with the

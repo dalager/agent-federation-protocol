@@ -13,7 +13,7 @@
 
 import type { KeyObject } from "node:crypto";
 import type { JsonValue } from "../crypto/jcs.ts";
-import { loadOrCreateKeyPair, publicKeyFromMultibase, type KeyPair } from "../crypto/keys.ts";
+import { keyHistory, loadOrCreateKeyPair, publicKeyFromMultibase, type KeyHistoryEntry, type KeyPair } from "../crypto/keys.ts";
 import { attachProof, digestOf, verifyProof } from "../crypto/proof.ts";
 import { instantMillis } from "../crypto/time.ts";
 import type { Db } from "../store/db.ts";
@@ -70,6 +70,7 @@ interface LivenessValue {
 
 export class Hub {
   readonly hubId: string;
+  private readonly keyDir: string;
   readonly actorId: string;
   readonly outbox: Outbox;
   readonly queue: DeliveryQueue;
@@ -135,6 +136,7 @@ export class Hub {
 
     ensureHubSchema(this.db);
     this.crdt = new CRDTStore(this.db);
+    this.keyDir = deps.keyDir;
     this.key = loadOrCreateKeyPair(deps.keyDir, `hub-${deps.hubId}`, this.actorId);
     this.outbox = new Outbox(this.db);
     this.queue = new DeliveryQueue(this.db, deps.maxDeliveryAttempts, deps.backoffBaseMs);
@@ -202,6 +204,16 @@ export class Hub {
 
   actorDocument(): ActorDocument {
     return hubActor(this.origin, this.hubId, this.key);
+  }
+
+  /**
+   * ADR-0012 Decision 1: a hub signs its own outbox, so its keys are among the
+   * keys that signed things in an export — and a history that skipped them
+   * would leave the hub's chain resolvable only against its current document,
+   * which is the gap this ADR closes for everyone else.
+   */
+  keyHistory(): KeyHistoryEntry[] {
+    return keyHistory(this.keyDir, `hub-${this.hubId}`, this.actorId);
   }
 
   members(): string[] {
