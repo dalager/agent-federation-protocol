@@ -27,7 +27,7 @@ the declaration. Never assumed public.
 |---|---|---|
 | `public` | Anyone, unauthenticated | Actor documents, capability advertisements, shadow Notes about non-sensitive events |
 | `hub` | Instances holding an active FederationAgreement **whose grants admit that hub**, and their enrolled agents | Hub-scoped CRDT deltas, Announced Tasks, Bids, Votes, DecisionRecords |
-| `parties` | Only actors named in `to`/`cc` (plus their operating instances) | Direct `Offer{Task}` / `Result` between two agents — payload and attachments |
+| `parties` | Only actors named in `to`/`cc` — an instance actor qualifies when named itself | Direct `Offer{Task}` / `Result` between two agents — payload and attachments |
 | `internal` | Only the originating instance | Records an instance keeps for its own audit but does not federate |
 
 **Actor documents and roster entries are necessarily `public`** — signature verification
@@ -46,27 +46,20 @@ stranger, so probing yields nothing).
 This is the same mechanism Mastodon calls *authorized fetch*; AFP makes it mandatory for
 every class above `public`.
 
-> **Specified, not yet built.** The reference implementation enforces only the *closed*
-> half of this rule: `ap/server.ts` serves activities and artifacts whose class is
-> `public` and returns `404` for everything else, to everyone, without reading a
-> signature on the request. No `GET` path verifies an HTTP Signature or runs the two-tier
-> gate, and `grantAdmits` — the admission logic that would decide these cases — is
-> reached only by the `afp:AuditGrant` flow.
+> **Built for the P4 shape** ([ADR-0013](adr/0013-authorized-fetch.md)). A `GET` for a
+> non-`public` resource now resolves the requester from its signature, runs the same
+> deny-list and agreement stages the inbox runs, and decides by class: `public` to
+> anyone including the unsigned; `hub` to an enrolled agent of an operator whose
+> agreement grants that hub; `parties` to an agent the activity names; `internal` to
+> nobody, ever, including a grant holder. An unsigned request is not an error — it is
+> anonymous, and anonymous still sees exactly what it saw before, which is how a server
+> with no gate configured stays byte-identical to the old one.
 >
-> So a federated peer that *is* entitled to a `parties` or `hub` activity is refused
-> exactly as a stranger is. That satisfies P4's gate check (which asks that a non-named
-> peer get `404` rather than `403`) while leaving the other half of the mechanism —
-> admitting the peer who *should* be served — unimplemented. The full record travels by
-> export today, under the operator's control, which is why nothing in the built phases
-> has needed the open half yet.
->
-> Stated here rather than left as a pleasant assumption: an implementer reading the
-> paragraph above would otherwise conclude that a signed `GET` from an agreed instance
-> fetches a hub-visibility activity, and it does not.
->
-> The mechanism is designed in [ADR-0013](adr/0013-authorized-fetch.md) — one gate for
-> reads and writes, admission by class, and an explicit boundary on what the record can
-> ever prove about who read what.
+> Two limits worth knowing rather than discovering. Enrollment is answerable only for
+> hubs **this instance hosts**: `afp:MembershipProof` does not exist yet, so a hub
+> someone else hosts is P5's problem. And `parties` admits the agent the addressing
+> *names* — being the operator of a named agent is not admission, because at P4 that
+> activity was already delivered to that operator anyway.
 
 ### The auditor role
 
@@ -77,13 +70,14 @@ granting instance's own record, so *the audit itself is auditable*. A grant neve
 `internal`, and it never crosses to another operator's data — each operator grants for
 their own.
 
-> **Also specified, not yet built.** A grant can be issued, recorded and expired today,
-> and it opens nothing: `grantAdmits` — the function that decides whether a grant covers
-> a request — has no caller, because nothing above `public` is ever served (above). No
-> fetch is logged, for the same reason: there are no admitted fetches to log. Both halves
-> land together in [ADR-0013](adr/0013-authorized-fetch.md) A5, and the recorded fetch is
-> the *only* read that ADR logs — see 04 § What the record does not answer for why the
-> others deliberately leave no trace.
+> **Wired, and bounded by what enables it** ([ADR-0013](adr/0013-authorized-fetch.md)
+> A5). `grantAdmits` now has a caller: a live grant widens which classes its named
+> auditor may read, after the deny-list and never past it, and never to `internal`. A
+> served fetch admitted by a grant is reported to the host so it can be recorded — the
+> only read this design logs, and the reason is in 04 § What the record does not answer.
+> What a deployment must still do is *supply* the grants and record the callback: an
+> instance that hands the gate an empty grant list has an auditor role that opens
+> nothing, exactly as before.
 
 > **Confidentiality is not secrecy from the operator.** Every class is readable by the
 > instance hosting the actor. AFP protects data *between* operators and from the public;

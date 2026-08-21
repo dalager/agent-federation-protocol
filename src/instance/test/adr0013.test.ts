@@ -156,6 +156,31 @@ describe("ADR-0013 gate: a grant widens entitlement, and never past a refusal", 
     g.instance.close();
   });
 
+  it("`parties` admits the agent the activity names, and only what it names", async () => {
+    // The positive control for the addressing predicate — without it the
+    // refusal cases below could pass because `parties` never admits anyone.
+    // Also pins the narrowing recorded in Decision 3: being the *operator of*
+    // a named agent is not admission, because the addressing does not say it.
+    const g = signedGate();
+    const auth = await authorizeRead(g.deps, { path: g.path, headers: g.headers });
+    assert.notEqual(auth.requester, null);
+    const operator = auth.requester!.operatedBy;
+
+    assert.equal(auth.admits(activity("parties", { to: [g.agentId] })), true, "named directly");
+    assert.equal(auth.admits(activity("parties", { cc: [g.agentId] })), true, "cc counts as named");
+    assert.equal(
+      auth.admits(activity("parties", { to: [operator] })),
+      false,
+      "addressed to the operator, not to this agent — the agent is not the instance",
+    );
+    assert.equal(
+      auth.admits(activity("parties", { to: ["https://elsewhere.example/agents/x"] })),
+      false,
+      "somebody else's mail",
+    );
+    g.instance.close();
+  });
+
   it("the same requester, not deny-listed, is admitted to its hub", async () => {
     // The positive control: without it, the case above could pass for any
     // reason at all — a broken signature, a missing agreement, a typo in the

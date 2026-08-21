@@ -217,18 +217,33 @@ async function main(): Promise<void> {
       const actorId = String(instance.instanceDocument().id);
       const federation = new Federation(instance.db, actorId, () => instance.clock.now());
 
+      // ADR-0013: the read half of the same gate. Without this the server
+      // would serve `public` and 404 everything else to everyone — the
+      // mechanism would exist and be reachable by nobody, which is the
+      // "specified but not built" failure one layer down.
       const server = createHttpServer(instance, {
         inbox: {
           federation,
           receive: (activity) => instance.receiveAdmitted(activity),
           fetchDocument: fetchActorDocument,
         },
+        read: {
+          fetchDocument: fetchActorDocument,
+          isDenylisted: (who) => federation.isDenylisted(who),
+          activeAgreementsWith: (counterparty, at) => federation.activeAgreementsWith(counterparty, at),
+          // Enrollment is answerable only for hubs this instance hosts
+          // (ADR-0013 Decision 3). `serve` runs no hub, so no `hub`-class
+          // activity is admitted here — a stricter answer than a wrong one.
+          roleOf: () => null,
+          grants: () => [],
+          now: () => instance.clock.now(),
+        },
       });
       server.listen(config.httpPort, () => {
         console.log(`AFP instance on http://localhost:${config.httpPort}  (origin: ${config.origin})`);
         console.log("  GET  /actor  /roster  /agents/:name  /agents/:name/outbox");
         console.log("  POST /actor/inbox  /agents/:name/inbox   (HTTP Signature + agreement gate)");
-        console.log("  everything above `public` returns 404 to an unauthenticated fetch");
+        console.log("  GET  above `public`: signed + gated (ADR-0013); unsigned sees `public` only, 404 otherwise");
       });
       break;
     }

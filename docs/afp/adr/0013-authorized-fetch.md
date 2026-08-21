@@ -113,7 +113,7 @@ becomes unverifiable in one move.
 |---|---|
 | `public` | Always. No signature required, none consulted. |
 | `hub` | The requesting instance holds an **active agreement whose grants admit that hub**, and the requesting agent is **enrolled in that hub** — any role, including `observer`; reading is what an observer is for. |
-| `parties` | The requesting agent is **named in the activity's `to`/`cc`**, or is the **operating instance of a named actor** (ADR-0005: an instance may read what its own agent was sent). |
+| `parties` | The requesting agent is **named in the activity's `to`/`cc`** — or is an **instance actor that is itself named** there. See the narrowing below: "the operating instance of a named agent" is deliberately *not* admitted. |
 | `internal` | **Never.** Not to a peer, not to an agreement holder, not under a grant. |
 
 Two precisions the code forces, and they are the difference between a predicate and a
@@ -127,6 +127,19 @@ wish:
   establishes that we speak; being named in `to`/`cc` establishes that this was sent to
   you. Inventing a `"read"` grant type to express that would add a thing to configure that
   the activity already says.
+- **`parties` admits only what the addressing says outright.** An earlier draft of the
+  row above read "or is the operating instance of a named actor", citing ADR-0005's
+  principle that an instance may read what its own agent was sent. Implemented literally,
+  that means resolving the operator of *every* addressee — a document fetch per `to`/`cc`
+  entry, on every read, to answer a question the activity does not state. The narrowing is
+  not just a concession to a synchronous predicate: at P4 an activity addressed to
+  someone's agent was **already delivered to that operator**, so fetching it back is
+  redundant, and the case that is not redundant — an instance actor addressed directly —
+  is exactly the one the addressing already names. So the predicate reads what is written
+  and refuses the rest, which is Decision 7's closed-by-default applied where it costs
+  nothing. If a future flow genuinely needs the wider reading, it needs a way to answer
+  "who operates this actor" without a fetch, and that is a dependency to add deliberately
+  rather than a predicate to loosen.
 - **Enrollment is answerable here only for hubs this instance hosts.** `Hub.roleOf` reads
   local hub state, and it answers correctly for *foreign* agents too, because enrolling a
   foreign agent is already a recorded act gated by `afp:operatedBy` (ADR-0005). What it
