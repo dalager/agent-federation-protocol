@@ -87,7 +87,12 @@ export function offerTask(envelope: Envelope, task: TaskSpec): { [key: string]: 
   // ADR-0011 Decision 4: outside buildPinSet on purpose — prehistory, not a pin.
   if (task.priorThread) object["afp:priorThread"] = task.priorThread;
 
-  return { ...base(envelope, "Offer"), object };
+  // AS2 Offer means "offering object *to target*" (Vocab §3.1); the party
+  // being offered the task is named as `target`, not only as an addressee
+  // (ADR-0017 Decision 6, closing critique finding 1.6).
+  const target: JsonValue = envelope.to.length === 1 ? envelope.to[0] : [...envelope.to];
+
+  return { ...base(envelope, "Offer"), ...(envelope.to.length > 0 ? { target } : {}), object };
 }
 
 export function acceptTask(

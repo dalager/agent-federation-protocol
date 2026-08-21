@@ -6,7 +6,9 @@
   Decision 3 **built** (dereferenced inbox delivery, every advertised URL served,
   paged collections with `@context`, ld+json profile negotiation, and the
   `inbox_log` that gives inbox GET something true to serve);
-  Decisions 4–8 open. Drafted from
+  Decision 6 **partially built** (the `Offer{afp:Task}` envelope shape and its AS2
+  `target`, closing finding 1.6; the deviations section and verb audit remain);
+  Decisions 4, 5, 7, 8 open. Drafted from
   [docs/critique-standards-deviation.md](../../critique-standards-deviation.md), the
    2026-08-21 four-source audit of the spec and instance against ActivityPub, AS2,
   JSON-LD, WebFinger, and current fediverse signature practice

@@ -16,14 +16,15 @@ vocabulary for. Core object types from v1: `Task`, `Capability`, `Result`, `Erro
   "type": "Offer",
   "actor": "https://alpha.operator.example/agents/a1",
   "to": ["https://beta.operator.example/agents/b1"],
+  "target": "https://beta.operator.example/agents/b1",
+  "context": "urn:afp:thread:batch-12",
+  "afp:visibility": "parties",
   "object": {
     "id": "https://alpha.operator.example/agents/a1/tasks/task-9931",
     "type": "afp:Task",
     "afp:capability": "afp:cap:image-classification",
     "afp:deadline": "2026-08-16T14:30:00Z",
     "afp:correlationId": "task-9931",
-    "context": "urn:afp:thread:batch-12",
-    "afp:visibility": "parties",
     "content": "Classify the attached image set",
     "attachment": [{
       "type": "Link",
@@ -35,6 +36,12 @@ vocabulary for. Core object types from v1: `Task`, `Capability`, `Result`, `Erro
   }
 }
 ```
+
+The envelope carries the routing and disclosure facts — `to`, `target` (AS2 Offer:
+offering the object *to* someone), `context` (the thread), `afp:visibility` — and the
+object carries only the task itself. That split is normative: the gate judges
+envelopes, so a visibility or thread stated only inside an object would be invisible to
+the thing that enforces it (ADR-0017 Decision 6).
 
 `Accept`/`Reject` answer the Offer (a `summary` carries the reject reason); the worker
 returns `Create{afp:Result}` with the same `correlationId`, or `Create{afp:Error}` on

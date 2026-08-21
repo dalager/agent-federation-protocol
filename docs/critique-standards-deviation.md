@@ -91,7 +91,13 @@ delivery log (`inbox_log`) to its owner — the instance's own signature — and
 
 Actor documents publish `inbox`/`outbox` for the instance and hub actors, but the server routes neither `GET /actor/outbox`, `GET /hubs/:id/outbox`, nor any `GET .../inbox` (`ap/server.ts:152-266`). AP §4.1 requires actors' inbox/outbox to be dereferenceable OrderedCollections. Additionally, the one outbox that *is* served (`/agents/:name/outbox`) lacks `@context`, has no paging (AP §5.1 recommends paged collections), and its `totalItems` reflects the post-filter count rather than the collection size (`ap/server.ts:204-209`).
 
-### 1.6 Doc/code shape divergence on `Offer{afp:Task}` — `status: open`
+### 1.6 Doc/code shape divergence on `Offer{afp:Task}` — `status: fixed-spec` + `fixed-code`
+
+**Resolution (2026-08-21, ADR-0017 Decision 6, envelope shape):** the spec example now
+puts `afp:visibility` and `context` on the activity envelope, matching the code, with
+normative prose for why (the gate judges envelopes). `Offer` additionally gains its AS2
+`target` — in the example and in `offerTask` (single recipient as a string, fan-out as
+an array). Original finding follows.
 
 The spec example puts `afp:visibility` and `context` on the **object** (`03-coordination.md:12-37`); the code puts both on the **activity envelope** (`ap/activities.ts:39-40`).
 
