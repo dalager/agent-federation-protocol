@@ -129,6 +129,12 @@ omission, not a silent hole. An undeclared gap remains exactly what it is today 
 tampering. The line this draws is the whole point of 29b: **discretion is declared;
 deletion is detected.**
 
+*(Extended by [ADR-0012](0012-the-long-horizon.md): the manifest becomes a signed document
+and gains `afp:keyHistory`, `afp:members`, and — where a deployment declares one —
+`afp:retentionDuty` and `afp:anchors`. This ADR specified how an export is *scoped* without
+ever stating what a bundle *contains*; `afp:members` closes that, and the key history keeps
+a scoped export verifiable after the keys that signed it have been rotated away.)*
+
 ## Options considered
 
 | Option | Rejected because |

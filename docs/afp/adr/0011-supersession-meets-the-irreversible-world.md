@@ -14,7 +14,7 @@
   (the pin point Decision 1 writes into — **built**, so this ADR extends a live mechanism
   rather than assuming a proposed one; Decision 3 also settles the synthesizer question
   ADR-0010 deferred here)
-- **Driven by:** [scenario 09 / campaign 6](../scenarios/README.md#campaign-6--open),
+- **Driven by:** [scenario 09 / campaign 6](../scenarios/README.md#campaign-6--v318v320-adr-0010-adr-0011-adr-0012),
   findings 38 and 39
 
 ## Context

@@ -128,7 +128,7 @@ two folders are one command. **Campaign closed, 7 for 7.**
 | 29b | A scoped export and a tampered one share a signature — lawful redaction gaps a `prevActivity` chain exactly as deletion does | A record-level redaction mechanism (digest-only stubs keeping the chain linkable), decided as spec, not patched in the verifier |
 | 30 | Neither ingestion duty names the federated boundary as its site — 04's untrusted-result sandbox and finding 19's port summary both apply to a subcontractor's Result, and neither says so | One paragraph siting both duties at the boundary, before "boundary-ready" gets read as "trust the attachment" |
 
-### Campaign 6 — open
+### Campaign 6 → v3.18–v3.20 (ADR-0010, ADR-0011, ADR-0012)
 
 Twelve findings from [scenario 09](09-the-screening-sidecar.md), the first scenario to
 deploy the solo profile *inside* another system's actuation boundary and the first
@@ -156,8 +156,12 @@ sequential-thread ordering rule, an unconditional outcome check that would have 
 every governance vote, and the leg partition's scope). [ADR-0011](../adr/0011-supersession-meets-the-irreversible-world.md) is **Accepted and
 built** too — findings 38 and 39 closed, with declared irreversibility, the `annotate`
 disposition, the panel delta, and `afp:priorThread`; its build turned ADR-0007's own gate
-red, which was the requirement working rather than a regression. ADR-0012 remains Proposed
-and unbuilt.
+red, which was the requirement working rather than a regression.
+[ADR-0012](../adr/0012-the-long-horizon.md) is **Accepted and built** as well — key
+history in a now-signed manifest, rotation distinguished from revocation, declared
+retention duties, and the bundle's content inventory with CRDT state stated to be outside
+it. **Campaign 6 is closed**: all twelve findings resolved, three ADRs built and swept
+into the spec body.
 
 | # | Finding | Candidate |
 |---|---|---|

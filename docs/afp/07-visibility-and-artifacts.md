@@ -75,7 +75,11 @@ read. Across operators that assumption fails.
   class of the activity that referenced them.
 - **Retention** — the serving instance SHOULD keep artifacts at least as long as the
   activities referencing them are federated; on expiry, the digest still proves what was
-  claimed even when bytes are gone.
+  claimed even when bytes are gone. That is the **federation floor, not a retention
+  policy** (ADR-0012): where a deployment declares an `afp:retentionDuty`, the *bytes* of
+  every artifact referenced by a retained activity MUST be kept for the declared horizon.
+  A digest proves what was claimed; it does not hand a data subject the document their
+  application consisted of, and a statutory horizon is a claim about the bytes.
 - **Externally-fetched evidence** — when an artifact is a copy of something obtained
   outside AFP (a fetched web page, a registry extract), the Link SHOULD additionally carry
   `afp:sourceUrl` and `afp:fetchedAt`, so evidence provenance doesn't stop at "the agent

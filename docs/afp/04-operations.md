@@ -301,7 +301,8 @@ An activity bearing a valid signature from a key with no authority over its acto
 ### Replay procedure
 
 1. **Resolve authority** from the signed roster and the actor documents: for each agent,
-   which key may sign for it.
+   which key may sign for it — and, where the manifest carries an `afp:keyHistory`, *which
+   key was valid when* (below).
 2. **Select** by `context`, ordering by `afp:seq` where present.
 3. **Verify each activity**: its signature, *and* that the signing key was authorized for
    its `actor` under the rule above.
@@ -315,6 +316,38 @@ An activity bearing a valid signature from a key with no authority over its acto
 A gap in any chain, a digest mismatch, an activity signed by a key with no authority over
 its actor, a rostered agent with no outbox, or a counted vote you cannot produce is a
 failed audit.
+
+### The manifest, and what a bundle contains (ADR-0012)
+
+An export's manifest is a **signed document**, not a note attached to one: it carries the
+export's self-description under the same `DataIntegrityProof` as everything else, so the
+one part of a bundle that used to be freely editable no longer is.
+
+- **`afp:keyHistory`** — every key that signed anything in the bundle, per actor, with its
+  validity interval and how it left service (`afp:retiredBy: "rotation" | "revocation"`).
+  A signature resolves against the key valid *at its `published` instant*, so a rotation
+  stops stranding the corpus signed before it. An absent `afp:validFrom` means unbounded
+  below — a first key's start was often never recorded, and inventing one would fail
+  exactly the old exports this exists to keep verifiable. Intervals bind per key: a
+  `verificationMethod` the history does not declare resolves from the actor documents as
+  it always has.
+- **`afp:members`** — every file the bundle contains, relative to its root. Checked both
+  ways: an undeclared file is something that travelled without being admitted to, a
+  declared-but-absent one is the hole ADR-0009 already names.
+- **`afp:retentionDuty`** and **`afp:anchors`** — a declared duty (horizon and basis) and
+  the external anchoring that backs it. Declaring the duty is what turns its obligations
+  on; a verifier cannot know from bytes whether a statute applies. Anchors are checked for
+  coherence — every anchored digest must be a chain head the bundle contains — and are
+  never dereferenced: the verifier reaches no network by design, so confirming the
+  timestamp itself is the auditor's step, not the replay's.
+
+What a bundle contains is now exhaustive: instance document, roster, per-actor outboxes
+(stubs included), hub outboxes, artifacts, received activities, manifest. **Hub CRDT state
+is a projection and is not exported** — which makes a design rule out of what 02 already
+implies: anything that must ever be disclosed, redacted, retained or replayed has to live
+in activities, because activities are the only thing the export, the stub machinery and
+the verifier can see. Subject content parked in application state sits where no audit view
+can lawfully cut.
 
 > **Found by building it.** Steps 1, 3 and 5 were absent from this procedure until a P1
 > implementation was checked against it: a `Result` re-signed with a *different agent's*

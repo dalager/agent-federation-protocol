@@ -297,7 +297,22 @@ keeps an *independent* verifier cheap — and an independent verifier is what ma
 claim worth anything. Documents carrying a proof include
 `https://w3id.org/security/data-integrity/v1` in their `@context`.
 
-**Key rotation:** publish the new key with a short overlap window; on compromise, rotate
-immediately, push an `Update` of the actor document, and treat the old `keyId` as revoked.
-Instance-custodied agents rotate centrally — one of the main operational arguments for that
-custody mode.
+**Key rotation — and why it is not revocation** (ADR-0012). Publish the new key with a
+short overlap window and push an `Update` of the actor document. What must *not* happen is
+the thing this section used to prescribe — treating the old `keyId` as revoked. Rotation
+and revocation are opposite claims about the past:
+
+- **Rotation archives.** The superseded key keeps its validity interval; everything it
+  signed while valid verifies forever. Retiring a key is not a statement that its
+  signatures were lies.
+- **Revocation cuts.** A compromised key's interval is terminated at the compromise
+  instant, and anything signed after that instant fails.
+
+Conflating them strands the corpus: `instance` custody means one key signs everything, so
+a single routine rotation would retroactively invalidate every activity that key ever
+signed, for a verifier resolving keys from the current — now rewritten — document. The
+actor document remains the source of *current* trust; an export's `afp:keyHistory`
+(04 § The manifest) is the source for *old* signatures, carrying each key's interval and
+`afp:retiredBy`. Instance-custodied agents rotate centrally — one of the main operational
+arguments for that custody mode, and the reason getting this distinction right matters
+more here than in a per-agent-key deployment.

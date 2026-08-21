@@ -11,7 +11,7 @@
   this generalizes), [ADR-0006](0006-checkable-actuation.md) (the action policy whose
   pin point this moves), [ADR-0007](0007-supersession.md) (dispositions run "under the
   same pinned policy" — so the pin must exist to run under)
-- **Driven by:** [scenario 09 / campaign 6](../scenarios/README.md#campaign-6--open),
+- **Driven by:** [scenario 09 / campaign 6](../scenarios/README.md#campaign-6--v318v320-adr-0010-adr-0011-adr-0012),
   findings 34, 35, 37 — the campaign's through-line
 
 ## Context

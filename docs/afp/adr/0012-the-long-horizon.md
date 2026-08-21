@@ -11,7 +11,7 @@
 - **Builds on:** [ADR-0001](0001-p1-stack.md) (the signatures that must keep
   verifying), [ADR-0009](0009-federated-replay.md) (the manifest and export format
   this ADR extends — and the content-inventory question it left implicit)
-- **Driven by:** [scenario 09 / campaign 6](../scenarios/README.md#campaign-6--open),
+- **Driven by:** [scenario 09 / campaign 6](../scenarios/README.md#campaign-6--v318v320-adr-0010-adr-0011-adr-0012),
   finding 40, and the sharp half of finding 32
 
 ## Context
