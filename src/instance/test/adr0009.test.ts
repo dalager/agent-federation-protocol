@@ -243,3 +243,38 @@ describe("ADR-0009 gate: two exports, one engagement", () => {
     }
   });
 });
+
+describe("ADR-0009: a scope covers the whole bundle, received bytes included", () => {
+  it("out-of-scope received activities are dropped, not shipped", async () => {
+    // Found by review: `exportBundle` stubbed its own outboxes by scope and
+    // shipped received.jsonld unfiltered — so the subject-scoped audit bundle
+    // (the deliverable 29b exists for) redacted the operator's activities on
+    // other clients' threads while handing over the counterparties' copies of
+    // those same threads verbatim. The stubs closed the front door; the back
+    // door was open.
+    const { testInstance } = await import("./helpers.ts");
+    const { exportBundle } = await import("../src/export.ts");
+    const { instance, config } = testInstance(["writer"], "afp:cap:assess");
+    const inThread = "urn:afp:thread:this-client";
+    const outThread = "urn:afp:thread:other-client";
+    instance.publish("writer", [], inThread, "parties", (envelope) =>
+      // any local activity, so the scoped thread is non-empty
+      ({ ...envelope, id: envelope.activityId, type: "Create", actor: envelope.actor, to: [], published: envelope.published, context: envelope.thread, "afp:visibility": "parties", object: { id: "urn:afp:result:x", type: "afp:Result", "afp:correlationId": "x", content: "ok", attributedTo: envelope.actor } }) as never,
+    );
+
+    const received = {
+      receivedActivities: () => [
+        { digest: "sha256:aaa", fromInstance: "https://bravo.example/actor", activity: { id: "urn:a:1", context: inThread } as never },
+        { digest: "sha256:bbb", fromInstance: "https://bravo.example/actor", activity: { id: "urn:a:2", context: outThread } as never },
+      ],
+    };
+    exportBundle(instance, config.exportDir, [], { threads: [inThread], omitActors: [] }, received);
+
+    const receivedOut = JSON.parse(readFileSync(join(config.exportDir, "received.jsonld"), "utf8"));
+    const ids = (receivedOut.orderedItems as { "afp:activity": { id: string } }[]).map((i) => i["afp:activity"].id);
+    assert.deepEqual(ids, ["urn:a:1"], "only the declared thread's received bytes ship");
+    const manifest = JSON.parse(readFileSync(join(config.exportDir, "MANIFEST.json"), "utf8"));
+    assert.ok((manifest["afp:members"] as string[]).includes("received.jsonld"));
+    instance.close();
+  });
+});

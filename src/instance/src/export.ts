@@ -189,6 +189,11 @@ export function exportBundle(
     ...instance.outbox.byActor(String(instance.instanceDocument().id)).map((e) => e.activity),
     ...instance.specs.flatMap((spec) => instance.outbox.byActor(instance.actorId(spec.name)).map((e) => e.activity)),
     ...hubs.flatMap((hub) => hub.outbox.byActor(hub.actorId).map((e) => e.activity)),
+    // Received bytes count as pin carriers too: a delegated thread's opening
+    // Offer is the counterparty's, and under today's thread grammar it shares
+    // the answer's fate — but the guard is written against the rule, not the
+    // grammar, so a future scope that could split them inherits the refusal.
+    ...(received?.receivedActivities().map((item) => item.activity) ?? []),
   ]);
 
   writeOutbox("instance", String(instance.instanceDocument().id));
@@ -229,7 +234,15 @@ export function exportBundle(
   // ADR-0009 Decision 3: what this instance received across the boundary,
   // verbatim — the bytes the joint replay checks against the sender's export.
   if (received) {
-    const items = received.receivedActivities();
+    // The same scope that stubs our own outboxes filters what we received:
+    // a subject-scoped bundle that redacted every local activity on another
+    // client's thread while shipping the counterparty's activities on that
+    // same thread verbatim would leak through the back door what the stubs
+    // closed at the front. Dropped rather than stubbed — received.jsonld is a
+    // flat evidence collection, not a chain, so an absence leaves no hole for
+    // the chain checks to misread, and ADR-0009's cross-check runs from
+    // present-received to the sender's bundle, never the reverse.
+    const items = received.receivedActivities().filter((item) => inScope(item.activity));
     if (items.length) {
       writeJson(join(dir, "received.jsonld"), {
         "@context": AFP_CONTEXTS,

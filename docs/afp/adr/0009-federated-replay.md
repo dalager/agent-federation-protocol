@@ -82,7 +82,15 @@ Two corollaries, both cheap and both load-bearing:
 ### 3. A received activity must be the same bytes its sender recorded
 
 For every cross-boundary activity present in domain A's bundle as received-from-B: it
-MUST resolve **by digest** to the same activity in B's export. A mismatch — same id,
+MUST resolve **by digest** to the same activity in B's export. Present-received is the
+direction of the obligation — and it is also the direction of the *scope*: A's scoped
+export ships only the received bytes on threads it declares, or the stubs that closed A's
+own activities on an out-of-scope thread would be undone by the counterparty's copies of
+that same thread walking out unredacted. Out-of-scope received bytes are dropped rather
+than stubbed — the collection is flat evidence, not a chain, so an absence leaves no hole
+for a chain check to misread. *(Stated 2026-08-21, after a review found `exportBundle`
+shipping received bytes unfiltered; this ADR had specified the scope for own outboxes and
+was silent on the other half of the bundle.)* A mismatch — same id,
 different bytes — is a named divergence finding against whichever copy fails its
 signature (or against both stories, when each verifies under its own domain's keys: the
 strongest possible evidence that one operator re-signed history, surfaced rather than
