@@ -70,11 +70,17 @@ Phase one currently reports failures per domain. It gains a **census**: how many
 each named family ran for each domain, so a reader can see that a bundle was actually
 examined rather than merely not-failing.
 
-This is the answer to the shape of hole ADR-0010 documented and campaign 7 found again: a
-thread whose governing pins resolve to nothing runs no pin checks, no synthesizer check and
-no sufficiency check, and reports nothing at all. Under one bundle that is a silence
-someone might notice. Under three it is invisible, because two clean bundles' checks fill
-the report.
+The shape of the problem is the one ADR-0010 hit and closed at source: a thread whose
+governing pins resolved to nothing ran no pin checks, no synthesizer check and no
+sufficiency check, and reported nothing at all. Under one bundle that is a silence someone
+might notice. Under three it is invisible, because two clean bundles' checks fill the
+report.
+
+That *particular* silence is now impossible — ADR-0010 Decision 5 names it. What this
+decision addresses is the class: every conditional check in the verifier has the same
+property, that failing to run and passing produce identical output, and the set of
+conditional checks has grown with every ADR since 0006. A census does not need to know
+which condition failed to make the absence legible.
 
 A census does not decide whether a zero is acceptable — some bundles legitimately contain
 no actuation at all. It makes the zero *visible*, which is the difference between a

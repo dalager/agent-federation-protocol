@@ -114,6 +114,13 @@ position:
   set, a visibility floor, an agreement's grants). The outbox is untouched — the same
   record can produce the full export tomorrow, and two exports of different scopes are
   two views that agree wherever they overlap, checkably.
+  *(Constrained by [ADR-0010](0010-pinning-without-an-auction.md) Decision 5: a scope may
+  not withhold a thread's task-bearing activity while disclosing an answer on that thread.
+  The pins an answer was judged under are frame rather than content, and every pin check is
+  conditional on their being resolvable — so redacting them fails nothing and silences all
+  of them. Only the thread-set scope is implemented today, and it cannot split a thread;
+  the constraint is stated for the visibility-floor and grant scopes named above, which
+  can.)*
 - **Monotonicity across stubs:** a stub carries no `published`, so the chain-wide
   non-decreasing check (ADR-0008) brackets across it — the first disclosed activity
   after a stub run must not precede the last disclosed one before it. The backstop

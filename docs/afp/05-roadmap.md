@@ -205,7 +205,9 @@ avoid and P4 never had to make: **the hub is somebody's server** — which settl
 proof of membership, what members do while the host is partitioned, and whose state the
 case file carries, as one question with four faces.
 
-Two of those findings were already known here before the scenario confirmed them: both are things a P5 plan will hit in its first
+Two of those findings were already known here before the scenario confirmed them — one is
+now closed, and is kept below with its resolution rather than deleted, because a blocker
+that quietly disappears teaches a later reader nothing: both are things a P5 plan will hit in its first
 week, and neither is visible from the phase table above.
 
 - **`afp:MembershipProof` exists in prose only.** P5's row promises `hub` visibility
@@ -214,13 +216,13 @@ week, and neither is visible from the phase table above.
   verify enrollment in a hub somebody else runs. Grep the implementation and the type does
   not appear. So P5 does not begin with hub reads; it begins with designing the proof that
   makes them decidable — who signs it, what it binds, and how it expires.
-- **A scoped export can silently disarm the pin checks.** [ADR-0010](adr/0010-pinning-without-an-auction.md)
-  names this in its open questions: redact a pin-bearing `Offer` under ADR-0009 and the
-  thread has no task activity left, so the governing pins resolve to nothing and every
-  actuation check no-ops — in exactly the subject-scoped audit bundle scenario 09 exists to
-  produce. It is documented and deliberately uncovered by any gate, because a test
-  asserting today's vacuous pass would encode the bug. It wants deciding before P5 adds
-  more redaction surface, not after.
+- ~~**A scoped export can silently disarm the pin checks.**~~ **Closed** —
+  [ADR-0010](adr/0010-pinning-without-an-auction.md) Decision 5, built at v3.23. Redacting
+  a pin-bearing `Offer` left the thread with no task activity, so the governing pins
+  resolved to nothing and every actuation check on it no-opped; the export now refuses to
+  emit such a bundle and replay names one that arrives from anywhere else. Closed before P5
+  widens the redaction surface, which was the whole reason for triaging it as its own track
+  rather than folding it into a P5 ADR.
 
 ## Open questions
 
