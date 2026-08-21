@@ -26,7 +26,7 @@ import { tmpdir } from "node:os";
 import { after, describe, it } from "node:test";
 
 import { createResult } from "../src/ap/activities.ts";
-import { rotateKeyPair, revokeKeyPair } from "../src/crypto/keys.ts";
+import { keyHistory, loadOrCreateKeyPair, revokeKeyPair, rotateKeyPair } from "../src/crypto/keys.ts";
 import { exportBundle } from "../src/export.ts";
 import { cleanupWorkspaces, runVerifier, testInstance } from "./helpers.ts";
 import { VERIFIER } from "./adr0010-fixtures.ts";
@@ -173,6 +173,42 @@ describe("ADR-0012 gate: an export outlives the key that signed it", () => {
     assert.doesNotMatch(legacy.result.output, /keys: .*signed by a key valid at its published instant/);
     assert.doesNotMatch(legacy.result.output, /bundle: every file present is declared in afp:members/);
 
+    instance.close();
+  });
+
+  it("a revocation survives its own recovery path — the record is never reborn", async () => {
+    // Found by review: `loadOrCreateKeyPair` claimed in a comment to refuse
+    // when history exists with no active key, and never checked. The failure
+    // was not an edge case — `rotateKeyPair` *called* loadOrCreate first, so
+    // the documented recovery after a compromise (rotate to mint a successor)
+    // was exactly what overwrote the revoked PEM and replaced its history
+    // entry with a bare one: a revoked key reborn as a fresh unbounded key
+    // under the same keyId, the compromise cut erased. Erasure in the key
+    // store, in the one flow an operator under incident pressure follows.
+    const { instance, config } = testInstance(["writer"], CAPABILITY);
+    const writer = instance.actorId("writer");
+    const original = instance.key("writer");
+    const compromisedAt = new Date("2026-08-20T12:00:00.000Z");
+    revokeKeyPair(config.keyDir, "writer", compromisedAt);
+
+    // The destructive path refuses instead of minting.
+    assert.throws(
+      () => loadOrCreateKeyPair(config.keyDir, "writer", writer),
+      /retired.*revocation.*rotateKeyPair/s,
+    );
+
+    // The sanctioned path appends — and touches nothing behind it.
+    const successor = rotateKeyPair(config.keyDir, "writer", writer, new Date("2026-08-20T12:05:00.000Z"));
+    assert.match(successor.keyId, /#ed25519-key-2$/);
+    const history = keyHistory(config.keyDir, "writer", writer);
+    assert.equal(history.length, 2);
+    assert.equal(history[0].retiredBy, "revocation", "the compromise cut survives the rotation");
+    assert.equal(history[0].validUntil, compromisedAt.toISOString(), "at the instant the revocation wrote");
+    assert.equal(
+      history[0].publicKeyMultibase,
+      original.publicKeyMultibase,
+      "the retired PEM is the original key, not a rebirth under its id",
+    );
     instance.close();
   });
 });

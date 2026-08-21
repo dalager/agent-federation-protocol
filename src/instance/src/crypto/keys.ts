@@ -216,9 +216,24 @@ export function loadOrCreateKeyPair(keyDir: string, name: string, controller: st
   const active = activeEntry(existing);
   if (active) return loadKeyPairAt(keyDir, name, controller, active);
 
-  // Nothing on disk yet (or every ordinal already retired, which only happens
-  // if effectiveIndex found real history — but no PEM at ordinal 1 means this
-  // is a genuinely fresh actor): mint ordinal 1.
+  // History with no active entry means every ordinal was retired — a
+  // revocation with no successor yet. Minting here would OVERWRITE the
+  // retired ordinal-1 PEM and replace its history entry with a bare one,
+  // erasing the very interval and `retiredBy` record ADR-0012 exists to
+  // preserve: a revoked key silently reborn as a fresh unbounded key under
+  // the same keyId. That is erasure in the key store, and the fix is a
+  // refusal — the successor comes from `rotateKeyPair`, which appends an
+  // ordinal instead of rewriting one. (Found by review: the previous code
+  // claimed this distinction in a comment and never checked it.)
+  if (existing.length > 0) {
+    throw new Error(
+      `no active key for ${name}: its last key was retired ` +
+        `(${existing.at(-1)?.retiredBy ?? "unknown"} at ${existing.at(-1)?.validUntil ?? "?"}) — ` +
+        `mint a successor with rotateKeyPair rather than re-creating ordinal 1`,
+    );
+  }
+
+  // Genuinely fresh actor: mint ordinal 1.
   const path = pemPath(keyDir, name, 1);
   mkdirSync(dirname(path), { recursive: true });
   const pair = generateKeyPairSync("ed25519");
@@ -247,11 +262,15 @@ export function rotateKeyPair(
   controller: string,
   at: Date = new Date(),
 ): KeyPair {
-  // Ensures ordinal 1 exists before rotating a brand-new actor.
-  loadOrCreateKeyPair(keyDir, name, controller);
+  // Ensures ordinal 1 exists before rotating a brand-new actor — but only a
+  // brand-new one. After a revocation there is history and no active key, and
+  // the old call to loadOrCreateKeyPair here would have re-minted ordinal 1
+  // destructively (see the refusal there); rotation is precisely the sanctioned
+  // successor path, so it appends the next ordinal whether or not a current
+  // key exists to retire.
+  if (effectiveIndex(keyDir, name).length === 0) loadOrCreateKeyPair(keyDir, name, controller);
   const entries = effectiveIndex(keyDir, name);
   const current = activeEntry(entries);
-  if (!current) throw new Error(`no active key to rotate for ${name}`);
 
   const retiredAt = at.toISOString();
   const nextOrdinal = Math.max(...entries.map((e) => e.ordinal)) + 1;
@@ -261,8 +280,11 @@ export function rotateKeyPair(
     mode: 0o600,
   });
 
+  // Close the current key's interval where one is still open; after a
+  // revocation the interval is already cut, and the cut stays exactly as the
+  // revocation wrote it.
   const nextEntries = entries.map((e) =>
-    e.ordinal === current.ordinal ? { ...e, validUntil: retiredAt, retiredBy: "rotation" as const } : e,
+    current && e.ordinal === current.ordinal ? { ...e, validUntil: retiredAt, retiredBy: "rotation" as const } : e,
   );
   const newEntry: KeyIndexEntry = { ordinal: nextOrdinal, validFrom: retiredAt };
   nextEntries.push(newEntry);
