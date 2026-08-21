@@ -203,6 +203,46 @@ async function main(): Promise<void> {
       break;
     }
 
+    case "p5": {
+      const { runP5Demo } = await import("./demoP5.ts");
+      const demo = await runP5Demo();
+      const shortAgent = (url: string): string => url.split("/").pop() ?? url;
+
+      console.log(`\nalpha  ${demo.alpha.origin}  (n-noc, n-telemetry) — hosts the bridge at /hubs/bridge/inbox`);
+      console.log(`bravo  ${demo.bravo.origin}  (s-noc)`);
+      console.log(`gamma  ${demo.gamma.origin}  (e-noc, e-watcher)\n`);
+
+      console.log(`the bridge seats ${demo.members.length}, foreign seats enrolled through the real inbox`);
+      console.log(`  observer: ${shortAgent(demo.observer)} — reads at hub visibility, never decides\n`);
+
+      console.log("the write door (ADR-0016 Decision 2):");
+      console.log(`  unenrolled agent, valid operator      ${demo.rogueStatus} {"error":"refused"}`);
+      console.log(`  same write, valid membership proof    ${demo.provenRogueStatus} — identical: the proof is a read credential`);
+      console.log(`  enrolled observer's vote              ${demo.observerVoteStatus} at the door, dead in the handler`);
+      console.log(`  member votes tallied                  ${demo.talliedVotes} (the observer's not among them)\n`);
+
+      console.log("afp:uncounted on the closing DecisionRecord:");
+      for (const [agent, status] of Object.entries(demo.uncounted)) {
+        console.log(`  ${shortAgent(agent).padEnd(12)} ${status}`);
+      }
+
+      console.log(`\nreplica convergence (Offer{afp:Digest} / Accept{afp:StateDeltas}, over sockets):`);
+      console.log(`  seats: ${demo.replicaSeats.before} bare -> ${demo.replicaSeats.afterPull} after one pull -> ${demo.replicaSeats.afterSecondPull} after a second (idempotent)`);
+      console.log(`  synced stores: ${demo.syncStores.join(", ")}`);
+      console.log(`  (liveness is absent by design — hub-generated, re-observed per replica)\n`);
+
+      console.log("the kill criterion — the hub's host dies mid-task:");
+      console.log(`  in-flight mesh delegation completed:  ${demo.meshCompleted} (the hub never sat on the payload path)`);
+      console.log(`  new write toward the dead hub:        fails to its caller (${demo.deadHubWriteError || "connection refused"})\n`);
+
+      console.log(`export:  alpha (with the bridge) — ${demo.exports.alpha.activities} activities -> ${demo.exports.alpha.dir}`);
+      console.log(`         bravo                   — ${demo.exports.bravo.activities} activities -> ${demo.exports.bravo.dir}`);
+      console.log(`         gamma                   — ${demo.exports.gamma.activities} activities -> ${demo.exports.gamma.dir}`);
+      console.log(`\nverify it:  python3 ../verifier/afp_verify.py export-p5/alpha export-p5/bravo export-p5/gamma --thread ${demo.incidentThread} --verbose\n`);
+      await demo.close();
+      break;
+    }
+
     case "export": {
       const config = loadConfig();
       const instance = new AfpInstance(config, agentRegistrations(config));
@@ -256,7 +296,7 @@ async function main(): Promise<void> {
     }
 
     default:
-      console.error(`unknown command: ${command}\nusage: cli.ts [demo|p2|p3|p4|export|serve]`);
+      console.error(`unknown command: ${command}\nusage: cli.ts [demo|p2|p3|p4|p5|export|serve]`);
       process.exit(1);
   }
 }

@@ -23,6 +23,7 @@ npm run demo:p2       # P2: 30 agents agree on the best policy (-> ./export-p2)
 npm run demo:p3       # P3: two auctions, coalition award, synthesis (-> ./export-p3)
 npm run demo:p3:llm   # the same auction, answers written by a real local model
 npm run demo:p4       # P4: three instances over real HTTP, one boundary (-> ./export-p4)
+npm run demo:p5       # P5: a shared hub with a real inbox, replica sync (-> ./export-p5)
 npm run gate          # the acceptance gate: P1's 11 checks + CRDT + hub + auction + boundary
 npm run serve         # the public HTTP surface + the federation inbox
 ```
@@ -208,6 +209,52 @@ silent deletion), and every cross-boundary activity was admitted by a named
 grant. `test/adr0009.test.ts` breaks each of these one at a time and asserts
 the verifier fails by name.
 
+## The P5 demo
+
+Three operators, one shared hub. Alpha hosts the `bridge` and serves it at a real
+inbox (`POST /hubs/bridge/inbox` — the same boundary implementation as every other
+inbox, ADR-0016 Decision 1); Bravo and Gamma enroll their agents across the boundary
+through it. Real HTTP, real signatures, real SQLite per operator (under `./data-p5/`).
+
+```
+the write door (ADR-0016 Decision 2):
+  unenrolled agent, valid operator      403 {"error":"refused"}
+  same write, valid membership proof    403 — identical: the proof is a read credential
+  enrolled observer's vote              202 at the door, dead in the handler
+replica convergence:  seats 0 bare -> 5 after one pull -> 5 after a second (idempotent)
+the kill criterion:   in-flight mesh work completes; a new hub write gets ECONNREFUSED
+```
+
+The story, in order:
+
+1. **The hub gets an inbox** — foreign enrollments and votes arrive as signed POSTs
+   through the P4 boundary, then meet one extra check: the write door. Enrollment is
+   admission, from the hub's own record; role is authority, enforced in the handlers
+   — which is why the observer's vote is admitted at the door and never tallied.
+2. **The proof stays a read credential** — a valid `afp:MembershipProof` on a write
+   changes nothing. It exists for a third party that cannot ask the hub; on a write,
+   the hub is the one being asked.
+3. **Replica sync carries activities** — Bravo's bare replacement bridge
+   (`replicaOf`) converges from nothing: `Offer{afp:Digest}` of per-store version
+   vectors, answered by `Accept{afp:StateDeltas}` carrying the signed activities that
+   moved the stores — governing activities for protocol stores, an explicit
+   `Update{afp:CRDTDelta}` for the demo's `app:backlog` — re-derived through the same
+   `receive`. A second pull is a no-op; liveness never syncs.
+4. **The kill criterion** — in-flight mesh work completes (payload runs member to
+   member), and a new write toward the dead hub fails to its caller — visible
+   degradation (ADR-0014 Decision 2), never a queue's silence.
+
+Three case files, one auditor command — the first joint replay whose counted votes
+genuinely crossed a boundary: the foreign votes are received bytes in the hub host's
+bundle, resolved from the thread pool and signature-verified in phase two against
+each sender's own bundle (ADR-0016's T8 amendment):
+
+```bash
+python3 ../verifier/afp_verify.py export-p5/alpha export-p5/bravo export-p5/gamma \
+    --thread urn:afp:thread:incident-9 --verbose
+# PASSED — 365 checks, no gaps
+```
+
 ## Using a running instance
 
 `npm run serve` starts the real HTTP surface — the same one the P4 demo runs
@@ -282,7 +329,9 @@ await instance.run(transport);   // your Create crosses; theirs activates the ro
 `src/demoP4.ts` is the working reference for the full wiring — operator setup
 (~40 lines), handshake, delegation, and the scoped export. Adapt it rather
 than reinventing it; `test/adr0008.test.ts` additionally exercises expiry,
-deny-listing, and the in-flight-work exception.
+deny-listing, and the in-flight-work exception. `src/demoP5.ts` extends the
+same wiring with a hosted hub (the `hubs` server option), the hub-inbox write
+path, and replica sync; `test/adr0016.test.ts` is its gate.
 
 Once an agreement is active, cross-boundary work is the ordinary P1 flow:
 publish an `Offer{afp:Task}` addressed to the counterparty's agent and run the
@@ -383,7 +432,7 @@ src/
                      the collection-level coverage assertion
   instance.ts        the adapter stack: signing, chain, gate, dedupe, dispatch
   export.ts          the bundle you hand to a third party — hub outboxes included
-  demo.ts, demoP2.ts, demoP3.ts, demoP4.ts, experimentP3.ts, cli.ts
+  demo.ts, demoP2.ts, demoP3.ts, demoP4.ts, demoP5.ts, experimentP3.ts, cli.ts
 test/gate.test.ts    the 11 P1 acceptance checks
 test/crdt.test.ts    P2: merge property tests (commutative/associative/idempotent)
 test/hub.test.ts     P2: enrollment, a full L0 round, lifecycle, and the

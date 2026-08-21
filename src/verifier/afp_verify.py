@@ -713,9 +713,13 @@ def verify_export(export: Path, thread: str | None, report: Report) -> dict:
     # ADR-0002 Decision 3 / 04 replay step 7. Exports with no DecisionRecord
     # (all of P1, and any P2 export without a closed vote) run none of this —
     # backward compatible by construction.
+    # ADR-0016: which pool entries are received bytes — a counted vote that
+    # resolves to one is signature-verified in phase two against its sender's
+    # bundle, never against this domain's key table (ADR-0015 N2's grain).
+    received_digests = {digest_of(a) for a in received_activities}
     for activity in all_activities:
         if afp_object(activity, "afp:DecisionRecord") is not None:
-            check_decision_record(report, activity, all_activities, keys, pool=thread_pool)
+            check_decision_record(report, activity, all_activities, keys, pool=thread_pool, received=received_digests)
 
         if activity.get("type") == "afp:Archive":
             check_archive_state(report, activity)

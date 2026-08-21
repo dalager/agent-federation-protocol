@@ -181,6 +181,7 @@ def check_decision_record(
     all_activities: list[dict],
     keys: dict[str, bytes],
     pool: list[dict] | None = None,
+    received: set[str] | None = None,
 ) -> None:
     decision = afp_object(decision_activity, "afp:DecisionRecord") or {}
     label = decision.get("id", "<no id>")
@@ -234,7 +235,12 @@ def check_decision_record(
     # The pinned set is the explicit voter list (02 "Snapshot-pinning"); the
     # weight map's keys are the fallback when a proposal omits it.
     pinned_voters = set(proposal.get("afp:voters", []) or declared_weights)
-    by_digest = {digest_of(a): a for a in all_activities}
+    # ADR-0016: counted votes resolve from the thread pool — own plus
+    # received — because with the hub's inbox live, a foreign member's vote
+    # reaches the hub host as received bytes (the same grain ADR-0015 N2
+    # ruled for declines). Phase two's received-check verifies those bytes
+    # against the sender's own bundle; nothing here is trusted more.
+    by_digest = {digest_of(a): a for a in (pool if pool is not None else all_activities)}
 
     # ADR-0004 Decision 1 — only member-role agents may ever be pinned into a
     # quorum snapshot; a requester or observer in afp:voters is a failure the
@@ -288,8 +294,15 @@ def check_decision_record(
 
         reason = verify_proof(vote_activity, keys)
         if reason is not None:
-            unsigned.append(f"{vote_hash[:24]}… ({reason})")
-            continue
+            # ADR-0016: a counted vote held as received bytes crossed the
+            # boundary to reach this hub, and its author's keys live in the
+            # author's bundle, not this one. Phase two's received-check
+            # verifies exactly those bytes against the sender — failing them
+            # here against the wrong key table would make every foreign vote
+            # unverifiable by construction. Own-bundle votes still fail here.
+            if received is None or vote_hash not in received:
+                unsigned.append(f"{vote_hash[:24]}… ({reason})")
+                continue
 
         voter = vote_activity.get("actor")
         if voter not in pinned_voters:

@@ -335,7 +335,22 @@ can be pulled until the hub can say which activity moved which store.
 | **T6** ✅ | Spec sweep, five amendments the draft's own sweep surfaced: (a) 02's "every mutation travels as `Update{afp:CRDTDelta}`" qualified to the two populations — explicit delta activities for application-defined stores, governing activities for protocol stores; (b) 02's anti-entropy section and 03's vocabulary table given the built meaning of `afp:StateDeltas`, and liveness's exclusion stated; (c) ADR-0002 Decision 5's "deltas as discrete signed activities" corrected where it was written; (d) 04's two-tier gate line narrowed so `MembershipProof` is the read path's, matching 07; (e) 04's and `federation.ts`'s gate order corrected to the executed one — **a pre-existing defect this ADR only found**, see below | `02-hubs-and-state.md`, `03-coordination.md`, `04-operations.md`, `05-roadmap.md`, `adr/0002`, `federation/federation.ts` | 3 |
 | **T7** ✅ | Gate, over real sockets, extending M6's three-operator harness: enrollments and votes reach the hub through its **real inbox**; an unenrolled foreign agent's write is refused opaquely; a member presenting a valid membership proof on a write is refused just the same; an enrolled **observer's** vote crosses the door and dies in the handler — admission and authority discriminated as two different refusals at two different layers; an application-defined store's `Update{afp:CRDTDelta}` syncs by the same exchange as a protocol store's governing activity — one path, two populations; a replica lagging by a known number of activities converges by digest exchange, and its converged state matches the leader's canonical hashes; the hub is killed mid-task and **new allocation stalls while in-flight work completes**; artifact bytes are shown never to traverse the hub | `test/adr0016.test.ts` (extending `adr0014-m6.test.ts`) | 3 |
 
-Nothing in T1–T5 adds a verifier check, per Decision 6. T7's assertions are over transport
+| **T8** ✅ | The P5 demo (`demo:p5`): the transport as a narrative, leaving three verifiable case files on disk — and the first N=3 joint replay whose counted votes genuinely crossed a boundary. Building it falsified one clause of Decision 6 (below) | `demoP5.ts`, `cli.ts`, `decision.py`, `afp_verify.py` | 3 |
+
+Nothing in T1–T5 adds a verifier check, per Decision 6.
+
+**Amendment (T8, same day): the transport did reach the verifier after all — not with
+a new check, but by widening an old one's pool.** Decision 6's claim that the exchange
+has no verifier surface holds; what it did not foresee is that the *hub inbox* changes
+what an existing check must resolve. With foreign votes arriving as received bytes, a
+DecisionRecord's `afp:countedVotes` resolves from the thread pool — own plus received —
+rather than own activities alone, which is ADR-0015 N2's ruling applied to votes one
+refusal earlier. A counted vote held as received bytes defers its signature to phase
+two's received-check against the sender's bundle (its author's keys live there, not
+here); an own-bundle vote still fails locally. Discrimination-verified: a tampered
+received vote passes phase one and fails phase two by name — `joint: received {id}
+matches the sender's record` — and the hub host's bundle alone still replays clean, the
+same stance ADR-0015 N1 takes on a sender's absence. T7's assertions are over transport
 behaviour and converged state, not over the record — and the one record-touching artifact
 of this ADR, the exchange activities themselves, is checked by the activity machinery it
 already rides.

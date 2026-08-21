@@ -52,6 +52,20 @@ that catches divergence, silent deletion, and two-story agreements by name. Stac
 [ADR-0008](docs/afp/adr/0008-p4-federation-stack.md),
 [ADR-0009](docs/afp/adr/0009-federated-replay.md).
 
+**P5 is built** — the shared hub. The hub becomes somebody's server with its own inbox:
+`POST /hubs/:id/inbox` is the same boundary implementation every foreign byte crosses,
+plus one write door — enrollment from the hub's own record, with `afp:MembershipProof`
+deliberately not consulted (a proof is for whoever cannot ask the hub; on a write, the
+hub is the one being asked). Members prove enrollment to third parties portably, degrade
+to the P4 mesh when the host partitions, and reconcile back on the record. Cross-instance
+CRDT sync carries the signed activities that moved the stores — never bare deltas — over
+`Offer{afp:Digest}` / `Accept{afp:StateDeltas}`, answered from a provenance table of ids.
+Kill the hub mid-task and new allocation stalls while in-flight work completes, because
+the hub never sat on the payload path. Stack:
+[ADR-0014](docs/afp/adr/0014-p5-shared-hub-stack.md),
+[ADR-0015](docs/afp/adr/0015-the-case-file-at-n-parties.md),
+[ADR-0016](docs/afp/adr/0016-p5-transport.md).
+
 | | |
 |---|---|
 | [`src/instance/`](src/instance/) | The instance — TypeScript on Node 22.5+, no dependencies, no build step |
@@ -63,6 +77,7 @@ npm run demo:offline   # P1: writer drafts, reviewer critiques, bundle exported
 npm run demo:p2        # P2: 30 agents agree on the best policy — DecisionRecord + export
 npm run demo:p3        # P3: two sealed auctions, a coalition award, a ratified Synthesis
 npm run demo:p4        # P4: three instances over real HTTP — handshake, probe, delegation, joint export
+npm run demo:p5        # P5: a shared hub with a real inbox — the write door, replica sync, the kill criterion
 npm run gate           # the acceptance gate: P1's 11 checks, CRDT property tests, hub, auction, boundary
 
 cd ../verifier
@@ -70,6 +85,7 @@ python3 afp_verify.py ../instance/export --thread urn:afp:thread:doc-1
 python3 afp_verify.py ../instance/export-p2 --thread urn:afp:thread:codebase-integrity
 python3 afp_verify.py ../instance/export-p3 --thread urn:afp:thread:q-88-migration-estimate
 python3 afp_verify.py ../instance/export-p4/alpha ../instance/export-p4/beta --verbose
+python3 afp_verify.py ../instance/export-p5/alpha ../instance/export-p5/bravo ../instance/export-p5/gamma --verbose
 ```
 
 The verifier is a deliberately independent second implementation in another language — a
