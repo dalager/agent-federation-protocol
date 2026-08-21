@@ -279,7 +279,7 @@
 
 <div class="page">
   <header class="hero">
-    <p class="eyebrow">Architecture Spec &middot; Multi-Operator Agent Federation &middot; Revision 3.24</p>
+    <p class="eyebrow">Architecture Spec &middot; Multi-Operator Agent Federation &middot; Revision 3.25</p>
     <h1>Agent Federation Protocol</h1>
     <p class="dek">Multiple operators, each running their own instance of agents, join forces on a common problem — federating through problem-scoped hubs over ActivityPub, the W3C protocol behind Mastodon. No central broker, consortium trust, no token economics.</p>
     <div class="callout">
@@ -1074,6 +1074,7 @@ sequenceDiagram
 }</code></pre>
         </div>
         <p>At L1 the DecisionRecord embeds or references the 2f+1 commit certificate; at L0 it <em>is</em> the closing artifact. Either way, <code>afp:countedVotes</code> — hashes of every counted signed vote — binds the outcome to its exact evidence set.</p>
+        <div class="note"><strong>And what it does not contain (ADR-0014):</strong> <code>afp:uncounted</code> accounts for the pinned voters no vote was counted from &mdash; <code>declined</code> where a recorded <code>Reject</code> of the proposal exists (participation without assent), <code>silent</code> where nothing arrived at all, which during a partition is not an abstention and must not read as one. Counted plus uncounted must partition the snapshot exactly, and every decline must be producible from the bundle. Alongside it, ADR-0014 gives the shared hub its membership proof (a portable, expiring, hub-signed enrollment statement), its degraded mode (mesh work rejoins via <code>afp:priorThread</code>), and an anchorable chain head.</div>
         <h3>Synthesis: answers that are not decisions</h3>
         <p><code>afp:DecisionRecord</code> answers <em>&ldquo;what did we decide&rdquo;</em> — a discrete outcome selected by votes. Some tasks instead produce <em>&ldquo;what do we know, and how sure are we&rdquo;</em>: an estimate, a forecast, an assessment, assembled from several agents' partial answers. Collapsing that into a single figure destroys the uncertainty and disagreement a requester most needs.</p>
         <p><code>afp:Synthesis</code> is the artifact for those. It is emitted by <strong>the synthesizer the record names</strong> — derived from the Award where an auction ran (&sect;9.1), or pinned as <code>afp:synthesizer</code> on the task-bearing activity where none did (ADR-0010) — and binds the answer to its inputs. Where the thread's governing pins include an <code>afp:actionPolicy</code>, the Synthesis MUST also carry <code>afp:category</code> — one of the policy's keys, with the reserved <code>afp:no-verdict</code> always available for the panel that could not answer. Answering short of the pinned <code>afp:answerSufficiency</code> is permitted only under that category, and only with the missing legs declared in <code>afp:absentInputs</code> — a partial answer is a stated one, never a quiet one. The activity that then acts on the answer hash-binds itself to it (<code>afp:actsOn</code>, <code>afp:action</code>) — naming either the Synthesis or, where a round ratified it, the <code>DecisionRecord</code> whose <code>afp:outcome</code> names it, resolved by the verifier in exactly one hop:</p>

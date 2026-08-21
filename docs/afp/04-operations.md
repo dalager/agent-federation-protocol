@@ -171,7 +171,10 @@ check it by recomputing the tally over the referenced votes:
 
 At L1 the DecisionRecord embeds or references the 2f+1 commit certificate; at L0 it *is*
 the closing artifact. Either way, `afp:countedVotes` (hashes of every counted signed vote)
-binds the outcome to its exact evidence set.
+binds the outcome to its exact evidence set — and `afp:uncounted` (ADR-0014) accounts for
+the pinned voters it does *not* contain, telling a recorded decline from silence, because
+a tally of two-of-three during a partition is a different decision from two-of-three with
+one refusal and a reader years later should not have to guess which.
 
 ### Synthesis: answers that are not decisions
 

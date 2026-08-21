@@ -216,7 +216,7 @@ week, and neither is visible from the phase table above.
   it against the hub's published key and requires the named agent to equal the requester
   it already authenticated. ADR-0013's `hub` predicate is widened from "a hub I host" to
   "a hub whose proof I can verify" — deny-list and agreement stages unchanged. P5's hub
-  reads are unblocked; what remains of ADR-0014 is Decisions 2–4.
+  reads are unblocked, and Decisions 2–4 followed the same day — what remains of ADR-0014 is M6, the full three-instance HTTP gate.
 - ~~**A scoped export can silently disarm the pin checks.**~~ **Closed** —
   [ADR-0010](adr/0010-pinning-without-an-auction.md) Decision 5, built at v3.23. Redacting
   a pin-bearing `Offer` left the thread with no task activity, so the governing pins
