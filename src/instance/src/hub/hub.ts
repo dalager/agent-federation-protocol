@@ -32,7 +32,7 @@ import {
 import { LWWRegister, ORMap, ORMapLWW, ORSet } from "./crdtAdapter.ts";
 import { voterWeights } from "./weights.ts";
 import { CRDTStore, type LWWState, type ORMapState, type ORSetState } from "../crdt/index.ts";
-import { ensureHubSchema, loadRound, saveRound, saveVoteReceipt, voteReceiptsFor, type RoundRow } from "./store.ts";
+import { ensureHubSchema, loadRound, roundByProposal, roundDeclinesFor, saveRound, saveRoundDecline, saveVoteReceipt, voteReceiptsFor, type RoundRow } from "./store.ts";
 import { Allocator } from "../allocation/allocator.ts";
 import { logAdmission } from "../allocation/store.ts";
 
@@ -230,6 +230,32 @@ export class Hub {
    * Returns null for the un-enrolled — a hub does not sign statements about
    * strangers, not even negative ones.
    */
+  /**
+   * ADR-0014 Decision 4: a member's Reject of an open round's proposal —
+   * recorded so the closing DecisionRecord can tell "declined" from "silent".
+   * Returns false when the Reject names no open round, so the dispatch can
+   * fall through to the bid-window decline path (03).
+   */
+  private onRoundDecline(activity: { [key: string]: JsonValue }): boolean {
+    const proposalId = String(activity.object ?? "");
+    const row = roundByProposal(this.db, proposalId);
+    if (!row || row.status !== "open") return false;
+    const actor = String(activity.actor ?? "");
+    if (!row.voters.includes(actor)) return false; // outside the pinned electorate — not this round's to record
+    saveRoundDecline(this.db, row.roundId, actor, digestOf(activity));
+    return true;
+  }
+
+  /**
+   * ADR-0014 Decision 3: the hub's chain head, exposed so a deployment can
+   * anchor it on a cadence via ADR-0012's carrier (`afp:anchors`). The hub's
+   * hash-chained outbox is the one cross-operator order no member's clock
+   * controls; this is the digest that pins it.
+   */
+  chainHead(): string | null {
+    return this.outbox.headDigest(this.actorId);
+  }
+
   membershipProof(agent: string, ttlMs = 15 * 60 * 1000): { [key: string]: JsonValue } | null {
     const role = this.roleOf(agent);
     if (role === null) return null;
@@ -359,7 +385,13 @@ export class Hub {
     // activities that reference no open auction of ours.
     if (type === "afp:bidCommit") return this.allocation.onCommit(activity);
     if (type === "afp:BidReveal") return this.allocation.onReveal(activity);
-    if (type === "Reject") return this.allocation.onDecline(activity);
+    if (type === "Reject") {
+      // A Reject may decline a round's proposal (ADR-0014 Decision 4) or an
+      // announced task's bid window (03) — the object decides, and the round
+      // path answers first because a proposal id is never a task id.
+      if (this.onRoundDecline(activity)) return;
+      return this.allocation.onDecline(activity);
+    }
     if (type === "Accept") return this.allocation.onAccept(activity);
     // Other inbound types are recorded by delivery alone — an inbox is a hint,
     // never an instruction.
@@ -686,6 +718,17 @@ export class Hub {
     const outcome = Object.entries(tally).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "abstain";
     const countedVotes = votes.map((vote) => vote.digest);
 
+    // ADR-0014 Decision 4: account for every pinned voter the tally did not
+    // hear from, and say which kind of not-hearing it was. A recorded Reject
+    // of the proposal is "declined" — participation without assent; nothing
+    // at all is "silent", which during a partition is not an abstention and
+    // must not read as one.
+    const heard = new Set(votes.map((vote) => vote.actor));
+    const declined = new Set(roundDeclinesFor(this.db, round));
+    const uncounted = row.voters
+      .filter((voter) => !heard.has(voter))
+      .map((agent) => ({ agent, status: (declined.has(agent) ? "declined" : "silent") as "declined" | "silent" }));
+
     const entry = this.emit(row.voters, row.thread, "hub", (envelope) =>
       decisionRecord(envelope, {
         recordId: `${this.actorId}/rounds/${round}/decision`,
@@ -696,6 +739,7 @@ export class Hub {
         countedVotes,
         weightTally: tally,
         priorQuorumSnapshot: options?.priorQuorumSnapshot,
+        uncounted,
       }),
     );
 

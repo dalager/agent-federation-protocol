@@ -1,8 +1,10 @@
 # ADR-0014 — The P5 shared-hub stack: the hub is somebody's server
 
-- **Status:** Proposed — **Decision 1 built** (M1–M2, 2026-08-21): the proof, its
-  verification, and the widened read predicate are live and gated. Decisions 2–4 remain
-  open
+- **Status:** Accepted, and **built** through M5 (2026-08-21): the proof and the widened
+  read predicate, the priorThread reconciliation edge, the hub's anchorable chain head,
+  and silent-vs-declined on the DecisionRecord — each gated with discriminating
+  mutations. M6, the full three-instance HTTP gate, remains open and is what P5's
+  integration demo owes
 - **Date:** 2026-08-21
 - **Applies to:** P5 — every deployment where more than one operator shares a hub, which
   is the first configuration where the hub stops being an implementation detail of one
@@ -122,6 +124,18 @@ Degrading to the mesh is not a lesser mode of the same thing — it loses the hu
 its shared state, and its quorum. Saying so is the point: an operator that knows it is
 running degraded behaves differently from one that thinks the bridge is quiet.
 
+**The reconciliation edge already exists, and that is the ruling.** Work done in the mesh
+happens on ordinary P4 threads; when the hub returns, the activity that carries the work
+back onto a hub thread names the mesh thread as **`afp:priorThread`** — ADR-0011
+Decision 4's property, doing exactly what it was built for. The mesh thread closes with a
+terminal outcome like any thread; the hub-side continuation opens with its prehistory
+followable; and the verifier's existing check (a named prior thread that is present must
+be closed and unretracted) applies unchanged. No new activity type, no merge protocol, no
+"rejoin" ceremony: the inherited constraint said P5 adds participants and never integrity
+machinery, and Decision 2 is the constraint holding — the off-hub stretch is visible in
+the record because it is an ordinary thread with an ordinary edge, not because anything
+new was invented to describe it.
+
 ### 3. The hub is the sequencing authority its members' clocks cannot be
 
 Cross-operator ordering claims SHOULD be made **relative to hub-observed order**, not to
@@ -133,6 +147,16 @@ mechanism rather than inventing a second one. ADR-0012 introduced anchoring for 
 duty; a shared hub has the same need for a different reason — its members must be able to
 show a stranger that the sequence they agree on was fixed before the dispute, not composed
 after it.
+
+**Hub-observed order is the hub's own hash-chained outbox** — a thing it already has.
+Every Announce it fanned out, every proposal, every DecisionRecord sits in one chain
+whose order no member controls, and "relative to hub-observed order" means citing those
+activities by digest, which the record already supports everywhere else. The hub exposes
+its **chain head** so a deployment can anchor it on a cadence; the anchor itself rides
+ADR-0012's existing carrier (`afp:anchors` in the manifest, `{actor, head, instant,
+anchorRef}`), and ADR-0012's existing check — every anchored digest is a chain head the
+bundle contains — applies to a hub's head with no new rule, because the hub's outbox is
+in the bundle like every other actor's.
 
 What this decision does **not** do is make the hub a timestamping authority for its
 members' own records. Each member's chain remains its own, self-asserted and self-signed.
@@ -152,6 +176,18 @@ Both are already implicit in the difference between `afp:countedVotes` and
 reconstruction is exactly the kind of inference this project turns into a field. A tally of
 two-of-three during a partition is a different decision from two-of-three with one refusal,
 and an operator reading it years later should not have to guess which.
+
+The shape on the record: **`afp:uncounted`** on the DecisionRecord — one entry per
+snapshot member from whom no vote was counted, `{agent, afp:status}` with status
+`"declined"` or `"silent"`. Declined means a recorded `Reject` of the round's proposal
+exists from that member — the same AS2 shape 03 already prescribes for declining an
+announced task, now meaning the same thing for a proposal: participation without assent.
+The writer emits the field whenever it closes a round, an **empty list included**, so a
+full turnout is distinguishable from a pre-ADR-0014 record that never accounted for
+anyone. Replay holds the field to its arithmetic: counted actors and uncounted agents
+MUST partition the pinned electorate exactly, and every `"declined"` MUST be backed by a
+present `Reject` — a decline the bundle cannot produce is the counted-vote-you-cannot-
+produce, one refusal earlier.
 
 Deliberately **not** decided here: whether a silent member should block the decision.
 That is quorum policy, which ADR-0002 put in the hub's hands, and a protocol rule would be
@@ -208,9 +244,9 @@ until a member can prove membership to a peer.
 |---|---|---|
 | **M1** ✅ | `afp:MembershipProof`: issuance at the hub, the signed shape, expiry | 1 |
 | **M2** ✅ | Verification at the serving instance; ADR-0013's `hub` predicate widened from locally-hosted to proof-bearing | 1 |
-| **M3** | Degraded mode: the mesh fallback and the recorded reconciliation on the hub's return | 2 |
-| **M4** | Hub-observed order; hub chain-head anchoring on a cadence (reusing ADR-0012's carrier) | 2 |
-| **M5** | Silent-vs-declined on the `DecisionRecord`; verifier check that the two are distinguishable and consistent with the snapshot | 2 |
+| **M3** ✅ | Degraded mode: the mesh fallback and the recorded reconciliation on the hub's return | 2 |
+| **M4** ✅ | Hub-observed order; hub chain-head anchoring on a cadence (reusing ADR-0012's carrier) | 2 |
+| **M5** ✅ | Silent-vs-declined on the `DecisionRecord`; verifier check that the two are distinguishable and consistent with the snapshot | 2 |
 | **M6** | Gate: three instances, one hub — a member reads a peer's hub activity under a proof; an expired proof is refused; the host partitions and the mesh carries the work; the reconciliation is visible on return; a round with one member silent records it as silent, not as an abstention | 3 |
 
 ## References

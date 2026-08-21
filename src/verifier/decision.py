@@ -323,6 +323,62 @@ def check_decision_record(
         + ", ".join(f"{voter} ({h[:24]}…)" for h, voter in outside),
     )
 
+    # ADR-0014 Decision 4 — afp:uncounted, where the record carries it. Two
+    # silences that used to look identical: a member that recorded a Reject of
+    # the proposal (declined — participation without assent) and one from whom
+    # nothing arrived at all (silent — which during a partition is not an
+    # abstention). The field is opt-in for compatibility: records closed
+    # before ADR-0014 never accounted for anyone and are checked as before.
+    uncounted = decision.get("afp:uncounted")
+    if isinstance(uncounted, list):
+        uncounted_agents = {
+            str(entry.get("agent"))
+            for entry in uncounted
+            if isinstance(entry, dict) and isinstance(entry.get("agent"), str)
+        }
+        overlap = counted_voters & uncounted_agents
+        partitioned = (
+            len(uncounted_agents) == len(uncounted)
+            and not overlap
+            and counted_voters | uncounted_agents == pinned_voters
+        )
+        report.record(
+            f"decision: {label} afp:uncounted partitions the pinned electorate",
+            partitioned,
+            "" if partitioned else
+            f"counted voters plus afp:uncounted must equal the pinned snapshot exactly — "
+            f"counted {sorted(counted_voters)!r}, uncounted {sorted(uncounted_agents)!r}, "
+            f"pinned {sorted(pinned_voters)!r}"
+            + (f", overlap {sorted(overlap)!r}" if overlap else "")
+            + " (ADR-0014)",
+        )
+
+        undeclined = []
+        for entry in uncounted:
+            if not isinstance(entry, dict) or entry.get("afp:status") != "declined":
+                continue
+            agent = str(entry.get("agent"))
+            proposal_id = None
+            for a in all_activities:
+                obj = afp_object(a, "afp:Proposal")
+                if obj is not None and obj.get("afp:round") == decision.get("afp:round"):
+                    proposal_id = obj.get("id")
+                    break
+            rejected = any(
+                a.get("type") == "Reject" and a.get("actor") == agent and a.get("object") == proposal_id
+                for a in all_activities
+            )
+            if not rejected:
+                undeclined.append(agent)
+        report.record(
+            f"decision: {label} declined members declined on the record",
+            not undeclined,
+            "" if not undeclined else
+            "afp:uncounted marks " + ", ".join(undeclined) + " as declined, but the bundle "
+            "holds no Reject of this round's proposal from them — a decline the record "
+            "cannot produce (ADR-0014)",
+        )
+
     # Check 1 — tally recomputation, over whatever votes survived checks 2/3.
     # A pinned voter with no counted vote abstains by omission, and its weight
     # lands under "abstain" (04's DecisionRecord example carries that key).

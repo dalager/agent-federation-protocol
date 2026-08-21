@@ -179,6 +179,13 @@ export interface DecisionRecordSpec {
    * indistinguishable on the record.
    */
   priorQuorumSnapshot?: string;
+  /**
+   * ADR-0014 Decision 4: the snapshot members from whom no vote was counted —
+   * `declined` where a recorded Reject of the proposal exists, `silent`
+   * otherwise. Emitted whenever supplied, an empty list included, so a full
+   * turnout is distinguishable from a record that never accounted for anyone.
+   */
+  uncounted?: readonly { agent: string; status: "declined" | "silent" }[];
 }
 
 /** `Create{afp:DecisionRecord}` — closes every round, L0 or L1 (04 § Decision records). */
@@ -195,6 +202,9 @@ export function decisionRecord(envelope: Envelope, spec: DecisionRecordSpec): { 
     attributedTo: envelope.actor,
   };
   if (spec.priorQuorumSnapshot) object["afp:priorQuorumSnapshot"] = spec.priorQuorumSnapshot;
+  if (spec.uncounted !== undefined) {
+    object["afp:uncounted"] = spec.uncounted.map((u) => ({ agent: u.agent, "afp:status": u.status }));
+  }
   return { ...base(envelope, "Create"), object };
 }
 

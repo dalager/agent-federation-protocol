@@ -36,6 +36,18 @@ CREATE TABLE IF NOT EXISTS hub_vote_receipts (
   value       TEXT NOT NULL,
   PRIMARY KEY (round_id, actor)
 );
+
+-- ADR-0014 Decision 4: a recorded Reject of a round's proposal — what lets a
+-- DecisionRecord tell "declined" from "silent" when it lists the snapshot
+-- members no vote was counted from. Kept apart from vote receipts on purpose:
+-- a decline is participation without assent, never a ballot, and closeRound
+-- must not count it as one.
+CREATE TABLE IF NOT EXISTS hub_round_declines (
+  round_id       TEXT NOT NULL,
+  actor          TEXT NOT NULL,
+  reject_digest  TEXT NOT NULL,
+  PRIMARY KEY (round_id, actor)
+);
 `;
 
 export function ensureHubSchema(db: Db): void {
@@ -115,4 +127,28 @@ export function voteReceiptsFor(db: Db, roundId: string): { actor: string; voteD
     voteDigest: String(row.vote_digest),
     value: String(row.value),
   }));
+}
+
+/** The open round a proposal belongs to — how a `Reject{proposal}` finds its round. */
+export function roundByProposal(db: Db, proposalId: string): RoundRow | null {
+  const row = db.prepare("SELECT round_id FROM hub_rounds WHERE proposal_id = ?").get(proposalId) as
+    | Record<string, unknown>
+    | undefined;
+  return row ? loadRound(db, String(row.round_id)) : null;
+}
+
+/** ADR-0014 Decision 4: record a member's Reject of a round's proposal. */
+export function saveRoundDecline(db: Db, roundId: string, actor: string, rejectDigest: string): void {
+  db.prepare(
+    `INSERT INTO hub_round_declines (round_id, actor, reject_digest)
+       VALUES (?, ?, ?)
+       ON CONFLICT (round_id, actor) DO NOTHING`,
+  ).run(roundId, actor, rejectDigest);
+}
+
+/** Actors who declined a round, for closeRound's afp:uncounted partition. */
+export function roundDeclinesFor(db: Db, roundId: string): string[] {
+  return (db.prepare("SELECT actor FROM hub_round_declines WHERE round_id = ?").all(roundId) as { actor: string }[]).map(
+    (row) => String(row.actor),
+  );
 }

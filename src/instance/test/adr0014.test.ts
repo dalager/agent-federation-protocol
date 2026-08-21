@@ -23,9 +23,12 @@ import type { JsonValue } from "../src/crypto/jcs.ts";
 import { attachProof } from "../src/crypto/proof.ts";
 import { signRequest } from "../src/federation/httpSig.ts";
 import { authorizeRead, type ReadGateDeps } from "../src/federation/readGate.ts";
-import { enroll } from "../src/hub/activities.ts";
+import { castVote, enroll } from "../src/hub/activities.ts";
 import { hubTransport } from "../src/hub/hub.ts";
-import { cleanupWorkspaces, testHub, testInstance } from "./helpers.ts";
+import { exportBundle } from "../src/export.ts";
+import { createResult } from "../src/ap/activities.ts";
+import { cleanupWorkspaces, mutateBundle, runVerifier, testHub, testInstance } from "./helpers.ts";
+import { VERIFIER } from "./adr0010-fixtures.ts";
 
 after(cleanupWorkspaces);
 
@@ -186,3 +189,139 @@ function signRequestAt(t: Awaited<ReturnType<typeof threeParty>>, at: Date) {
   const key = t.instance.key("a1");
   return signRequest("GET", t.path, "server.example", "", key.keyId, key.privateKey, at);
 }
+
+describe("ADR-0014 Decisions 2-4: the mesh edge, the hub's head, and the two silences", () => {
+  it("a round tells declined from silent, and replay holds it to the arithmetic", async () => {
+    const AGENTS = ["a1", "a2", "a3"] as const;
+    const { instance, config } = testInstance(AGENTS, CAPABILITY);
+    const { hub, hubKeys } = testHub(instance, AGENTS, "bridge");
+    const transport = hubTransport(hub, instance.localTransport(), (t) => instance.nameOf(t) !== null);
+    for (const name of AGENTS) {
+      instance.publishAsInstance([hub.actorId], "urn:afp:thread:enroll", "hub", (envelope) =>
+        enroll(envelope, { agent: instance.actorId(name), hub: hub.actorId, capabilities: [CAPABILITY], hubKey: hubKeys.get(name)!.keyId }),
+      );
+    }
+    await instance.run(transport);
+    const thread = "urn:afp:thread:round-1";
+
+    const proposal = hub.proposeRound({ round: "urn:afp:round:r1", thread, question: "sev-1?", options: ["yes", "no"] });
+    const proposalId = String((proposal.activity.object as Record<string, unknown>).id);
+    const snapshot = String((proposal.activity.object as Record<string, unknown>)["afp:quorumSnapshot"]);
+
+    // a1 votes; a2 declines on the record; a3 says nothing at all.
+    await hub.receive(
+      instance.publish("a1", [hub.actorId], thread, "hub", (envelope) =>
+        castVote(envelope, { voteId: `${envelope.actor}/votes/r1`, round: "urn:afp:round:r1", proposalHash: proposal.digest, quorumSnapshot: snapshot, value: "yes" }),
+      ).activity,
+    );
+    await hub.receive(
+      instance.publish("a2", [hub.actorId], thread, "hub", (envelope) =>
+        ({
+          "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+          id: envelope.activityId,
+          type: "Reject",
+          actor: envelope.actor,
+          to: [...envelope.to],
+          published: envelope.published,
+          context: envelope.thread,
+          "afp:visibility": envelope.visibility,
+          ...(envelope.prevActivity !== null ? { "afp:prevActivity": envelope.prevActivity } : {}),
+          object: proposalId,
+          summary: "cannot assent without our own telemetry",
+        }) as never,
+      ).activity,
+    );
+    const decision = hub.closeRound("urn:afp:round:r1");
+    const record = decision.activity.object as Record<string, unknown>;
+    const uncounted = record["afp:uncounted"] as { agent: string; "afp:status": string }[];
+    assert.equal(uncounted.length, 2);
+    const byAgent = Object.fromEntries(uncounted.map((u) => [u.agent, u["afp:status"]]));
+    assert.equal(byAgent[instance.actorId("a2")], "declined", "a recorded Reject is participation without assent");
+    assert.equal(byAgent[instance.actorId("a3")], "silent", "nothing at all is not an abstention");
+
+    // Terminal outcome, vouch the hub, export, verify.
+    instance.publish("a1", [], thread, "parties", (envelope) =>
+      createResult(envelope, { resultId: "urn:afp:result:r1", correlationId: "r1", content: "closed" }),
+    );
+    const { vouch } = await import("../src/ap/activities.ts");
+    instance.publishAsInstance([], "urn:afp:thread:roster", "public", (envelope) =>
+      vouch(envelope, { agent: hub.actorId, capabilities: ["afp:cap:hub"], keyCustody: "self" }),
+    );
+    const exported = exportBundle(instance, config.exportDir, [hub]);
+    const clean = runVerifier(VERIFIER, config.exportDir, thread, ["--verbose"]);
+    assert.equal(clean.code, 0, `verifier failed:\n${clean.output}`);
+    assert.match(clean.output, /decision: .*afp:uncounted partitions the pinned electorate/);
+    assert.match(clean.output, /decision: .*declined members declined on the record/);
+
+    // Mutation 1 — the decline the bundle cannot produce: strip a2's Reject.
+    const noReject = mutateBundle(VERIFIER, exported.dir, thread, "a2", (outbox) => {
+      outbox.orderedItems = outbox.orderedItems.filter((a) => a.type !== "Reject");
+    });
+    assert.notEqual(noReject.code, 0);
+    assert.match(noReject.output, /FAIL \] decision: .*declined members declined on the record/);
+
+    // Mutation 2 — the silent member quietly dropped from the accounting.
+    const droppedSilent = mutateBundle(VERIFIER, exported.dir, thread, "hub-bridge", (outbox) => {
+      for (const activity of outbox.orderedItems) {
+        const object = activity.object as Record<string, unknown> | undefined;
+        if (object?.type === "afp:DecisionRecord" && Array.isArray(object["afp:uncounted"])) {
+          object["afp:uncounted"] = (object["afp:uncounted"] as { "afp:status": string }[]).filter(
+            (u) => u["afp:status"] !== "silent",
+          );
+        }
+      }
+    });
+    assert.notEqual(droppedSilent.code, 0);
+    assert.match(droppedSilent.output, /FAIL \] decision: .*afp:uncounted partitions the pinned electorate/);
+
+    instance.close();
+  });
+
+  it("mesh work rejoins the hub through afp:priorThread — the edge that already existed", async () => {
+    // Decision 2's ruling in miniature: degraded-mode work is an ordinary P4
+    // thread, and the reconciliation on the hub's return is ADR-0011's
+    // priorThread edge, not new machinery.
+    const { instance, config } = testInstance(["a1", "a2"], CAPABILITY);
+    const mesh = "urn:afp:thread:mesh-during-partition";
+    instance.delegate({ from: "a1", to: "a2", capability: CAPABILITY, content: "carry on pairwise", thread: mesh, correlationId: "m1" });
+    instance.publish("a2", [], mesh, "parties", (envelope) =>
+      createResult(envelope, { resultId: "urn:afp:result:m1", correlationId: "m1", content: "done off-hub" }),
+    );
+    instance.delegate({
+      from: "a1", to: "a2", capability: CAPABILITY,
+      content: "reconcile: the mesh stretch, rejoining the bridge",
+      thread: "urn:afp:thread:bridge-resumed", correlationId: "m2",
+      priorThread: mesh,
+    });
+    instance.publish("a2", [], "urn:afp:thread:bridge-resumed", "parties", (envelope) =>
+      createResult(envelope, { resultId: "urn:afp:result:m2", correlationId: "m2", content: "rejoined" }),
+    );
+    exportBundle(instance, config.exportDir);
+    const clean = runVerifier(VERIFIER, config.exportDir, "urn:afp:thread:bridge-resumed", ["--verbose"]);
+    assert.equal(clean.code, 0, `verifier failed:\n${clean.output}`);
+    assert.match(clean.output, /afp:priorThread resolves to a closed, unretracted thread/);
+    instance.close();
+  });
+
+  it("the hub's chain head anchors like any actor's — ADR-0012's rule, no new rule", async () => {
+    const t = await threeParty();
+    assert.equal(t.hub.chainHead(), null, "a hub that never emitted has no head — receiving is not emitting");
+    // The head exists once the hub authors something of its own.
+    t.hub.proposeRound({ round: "urn:afp:round:anchor-me", thread: "urn:afp:thread:enroll", question: "q?", options: ["yes", "no"] });
+    const head = t.hub.chainHead();
+    assert.ok(head, "a hub that has emitted has a head to anchor");
+    const { vouch } = await import("../src/ap/activities.ts");
+    t.instance.publishAsInstance([], "urn:afp:thread:roster", "public", (envelope) =>
+      vouch(envelope, { agent: t.hub.actorId, capabilities: ["afp:cap:hub"], keyCustody: "self" }),
+    );
+    const config = (t.instance as unknown as { config: { exportDir: string } }).config;
+    exportBundle(t.instance, config.exportDir, [t.hub], undefined, undefined, {
+      retentionDuty: { horizon: "P5Y", basis: "test" },
+      anchors: [{ actor: t.hub.actorId, head: t.hub.chainHead()!, instant: NOW.toISOString(), anchorRef: "https://ts.example/1" }],
+    });
+    const clean = runVerifier(VERIFIER, config.exportDir, "urn:afp:thread:enroll", ["--verbose"]);
+    assert.equal(clean.code, 0, `verifier failed:\n${clean.output}`);
+    assert.match(clean.output, /retention: every anchor names a chain head this bundle contains/);
+    t.instance.close();
+  });
+});
