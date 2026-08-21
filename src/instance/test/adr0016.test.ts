@@ -282,7 +282,7 @@ describe("ADR-0016: the hub's inbox and cross-instance CRDT sync, over real sock
     // by its own explicit signed Update{afp:CRDTDelta}, through the same door.
     const backlogDelta = bravo.instance.publish("s-noc", [hub.actorId], incident, "hub", (envelope) =>
       ({
-        "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+        "@context": ["https://www.w3.org/ns/activitystreams", "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"],
         id: envelope.activityId,
         type: "Update",
         actor: envelope.actor,

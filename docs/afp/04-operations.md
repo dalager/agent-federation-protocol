@@ -13,7 +13,7 @@ can recompute it independently; `afp:computedBy` is a field, not a privileged ro
 
 ```json
 {
-  "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+  "@context": ["https://www.w3.org/ns/activitystreams", "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"],
   "id": "https://hub.consortium.example/summaries/2026-w33",
   "type": "afp:ContributionSummary",
   "afp:hub": "https://hub.consortium.example/actor",
@@ -162,7 +162,7 @@ check it by recomputing the tally over the referenced votes:
 
 ```json
 {
-  "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+  "@context": ["https://www.w3.org/ns/activitystreams", "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"],
   "id": "https://hub.local/rounds/round-42/decision",
   "type": "afp:DecisionRecord",
   "afp:hub": "https://hub.local/actor",

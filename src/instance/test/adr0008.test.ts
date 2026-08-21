@@ -142,7 +142,7 @@ describe("ADR-0008 gate: two instances, one boundary, over real HTTP", () => {
 
       // --- Mallory probes: validly signed, party to nothing.
       const probe = mallory.instance.publish("m-probe", [beta.instance.actorId("b-assessor")], "urn:afp:thread:probe", "parties", (envelope: Envelope) => ({
-        "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+        "@context": ["https://www.w3.org/ns/activitystreams", "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"],
         id: envelope.activityId,
         type: "Offer",
         actor: envelope.actor,
@@ -182,7 +182,7 @@ describe("ADR-0008 gate: two instances, one boundary, over real HTTP", () => {
 
       // --- Direct delegation: the P1 flow with a firewall in it.
       const offer = alpha.instance.publish("a-lead", [beta.instance.actorId("b-assessor")], "urn:afp:thread:sub-1", "parties", (envelope: Envelope) => ({
-        "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+        "@context": ["https://www.w3.org/ns/activitystreams", "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"],
         id: envelope.activityId,
         type: "Offer",
         actor: envelope.actor,
@@ -220,7 +220,7 @@ describe("ADR-0008 gate: two instances, one boundary, over real HTTP", () => {
       // --- Expiry stalls new work…
       clock.jumpTo(new Date(new Date(expires).getTime() + 1000).toISOString());
       const lateOffer = alpha.instance.publish("a-lead", [beta.instance.actorId("b-assessor")], "urn:afp:thread:sub-2", "parties", (envelope: Envelope) => ({
-        "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+        "@context": ["https://www.w3.org/ns/activitystreams", "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"],
         id: envelope.activityId,
         type: "Offer",
         actor: envelope.actor,

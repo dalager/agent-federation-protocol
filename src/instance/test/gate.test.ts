@@ -346,7 +346,7 @@ describe("P1 acceptance gate", () => {
       }
       assert.deepEqual(activity["@context"], [
         "https://www.w3.org/ns/activitystreams",
-        "https://afp.example/ns/v3",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
         "https://w3id.org/security/data-integrity/v1",
       ]);
       // A federated record would look identical; nothing may hint at transport,

@@ -223,7 +223,7 @@ describe("ADR-0014 M6: three operators, one hub, one partition", () => {
     const incident = "urn:afp:thread:incident-4471";
     gamma.instance.publish("e-noc", [], incident, "hub", (envelope) =>
       ({
-        "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+        "@context": ["https://www.w3.org/ns/activitystreams", "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"],
         id: envelope.activityId,
         type: "Create",
         actor: envelope.actor,
@@ -316,7 +316,7 @@ describe("ADR-0014 M6: three operators, one hub, one partition", () => {
     await hub.receive(
       alpha.instance.publish("n-telemetry", [hub.actorId], incident, "hub", (envelope) =>
         ({
-          "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+          "@context": ["https://www.w3.org/ns/activitystreams", "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"],
           id: envelope.activityId,
           type: "Reject",
           actor: envelope.actor,

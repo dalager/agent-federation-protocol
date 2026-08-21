@@ -217,7 +217,7 @@ describe("ADR-0014 Decisions 2-4: the mesh edge, the hub's head, and the two sil
     await hub.receive(
       instance.publish("a2", [hub.actorId], thread, "hub", (envelope) =>
         ({
-          "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+          "@context": ["https://www.w3.org/ns/activitystreams", "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"],
           id: envelope.activityId,
           type: "Reject",
           actor: envelope.actor,

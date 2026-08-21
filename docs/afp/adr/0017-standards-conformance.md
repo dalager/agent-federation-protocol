@@ -47,12 +47,14 @@ format without private knowledge. Every decision below is an instance of that te
 ### 1. A real, resolvable `@context` — one URL, one mapping, published
 
 The `afp:` context moves from `https://afp.example/ns/v3` to a real, operator-neutral
-URL that serves a JSON-LD context document (long-term: alongside a FEP, Decision 8;
-until then: this repository serves it and the spec pins its content). One canonical
-form, used everywhere:
+URL that serves a JSON-LD context document — chosen:
+`https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld`, served from this
+repository's `docs/ns/v3.jsonld` via GitHub Pages, with the spec pinning its content
+(long-term: alongside a FEP, Decision 8). One canonical form, used everywhere:
 
 ```json
-"@context": ["https://www.w3.org/ns/activitystreams", "<afp-context-url>"]
+"@context": ["https://www.w3.org/ns/activitystreams",
+             "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"]
 ```
 
 The context document defines the `afp` prefix and **every term AFP uses**, including

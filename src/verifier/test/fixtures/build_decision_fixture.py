@@ -39,7 +39,7 @@ CREATED = "2026-08-18T00:00:00.000Z"
 
 CONTEXT = [
     "https://www.w3.org/ns/activitystreams",
-    "https://afp.example/ns/v3",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
     "https://w3id.org/security/data-integrity/v1",
 ]
 

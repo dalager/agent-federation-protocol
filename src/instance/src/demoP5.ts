@@ -295,7 +295,7 @@ export async function runP5Demo(options: { rootDir?: string; exportRoot?: string
   // --- An application-defined store, moved by its own signed activity (Decision 3).
   const backlog = bravo.instance.publish("s-noc", [hub.actorId], incident, "hub", (envelope) =>
     ({
-      "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+      "@context": ["https://www.w3.org/ns/activitystreams", "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"],
       id: envelope.activityId,
       type: "Update",
       actor: envelope.actor,

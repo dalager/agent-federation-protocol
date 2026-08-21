@@ -171,7 +171,7 @@ describe("ADR-0015: the case file at N parties", () => {
     // Bravo's member declines — a genuinely foreign-signed Reject.
     const reject = bravo.instance.publish("s-noc", [hub.actorId], thread, "hub", (envelope) =>
       ({
-        "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+        "@context": ["https://www.w3.org/ns/activitystreams", "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"],
         id: envelope.activityId,
         type: "Reject",
         actor: envelope.actor,

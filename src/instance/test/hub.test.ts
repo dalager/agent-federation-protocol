@@ -390,7 +390,7 @@ describe("P2 hub: enrollment and an L0 weighted-quorum round", () => {
       closes: new Date(instance.clock.now().getTime() + 600_000).toISOString(),
     };
     const inboundAnnounce = instance.publish("a3", [hub.actorId], thread, "hub", (envelope: Envelope) => ({
-      "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+      "@context": ["https://www.w3.org/ns/activitystreams", "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"],
       id: envelope.activityId,
       type: "Announce",
       actor: envelope.actor,
@@ -421,7 +421,7 @@ describe("P2 hub: enrollment and an L0 weighted-quorum round", () => {
 
     // An observer's announce is rejected and audit-logged — never an auction.
     const observerAnnounce = instance.publish("a4", [hub.actorId], "urn:afp:thread:obs-ask", "hub", (envelope: Envelope) => ({
-      "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+      "@context": ["https://www.w3.org/ns/activitystreams", "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"],
       id: envelope.activityId,
       type: "Announce",
       actor: envelope.actor,
@@ -447,7 +447,7 @@ describe("P2 hub: enrollment and an L0 weighted-quorum round", () => {
 
     // Bid admission: a commit from a non-member role is rejected, audit-logged.
     const requesterCommit = instance.publish("a3", [hub.actorId], thread, "hub", (envelope: Envelope) => ({
-      "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+      "@context": ["https://www.w3.org/ns/activitystreams", "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"],
       id: envelope.activityId,
       type: "afp:bidCommit",
       actor: envelope.actor,
@@ -471,7 +471,7 @@ describe("P2 hub: enrollment and an L0 weighted-quorum round", () => {
 
     // The requester reports observed actuals onto its own thread → Settlement.
     const actualsReport = instance.publish("a3", [hub.actorId], thread, "hub", (envelope: Envelope) => ({
-      "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+      "@context": ["https://www.w3.org/ns/activitystreams", "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"],
       id: envelope.activityId,
       type: "Create",
       actor: envelope.actor,
@@ -521,7 +521,7 @@ describe("P2 hub: enrollment and an L0 weighted-quorum round", () => {
     const now = instance.clock.now();
     const announceOf = (taskId: string, thread: string, window: { opens: string; closes: string }) =>
       instance.publish("a1", [hub.actorId], thread, "hub", (envelope: Envelope) => ({
-        "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+        "@context": ["https://www.w3.org/ns/activitystreams", "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"],
         id: envelope.activityId,
         type: "Announce",
         actor: envelope.actor,
@@ -593,7 +593,7 @@ describe("P2 hub: enrollment and an L0 weighted-quorum round", () => {
 
     const assetUpdate = (name: string, digest: string) =>
       instance.publish(name, [hub.actorId], "urn:afp:thread:assets", "hub", (envelope: Envelope) => ({
-        "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+        "@context": ["https://www.w3.org/ns/activitystreams", "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"],
         id: envelope.activityId,
         type: "Update",
         actor: envelope.actor,
@@ -669,7 +669,7 @@ describe("P2 hub: enrollment and an L0 weighted-quorum round", () => {
 
     const assetUpdate = (name: string, version: string, digest: string) =>
       instance.publish(name, [hub.actorId], "urn:afp:thread:assets", "hub", (envelope: Envelope) => ({
-        "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+        "@context": ["https://www.w3.org/ns/activitystreams", "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"],
         id: envelope.activityId,
         type: "Update",
         actor: envelope.actor,

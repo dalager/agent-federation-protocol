@@ -17,7 +17,7 @@ different hubs.
 
 ```json
 {
-  "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+  "@context": ["https://www.w3.org/ns/activitystreams", "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"],
   "id": "https://alpha.operator.example/activities/en1",
   "type": "afp:Enroll",
   "actor": "https://alpha.operator.example/actor",
@@ -109,7 +109,7 @@ stores, e.g. `app:backlog`), and remember that CRDTs converge state — they don
 
 ```json
 {
-  "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+  "@context": ["https://www.w3.org/ns/activitystreams", "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"],
   "id": "https://alpha.operator.example/activities/delta-33ab",
   "type": "Update",
   "actor": "https://alpha.operator.example/agents/a1",
@@ -148,7 +148,7 @@ with decaying-fanout rumor spreading instead of waiting for the next pull cycle.
 
 ```json
 {
-  "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+  "@context": ["https://www.w3.org/ns/activitystreams", "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"],
   "id": "https://alpha.operator.example/activities/digest-77e1",
   "type": "Offer",
   "actor": "https://alpha.operator.example/actor",

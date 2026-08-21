@@ -90,7 +90,7 @@ function publish(
   body: { [key: string]: unknown },
 ) {
   return instance.publish(name, [hub.actorId], thread, "hub", (envelope: Envelope) => ({
-    "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+    "@context": ["https://www.w3.org/ns/activitystreams", "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"],
     id: envelope.activityId,
     actor: envelope.actor,
     to: [...envelope.to],

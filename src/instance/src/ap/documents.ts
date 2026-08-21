@@ -13,7 +13,7 @@ import { attachProof, DATA_INTEGRITY_CONTEXT, type SignedDocument } from "../cry
 import type { KeyPair } from "../crypto/keys.ts";
 
 export const AS2_CONTEXT = "https://www.w3.org/ns/activitystreams";
-export const AFP_CONTEXT = "https://afp.example/ns/v3";
+export const AFP_CONTEXT = "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld";
 
 /** Every AFP document carries the same three contexts. */
 export const AFP_CONTEXTS: JsonValue = [AS2_CONTEXT, AFP_CONTEXT, DATA_INTEGRITY_CONTEXT];

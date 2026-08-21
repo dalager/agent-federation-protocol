@@ -27,7 +27,7 @@ agreement with.
 
 ```json
 {
-  "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+  "@context": ["https://www.w3.org/ns/activitystreams", "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"],
   "id": "https://alpha.operator.example/actor",
   "type": ["Application", "afp:Instance"],
   "name": "Alpha Operator Instance",
@@ -69,7 +69,7 @@ membership is verifiable from a cached copy without a live roundtrip:
 
 ```json
 {
-  "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3",
+  "@context": ["https://www.w3.org/ns/activitystreams", "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
                "https://w3id.org/security/data-integrity/v1"],
   "id": "https://alpha.operator.example/roster",
   "type": "OrderedCollection",
@@ -288,6 +288,25 @@ while HTTP Signatures become mandatory at P4, when there is first a real hop to
 authenticate: an instance whose agents are wired in-process has no hop to sign, and its
 record is identical either way. Failures at either layer are audit-logged and dropped,
 never processed.
+
+**The `afp:` context and the processing model** (ADR-0017 Decision 1). The extension
+context is published at
+`https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld` (source:
+`docs/ns/v3.jsonld` in this repository) and is referenced in exactly one canonical form —
+`["https://www.w3.org/ns/activitystreams", "<context-url>"]`, the AS2 context first. The
+context defines the `afp` prefix (so every `afp:*` term resolves by compact-IRI
+expansion, which AS2 Core § 5 requires extension-supporting consumers to perform) and
+gives explicit definitions to AFP's unprefixed terms (`agent`, `status`, `since`,
+`nonce`, `value`, the CRDT-delta fields, agreement fields). The rule: a property either
+belongs to AS2 or appears in the AFP context document — a bare invented key is a spec
+bug.
+
+Two processing rules are normative. **AFP documents are authored and consumed in
+compacted form** — implementations read literal keys and are not required to run JSON-LD
+expansion. And **signed documents are relayed byte-for-byte**: `eddsa-jcs-2022` signs
+the JCS canonicalization of the compacted document, so a re-compaction that changes
+serialization breaks digest equality. "Store what you verified, not a re-serialization"
+(04 § replay) applies on the wire, not only in the archive.
 
 **Cryptosuite: `eddsa-jcs-2022`.** EdDSA signing, SHA-256 hashing, and JSON Canonicalization
 Scheme (RFC 8785) canonicalization, per FEP-8b32. Chosen deliberately over the

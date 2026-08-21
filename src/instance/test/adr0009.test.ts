@@ -121,7 +121,7 @@ describe("ADR-0009 gate: two exports, one engagement", () => {
 
       // --- Bravo does something that is none of Alpha's business.
       beta.instance.publish("b-assessor", [], "urn:afp:thread:other-client", "internal", (envelope: Envelope) => ({
-        "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+        "@context": ["https://www.w3.org/ns/activitystreams", "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"],
         id: envelope.activityId,
         type: "Create",
         actor: envelope.actor,
@@ -135,7 +135,7 @@ describe("ADR-0009 gate: two exports, one engagement", () => {
 
       // --- The delegation, and Bravo's engagement-thread answer.
       const offer = alpha.instance.publish("a-lead", [beta.instance.actorId("b-assessor")], "urn:afp:thread:sub-1", "parties", (envelope: Envelope) => ({
-        "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+        "@context": ["https://www.w3.org/ns/activitystreams", "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"],
         id: envelope.activityId,
         type: "Offer",
         actor: envelope.actor,

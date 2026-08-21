@@ -18,7 +18,17 @@ AFP's self-description is honest and mostly accurate — it frames itself as "AS
 
 ## 1. Errors — things that are actually wrong
 
-### 1.1 The JSON-LD story doesn't hold together — `status: open`
+### 1.1 The JSON-LD story doesn't hold together — `status: fixed-spec` + `fixed-code` (pending: enable GitHub Pages)
+
+**Resolution (2026-08-21, ADR-0017 Decision 1):** the context document now exists at
+`docs/ns/v3.jsonld`, canonical URL
+`https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld` (live once GitHub
+Pages is enabled for `main:/docs`). It defines the `afp` prefix and all previously
+unprefixed terms, with `@id`/`xsd:dateTime` coercions for load-bearing properties. All
+docs, code, tests, fixtures, and the export now use the one canonical URL; the inline
+Form-B example in `03-coordination.md` is canonicalized. `01-foundations.md` gains
+normative text for the compacted-form processing model and byte-preserving relay of
+signed documents. Original finding follows.
 
 The most substantive finding.
 

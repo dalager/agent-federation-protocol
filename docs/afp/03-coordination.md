@@ -11,7 +11,7 @@ vocabulary for. Core object types from v1: `Task`, `Capability`, `Result`, `Erro
 
 ```json
 {
-  "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+  "@context": ["https://www.w3.org/ns/activitystreams", "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"],
   "id": "https://alpha.operator.example/agents/a1/activities/8f2a",
   "type": "Offer",
   "actor": "https://alpha.operator.example/agents/a1",
@@ -540,7 +540,7 @@ plausible values). The reveal wraps it unchanged:
 
 ```json
 {
-  "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+  "@context": ["https://www.w3.org/ns/activitystreams", "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"],
   "id": "https://beta.operator.example/agents/b1/activities/0007",
   "type": "afp:BidReveal",
   "actor": "https://beta.operator.example/agents/b1",
@@ -699,7 +699,7 @@ hub governance.
 
 ```json
 {
-  "@context": ["https://www.w3.org/ns/activitystreams", { "afp": "https://afp.example/ns/v3#" }],
+  "@context": ["https://www.w3.org/ns/activitystreams", "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"],
   "id": "https://agent-a.example/activities/vote-91a3",
   "type": "Create",
   "actor": "https://agent-a.example/actor",

@@ -112,7 +112,7 @@ describe("ADR-0010 gate: the auction root and the direct root mean the same thin
       payloads.push({ name, payload });
       await hub.receive(
         auctionInstance.publish(name, [hub.actorId], thread, "hub", (envelope: HubEnvelope) => ({
-          "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+          "@context": ["https://www.w3.org/ns/activitystreams", "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"],
           id: envelope.activityId,
           actor: envelope.actor,
           to: [...envelope.to],
@@ -131,7 +131,7 @@ describe("ADR-0010 gate: the auction root and the direct root mean the same thin
     for (const { name, payload } of payloads) {
       await hub.receive(
         auctionInstance.publish(name, [hub.actorId], thread, "hub", (envelope: HubEnvelope) => ({
-          "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+          "@context": ["https://www.w3.org/ns/activitystreams", "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"],
           id: envelope.activityId,
           actor: envelope.actor,
           to: [...envelope.to],
