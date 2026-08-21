@@ -12,7 +12,7 @@
   and the CRDT-state exclusion whose consequence lands here),
   [ADR-0010](0010-pinning-without-an-auction.md) (whose open question is now closed at
   source by its Decision 5 — what remains here is the general shape of that defect)
-- **Driven by:** [scenario 10 / campaign 7](../scenarios/README.md#campaign-7--open),
+- **Driven by:** [scenario 10 / campaign 7](../scenarios/README.md#campaign-7--v324v327-adr-0014-adr-0015),
   findings 47, 49, and the second half of 48
 
 ## Context

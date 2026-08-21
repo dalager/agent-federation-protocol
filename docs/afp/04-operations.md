@@ -115,6 +115,13 @@ Three rules carry the join:
 - **The agreement must be digest-equal in every party's bundle.** Each side's signed
   `Create{afp:FederationAgreement}` wraps the byte-identical object; a pair of exports
   whose agreements differ is not one engagement but two stories.
+- **Received copies must also agree with each other** (ADR-0015): two domains holding
+  copies of one sender activity are checked directly against one another, because the
+  sender's lawful redaction (or absence from the set) leaves each copy nothing
+  authoritative to fail against individually — while two receivers holding two byte-forms
+  of one id is the sender telling two stories, visible only to whoever holds the set. And
+  the replay prints a **census** — per domain, per check family, zeros included — so a
+  bundle whose conditional checks all skipped shows its zeros instead of showing nothing.
 - **A received activity must be the same bytes its sender recorded.** Each bundle
   carries what crossed its boundary inbound (`received.jsonld`), and every entry must
   resolve by digest to the same activity in the sender's export — a mismatch is a

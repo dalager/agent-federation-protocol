@@ -16,7 +16,7 @@
   two-tier gate and the pairwise agreements this leans on when the hub is gone),
   [ADR-0013](0013-authorized-fetch.md) (whose `hub` read predicate is scoped to
   locally-hosted hubs precisely because Decision 1 here did not exist)
-- **Driven by:** [scenario 10 / campaign 7](../scenarios/README.md#campaign-7--open),
+- **Driven by:** [scenario 10 / campaign 7](../scenarios/README.md#campaign-7--v324v327-adr-0014-adr-0015),
   findings 43, 44, 45, 46
 
 ## Context

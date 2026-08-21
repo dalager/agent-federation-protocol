@@ -193,7 +193,7 @@ finding 41).
 | `afp:AuditGrant` | Credential | Signed, expiring, scoped read grant naming an auditor actor (07) |
 | `afp:digest`, `afp:size` | Properties (Link) | Hash-addressing for artifacts; `afp:digest` is mandatory on attachments (07) |
 | `afp:sourceUrl`, `afp:fetchedAt` | Properties (Link) | Provenance for externally-fetched evidence (07) |
-| `afp:Freeze` / `afp:Archive` | Activity | Hub lifecycle: suspend new work / terminal read-only close with canonical state hashes (07) |
+| `afp:Freeze` / `afp:Archive` | Activity | Hub lifecycle: suspend new work / terminal read-only close with canonical state hashes (07) — and, beside them, `afp:state`: the converged state those hashes are hashes of, entering the record once, at the moment it stops changing; replay recomputes each declared hash from it (ADR-0015) |
 | `afp:coverage` | Property (Bid) | Declared sub-domains this bidder claims, with per-domain confidence — input to set-selection rules |
 | `afp:Synthesis` | Object (in `Create`) | Combined answer bound to contributing Results: method, range, confidence, assumptions, dissent, superseded inputs (04) |
 | `afp:Settlement` | Activity | Links prior estimates to observed actuals, releasing deferred reputation adjustment (04) |

@@ -216,7 +216,7 @@ week, and neither is visible from the phase table above.
   it against the hub's published key and requires the named agent to equal the requester
   it already authenticated. ADR-0013's `hub` predicate is widened from "a hub I host" to
   "a hub whose proof I can verify" — deny-list and agreement stages unchanged. P5's hub
-  reads are unblocked, Decisions 2–4 followed the same day, and M6 closed it out: scenario 10's mechanics gated over three real HTTP servers, partition and rejoin included. ADR-0014 is built; campaign 7's remaining open work is ADR-0015.
+  reads are unblocked, Decisions 2–4 followed the same day, and M6 closed it out over three real HTTP servers. ADR-0015 followed — cross-receiver consistency, the check census, the archived state — and **campaign 7 is closed**: seven findings, two ADRs, opened and shut in a day. P5's remaining scope is the transport it always was: the hub's own HTTP inbox and cross-instance CRDT sync.
 - ~~**A scoped export can silently disarm the pin checks.**~~ **Closed** —
   [ADR-0010](adr/0010-pinning-without-an-auction.md) Decision 5, built at v3.23. Redacting
   a pin-bearing `Offer` left the thread with no task activity, so the governing pins

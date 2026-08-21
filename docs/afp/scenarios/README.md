@@ -183,12 +183,20 @@ into the spec body.
 | 41 | Human oversight ends outside the record — the Article-14 moment (the caseworker's decision on a flagged case) never enters it, and the only recorded-human-decision mechanism (Mastodon command mapping) is P4, out of the solo profile | Extend 03's reconciliation duty one notch: where a flagged outcome hands off to a human, the port SHOULD reconcile the human's disposition onto the same `context` |
 | 42 | What replay proves is never stated in one place — it recomputes signatures, chains, digests, tallies, and rules, never a `Result`'s `content`; and the dedupe rule is quietly load-bearing as the verdict-consistency control for non-deterministic brains | One paragraph in 04's replay procedure stating the guarantee's boundary, with the dedupe rule cross-referenced as what makes a brain's verdict single-valued |
 
-### Campaign 7 — open
+### Campaign 7 → v3.24–v3.27 (ADR-0014, ADR-0015)
 
 Seven findings from [scenario 10](10-the-incident-bridge.md), the first workload that needs
 a *shared* hub rather than a mesh of pairwise agreements — and therefore the first to ask
 P5's two defining questions out loud. Written before the P5 stack ADR on purpose: every
 finding this repository has acted on came from a scenario that went first.
+
+**Closed 2026-08-21, the same day it opened** — seven findings, two ADRs, both built and
+gated: [ADR-0014](../adr/0014-p5-shared-hub-stack.md) (43–46) and
+[ADR-0015](../adr/0015-the-case-file-at-n-parties.md) (47, 49, and 48's second half; the
+first half closed at source in ADR-0010 Decision 5). The through-line held to the end:
+every fix either reused machinery that already existed or made an existing silence
+visible, and the one genuinely new record surface (`afp:uncounted`, `afp:state`) entered
+where state stops changing rather than while it still is.
 
 The through-line: **the hub is somebody's server.** P4 could avoid that question because
 there was no hub; P5 cannot, and five of the seven findings are one decision wearing
@@ -228,6 +236,6 @@ replay.
 | 44 | *(**closed** — ADR-0014, built)* The hub is a single point of failure that is also a participant; when the host is the operator having the incident, the shared state goes with it and the spec's implicit answer is "wait" | State the risk in 06 and sanction a degraded mode: members MAY continue on the P4 direct flow and reconcile into the hub on its return, as a recorded act |
 | 45 | *(**closed** — ADR-0014, built)* Three clocks, one timeline, no comparison — `published` is self-asserted and monotonicity is chain-local, while "who knew what when" is the audit's first question | The hub SHOULD anchor its own chain head on a cadence (ADR-0012's mechanism); cross-operator ordering claims SHOULD be relative to hub-observed order |
 | 46 | *(**closed** — ADR-0014, built)* An unreachable member is not an abstention, and a `DecisionRecord` cannot tell them apart — liveness registers, which would, live on the partitioned hub | Record the snapshot members from whom no vote was counted, distinguishing a recorded `Reject` from silence |
-| 47 | The case file omits the state the operators worked from: ADR-0012 keeps CRDT state out of the export correctly, and at P5 that state *is* the coordinated timeline | Make ADR-0012's own revisit trigger concrete — `afp:Archive` carries the final converged state into the record as an activity, once, when it stops changing |
-| 48 | *(first half **closed** — ADR-0010 Decision 5)* A no-op check hides better in three bundles than in one — ADR-0010's unresolved redaction question means a stubbed pin-bearing `Offer` leaves checks silently passing, and per-domain phase one makes that indistinguishable from clean | Resolve ADR-0010's open question before P5 widens the redaction surface; have the joint replay report a per-domain check census, so a bundle that checked nothing is visible |
-| 49 | ADR-0009's join was specified for a pair — received bytes resolve against *the* sender, agreements are digest-equal across *two* copies — and at N=3 a party can observe a divergence between two others | State the join as all-pairs, and decide whether a divergence between two domains is reported to the third |
+| 47 | *(**closed** — ADR-0015, built)* The case file omits the state the operators worked from: ADR-0012 keeps CRDT state out of the export correctly, and at P5 that state *is* the coordinated timeline | Make ADR-0012's own revisit trigger concrete — `afp:Archive` carries the final converged state into the record as an activity, once, when it stops changing |
+| 48 | *(**closed** — first half ADR-0010 Decision 5, second half ADR-0015's census)* A no-op check hides better in three bundles than in one — ADR-0010's unresolved redaction question means a stubbed pin-bearing `Offer` leaves checks silently passing, and per-domain phase one makes that indistinguishable from clean | Resolve ADR-0010's open question before P5 widens the redaction surface; have the joint replay report a per-domain check census, so a bundle that checked nothing is visible |
+| 49 | *(**closed** — ADR-0015, built)* ADR-0009's join was specified for a pair — received bytes resolve against *the* sender, agreements are digest-equal across *two* copies — and at N=3 a party can observe a divergence between two others | State the join as all-pairs, and decide whether a divergence between two domains is reported to the third |

@@ -279,7 +279,7 @@
 
 <div class="page">
   <header class="hero">
-    <p class="eyebrow">Architecture Spec &middot; Multi-Operator Agent Federation &middot; Revision 3.26</p>
+    <p class="eyebrow">Architecture Spec &middot; Multi-Operator Agent Federation &middot; Revision 3.27</p>
     <h1>Agent Federation Protocol</h1>
     <p class="dek">Multiple operators, each running their own instance of agents, join forces on a common problem — federating through problem-scoped hubs over ActivityPub, the W3C protocol behind Mastodon. No central broker, consortium trust, no token economics.</p>
     <div class="callout">
@@ -1151,6 +1151,7 @@ sequenceDiagram
 
         <h3>Federated replay &amp; lawful redaction (ADR-0009)</h3>
         <p>When an engagement spans trust domains, the audit takes <strong>every party's export at once</strong> and stays one verifier: N single-domain replays — each bundle answering for its own roster, findings labelled by domain — plus a cross-check. Authority is partitioned by <code>afp:operatedBy</code> (a domain's keys are believed only from its own export — else one operator smuggles forged counterparty keys and re-signs "received" history); the co-signed agreement must be digest-equal in every bundle (else two stories, not one engagement); and every received activity must resolve by digest to the same bytes in the sender's export — divergence is a named finding, absence is attributed to the sender. Obligation: store what you verified, not a re-serialization.</p>
+        <div class="note"><strong>At N parties (ADR-0015):</strong> received copies of one sender activity are checked directly against <em>each other</em> across receivers &mdash; the finding only the holder of the set can see, since lawful redaction leaves each copy nothing authoritative to fail against alone. A foreign member&rsquo;s decline resolves as received evidence like everything cross-boundary. The replay prints a per-domain <strong>check census</strong>, zeros included, so a bundle whose conditional checks all skipped shows its zeros rather than nothing. And <code>afp:Archive</code> carries <code>afp:state</code> beside its canonical hashes, recomputed at replay &mdash; the converged state enters the record once, when it stops changing.</div>
         <p>Lawful redaction is an <strong>export-time transform</strong> — the record is never mutated. A scoped export replaces each withheld activity, 1:1, with a digest-only <code>afp:Redacted</code> stub in chain position; the chain check accepts the stub as a link and <code>published</code> monotonicity brackets across it. The manifest's <code>afp:exportScope</code> declares the threads answered for and the actors deliberately omitted; an undeclared gap remains tampering. <strong>Discretion is declared; deletion is detected.</strong></p>
 
         <h3>The manifest, and what a bundle contains (ADR-0012)</h3>
