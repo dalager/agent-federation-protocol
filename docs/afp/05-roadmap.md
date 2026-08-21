@@ -199,7 +199,13 @@ where the operator holds every key
 
 ## Known blockers before P5 opens
 
-Recorded here rather than rediscovered: both are things a P5 plan will hit in its first
+[Scenario 10](scenarios/10-the-incident-bridge.md) walks P5 end to end before its stack ADR
+exists, and reports seven findings (campaign 7). Its through-line is the decision P5 cannot
+avoid and P4 never had to make: **the hub is somebody's server** — which settles hosting,
+proof of membership, what members do while the host is partitioned, and whose state the
+case file carries, as one question with four faces.
+
+Two of those findings were already known here before the scenario confirmed them: both are things a P5 plan will hit in its first
 week, and neither is visible from the phase table above.
 
 - **`afp:MembershipProof` exists in prose only.** P5's row promises `hub` visibility

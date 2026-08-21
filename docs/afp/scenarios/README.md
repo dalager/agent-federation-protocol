@@ -21,6 +21,7 @@ protocol does; that review tested whether the build order still matched it.
 | [08](08-the-subcontract.md) | The subcontract: two operators, one boundary, no shared hub | The P4 handshake alone — adversarial probing of the gate, direct cross-boundary delegation, cross-boundary settlement, agreement expiry vs in-flight work, two-export replay | 7 |
 | [08 · story](08-the-subcontract-story.md) | The same subcontract, outside-in | A first: the scenario retold through its human actors — the double sale, the near-miss, the seams. No findings machinery; a readability check on the whole design | — |
 | [09](09-the-screening-sidecar.md) | The screening sidecar: an auditable agentic subsystem inside someone else's workflow | Solo profile behind a pre-existing actuation boundary, external initiator, fixed-panel fan-out, polyglot brains behind the port, dissent into the verdict, checkable actuation against an external API, subject-scoped audit export (EU AI Act) | 12 |
+| [10](10-the-incident-bridge.md) | The incident bridge: three operators, one hub, and the host is the one on fire | The P5 shakedown — a shared hub across three trust domains, hub reads across the boundary, CRDT convergence after the host partitions, a quorum round with a member unreachable, membership churn mid-decision, and the first three-export replay | 7 |
 | [· tuesday](the-operators-tuesday.md) | The operator's Tuesday | The built stack's ordinary day, every noun pointing at a file — commands, tables, outputs and warts of the solo profile as it runs today; the hard-focus baseline the P4 build will be measured against | — |
 
 ## Findings ledger
@@ -181,3 +182,25 @@ into the spec body.
 | 40 | Nothing supports verifying a five-year-old export — rotation treats old keys as revoked, actor documents are current-state, no key-validity windows or manifest key history, anchoring only a SHOULD, artifact retention scoped to federation lifetime rather than statute | Manifest carries signing-key history with validity intervals; statutory deployments MUST anchor chain heads externally and retain artifact bytes for the retention horizon |
 | 41 | Human oversight ends outside the record — the Article-14 moment (the caseworker's decision on a flagged case) never enters it, and the only recorded-human-decision mechanism (Mastodon command mapping) is P4, out of the solo profile | Extend 03's reconciliation duty one notch: where a flagged outcome hands off to a human, the port SHOULD reconcile the human's disposition onto the same `context` |
 | 42 | What replay proves is never stated in one place — it recomputes signatures, chains, digests, tallies, and rules, never a `Result`'s `content`; and the dedupe rule is quietly load-bearing as the verdict-consistency control for non-deterministic brains | One paragraph in 04's replay procedure stating the guarantee's boundary, with the dedupe rule cross-referenced as what makes a brain's verdict single-valued |
+
+### Campaign 7 — open
+
+Seven findings from [scenario 10](10-the-incident-bridge.md), the first workload that needs
+a *shared* hub rather than a mesh of pairwise agreements — and therefore the first to ask
+P5's two defining questions out loud. Written before the P5 stack ADR on purpose: every
+finding this repository has acted on came from a scenario that went first.
+
+The through-line: **the hub is somebody's server.** P4 could avoid that question because
+there was no hub; P5 cannot, and five of the seven findings are one decision wearing
+different faces — who hosts it, how a member proves membership to a third party, what
+members do while the host is partitioned, and whose state the case file carries.
+
+| # | Finding | Candidate |
+|---|---|---|
+| 43 | `afp:MembershipProof` is a noun with no mechanism, and it blocks the read path: a hub-class activity lives in its author's outbox, but the fetching member is enrolled in a hub the author does not host, so ADR-0013's `hub` predicate (scoped to locally-hosted hubs) refuses every cross-member read | Define it — a signed, expiring statement by the hub naming agent, hub and role, presented by the fetcher and verified against the hub's published key |
+| 44 | The hub is a single point of failure that is also a participant; when the host is the operator having the incident, the shared state goes with it and the spec's implicit answer is "wait" | State the risk in 06 and sanction a degraded mode: members MAY continue on the P4 direct flow and reconcile into the hub on its return, as a recorded act |
+| 45 | Three clocks, one timeline, no comparison — `published` is self-asserted and monotonicity is chain-local, while "who knew what when" is the audit's first question | The hub SHOULD anchor its own chain head on a cadence (ADR-0012's mechanism); cross-operator ordering claims SHOULD be relative to hub-observed order |
+| 46 | An unreachable member is not an abstention, and a `DecisionRecord` cannot tell them apart — liveness registers, which would, live on the partitioned hub | Record the snapshot members from whom no vote was counted, distinguishing a recorded `Reject` from silence |
+| 47 | The case file omits the state the operators worked from: ADR-0012 keeps CRDT state out of the export correctly, and at P5 that state *is* the coordinated timeline | Make ADR-0012's own revisit trigger concrete — `afp:Archive` carries the final converged state into the record as an activity, once, when it stops changing |
+| 48 | A no-op check hides better in three bundles than in one — ADR-0010's unresolved redaction question means a stubbed pin-bearing `Offer` leaves checks silently passing, and per-domain phase one makes that indistinguishable from clean | Resolve ADR-0010's open question before P5 widens the redaction surface; have the joint replay report a per-domain check census, so a bundle that checked nothing is visible |
+| 49 | ADR-0009's join was specified for a pair — received bytes resolve against *the* sender, agreements are digest-equal across *two* copies — and at N=3 a party can observe a divergence between two others | State the join as all-pairs, and decide whether a divergence between two domains is reported to the third |
