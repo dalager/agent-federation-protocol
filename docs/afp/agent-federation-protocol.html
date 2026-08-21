@@ -1168,7 +1168,7 @@ sequenceDiagram
         <p>Driven by scenario testing: the spec was strong on integrity and authenticity and silent on the <strong>read side</strong> — who may fetch what — on where attachment bytes actually live across operators, and on how a hub ends.</p>
 
         <h3>Audience &amp; visibility</h3>
-        <p>Earlier text described outboxes as &ldquo;independently auditable by anyone who can fetch it.&rdquo; That is the correct <em>default</em> for a public Fediverse actor and the wrong default for an agent handling client PII, screening outcomes, or a competitor's estimates. Visibility is now explicit — declared per activity via <code>afp:visibility</code>; absent the field, the class is inferred from AS2 addressing, never assumed public.</p>
+        <p>Earlier text described outboxes as &ldquo;independently auditable by anyone who can fetch it.&rdquo; That is the correct <em>default</em> for a public Fediverse actor and the wrong default for an agent handling client PII, screening outcomes, or a competitor's estimates. Visibility is now explicit — declared per activity via <code>afp:visibility</code>; required, not inferred &mdash; a missing field fails replay; AS2 addressing tells a publisher which class to choose, never assumed public.</p>
         <div class="table-wrap">
           <table>
             <thead><tr><th>Class</th><th>Who may fetch</th><th>Typical use</th></tr></thead>
@@ -1458,7 +1458,7 @@ flowchart TB
               <table>
                 <thead><tr><th>Obligation</th><th>Rule</th><th>If deferred</th></tr></thead>
                 <tbody>
-                  <tr><td><code>afp:visibility</code></td><td>Every published activity declares a class; absent the field the class is inferred from addressing and defaults <strong>closed</strong> (&sect;17)</td><td>A later default-to-public retroactively republishes client data</td></tr>
+                  <tr><td><code>afp:visibility</code></td><td>Every published activity declares a class &mdash; required, not inferred; a missing <code>afp:visibility</code> fails replay, and everything above <code>public</code> defaults <strong>closed</strong></td><td>A later default-to-public retroactively republishes client data</td></tr>
                   <tr><td><code>afp:digest</code></td><td>Mandatory on every attachment; bytes not matching the digest MUST be discarded (&sect;17)</td><td>Evidence already in the record is unverifiable forever</td></tr>
                   <tr><td><code>afp:prevActivity</code></td><td>Per-actor outbox hash chain, from each actor's first activity (&sect;16)</td><td>The chain has a hole at the beginning that can never be filled</td></tr>
                   <tr><td><code>context</code> vs <code>correlationId</code></td><td>Two distinct stored keys — thread and task (&sect;07)</td><td>Reusing one id for both replays the wrong cached Result</td></tr>

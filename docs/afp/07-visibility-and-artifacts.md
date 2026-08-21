@@ -13,8 +13,15 @@ is now explicit.
 
 ### Four visibility classes
 
-Declared per activity via `afp:visibility`; absent the field, the class is inferred from
-AS2 addressing (`to`/`cc`/`audience`) — never assumed public.
+Declared per activity via `afp:visibility` — **required, not inferred**. An earlier
+revision said an absent field was inferred from AS2 addressing (`to`/`cc`/`audience`);
+that inference no longer exists anywhere. The P1 obligation makes the class a required
+argument on every builder, so no code path can publish an activity without one, and
+replay names a missing class as a failure rather than guessing at it: *the record does not
+say who may read this* is a defect in the record, not a puzzle for the reader.
+
+Addressing still tells you which class to **choose** — it just no longer stands in for
+the declaration. Never assumed public.
 
 | Class | Who may fetch | Typical use |
 |---|---|---|
@@ -24,8 +31,9 @@ AS2 addressing (`to`/`cc`/`audience`) — never assumed public.
 | `internal` | Only the originating instance | Records an instance keeps for its own audit but does not federate |
 
 **Actor documents and roster entries are necessarily `public`** — signature verification
-requires key fetch. Everything else defaults *closed*: an activity with no explicit class
-and no addressing is `internal`.
+requires key fetch. Everything else defaults *closed*: the narrowest class that serves the
+activity's addressing, and `internal` where nothing else fits. "Defaults closed" is a
+rule for the publisher choosing a class, not a licence to omit one.
 
 ### Authorized fetch
 
@@ -134,8 +142,10 @@ from scenario 05):
   MAY carry `afp:reused` with the adaptation's own digest, closing the loop. Reuse
   becomes a fact in the record rather than a slide.
 - **Checkable at replay**: every asset reference must resolve to a registered
-  `afp:Asset` whose (id, version, digest) triple is consistent — an unresolvable reuse
-  claim is the asset-flavored *"counted vote you cannot produce."*
+  `afp:Asset` **by (id, version)** — an unresolvable reuse claim is the asset-flavored
+  *"counted vote you cannot produce."* The reference carries no copy of the asset's own
+  digest to cross-check against: the Bid claims id and version, and the Result's digest is
+  the adaptation's, which is a different artifact by design.
 
 ## Hub lifecycle
 

@@ -106,9 +106,15 @@ identity, versions, and provenance across hubs. New object type:
   "my cost is low *because* I start from this" as a claim under the sealed commitment —
   and a Result MAY carry `afp:reused` (asset ref + the delivered adaptation's own
   digest), closing the loop.
-- **Verifier check**: every `afp:reuses`/`afp:reused` reference resolves to a registered
-  `afp:Asset` in the export whose (id, version, digest) triple is consistent. A reuse
-  claim that resolves to nothing is the asset-flavored "counted vote you cannot produce."
+- **Verifier check**: every `afp:reuses`/`afp:reused` reference resolves **by (id,
+  version)** to a registered `afp:Asset` in the export. A reuse claim that resolves to
+  nothing is the asset-flavored "counted vote you cannot produce."
+  *(Corrected: an earlier wording asked for a consistent "(id, version, digest) triple",
+  which the bullet above makes impossible — a Bid's claim carries no digest, and the
+  Result's is the **adaptation's** own digest, deliberately a different artifact from the
+  asset it started from. There is no copy of the asset's digest on the reference side to
+  cross-check. The registered Asset's digest pins the asset; the reference pins which
+  asset.)*
 
 Cross-operator asset reference (P5) inherits this shape unchanged: the registry rides the
 same CRDT sync everything else does, and the digest makes a foreign asset claim exactly

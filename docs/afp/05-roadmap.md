@@ -53,7 +53,7 @@ rather than the audit phase.
 
 | Obligation | Rule | If deferred |
 |---|---|---|
-| `afp:visibility` | Every published activity declares a class; absent the field the class is inferred from addressing and defaults **closed** ([07](07-visibility-and-artifacts.md#four-visibility-classes)) | A later default-to-public retroactively republishes client data |
+| `afp:visibility` | Every published activity declares a class — required, not inferred; a missing `afp:visibility` fails replay, and everything above `public` defaults **closed** ([07](07-visibility-and-artifacts.md#four-visibility-classes)) | A later default-to-public retroactively republishes client data |
 | `afp:digest` | Mandatory on every attachment; bytes not matching the digest MUST be discarded ([07](07-visibility-and-artifacts.md#artifacts--attachments)) | Evidence already in the record is unverifiable forever |
 | `afp:prevActivity` | Per-actor outbox hash chain, from each actor's first activity ([04](04-operations.md#outbox-integrity-hash-chained-logs-afpprevactivity)) | The chain has a hole at the beginning that can never be filled |
 | `context` vs `correlationId` | Two distinct stored keys — thread and task ([03](03-coordination.md#correlation-vs-threading--two-distinct-ids)) | Reusing one id for both replays the wrong cached Result |
