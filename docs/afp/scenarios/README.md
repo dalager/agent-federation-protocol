@@ -139,8 +139,18 @@ claims (the "nothing lost" fan-out beat, the `actsOn` target) and surfaced nine 
 The through-line of the campaign: **the machinery added in campaigns 2–5 (action
 policies, synthesizer naming, sufficiency, dispositions) anchored itself to the
 Announce/Award pair, and the degenerate direct flow — the one 06 promises is "a
-degenerate case, never a fork" — silently loses all of it.** Unresolved; candidates
-are the scenario's own suggestions, not decisions.
+degenerate case, never a fork" — silently loses all of it.** Triaged into three
+proposed ADRs and two lighter tracks:
+[ADR-0010](../adr/0010-pinning-without-an-auction.md) (34, 35, 37 — pins on the
+task-bearing activity, the `actsOn` hop, the `afp:no-verdict` release),
+[ADR-0011](../adr/0011-supersession-meets-the-irreversible-world.md) (38, 39 —
+declared irreversibility, the `annotate` disposition, panel deltas,
+`afp:priorThread` and the fork ruling), and
+[ADR-0012](../adr/0012-the-long-horizon.md) (40 + the sharp half of 32 — key
+history in the manifest, rotation vs revocation, conditional retention MUSTs, the
+bundle's content inventory with CRDT state excluded). Findings 31, 33, 36, 41, 42
+are spec-precision edits (no ADR needed); 32's remainder is 06 deployment guidance
+resting on ADR-0012 Decision 4. All three ADRs Proposed, none built.
 
 | # | Finding | Candidate |
 |---|---|---|
