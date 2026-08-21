@@ -8,17 +8,53 @@
  * Everything else defaults closed. An unauthenticated stranger asking for a
  * `parties` activity gets **404, not 403** — non-existence and non-authorisation
  * must be indistinguishable, or probing yields a map of what exists.
+ *
+ * ADR-0013 adds the read half of the gate. When `options.read` is absent this
+ * file behaves exactly as it always has — public-only, no signature read —
+ * which is the compatibility proof, not an incidental property: every demo
+ * and every one of the 100 existing tests calls `createHttpServer` without
+ * `read` and must see byte-identical responses.
  */
 
 import { createServer, type Server } from "node:http";
 import type { AfpInstance } from "../instance.ts";
 import { handleInboxPost, type InboxDeps } from "../federation/inbox.ts";
+import { authorizeRead, type ReadAuthorization, type ReadGateDeps } from "../federation/readGate.ts";
+import type { OutboxEntry } from "../store/outbox.ts";
 
 const AP_CONTENT_TYPE = "application/activity+json";
 
 export interface ServerOptions {
   /** ADR-0008: when present, POST {actor}/inbox is live — the boundary's receiving half. */
   inbox?: Omit<InboxDeps, "selfOrigin" | "now">;
+  /**
+   * ADR-0013: when present, GET on non-`public` resources runs the same gate
+   * the inbox runs. `onGrantedFetch` is the one read this ADR records
+   * (Decision 5) — a fetch admitted under an `afp:AuditGrant`. Refusals are
+   * never reported here: a read refusal is free and anonymous, and logging
+   * it would hand a stranger a pen that writes into the record.
+   */
+  read?: ReadGateDeps & {
+    onGrantedFetch?: (info: { grant: string; auditor: string; path: string; at: Date }) => void;
+  };
+}
+
+/** Every outbox entry, anywhere, whose activity JSON mentions this digest — the artifact-visibility query, resource-agnostic. */
+function referencingEntries(instance: AfpInstance, digest: string): OutboxEntry[] {
+  const rows = instance.db
+    .prepare("SELECT * FROM outbox WHERE activity_json LIKE ?")
+    .all(`%${digest}%`) as Record<string, unknown>[];
+  return rows.map((row) => ({
+    activityId: String(row.activity_id),
+    actor: String(row.actor),
+    seq: Number(row.seq),
+    thread: row.thread === null ? null : String(row.thread),
+    digest: String(row.digest),
+    prevActivity: row.prev_activity === null ? null : String(row.prev_activity),
+    visibility: String(row.visibility),
+    published: String(row.published),
+    activity: JSON.parse(String(row.activity_json)),
+  }));
 }
 
 export function createHttpServer(instance: AfpInstance, options: ServerOptions = {}): Server {
@@ -32,6 +68,14 @@ export function createHttpServer(instance: AfpInstance, options: ServerOptions =
       res.end(payload);
     };
     const notFound = (): void => send(404, { error: "not found" }, "application/json");
+
+    // Decision 6: a response that depended on who asked must never be
+    // storable by a cache that will serve it to somebody who did not ask.
+    // `no-store` is load-bearing; `Vary: Signature` is belt to that braces.
+    const markUncacheable = (): void => {
+      res.setHeader("Cache-Control", "private, no-store");
+      res.setHeader("Vary", "Signature");
+    };
 
     if (req.method === "POST" && options.inbox && (path === "/actor/inbox" || /^\/agents\/[\w-]+\/inbox$/.test(path))) {
       const chunks: Buffer[] = [];
@@ -57,70 +101,125 @@ export function createHttpServer(instance: AfpInstance, options: ServerOptions =
 
     if (req.method !== "GET") return notFound();
 
-    try {
-      if (path === "/actor") return send(200, instance.instanceDocument());
-      if (path === "/roster") return send(200, instance.rosterDocument());
+    // GET headers a signed read carries — no `digest`, since a GET has no
+    // body (ADR-0013 Decision 1: the covered set is derived from the method).
+    const readHeaders = {
+      host: String(req.headers.host ?? ""),
+      date: String(req.headers.date ?? ""),
+      signature: String(req.headers.signature ?? ""),
+    };
 
-      const agentMatch = path.match(/^\/agents\/([\w-]+)$/);
-      if (agentMatch) {
-        const name = agentMatch[1];
-        if (!instance.specs.some((spec) => spec.name === name)) return notFound();
-        return send(200, instance.agentDocument(name));
+    (async () => {
+      try {
+        // `/actor`, `/roster`, `/agents/:name`, `/.well-known/afp-policy`
+        // stay unauthenticated forever (Decision 2, the bootstrap invariant):
+        // verifying a signature requires fetching a key over one of these
+        // routes, so gating them would make every signature unverifiable in
+        // one move. This is not an oversight — it is load-bearing.
+        if (path === "/actor") return send(200, instance.instanceDocument());
+        if (path === "/roster") return send(200, instance.rosterDocument());
+
+        const agentMatch = path.match(/^\/agents\/([\w-]+)$/);
+        if (agentMatch) {
+          const name = agentMatch[1];
+          if (!instance.specs.some((spec) => spec.name === name)) return notFound();
+          return send(200, instance.agentDocument(name));
+        }
+
+        const outboxMatch = path.match(/^\/agents\/([\w-]+)\/outbox$/);
+        if (outboxMatch) {
+          const name = outboxMatch[1];
+          if (!instance.specs.some((spec) => spec.name === name)) return notFound();
+
+          const entries = instance.outbox.byActor(instance.actorId(name));
+
+          let auth: ReadAuthorization | null = null;
+          let items: { [key: string]: unknown }[];
+          if (options.read) {
+            // One gate call per request; every entry is judged against it.
+            // An anonymous caller's `admits` is `public`-only by construction
+            // (Decision 2), which is exactly today's filter — the
+            // compatibility proof.
+            auth = await authorizeRead(options.read, { path, headers: readHeaders });
+            items = entries.filter((entry) => auth!.admits(entry.activity)).map((entry) => entry.activity);
+            markUncacheable();
+            if (auth.viaGrant) {
+              options.read.onGrantedFetch?.({ ...auth.viaGrant, path, at: instance.clock.now() });
+            }
+          } else {
+            // Only `public` activities are served unauthenticated. P1's task
+            // traffic is `parties`, so this collection is legitimately empty
+            // — the full record travels in the export, under the operator's
+            // control.
+            items = entries.filter((entry) => entry.visibility === "public").map((entry) => entry.activity);
+          }
+
+          return send(200, {
+            id: `${instance.actorId(name)}/outbox`,
+            type: "OrderedCollection",
+            totalItems: items.length,
+            orderedItems: items,
+          });
+        }
+
+        const artifactMatch = path.match(/^\/artifacts\/(sha256-[0-9a-f]{64})$/);
+        if (artifactMatch) {
+          const digest = artifactMatch[1].replace("-", ":");
+
+          // Resolve the resource and judge entitlement independently, then
+          // combine at the end (Decision 4: resolve-then-judge). Neither
+          // branch short-circuits the other — an absent artifact and an
+          // unauthorized one must cost the same work and return the same
+          // answer, or the timing difference becomes the oracle `404` exists
+          // to deny.
+          const ref = instance.artifacts.lookup(digest);
+          const bytes = ref ? instance.artifacts.get(digest) : null;
+          const referencing = referencingEntries(instance, digest);
+
+          let auth: ReadAuthorization | null = null;
+          let admitted: boolean;
+          if (options.read) {
+            auth = await authorizeRead(options.read, { path, headers: readHeaders });
+            // Decision 7: the narrowest rule. Every activity referencing this
+            // artifact must be admitted — one `parties` reference the
+            // requester cannot see still hides it. Never "any".
+            admitted = referencing.length > 0 && referencing.every((entry) => auth!.admits(entry.activity));
+          } else {
+            // Present rule, unchanged: served only if every referencing
+            // activity is `public`.
+            admitted = referencing.length > 0 && referencing.every((entry) => entry.visibility === "public");
+          }
+
+          if (!ref || !bytes || !admitted) return notFound();
+
+          if (options.read) {
+            markUncacheable();
+            if (auth?.viaGrant) {
+              options.read.onGrantedFetch?.({ ...auth.viaGrant, path, at: instance.clock.now() });
+            }
+          }
+
+          res.writeHead(200, { "content-type": ref.mediaType, "content-length": String(ref.size) });
+          return res.end(Buffer.from(bytes));
+        }
+
+        if (path === "/.well-known/afp-policy") {
+          return send(
+            200,
+            {
+              "afp:cryptosuite": "eddsa-jcs-2022",
+              "afp:phase": "P1",
+              "afp:federation": "none",
+              "afp:defaultVisibility": "internal",
+            },
+            "application/json",
+          );
+        }
+
+        return notFound();
+      } catch {
+        return notFound();
       }
-
-      const outboxMatch = path.match(/^\/agents\/([\w-]+)\/outbox$/);
-      if (outboxMatch) {
-        const name = outboxMatch[1];
-        if (!instance.specs.some((spec) => spec.name === name)) return notFound();
-        // Only `public` activities are served unauthenticated. P1's task traffic
-        // is `parties`, so this collection is legitimately empty — the full
-        // record travels in the export, under the operator's control.
-        const items = instance.outbox
-          .byActor(instance.actorId(name))
-          .filter((entry) => entry.visibility === "public")
-          .map((entry) => entry.activity);
-        return send(200, {
-          id: `${instance.actorId(name)}/outbox`,
-          type: "OrderedCollection",
-          totalItems: items.length,
-          orderedItems: items,
-        });
-      }
-
-      const artifactMatch = path.match(/^\/artifacts\/(sha256-[0-9a-f]{64})$/);
-      if (artifactMatch) {
-        const digest = artifactMatch[1].replace("-", ":");
-        const ref = instance.artifacts.lookup(digest);
-        // `get` re-hashes before returning, so bytes that no longer match their
-        // own name are indistinguishable from an absent artifact.
-        const bytes = ref ? instance.artifacts.get(digest) : null;
-        if (!ref || !bytes) return notFound();
-
-        // An artifact inherits the visibility of the activity that referenced
-        // it. Serve it unauthenticated only if every such activity is `public`;
-        // otherwise a stranger gets 404, like any other closed resource.
-        if (!instance.artifactIsPublic(digest)) return notFound();
-
-        res.writeHead(200, { "content-type": ref.mediaType, "content-length": String(ref.size) });
-        return res.end(Buffer.from(bytes));
-      }
-
-      if (path === "/.well-known/afp-policy") {
-        return send(
-          200,
-          {
-            "afp:cryptosuite": "eddsa-jcs-2022",
-            "afp:phase": "P1",
-            "afp:federation": "none",
-            "afp:defaultVisibility": "internal",
-          },
-          "application/json",
-        );
-      }
-
-      return notFound();
-    } catch {
-      return notFound();
-    }
+    })();
   });
 }

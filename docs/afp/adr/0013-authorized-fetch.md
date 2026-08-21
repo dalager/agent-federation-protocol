@@ -1,6 +1,8 @@
 # ADR-0013 — Authorized fetch: the read side of the two-tier gate
 
-- **Status:** Proposed — decisions closed to build depth; nothing is built
+- **Status:** Accepted, and **built** for the P4 shape — gated by admission-by-class at
+  the gate itself, and by the covered-header discipline that makes a body-less signature
+  safe. Remote-hub enrollment stays P5's problem (Decision 3)
 - **Date:** 2026-08-21
 - **Applies to:** every deployment that serves anything over HTTP — acute from P4, where
   a second operator exists to be entitled to something, and unavoidable at P5, where a
@@ -140,9 +142,24 @@ served to somebody else, and the honest alternative for a deployment that wants 
 auditor to see something is to publish it at a class the auditor can hold.
 
 **Grants are a fourth door, not a fifth class.** An `afp:AuditGrant` widens which classes
-a named auditor may read, within a scope and period — and it is checked at the class
-stage, after the agreement and deny-list stages have run like they do for everyone. A
-grant is a widening of entitlement, never a bypass of the gate.
+a named auditor may read, within a scope and period. A grant is a widening of entitlement,
+never a bypass of the gate — but the two gate stages it meets are not alike, and an
+earlier draft of this decision lost that distinction by naming them in one breath:
+
+- **The deny-list still refuses, and a grant cannot lift it.** Deny-listing an operator is
+  the strongest refusal this protocol has; a mechanism that could widen past it would make
+  it advisory. Checked *inside* the grant path, not merely before it — the ordinary
+  predicate fails a deny-listed requester and then the grant branch runs, so a check
+  placed only in the predicate is a check the grant path never performs.
+- **An active agreement is NOT required.** The grant *is* the relationship. Requiring an
+  agreement as well would make grants useless for the case they exist for — an external
+  compliance auditor, who has no federation with the operator and never will — and 07 is
+  explicit that a grant is issued *to an auditor actor*, not to a peer. What the auditor
+  cannot be is deny-listed.
+
+The asymmetry is the point: a grant answers "we chose to let this party read", and a
+deny-list answers "we refuse this party entirely". Only one of those is a statement the
+other may override.
 
 ### 4. `404` is the only refusal, and it must be indistinguishable
 
@@ -297,18 +314,18 @@ somebody who has another way to ask, and the permissive one can only ever over-d
 
 ## Build status
 
-Nothing is built. The staging is forced by the signature: nothing can be admitted until a
-`GET` can be authenticated at all.
+Built. The staging was forced by the signature: nothing could be admitted until a `GET`
+could be authenticated at all.
 
 | ID | Task | Where | Stage |
 |---|---|---|---|
-| **A1** | The method-derived covered-header set. `signRequest`/`verifyRequest` hardcode `(request-target) host date digest` and compare `digest` to the body unconditionally; both learn the set from the **method**, never from the incoming `headers=` list. One builder, parameterized — not a second pair. Includes the negative test that a `POST` declaring it covers no `digest` is refused | `federation/httpSig.ts` | 1 |
-| **A2** | `resolveRequester(headers) → { agent, operatedBy } \| null`: keyId → actor document (unauthenticated fetch, per the bootstrap invariant) → `afp:operatedBy`, or self when the actor is an instance actor. Lifted from the inline block in `handleInboxPost` and shared with it, so one rule answers "who is asking" on both paths | `federation/inbox.ts`, new shared helper | 1 |
-| **A3** | The read summary and the class stage: an `ActivitySummary`-shaped value for a resource (its hub, thread, class) so `admittingGrant` decides the `hub` case unchanged; the `parties` predicate over `to`/`cc` plus `afp:operatedBy`; `internal` refused unconditionally; `Hub.roleOf` for enrollment, scoped to locally-hosted hubs | `federation/grants.ts`, new read-gate module | 2 |
-| **A4** | `handleAuthorizedFetch` — mirrors `handleInboxPost`'s stage *order* without calling it (that function is body-coupled throughout): authenticate → resolve requester → denylist → active agreement → class. Wired into `ap/server.ts` ahead of the outbox and artifact handlers, falling through to today's public-only behaviour when unsigned | `ap/server.ts`, new module | 2 |
-| **A5** | Wire `grantAdmits` — designed for this and currently called by nothing — as the class-stage widening for `afp:AuditGrant`, and **record the admitted fetch**, which is the one read this ADR does log (Decision 5). Refusals stay unlogged, deliberately | `federation/visibility.ts`, read-gate module | 2 |
-| **A6** | Response discipline: one `notFound()` body for every refusal reason; resolve-then-judge so refusal order leaks nothing; `Cache-Control: private, no-store` and `Vary: Signature` on every non-`public` response; artifacts keep the all-referencing-activities-are-public rule for the anonymous path | `ap/server.ts` | 3 |
-| **A7** | Gate `test/adr0013.test.ts` on the real-HTTP scaffold from `adr0008.test.ts` (`freePort()`, `operator()`): a signed `GET` from an agreed, enrolled peer fetches a `hub` activity; the same peer is refused a `parties` activity it is not named in; a named peer fetches it; an unsigned `GET` gets `public` only; a deny-listed instance is refused; `internal` is refused to everyone including a grant holder; an expired agreement is refused; a grant-admitted fetch appears in the record while a refusal does not; and every refusal is byte-identical | `test/adr0013.test.ts` | 3 |
+| **A1** ✅ | The method-derived covered-header set. `signRequest`/`verifyRequest` hardcode `(request-target) host date digest` and compare `digest` to the body unconditionally; both learn the set from the **method**, never from the incoming `headers=` list. One builder, parameterized — not a second pair. Includes the negative test that a `POST` declaring it covers no `digest` is refused | `federation/httpSig.ts` | 1 |
+| **A2** ✅ | `resolveRequester(headers) → { agent, operatedBy } \| null`: keyId → actor document (unauthenticated fetch, per the bootstrap invariant) → `afp:operatedBy`, or self when the actor is an instance actor. Lifted from the inline block in `handleInboxPost` and shared with it, so one rule answers "who is asking" on both paths | `federation/inbox.ts`, new shared helper | 1 |
+| **A3** ✅ | The read summary and the class stage: an `ActivitySummary`-shaped value for a resource (its hub, thread, class) so `admittingGrant` decides the `hub` case unchanged; the `parties` predicate over `to`/`cc` plus `afp:operatedBy`; `internal` refused unconditionally; `Hub.roleOf` for enrollment, scoped to locally-hosted hubs | `federation/grants.ts`, new read-gate module | 2 |
+| **A4** ✅ | `handleAuthorizedFetch` — mirrors `handleInboxPost`'s stage *order* without calling it (that function is body-coupled throughout): authenticate → resolve requester → denylist → active agreement → class. Wired into `ap/server.ts` ahead of the outbox and artifact handlers, falling through to today's public-only behaviour when unsigned | `ap/server.ts`, new module | 2 |
+| **A5** ✅ | Wire `grantAdmits` — designed for this and currently called by nothing — as the class-stage widening for `afp:AuditGrant`, and **record the admitted fetch**, which is the one read this ADR does log (Decision 5). Refusals stay unlogged, deliberately | `federation/visibility.ts`, read-gate module | 2 |
+| **A6** ✅ | Response discipline: one `notFound()` body for every refusal reason; resolve-then-judge so refusal order leaks nothing; `Cache-Control: private, no-store` and `Vary: Signature` on every non-`public` response; artifacts keep the all-referencing-activities-are-public rule for the anonymous path | `ap/server.ts` | 3 |
+| **A7** ✅ | Gate `test/adr0013.test.ts` on the real-HTTP scaffold from `adr0008.test.ts` (`freePort()`, `operator()`): a signed `GET` from an agreed, enrolled peer fetches a `hub` activity; the same peer is refused a `parties` activity it is not named in; a named peer fetches it; an unsigned `GET` gets `public` only; a deny-listed instance is refused; `internal` is refused to everyone including a grant holder; an expired agreement is refused; a grant-admitted fetch appears in the record while a refusal does not; and every refusal is byte-identical | `test/adr0013.test.ts` | 3 |
 
 A verifier task is conspicuously absent, and that absence is Decision 5 in executable
 form: reads leave no record, so there is nothing for replay to check. The single exception
