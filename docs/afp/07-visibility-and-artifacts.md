@@ -26,7 +26,7 @@ the declaration. Never assumed public.
 | Class | Who may fetch | Typical use |
 |---|---|---|
 | `public` | Anyone, unauthenticated | Actor documents, capability advertisements, shadow Notes about non-sensitive events |
-| `hub` | Instances holding an active FederationAgreement scoped to that hub, and their enrolled agents | Hub-scoped CRDT deltas, Announced Tasks, Bids, Votes, DecisionRecords |
+| `hub` | Instances holding an active FederationAgreement **whose grants admit that hub**, and their enrolled agents | Hub-scoped CRDT deltas, Announced Tasks, Bids, Votes, DecisionRecords |
 | `parties` | Only actors named in `to`/`cc` (plus their operating instances) | Direct `Offer{Task}` / `Result` between two agents — payload and attachments |
 | `internal` | Only the originating instance | Records an instance keeps for its own audit but does not federate |
 
@@ -63,6 +63,10 @@ every class above `public`.
 > Stated here rather than left as a pleasant assumption: an implementer reading the
 > paragraph above would otherwise conclude that a signed `GET` from an agreed instance
 > fetches a hub-visibility activity, and it does not.
+>
+> The mechanism is designed in [ADR-0013](adr/0013-authorized-fetch.md) — one gate for
+> reads and writes, admission by class, and an explicit boundary on what the record can
+> ever prove about who read what.
 
 ### The auditor role
 
