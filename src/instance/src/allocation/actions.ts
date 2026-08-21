@@ -72,3 +72,39 @@ export function dispositionStamp(
     "afp:disposes": disposedActionDigest,
   };
 }
+
+/**
+ * The `annotate` disposition (ADR-0011 Decision 2): for an action whose name
+ * was declared irrevocable, the honest disposition is "we cannot undo this,
+ * and here is the record saying so" — it binds the withdrawn justification to
+ * the standing consequence and commands nothing external.
+ *
+ * Deliberately does NOT compose `actionStamp`: it carries no `afp:action`, so
+ * there is nothing for the pinned policy to admit. ADR-0007's disposition duty
+ * still gets satisfied — `afp:disposes` still names the disposed action, and
+ * `afp:actsOn` still binds this activity to the superseding Synthesis — but
+ * the check the verifier runs swaps rather than lapses: it asks whether the
+ * disposed action's name appears in the `afp:irrevocableActions` pinned on the
+ * thread that action was taken on, not whether the action is admissible.
+ */
+export function annotateStamp(
+  disposedActionDigest: string,
+  supersedingSynthesisDigest: string,
+  irrevocableCheck?: { irrevocableActions: readonly string[]; disposedAction: string },
+): { [key: string]: JsonValue } {
+  // Symmetric with `actionStamp`'s policy guard: a writer refuses to claim an
+  // escape hatch its own pins never opened, rather than leaving the verifier to
+  // name it. The check is the disposed action's, not this activity's — the
+  // declaration that matters was pinned on the thread where the irrevocable
+  // thing was done, before it was done (ADR-0011 Decision 2).
+  if (irrevocableCheck && !irrevocableCheck.irrevocableActions.includes(irrevocableCheck.disposedAction)) {
+    throw new Error(
+      `cannot annotate ${irrevocableCheck.disposedAction}: it is not in the pinned afp:irrevocableActions (${[...irrevocableCheck.irrevocableActions].sort().join(", ") || "none"}) — annotation is only available where irreversibility was declared (ADR-0011)`,
+    );
+  }
+  return {
+    "afp:disposition": "annotate",
+    "afp:disposes": disposedActionDigest,
+    "afp:actsOn": supersedingSynthesisDigest,
+  };
+}

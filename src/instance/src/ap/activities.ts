@@ -59,6 +59,14 @@ export interface TaskSpec {
    * degenerate one-bidder auction.
    */
   pins?: TaskPins;
+  /**
+   * ADR-0011 Decision 4: names the closed thread this one continues, when this
+   * task opens a new ask on new information rather than revising the existing
+   * answer. Deliberately NOT part of the pin set — it identifies this thread's
+   * prehistory, not anything about the answer, so a fan-out's opening Offer
+   * may carry it while the rest do not without that reading as pin divergence.
+   */
+  priorThread?: string;
 }
 
 export function offerTask(envelope: Envelope, task: TaskSpec): { [key: string]: JsonValue } {
@@ -76,6 +84,8 @@ export function offerTask(envelope: Envelope, task: TaskSpec): { [key: string]: 
   // of several Offers on one thread must carry a byte-identical set of them —
   // which is why they are built once, as one value, rather than field by field.
   if (task.pins) Object.assign(object, buildPinSet(task.pins));
+  // ADR-0011 Decision 4: outside buildPinSet on purpose — prehistory, not a pin.
+  if (task.priorThread) object["afp:priorThread"] = task.priorThread;
 
   return { ...base(envelope, "Offer"), object };
 }

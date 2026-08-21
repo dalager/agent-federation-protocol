@@ -625,7 +625,15 @@ export class Hub {
    * outbox, and a voter absent from `afp:countedVotes` never had its ballot
    * counted, which is checkable from this record alone.
    */
-  closeRound(round: string): OutboxEntry {
+  /**
+   * `priorQuorumSnapshot` (ADR-0011 Decision 3): pass the ratifying
+   * DecisionRecord's `afp:quorumSnapshot` when this round ratifies a Synthesis
+   * that supersedes one this hub already ratified. The hub never discovers
+   * this on its own — the caller, who knows which answer is being superseded,
+   * supplies it; not persisted in `hub_rounds`, since it is an input to this
+   * one closing call rather than state the round needs to survive a restart.
+   */
+  closeRound(round: string, options?: { priorQuorumSnapshot?: string }): OutboxEntry {
     if (this.status === "archived") throw new Error("hub is archived — terminal, read-only (afp:Archive)");
     const row = loadRound(this.db, round);
     if (!row) throw new Error(`unknown round ${round}`);
@@ -644,6 +652,7 @@ export class Hub {
         quorumSnapshot: row.quorumSnapshot,
         countedVotes,
         weightTally: tally,
+        priorQuorumSnapshot: options?.priorQuorumSnapshot,
       }),
     );
 

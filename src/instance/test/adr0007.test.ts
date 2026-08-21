@@ -157,7 +157,10 @@ describe("ADR-0007 gate: supersession replays end to end", () => {
     });
     const safeDigest = digestOf(safeSynthesis.activity);
 
-    const ratify = async (round: string, outcomeId: string) => {
+    // `priorQuorumSnapshot` is ADR-0011 Decision 3: a round ratifying a
+    // *superseding* answer must name the electorate that ratified the answer
+    // being withdrawn, so a changed panel is visible rather than implied.
+    const ratify = async (round: string, outcomeId: string, priorQuorumSnapshot?: string) => {
       const proposal = hub.proposeRound({ round, thread, question: `Ratify ${outcomeId}?`, options: [outcomeId, "reject"] });
       const snapshot = String((proposal.activity.object as Record<string, unknown>)["afp:quorumSnapshot"]);
       for (const name of AGENTS) {
@@ -167,7 +170,7 @@ describe("ADR-0007 gate: supersession replays end to end", () => {
           ).activity,
         );
       }
-      return hub.closeRound(round);
+      return hub.closeRound(round, priorQuorumSnapshot ? { priorQuorumSnapshot } : undefined);
     };
     const decision1 = await ratify("urn:afp:round:ratify-safe", synthesisId);
     assert.equal((decision1.activity.object as Record<string, unknown>)["afp:outcome"], synthesisId);
@@ -192,7 +195,8 @@ describe("ADR-0007 gate: supersession replays end to end", () => {
       },
     });
     const unsafeDigest = digestOf(unsafeSynthesis.activity);
-    await ratify("urn:afp:round:ratify-unsafe", unsafeId);
+    const safeSnapshot = String((decision1.activity.object as Record<string, unknown>)["afp:quorumSnapshot"]);
+    await ratify("urn:afp:round:ratify-unsafe", unsafeId, safeSnapshot);
 
     publish(instance, hub, "api", thread, {
       type: "afp:Act",

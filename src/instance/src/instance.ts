@@ -36,7 +36,7 @@ import {
   type Envelope,
   type Visibility,
 } from "./ap/activities.ts";
-import { validateActionPolicy, type TaskPins } from "./ap/pins.ts";
+import { validateActionPolicy, validateIrrevocableActions, type TaskPins } from "./ap/pins.ts";
 import type { Brain } from "./brains/port.ts";
 import { Inbox } from "./inbox.ts";
 
@@ -349,8 +349,22 @@ export class AfpInstance {
      * two stories by accident.
      */
     pins?: TaskPins;
+    /**
+     * ADR-0011 Decision 4: the closed thread this ask continues, when the
+     * claim is new information rather than that the old answer was wrong on
+     * what it saw. Beside the pins, deliberately not among them.
+     */
+    priorThread?: string;
   }): OutboxEntry {
-    if (options.pins?.actionPolicy) validateActionPolicy(options.pins.actionPolicy);
+    if (options.pins?.actionPolicy) {
+      validateActionPolicy(options.pins.actionPolicy);
+      // ADR-0011 Decision 1: the escape hatch is only ever as honest as its
+      // declaration, so a name that names no action is refused here rather
+      // than read as live by whoever audits the annotation years later.
+      if (options.pins.irrevocableActions?.length) {
+        validateIrrevocableActions(options.pins.actionPolicy, options.pins.irrevocableActions);
+      }
+    }
     const target = this.actorId(options.to);
     const entry = this.publish(
       options.from,
@@ -367,6 +381,7 @@ export class AfpInstance {
           producedBy: options.producedBy,
           attachments: (options.attachments ?? []).map((ref) => Artifacts.toLink(ref) as JsonValue),
           pins: options.pins,
+          priorThread: options.priorThread,
         }),
     );
 

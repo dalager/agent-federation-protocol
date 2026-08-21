@@ -31,6 +31,13 @@ export interface TaskPins {
   answerSufficiency?: { [key: string]: JsonValue };
   /** ADR-0010 Decision 2: the one actor whose Synthesis is admissible for the thread. */
   synthesizer?: string;
+  /**
+   * ADR-0011 Decision 1: action names, drawn from the pinned policy's own
+   * values, whose external effect cannot be recalled — declared at pin time,
+   * before any answer exists, so the escape hatch it opens (the `annotate`
+   * disposition) is not negotiable after the answers are in.
+   */
+  irrevocableActions?: readonly string[];
 }
 
 /**
@@ -47,6 +54,21 @@ export function validateActionPolicy(policy: ActionPolicy): void {
 }
 
 /**
+ * ADR-0011 Decision 1: every declared irrevocable action name MUST appear as a
+ * value of the pinned policy — a name matching no action declares the
+ * irreversibility of nothing, which is the kind of dead clause an auditor
+ * reasonably reads as a live one.
+ */
+export function validateIrrevocableActions(policy: ActionPolicy, names: readonly string[]): void {
+  const admissible = new Set(Object.values(policy));
+  for (const name of names) {
+    if (!admissible.has(name)) {
+      throw new Error(`afp:irrevocableActions names ${name}, which is not a value of the pinned afp:actionPolicy (ADR-0011)`);
+    }
+  }
+}
+
+/**
  * The pin set as it goes onto the wire — keys present only when supplied.
  *
  * A fan-out builds this once and spreads the same object into every Offer of
@@ -58,5 +80,6 @@ export function buildPinSet(pins: TaskPins): { [key: string]: JsonValue } {
   if (pins.actionPolicy) pinSet["afp:actionPolicy"] = { ...pins.actionPolicy };
   if (pins.answerSufficiency) pinSet["afp:answerSufficiency"] = { ...pins.answerSufficiency };
   if (pins.synthesizer) pinSet["afp:synthesizer"] = pins.synthesizer;
+  if (pins.irrevocableActions?.length) pinSet["afp:irrevocableActions"] = [...pins.irrevocableActions];
   return pinSet;
 }

@@ -3,18 +3,23 @@ per-thread resolution that `action.py` and `allocation.py` both need.
 
 Kept apart from `action.py` for the same reason `decision.py` is kept apart
 from `afp_verify.py`: the pin set is not an actuation concept, it is the
-carrier three other extensions (policy, sufficiency, synthesizer) sit on top
-of, and an auditor asking "what does a pin actually check" should find it in
-one place.
+carrier four other extensions (policy, sufficiency, synthesizer, and
+ADR-0011's irrevocability declaration) sit on top of, and an auditor asking
+"what does a pin actually check" should find it in one place.
 
-`afp:actionPolicy`, `afp:answerSufficiency` and `afp:synthesizer` MAY be
-carried by any task-bearing activity — an `Announce{afp:Task}` or a direct
-`Offer{afp:Task}` — on the `afp:Task` object itself. A thread may carry
-several task-bearing activities (a fan-out of Offers); all of them MUST agree
-on a **pin digest**: `sha256(JCS(pin set))` over the object `{afp:actionPolicy,
-afp:answerSufficiency, afp:synthesizer}` restricted to the keys present. The
-empty pin set is a value like any other — an unpinned Offer added to a pinned
-thread is divergence, not abstention.
+`afp:actionPolicy`, `afp:answerSufficiency`, `afp:synthesizer` and
+`afp:irrevocableActions` MAY be carried by any task-bearing activity — an
+`Announce{afp:Task}` or a direct `Offer{afp:Task}` — on the `afp:Task` object
+itself. A thread may carry several task-bearing activities (a fan-out of
+Offers); all of them MUST agree on a **pin digest**: `sha256(JCS(pin set))`
+over those keys restricted to the ones present. The empty pin set is a value
+like any other — an unpinned Offer added to a pinned thread is divergence, not
+abstention.
+
+`afp:priorThread` sits beside the pins on the same object but deliberately
+outside them (ADR-0011 Decision 4): it identifies the thread's prehistory
+rather than governing the answer, so a fan-out whose opening Offer alone
+carries it must not read as divergence.
 """
 
 from __future__ import annotations
@@ -22,7 +27,12 @@ from __future__ import annotations
 from decision import afp_object, instant_millis
 from proof import digest_of
 
-PIN_KEYS = ("afp:actionPolicy", "afp:answerSufficiency", "afp:synthesizer")
+PIN_KEYS = (
+    "afp:actionPolicy",
+    "afp:answerSufficiency",
+    "afp:synthesizer",
+    "afp:irrevocableActions",
+)
 
 
 def is_task_bearing(activity: dict) -> dict | None:
@@ -169,6 +179,29 @@ def check_pins(report, thread_pool: list[dict]) -> None:
                 "that cannot state its non-answer action is not yet a policy (ADR-0010)",
             )
 
+        # ADR-0011 Decision 1 — every declared name MUST be a value of the
+        # pinned afp:actionPolicy; a name matching none declares the
+        # irreversibility of nothing. Checked OUTSIDE the policy block on
+        # purpose: names drawn from a policy that was never pinned are the
+        # same dead clause in its most complete form, and nesting this under
+        # `if policy` would let that one case through unexamined.
+        irrevocable = governing.get("afp:irrevocableActions")
+        if isinstance(irrevocable, list):
+            policy_values = set(policy.values()) if isinstance(policy, dict) else set()
+            unknown = sorted(name for name in irrevocable if name not in policy_values)
+            report.record(
+                f"pins: {thread} afp:irrevocableActions name actions the policy declares",
+                not unknown,
+                "" if not unknown else
+                f"afp:irrevocableActions names {unknown!r}, matching no value of the "
+                + (
+                    "pinned afp:actionPolicy"
+                    if isinstance(policy, dict)
+                    else "thread's afp:actionPolicy, which is not pinned at all"
+                )
+                + " — a declaration of the irreversibility of nothing (ADR-0011)",
+            )
+
         sufficiency = governing.get("afp:answerSufficiency")
         if isinstance(sufficiency, dict):
             has_award = any(
@@ -186,3 +219,90 @@ def check_pins(report, thread_pool: list[dict]) -> None:
                     "selection rule's minConfidence, neither of which exists in the direct "
                     "flow (ADR-0010)",
                 )
+
+
+def _synthesis_payload(activity: dict) -> dict | None:
+    """Local, deliberately duplicated copy of `action._synthesis_of` — `pins`
+    is imported by `action` at module load, so importing back would cycle."""
+    obj = activity.get("object")
+    if isinstance(obj, dict) and obj.get("type") == "afp:Synthesis":
+        return obj
+    return afp_object(activity, "afp:Synthesis")
+
+
+def check_prior_thread(report, thread_pool: list[dict]) -> None:
+    """ADR-0011 Decision 4 — a thread-opening task activity's `afp:priorThread`
+    resolves to a closed, unretracted thread when the export contains it.
+
+    Not part of the pin set (`afp:priorThread` sits beside the pins on the
+    `afp:Task` object, outside them). A named prior thread absent from this
+    bundle is not a failure — a lawfully scoped ADR-0009 export routinely
+    omits other subjects' threads — and is reported as an out-of-scope
+    reference under its own check name rather than folded into the
+    resolution check or silently skipped, so an auditor sees which case
+    applied. A thread naming itself is always a finding.
+    """
+    seen: set[tuple[str, str]] = set()
+    for activity in thread_pool:
+        task = is_task_bearing(activity)
+        if task is None:
+            continue
+        prior = task.get("afp:priorThread")
+        current = activity.get("context")
+        if not isinstance(prior, str) or not isinstance(current, str):
+            continue
+        key = (current, prior)
+        if key in seen:
+            continue
+        seen.add(key)
+
+        if prior == current:
+            report.record(
+                f"thread: {prior} afp:priorThread resolves to a closed, unretracted thread",
+                False,
+                f"thread {current!r} names itself as its own afp:priorThread — a thread "
+                f"cannot be its own prehistory (ADR-0011)",
+            )
+            continue
+
+        prior_activities = [a for a in thread_pool if a.get("context") == prior]
+        if not prior_activities:
+            report.record(
+                f"thread: {prior} afp:priorThread is out of scope for this export",
+                True,
+                f"referenced by thread {current!r} but not present in this bundle — a "
+                f"lawfully scoped export (ADR-0009) routinely omits other subjects' "
+                f"threads (ADR-0011)",
+            )
+            continue
+
+        is_closed = any(
+            afp_object(a, "afp:Result") is not None or afp_object(a, "afp:Error") is not None
+            for a in prior_activities
+        )
+        superseded = False
+        if is_closed:
+            prior_synth_digests = {
+                digest_of(a) for a in prior_activities if _synthesis_payload(a) is not None
+            }
+            superseded = any(
+                (s := _synthesis_payload(a)) is not None and s.get("afp:supersedes") in prior_synth_digests
+                for a in thread_pool
+            )
+
+        ok = is_closed and not superseded
+        if not ok:
+            detail = (
+                f"thread {prior!r} carries no terminal afp:Result/afp:Error — a 'new ask "
+                f"continuing a closed thread' pointing at a live thread (ADR-0011)"
+                if not is_closed else
+                f"thread {prior!r}'s answer was superseded — its outcome does not stand "
+                f"unretracted (ADR-0011)"
+            )
+        else:
+            detail = ""
+        report.record(
+            f"thread: {prior} afp:priorThread resolves to a closed, unretracted thread",
+            ok,
+            detail,
+        )

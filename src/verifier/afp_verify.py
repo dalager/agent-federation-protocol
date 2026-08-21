@@ -37,7 +37,7 @@ from asset import check_assets
 from action import check_actions, check_supersession
 from decision import afp_object, check_decision_record, check_enroll_authority, instant_millis
 from federation import check_federation, check_joint
-from pins import check_pins
+from pins import check_pins, check_prior_thread
 from proof import CRYPTOSUITE, decode_multikey, digest_of, verify_proof
 
 
@@ -500,6 +500,9 @@ def verify_export(export: Path, thread: str | None, report: Report) -> dict:
     # thread pool — the same pool `check_thread` runs over, because a
     # delegated thread's opening Offer may be authored by the counterparty.
     check_pins(report, thread_pool)
+    # ADR-0011 Decision 4: afp:priorThread resolves to a closed, unretracted
+    # thread when present; an absent one is a lawfully scoped omission.
+    check_prior_thread(report, thread_pool)
 
     # ADR-0005 Decision 2: who was entitled to issue each afp:Enroll. Exports
     # with no enrollment (all of P1) run none of this.

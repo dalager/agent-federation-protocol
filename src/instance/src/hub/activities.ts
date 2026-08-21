@@ -171,24 +171,31 @@ export interface DecisionRecordSpec {
   quorumSnapshot: string;
   countedVotes: readonly string[];
   weightTally: Readonly<Record<string, number>>;
+  /**
+   * ADR-0011 Decision 3: MUST when this record ratifies a *superseding*
+   * Synthesis — the `afp:quorumSnapshot` of the DecisionRecord that ratified
+   * the answer being superseded. Names the electorate, not just its size, so
+   * same-membership re-decision and changed-panel re-decision stop being
+   * indistinguishable on the record.
+   */
+  priorQuorumSnapshot?: string;
 }
 
 /** `Create{afp:DecisionRecord}` — closes every round, L0 or L1 (04 § Decision records). */
 export function decisionRecord(envelope: Envelope, spec: DecisionRecordSpec): { [key: string]: JsonValue } {
-  return {
-    ...base(envelope, "Create"),
-    object: {
-      id: spec.recordId,
-      type: "afp:DecisionRecord",
-      "afp:hub": spec.hub,
-      "afp:round": spec.round,
-      "afp:outcome": spec.outcome,
-      "afp:quorumSnapshot": spec.quorumSnapshot,
-      "afp:countedVotes": [...spec.countedVotes],
-      "afp:weightTally": { ...spec.weightTally },
-      attributedTo: envelope.actor,
-    },
+  const object: { [key: string]: JsonValue } = {
+    id: spec.recordId,
+    type: "afp:DecisionRecord",
+    "afp:hub": spec.hub,
+    "afp:round": spec.round,
+    "afp:outcome": spec.outcome,
+    "afp:quorumSnapshot": spec.quorumSnapshot,
+    "afp:countedVotes": [...spec.countedVotes],
+    "afp:weightTally": { ...spec.weightTally },
+    attributedTo: envelope.actor,
   };
+  if (spec.priorQuorumSnapshot) object["afp:priorQuorumSnapshot"] = spec.priorQuorumSnapshot;
+  return { ...base(envelope, "Create"), object };
 }
 
 // ------------------------------------------------------------------- Lifecycle

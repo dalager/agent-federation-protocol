@@ -77,6 +77,12 @@ export interface AnnounceSpec {
    * a ranking rule, which derives none, has to name instead.
    */
   synthesizer?: string;
+  /**
+   * ADR-0011 Decision 4: names the closed thread this announce continues, when
+   * this task opens a new ask on new information rather than revising the
+   * existing answer. NOT part of the pin set — see `ap/activities.ts` `TaskSpec`.
+   */
+  priorThread?: string;
 }
 
 /** `Announce{afp:Task}` — broadcast through the hub to enrolled members. */
@@ -102,6 +108,7 @@ export function announceTask(envelope: Envelope, spec: AnnounceSpec): { [key: st
   if (spec.actionPolicy) object["afp:actionPolicy"] = { ...spec.actionPolicy };
   if (spec.excludePerformersOf?.length) object["afp:excludePerformersOf"] = [...spec.excludePerformersOf];
   if (spec.synthesizer) object["afp:synthesizer"] = spec.synthesizer;
+  if (spec.priorThread) object["afp:priorThread"] = spec.priorThread;
   return { ...base(envelope, "Announce"), object };
 }
 

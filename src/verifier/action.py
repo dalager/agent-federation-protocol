@@ -204,6 +204,12 @@ def check_actions(report, all_activities: list[dict], thread_pool: list[dict]) -
         ):
             continue
 
+        if activity.get("afp:disposition") == "annotate":
+            # ADR-0011 Decision 2 — an annotate disposition carries no
+            # afp:action, so it has nothing to compare against the policy;
+            # `check_supersession` names and governs it instead.
+            continue
+
         category = synthesis.get("afp:category")
         admissible = policy.get(category) if isinstance(category, str) else None
         claimed = activity.get("afp:action")
@@ -236,14 +242,30 @@ def check_synthesis_pins(report, all_activities: list[dict], thread_pool: list[d
         governing, _ = _governing_pins(activity, all_activities)
         synthesizer = governing.get("afp:synthesizer") if governing else None
         if isinstance(synthesizer, str):
-            ok = activity.get("actor") == synthesizer and synthesis.get("attributedTo") == synthesizer
+            matches_pin = activity.get("actor") == synthesizer and synthesis.get("attributedTo") == synthesizer
+            ok = matches_pin
+            substituted = False
+            if not ok and isinstance(synthesis.get("afp:supersedes"), str):
+                # ADR-0011 Decision 3 — a ratified superseding Synthesis may
+                # substitute the pinned synthesizer; the ratifying quorum is
+                # then the authority for the substitution. An unratified one
+                # still fails — otherwise anyone supersedes by being someone
+                # else.
+                synthesis_id = synthesis.get("id")
+                substituted = any(
+                    (o := afp_object(a, "afp:DecisionRecord")) is not None
+                    and o.get("afp:outcome") == synthesis_id
+                    for a in all_activities
+                )
+                ok = substituted
             report.record(
                 f"synthesis: {label} is emitted by the pinned synthesizer",
                 ok,
                 "" if ok else
                 f"afp:synthesizer names {synthesizer!r}, but this Synthesis has actor "
-                f"{activity.get('actor')!r} / attributedTo {synthesis.get('attributedTo')!r} "
-                f"(ADR-0010)",
+                f"{activity.get('actor')!r} / attributedTo {synthesis.get('attributedTo')!r}, "
+                f"and it is not a ratified supersession — the one substitution a quorum's "
+                f"ratification may make (ADR-0010/ADR-0011)",
             )
 
         # Leg partition and answer-side sufficiency both belong to Decision
@@ -329,6 +351,21 @@ def check_supersession(report, all_activities: list[dict]) -> None:
             for a in all_activities
         )
 
+    def ratifying_decision(outcome_id: str | None) -> dict | None:
+        """The `afp:DecisionRecord` payload whose `afp:outcome` names
+        `outcome_id` — the same by-outcome resolution `ratified()` uses,
+        returning the record itself rather than a bool (ADR-0011 Decision 3:
+        no reverse index from snapshot digest to round)."""
+        if not isinstance(outcome_id, str):
+            return None
+        return next(
+            (
+                o for a in all_activities
+                if (o := afp_object(a, "afp:DecisionRecord")) is not None and o.get("afp:outcome") == outcome_id
+            ),
+            None,
+        )
+
     def acts_on_resolves_to(activity: dict, target_digest: str) -> bool:
         acts_on = activity.get("afp:actsOn")
         if not isinstance(acts_on, str):
@@ -368,14 +405,39 @@ def check_supersession(report, all_activities: list[dict]) -> None:
 
         # Decision 2 — overturning a decision costs what the decision cost.
         if ratified(superseded):
+            superseding_ratified = ratified(superseding)
             report.record(
                 f"supersession: {label} ratified, as the answer it retracts was",
-                ratified(superseding),
-                "" if ratified(superseding) else
+                superseding_ratified,
+                "" if superseding_ratified else
                 "the superseded Synthesis was ratified by a DecisionRecord, the "
                 "superseding one is not — a quorum's answer retracted without a quorum "
                 "(ADR-0007)",
             )
+
+            # ADR-0011 Decision 3 — where both are ratified, the superseding
+            # DecisionRecord names the electorate it overturns, and the name
+            # must be right: it MUST equal the afp:quorumSnapshot actually
+            # carried by the DecisionRecord that ratified the superseded
+            # Synthesis, found by afp:outcome, never by a snapshot-digest
+            # reverse index.
+            if superseding_ratified:
+                superseding_decision = ratifying_decision(label)
+                superseded_decision = ratifying_decision(superseded.get("id"))
+                declared = (
+                    superseding_decision.get("afp:priorQuorumSnapshot")
+                    if superseding_decision else None
+                )
+                actual = superseded_decision.get("afp:quorumSnapshot") if superseded_decision else None
+                snapshot_ok = declared is not None and declared == actual
+                report.record(
+                    f"supersession: {label} names the electorate that ratified the answer it retracts",
+                    snapshot_ok,
+                    "" if snapshot_ok else
+                    f"afp:priorQuorumSnapshot is {declared!r}, but the DecisionRecord that "
+                    f"ratified the superseded Synthesis carries afp:quorumSnapshot {actual!r} "
+                    f"(ADR-0011)",
+                )
 
         # Decision 3 — actions on the withdrawn answer are dealt with. The
         # orphan scan resolves afp:actsOn through zero-or-one DecisionRecord
@@ -390,10 +452,14 @@ def check_supersession(report, all_activities: list[dict]) -> None:
                 continue  # dispositions of earlier actions are not themselves orphaned
             action_digest = digest_of(actor_activity)
             action_label = actor_activity.get("id", "<no id>")
-            disposed = any(
-                a.get("afp:disposes") == action_digest and acts_on_resolves_to(a, superseding_digest)
-                for a in all_activities
+            disposing_activity = next(
+                (
+                    a for a in all_activities
+                    if a.get("afp:disposes") == action_digest and acts_on_resolves_to(a, superseding_digest)
+                ),
+                None,
             )
+            disposed = disposing_activity is not None
             report.record(
                 f"supersession: {action_label} disposed of after its justification was withdrawn",
                 disposed,
@@ -402,3 +468,25 @@ def check_supersession(report, all_activities: list[dict]) -> None:
                 f"of it (afp:disposes + afp:actsOn the superseding Synthesis) — an "
                 f"orphaned consequence (ADR-0007)",
             )
+
+            # ADR-0011 Decision 2 — the annotate disposition satisfies
+            # existence by itself (an annotate carries afp:disposes and
+            # afp:actsOn like any disposition, no afp:action). What it must
+            # additionally satisfy: the disposed action's own name was
+            # declared irrevocable on the governing pins of the thread the
+            # disposed action was taken on — the original action's thread,
+            # not the disposition's — resolved the same way check_actions
+            # resolves any Synthesis-bearing activity's governing pins.
+            if disposing_activity is not None and disposing_activity.get("afp:disposition") == "annotate":
+                governing, _ = _governing_pins(target_activity, all_activities)
+                irrevocable = governing.get("afp:irrevocableActions") if governing else None
+                action_name = actor_activity.get("afp:action")
+                annotate_ok = isinstance(irrevocable, list) and action_name in irrevocable
+                report.record(
+                    f"supersession: {action_label} annotates an action declared irrevocable",
+                    annotate_ok,
+                    "" if annotate_ok else
+                    f"{action_label}'s afp:action {action_name!r} is not among the "
+                    f"afp:irrevocableActions pinned on its own thread — an annotate "
+                    f"disposition against an action never declared irrevocable (ADR-0011)",
+                )
