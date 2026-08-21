@@ -34,6 +34,7 @@ import {
   offerAgreement,
 } from "./federation/federation.ts";
 import { httpTransport } from "./federation/transport.ts";
+import { signRequest } from "./federation/httpSig.ts";
 import { exportBundle, type ExportSummary } from "./export.ts";
 import { jumpClock } from "./demoP3.ts";
 
@@ -99,6 +100,19 @@ async function operator(
       receive: (activity) => instance.receiveAdmitted(activity),
       fetchDocument: fetchActorDocument,
     },
+    // ADR-0013: the read half of the same gate, live on the same port. The
+    // write half above decides who may put an activity in; this decides who
+    // may take one out, on the same deny-list and the same agreements.
+    read: {
+      fetchDocument: fetchActorDocument,
+      isDenylisted: (who) => federation.isDenylisted(who),
+      activeAgreementsWith: (counterparty, at) => federation.activeAgreementsWith(counterparty, at),
+      // No hub in this demo, so no `hub`-class activity is admitted — a
+      // stricter answer than a guessed one (ADR-0013 Decision 3).
+      roleOf: () => null,
+      grants: () => [],
+      now: () => clock.now(),
+    },
   });
   await new Promise<void>((resolveListen) => server.listen(port, "127.0.0.1", resolveListen));
 
@@ -121,6 +135,13 @@ export interface P4DemoResult {
   probeRefusal: string;
   /** HTTP status of an unsigned POST to an inbox — rejected before the gate. */
   unsignedStatus: number;
+  /**
+   * ADR-0013: activities visible on `b-assessor`'s outbox to three callers —
+   * the agreed peer named in them, a signed stranger, and an unsigned one.
+   * The last two must agree: a valid signature with no agreement behind it
+   * buys nothing.
+   */
+  reads: { alpha: number; mallory: number; anonymous: number };
   agreementExpires: string;
   boundaryLog: ReturnType<Federation["boundaryLog"]>;
   boundaryDigest: ReturnType<Federation["boundaryDigest"]>;
@@ -222,6 +243,33 @@ export async function runP4Demo(options: { rootDir?: string; exportRoot?: string
   await beta.instance.run(beta.transport); // Beta's brain answers; Accept + Result cross back
   await alpha.instance.run(alpha.transport); // Alpha's gate admits them
 
+  // --- 4b. The read half of the same gate (ADR-0013). Same URL, three
+  // callers, three answers — and the useful surprise is which two agree.
+  // Mallory holds a valid key and signs correctly; what it lacks is an
+  // agreement, so it is answered exactly as an anonymous stranger is.
+  // "Signed" was never the question.
+  //
+  // Alpha signs as `a-lead` rather than as its instance, and that is the
+  // decision showing its teeth: the activities are addressed to the agent,
+  // and ADR-0013 Decision 3 admits the actor the addressing *names* — being
+  // the operator of a named agent is not admission.
+  const readOutbox = async (as: { operator: Operator; agent: string } | null): Promise<number> => {
+    const target = `${beta.instance.actorId("b-assessor")}/outbox`;
+    const url = new URL(target);
+    let headers: Record<string, string> = { accept: "application/activity+json" };
+    if (as !== null) {
+      const key = as.operator.instance.key(as.agent);
+      const signed = signRequest("GET", url.pathname, url.host, "", key.keyId, key.privateKey, clock.now());
+      headers = { ...headers, host: signed.host, date: signed.date, signature: signed.signature };
+    }
+    const response = await fetch(target, { headers });
+    const body = (await response.json()) as { orderedItems?: unknown[] };
+    return Array.isArray(body.orderedItems) ? body.orderedItems.length : 0;
+  };
+  const readAsAlpha = await readOutbox({ operator: alpha, agent: "a-lead" });
+  const readAsMallory = await readOutbox({ operator: mallory, agent: "m-probe" });
+  const readAnonymous = await readOutbox(null);
+
   // --- 5. Both sides export. Instance actors are vouched onto the roster first —
   // membership is a recorded act, and the verifier resolves signers through it.
   for (const op of [alpha, beta]) {
@@ -244,6 +292,7 @@ export async function runP4Demo(options: { rootDir?: string; exportRoot?: string
     mallory,
     probeRefusal,
     unsignedStatus,
+    reads: { alpha: readAsAlpha, mallory: readAsMallory, anonymous: readAnonymous },
     agreementExpires: expires,
     boundaryLog: beta.federation.boundaryLog(),
     boundaryDigest: beta.federation.boundaryDigest(),

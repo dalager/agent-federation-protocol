@@ -167,6 +167,13 @@ async function main(): Promise<void> {
       console.log(`mallory's signed probe:   ${demo.probeRefusal}`);
       console.log(`mallory's unsigned POST:  ${demo.unsignedStatus} before the gate ever runs\n`);
 
+      // ADR-0013 — the read half, same gate, same port.
+      console.log("signed GET of b-assessor's outbox (same URL, three callers):");
+      console.log(`   alpha (agreed, named)   ${demo.reads.alpha} activities`);
+      console.log(`   mallory (signed only)   ${demo.reads.mallory}`);
+      console.log(`   anonymous (unsigned)    ${demo.reads.anonymous}`);
+      console.log("   a valid signature with no agreement behind it reads exactly what a stranger reads\n");
+
       console.log(`delegation ${demo.delegationThread} — alpha's record:`);
       for (const entry of demo.alpha.instance.outbox.byThread(demo.delegationThread)) {
         console.log(
