@@ -179,7 +179,7 @@ a guess.
 | `afp:Settlement` | Activity | Links prior estimates to observed actuals, releasing deferred reputation adjustment (04) |
 | `afp:bidWindow` | Property (announced Task) | `{opens, closes}` — commits land inside `[opens, closes)`, reveals after `closes` |
 | `afp:selectionRule` | Property (announced Task) | `{name, params}` — a rule from the published registry, pinned before any bid |
-| `afp:answerSufficiency` | Property (announced Task) | Coverage list and/or count that makes an acceptable answer — checkable at replay (ADR-0003) |
+| `afp:answerSufficiency` | Property (task-bearing activity) | Coverage list and/or count that makes an acceptable answer — checkable at replay (ADR-0003). Two readings, one pin: under an Award it is checked against the performers the selection rule picked; in the direct flow, against the count of Results the Synthesis binds. The `coverage` form does not carry over — it is scored against a bid's `afp:coverage` at a rule's `minConfidence`, neither of which exists without an auction (ADR-0010) |
 | `afp:estimatorPolicy`, `afp:estimators` | Properties (announced Task) | The hub's recorded position on estimator/bidder separation, and who it applies to |
 | `afp:commitment` | Property (`afp:bidCommit`) | `sha256(JCS(bid payload))` — the sealed phase carries only this |
 | `afp:winningBids`, `afp:performers`, `afp:synthesizer`, `afp:acceptBy` | Properties (Award) | The recomputable outcome: winning payload digests, performer set, named synthesizer, accept deadline |
@@ -189,9 +189,12 @@ a guess.
 | `afp:reuses` / `afp:reused` | Properties (Bid / Result) | An asset-reuse claim under the sealed commitment, and its delivered closure — both resolvable at replay |
 | `afp:reputationRule` | Property (announced Task) | `{name, params}` — a named pure derivation over settlements, from a small registry; pinned before any bid (ADR-0004) |
 | `afp:settlementSnapshot` | Property (announced Task) | Digests of every `afp:Settlement` the reputation derivation runs over — pinned at announce time, like `afp:quorumSnapshot` pins voters |
-| `afp:actionPolicy` | Property (announced Task) | Closed map `category → admissible action`, pinned before any answer exists — what may be *done* about the answer, recomputable at replay (ADR-0006) |
-| `afp:category` | Property (Synthesis) | The answer's category — MUST be a key of the announce's pinned `afp:actionPolicy` when one exists |
-| `afp:actsOn`, `afp:action` | Properties (any acting activity) | Digest of the Synthesis this action acts on, and the action name it claims — the consequence hash-bound to its cause, checked against the pinned policy |
+| `afp:actionPolicy` | Property (task-bearing activity) | Closed map `category → admissible action`, pinned before any answer exists — what may be *done* about the answer, recomputable at replay (ADR-0006). MUST declare the reserved `afp:no-verdict` category: a policy that cannot state its non-answer action is not yet a policy (ADR-0010) |
+| `afp:no-verdict` | Reserved category | The non-answer terminal. Where sufficiency cannot be met, the synthesizer closes the thread with this category and the actuation loop runs as it would for any other — so terminality always releases whatever waits on it, and an unanswerable ask ends in a verdict rather than parked forever (ADR-0010) |
+| `afp:synthesizer` | Property (task-bearing activity) | The one actor whose `Create{afp:Synthesis}` is admissible for the thread. Where an Award exists its derived synthesizer governs — the pin is the general form, the Award's the derived one (ADR-0003, ADR-0010) |
+| `afp:category` | Property (Synthesis) | The answer's category — MUST be a key of the thread's governing pinned `afp:actionPolicy` when one exists |
+| `afp:absentInputs` | Property (Synthesis) | The legs that contributed no Result: `{afp:correlationId, afp:errorCode, afp:digest}` per missing leg, the digest naming its terminal `Error` where one exists. A Synthesis MAY cover a partial input set, but every leg of its thread is either contributed or declared — missing inputs are never silently dropped (ADR-0010) |
+| `afp:actsOn`, `afp:action` | Properties (any acting activity) | Digest of the Synthesis this action acts on — or of a `DecisionRecord` whose `afp:outcome` names one, resolved by the verifier in exactly one hop so a ratifying deployment can bind to the artifact it actually ratified — and the action name it claims, checked against the pinned policy (ADR-0006, ADR-0010) |
 | `afp:excludePerformersOf` | Property (announced Task) | Prior task ids whose Award performers are excluded from this auction — the estimator wall generalized to any earlier task (ADR-0006) |
 | `afp:supersedes` | Property (Synthesis) | Answer-level retraction: the digest of the Synthesis activity withdrawn — distinct from input-level `afp:supersededInputs`; a ratified answer is superseded only by a ratified one (04, ADR-0007) |
 | `afp:disposes` | Property (any acting activity) | The digest of an action whose justification was withdrawn — paired with `afp:actsOn` on the superseding answer, so no acted-on retraction leaves an orphaned consequence (ADR-0007) |
@@ -229,9 +232,11 @@ classDiagram
         afp:hub?
         afp:bidWindow?
         afp:selectionRule?
-        afp:answerSufficiency?
         afp:estimatorPolicy?
         afp:estimators[]?
+        afp:actionPolicy?
+        afp:answerSufficiency?
+        afp:synthesizer?
         content
         attachment[]
     }
@@ -281,13 +286,15 @@ classDiagram
         afp:weightTally
     }
     class Synthesis {
-        afp:award
+        afp:award?
         afp:method
         afp:answer
         afp:confidence: int %
         afp:contributingResults[]: result digests
         afp:assumptions[]
         afp:dissent[]: first-class
+        afp:category?
+        afp:absentInputs[]?: declared missing legs
     }
     class Settlement {
         afp:task
@@ -421,6 +428,13 @@ enrolled member. Join/leave is enrollment, so senders never track subscriber lis
 Cross-operator allocation — for when the announcer *doesn't* know who should do the task.
 When the target is known, skip all of this and use the direct `Offer` flow; `Bid` sits
 alongside v1's flow, it doesn't replace it.
+
+What the direct flow skips is the *auction*, never the pins. `afp:actionPolicy`,
+`afp:answerSufficiency` and `afp:synthesizer` ride on the `afp:Task` object of whichever
+activity opens the thread — an `Announce` here, a direct `Offer` there — and a thread's
+task-bearing activities MUST agree on the whole set of them, so a fan-out of Offers is
+one story or a named finding. Skipping the ceremony costs nothing checkable; it once
+cost all of it (ADR-0010).
 
 1. **Announce** — `afp:Announce{Task}` broadcast to the hub: task spec, required
    capabilities, deadline, `afp:hub`, the `afp:bidWindow`, the `afp:answerSufficiency`
@@ -566,9 +580,12 @@ policy MAY require the resulting synthesis to be ratified by a vote.
 **Answer sufficiency is not voting quorum.** [02](02-hubs-and-state.md)'s quorum math
 governs *voting* participation. "How many independent answers make an acceptable answer"
 is a separate threshold, and a hub may express it as coverage (all domains spanned), as a
-count (at least 3 independent estimates), or both. State it in the announce
-(`afp:answerSufficiency`), not after — a selection that fails it is a recorded no-award,
-and a replay checks the awarded set against it (ADR-0003).
+count (at least 3 independent estimates), or both. State it up front on the task-bearing
+activity (`afp:answerSufficiency`), not after — a selection that fails it is a recorded
+no-award, and a replay checks the awarded set against it (ADR-0003). Where there is no
+auction to select anything, the same pin is checked against the answer instead: the
+count of Results the Synthesis binds, with `afp:no-verdict` as the declared way to fall
+short (ADR-0010).
 
 ### Declining is a record; silence is not
 

@@ -130,14 +130,27 @@ votes. Some tasks instead produce *"what do we know, and how sure are we"*: an e
 forecast, an assessment, assembled from several agents' partial answers. Collapsing that
 into a single figure destroys the uncertainty and disagreement a requester most needs.
 
-`afp:Synthesis` is the artifact for those. It is emitted by the synthesizer named in the
-Award (03 — Selection rules) and binds the answer to its inputs. Where the announce
-pinned an `afp:actionPolicy` (ADR-0006), the Synthesis MUST also carry `afp:category` —
-one of the policy's keys — because downstream *actions* are checked against
-`policy[category]`, and an answer outside the closed set would constrain nothing. The
-activity that then acts on the answer hash-binds itself to it (`afp:actsOn`,
-`afp:action`), so a replay can ask of any consequence: was this what the answer
-permitted? Its fields:
+`afp:Synthesis` is the artifact for those. It is emitted by **the synthesizer the record
+names** — derived from the Award where an auction ran (03 — Selection rules), or pinned
+as `afp:synthesizer` on the task-bearing activity where none did (ADR-0010) — and binds
+the answer to its inputs. A Synthesis from any other actor fails replay by name; a
+mandate held only in configuration is the claim-without-a-record the roster machinery
+exists to prevent, and it should not become admissible merely because the deployment
+skipped an auction it was told to skip.
+
+Where the thread's governing pins include an `afp:actionPolicy` (ADR-0006), the Synthesis
+MUST also carry `afp:category` — one of the policy's keys — because downstream *actions*
+are checked against `policy[category]`, and an answer outside the closed set would
+constrain nothing. One key is always available: the reserved `afp:no-verdict`, for the
+panel that could not answer. Answering short of the pinned `afp:answerSufficiency` is
+permitted only under that category, and only with the missing legs declared in
+`afp:absentInputs` — a partial answer is a stated one, never a quiet one.
+
+The activity that then acts on the answer hash-binds itself to it (`afp:actsOn`,
+`afp:action`) — naming either the Synthesis or, where a round ratified it, the
+`DecisionRecord` whose `afp:outcome` names it, which the verifier follows in exactly one
+hop. So a replay can ask of any consequence: was this what the answer permitted? Its
+fields:
 
 ```json
 {

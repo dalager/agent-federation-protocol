@@ -3,6 +3,14 @@
 Two supported profiles, one architecture. The protocol is designed so that the solo profile
 is a *degenerate case* of the federated one — never a fork.
 
+That promise has to be maintained, not just made. Scenario 09 found it broken for
+actuation: the solo profile routes almost everything through direct delegation, and the
+policy, sufficiency and synthesizer pins were all anchored to an `Announce` that flow does
+not produce — so three checks silently did nothing in the profile this page calls
+degenerate. ADR-0010 gave the pins a second carrier and replay a second root. The lesson
+generalizes past that fix: *degenerate* means fewer activities, never fewer checks, and a
+mechanism that only functions when an auction ran has forked the profiles without saying so.
+
 ## Federated consortium (the default story)
 
 Multiple operator instances, bilateral `FederationAgreement`s, shared problem-scoped hubs —
