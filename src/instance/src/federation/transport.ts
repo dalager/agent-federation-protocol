@@ -56,13 +56,31 @@ function signedHeaders(
 export function httpTransport(deps: HttpTransportDeps): Transport {
   /** Per-origin scheme preference learned by double-knocking. */
   const preferred = new Map<string, Scheme>();
+  /** Target actor id → its advertised inbox URL (ADR-0017 Decision 3). */
+  const inboxCache = new Map<string, string>();
+
+  // The recipient's inbox is read from its dereferenced actor document (AP
+  // §7.1), never constructed by convention — `${target}/inbox` happens to be
+  // AFP's own layout, but the actor document is the contract. An unfetchable
+  // document or one advertising no inbox is a failed hop for the retry
+  // queue, exactly like a refused POST.
+  const resolveInbox = async (target: string): Promise<URL> => {
+    const cached = inboxCache.get(target);
+    if (cached !== undefined) return new URL(cached);
+    const response = await fetch(target, { headers: { accept: "application/activity+json" } });
+    if (!response.ok) throw new Error(`actor fetch for ${target} failed: ${response.status}`);
+    const doc = (await response.json()) as { inbox?: unknown };
+    if (typeof doc.inbox !== "string") throw new Error(`actor document at ${target} advertises no inbox`);
+    inboxCache.set(target, doc.inbox);
+    return new URL(doc.inbox);
+  };
 
   return {
     name: "http",
     deliver: async (target: string, activity: { [key: string]: JsonValue }): Promise<void> => {
       if (deps.isLocal(target)) return deps.local.deliver(target, activity);
 
-      const inbox = new URL(`${target}/inbox`);
+      const inbox = await resolveInbox(target);
       const body = JSON.stringify(activity);
 
       const first: Scheme = preferred.get(inbox.origin) ?? "rfc9421";

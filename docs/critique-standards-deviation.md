@@ -67,11 +67,27 @@ ADR-0008 chose draft-cavage *for Mastodon compatibility*, but:
 
 Also, `algorithm="hs2019"` with Ed25519 is not what Mastodon accepts.
 
-### 1.4 Delivery resolves inboxes by string concatenation — `status: open`
+### 1.4 Delivery resolves inboxes by string concatenation — `status: fixed-code`
+
+**Resolution (2026-08-21, ADR-0017 Decision 3):** `httpTransport` now dereferences the
+target actor document and reads its `inbox` property (cached per actor id); an
+unfetchable document or one advertising no inbox is a failed hop for the retry queue.
+`sharedInbox` and addressing-collection fan-out remain out of scope by design — that is
+Decision 6's deviations section. Original finding follows.
 
 `federation/transport.ts:32` POSTs to `${target}/inbox` instead of dereferencing the target actor document and reading its `inbox` property (AP §7.1 requires resolving the recipient's inbox). Works between AFP instances by convention; breaks against essentially every real fediverse actor. No `sharedInbox` support; no recipient discovery from `to`/`cc`/`bto`/`bcc`/`audience` (only `to` is ever emitted, `ap/activities.ts:37`).
 
-### 1.5 Advertised URLs that 404 — `status: open`
+### 1.5 Advertised URLs that 404 — `status: fixed-code`
+
+**Resolution (2026-08-21, ADR-0017 Decision 3):** the instance actor now advertises
+`<id>/inbox`/`<id>/outbox` matching the mounted routes (it previously advertised
+`/inbox` while the server mounted `/actor/inbox` — a live mismatch the critique
+missed). `GET /actor/outbox` and `GET /hubs/:id/outbox` are served by the same gated
+implementation as agent outboxes. Collections carry `@context` and page past 50 items
+(`OrderedCollectionPage` with `partOf`/`next`/`prev`); `totalItems` is the collection's
+size, with filtering expressed by page contents. Inbox GET serves the new received-
+delivery log (`inbox_log`) to its owner — the instance's own signature — and answers
+404 to everyone else, per the authorized-fetch rule. Original finding follows.
 
 Actor documents publish `inbox`/`outbox` for the instance and hub actors, but the server routes neither `GET /actor/outbox`, `GET /hubs/:id/outbox`, nor any `GET .../inbox` (`ap/server.ts:152-266`). AP §4.1 requires actors' inbox/outbox to be dereferenceable OrderedCollections. Additionally, the one outbox that *is* served (`/agents/:name/outbox`) lacks `@context`, has no paging (AP §5.1 recommends paged collections), and its `totalItems` reflects the post-filter count rather than the collection size (`ap/server.ts:204-209`).
 
@@ -79,7 +95,12 @@ Actor documents publish `inbox`/`outbox` for the instance and hub actors, but th
 
 The spec example puts `afp:visibility` and `context` on the **object** (`03-coordination.md:12-37`); the code puts both on the **activity envelope** (`ap/activities.ts:39-40`).
 
-### 1.7 Media type — `status: open`
+### 1.7 Media type — `status: fixed-code`
+
+**Resolution (2026-08-21, ADR-0017 Decision 3):** `Accept: application/ld+json;
+profile="https://www.w3.org/ns/activitystreams"` is honoured and answered in kind on
+all AP routes; `application/activity+json` remains the default. Original finding
+follows.
 
 Only bare `application/activity+json` is produced/accepted (`ap/server.ts:26`, `federation/transport.ts:40`). AP §3.2 requires servers to respond to `Accept: application/ld+json; profile="https://www.w3.org/ns/activitystreams"`; treating the two as equivalent is a SHOULD. Plain-JSON handling of the profile parameter is absent.
 

@@ -20,6 +20,7 @@ import { createServer, type Server } from "node:http";
 import type { AfpInstance } from "../instance.ts";
 import { handleInboxPost, type InboxDeps } from "../federation/inbox.ts";
 import { authorizeRead, type ReadAuthorization, type ReadGateDeps } from "../federation/readGate.ts";
+import { AFP_CONTEXTS } from "./documents.ts";
 import type { OutboxEntry } from "../store/outbox.ts";
 import type { JsonValue } from "../crypto/jcs.ts";
 
@@ -55,6 +56,42 @@ export interface ServerOptions {
   }[];
 }
 
+/**
+ * An AS2 collection response (ADR-0017 Decision 3): `@context` on the
+ * document, `OrderedCollection` up to the page threshold, and
+ * `OrderedCollectionPage` with `partOf`/`next`/`prev` beyond it.
+ * `totalItems` is the collection's size; what a given requester may see is
+ * expressed by what the items contain, not by shrinking the count.
+ */
+const PAGE_SIZE = 50;
+function collectionDocument(
+  collectionId: string,
+  items: { [key: string]: unknown }[],
+  totalItems: number,
+  pageParam: string | null,
+): { [key: string]: unknown } {
+  if (pageParam === null && items.length <= PAGE_SIZE) {
+    return { "@context": AFP_CONTEXTS, id: collectionId, type: "OrderedCollection", totalItems, orderedItems: items };
+  }
+  if (pageParam === null) {
+    return { "@context": AFP_CONTEXTS, id: collectionId, type: "OrderedCollection", totalItems, first: `${collectionId}?page=1` };
+  }
+  const page = Math.max(1, Number.parseInt(pageParam, 10) || 1);
+  const start = (page - 1) * PAGE_SIZE;
+  const slice = items.slice(start, start + PAGE_SIZE);
+  const lastPage = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+  return {
+    "@context": AFP_CONTEXTS,
+    id: `${collectionId}?page=${page}`,
+    type: "OrderedCollectionPage",
+    partOf: collectionId,
+    totalItems,
+    ...(page > 1 ? { prev: `${collectionId}?page=${page - 1}` } : {}),
+    ...(page < lastPage ? { next: `${collectionId}?page=${page + 1}` } : {}),
+    orderedItems: slice,
+  };
+}
+
 /** Every outbox entry, anywhere, whose activity JSON mentions this digest — the artifact-visibility query, resource-agnostic. */
 function referencingEntries(instance: AfpInstance, digest: string): OutboxEntry[] {
   const rows = instance.db
@@ -78,7 +115,16 @@ export function createHttpServer(instance: AfpInstance, options: ServerOptions =
     const url = new URL(req.url ?? "/", instance.config.origin);
     const path = url.pathname;
 
-    const send = (status: number, body: unknown, contentType = AP_CONTENT_TYPE): void => {
+    // ADR-0017 Decision 3: `application/ld+json` with the AS2 profile is
+    // honoured as equivalent to `application/activity+json` (AP §3.2) — a
+    // caller that asks for the profile form gets it back.
+    const acceptHeader = String(req.headers.accept ?? "");
+    const negotiatedType =
+      acceptHeader.includes("application/ld+json") && acceptHeader.includes("https://www.w3.org/ns/activitystreams")
+        ? 'application/ld+json; profile="https://www.w3.org/ns/activitystreams"'
+        : AP_CONTENT_TYPE;
+
+    const send = (status: number, body: unknown, contentType = negotiatedType): void => {
       const payload = typeof body === "string" ? body : JSON.stringify(body, null, 2);
       res.writeHead(status, { "content-type": contentType });
       res.end(payload);
@@ -130,7 +176,19 @@ export function createHttpServer(instance: AfpInstance, options: ServerOptions =
           },
           body,
         )
-          .then((outcome) => send(outcome.status, outcome.body, "application/json"))
+          .then((outcome) => {
+            // ADR-0017 Decision 3: an admitted delivery is recorded, so the
+            // inbox has a collection to serve its owner. Refusals leave no
+            // trace here — the log records admissions, not attempts.
+            if (outcome.status === 202) {
+              try {
+                instance.inboxLog.record(path, JSON.parse(body), instance.clock.now());
+              } catch {
+                /* an unparseable body cannot have been admitted */
+              }
+            }
+            send(outcome.status, outcome.body, "application/json");
+          })
           .catch(() => send(500, { error: "internal" }, "application/json"));
       });
       return;
@@ -176,12 +234,23 @@ export function createHttpServer(instance: AfpInstance, options: ServerOptions =
           return send(200, instance.agentDocument(name));
         }
 
-        const outboxMatch = path.match(/^\/agents\/([\w-]+)\/outbox$/);
-        if (outboxMatch) {
-          const name = outboxMatch[1];
-          if (!instance.specs.some((spec) => spec.name === name)) return notFound();
-
-          const entries = instance.outbox.byActor(instance.actorId(name));
+        // ADR-0017 Decision 3: every advertised outbox is served — agent,
+        // instance actor, hosted hub — by one implementation, gated the same
+        // way, paged past a threshold.
+        const outboxActorId = ((): string | null => {
+          if (path === "/actor/outbox") return `${instance.config.origin}/actor`;
+          const agentOutbox = path.match(/^\/agents\/([\w-]+)\/outbox$/);
+          if (agentOutbox) {
+            return instance.specs.some((spec) => spec.name === agentOutbox[1]) ? instance.actorId(agentOutbox[1]) : null;
+          }
+          const hubOutbox = path.match(/^\/hubs\/([\w-]+)\/outbox$/);
+          if (hubOutbox && options.hubs?.some((h) => h.hubId === hubOutbox[1])) {
+            return `${instance.config.origin}/hubs/${hubOutbox[1]}`;
+          }
+          return null;
+        })();
+        if (outboxActorId !== null) {
+          const entries = instance.outbox.byActor(outboxActorId);
 
           let auth: ReadAuthorization | null = null;
           let items: { [key: string]: unknown }[];
@@ -204,12 +273,22 @@ export function createHttpServer(instance: AfpInstance, options: ServerOptions =
             items = entries.filter((entry) => entry.visibility === "public").map((entry) => entry.activity);
           }
 
-          return send(200, {
-            id: `${instance.actorId(name)}/outbox`,
-            type: "OrderedCollection",
-            totalItems: items.length,
-            orderedItems: items,
-          });
+          return send(200, collectionDocument(`${outboxActorId}/outbox`, items, entries.length, url.searchParams.get("page")));
+        }
+
+        // ADR-0017 Decision 3: a GET on an inbox serves the received-delivery
+        // log — to its owner. Anyone else gets the gate's ordinary answer,
+        // 404, indistinguishable from the route not existing; that is the
+        // authorized-fetch rule, not an unrouted hole.
+        if (path === "/actor/inbox" || /^\/(agents|hubs)\/[\w-]+\/inbox$/.test(path)) {
+          if (!options.read) return notFound();
+          const auth = await authorizeRead(options.read, { path, headers: readHeaders });
+          markUncacheable();
+          const self = `${instance.config.origin}/actor`;
+          const owner = auth.requester !== null && (auth.requester.agent === self || auth.requester.operatedBy === self);
+          if (!owner) return notFound();
+          const items = instance.inboxLog.byRecipient(path);
+          return send(200, collectionDocument(`${instance.config.origin}${path}`, items, items.length, url.searchParams.get("page")));
         }
 
         const artifactMatch = path.match(/^\/artifacts\/(sha256-[0-9a-f]{64})$/);

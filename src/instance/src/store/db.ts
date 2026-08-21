@@ -27,6 +27,17 @@ CREATE TABLE IF NOT EXISTS outbox (
   UNIQUE (actor, seq)
 );
 
+-- Received deliveries, by recipient inbox path (ADR-0017 Decision 3): what a
+-- GET on an inbox serves to its owner. Admission already happened at the gate;
+-- this is the record of it, not a second judgment.
+CREATE TABLE IF NOT EXISTS inbox_log (
+  activity_id   TEXT NOT NULL,
+  recipient     TEXT NOT NULL,          -- the inbox path the delivery hit
+  activity_json TEXT NOT NULL,
+  received_at   TEXT NOT NULL,
+  PRIMARY KEY (activity_id, recipient)
+);
+
 -- Layer 1 of 2: transport dedupe. A redelivered activity id never reaches dispatch.
 CREATE TABLE IF NOT EXISTS seen_ids (
   activity_id TEXT PRIMARY KEY,

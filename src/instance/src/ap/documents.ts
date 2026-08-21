@@ -61,8 +61,11 @@ export function instanceActor(
     type: ["Application", "afp:Instance"],
     name,
     "afp:operator": operator,
-    inbox: `${origin}/inbox`,
-    outbox: `${origin}/outbox`,
+    // `<id>/inbox` and `<id>/outbox`, matching the routes the server actually
+    // mounts — an actor document must never advertise a URL that is not
+    // served (ADR-0017 Decision 3).
+    inbox: `${id}/inbox`,
+    outbox: `${id}/outbox`,
     "afp:roster": `${origin}/roster`,
     "afp:policy": `${origin}/.well-known/afp-policy`,
     "afp:visibility": "public",

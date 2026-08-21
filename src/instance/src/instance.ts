@@ -14,6 +14,7 @@ import { loadOrCreateKeyPair, type KeyPair } from "./crypto/keys.ts";
 import { attachProof, digestOf } from "./crypto/proof.ts";
 import { openDb, type Db } from "./store/db.ts";
 import { Outbox, type OutboxEntry } from "./store/outbox.ts";
+import { InboxLog } from "./store/inboxLog.ts";
 import { SeenIds } from "./store/dedupe.ts";
 import { Tasks } from "./store/tasks.ts";
 import { Artifacts, type ArtifactRef } from "./store/artifacts.ts";
@@ -60,6 +61,7 @@ export const systemClock: Clock = { now: () => new Date() };
 export class AfpInstance {
   readonly db: Db;
   readonly outbox: Outbox;
+  readonly inboxLog: InboxLog;
   readonly seen: SeenIds;
   readonly tasks: Tasks;
   readonly artifacts: Artifacts;
@@ -82,6 +84,7 @@ export class AfpInstance {
     mkdirSync(config.dataDir, { recursive: true });
     this.db = openDb(config.dbPath);
     this.outbox = new Outbox(this.db);
+    this.inboxLog = new InboxLog(this.db);
     this.seen = new SeenIds(this.db, config.seenIdTtlMs);
     this.tasks = new Tasks(this.db);
     this.artifacts = new Artifacts(this.db, config.artifactDir, config.origin);

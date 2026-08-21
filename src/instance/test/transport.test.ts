@@ -31,10 +31,17 @@ function transport() {
   });
 }
 
-/** Record each request's scheme; answer per a scripted status list. */
+/**
+ * Record each POST's scheme; answer per a scripted status list. GETs are the
+ * actor-document dereference (ADR-0017 Decision 3) and answer with an actor
+ * whose advertised inbox is `<id>/inbox`.
+ */
 function scriptedFetch(statuses: number[]) {
   const schemes: string[] = [];
-  globalThis.fetch = (async (_url: unknown, init?: { headers?: Record<string, string> }) => {
+  globalThis.fetch = (async (url: unknown, init?: { method?: string; headers?: Record<string, string> }) => {
+    if ((init?.method ?? "GET") === "GET") {
+      return new Response(JSON.stringify({ id: String(url), inbox: `${String(url)}/inbox` }), { status: 200 });
+    }
     schemes.push(init?.headers?.["signature-input"] ? "rfc9421" : "cavage");
     const status = statuses[Math.min(schemes.length - 1, statuses.length - 1)];
     return new Response(status < 300 ? "{}" : '{"error":"no"}', { status });
