@@ -195,6 +195,31 @@ there was no hub; P5 cannot, and five of the seven findings are one decision wea
 different faces — who hosts it, how a member proves membership to a third party, what
 members do while the host is partitioned, and whose state the case file carries.
 
+**Triaged into two proposed ADRs and one amendment**, grouped by the decision each finding
+forces rather than by the subject it touches:
+
+- [ADR-0014](../adr/0014-p5-shared-hub-stack.md) — the P5 shared-hub stack (43, 44, 45,
+  46): everything that changes how the **hub itself** behaves and how members relate to it.
+  `afp:MembershipProof` so a member can prove enrollment to a peer that does not host the
+  hub; the host-as-participant problem and a sanctioned degraded mode; the hub as the
+  sequencing authority its members' clocks cannot be; and a quorum that can tell silence
+  from refusal. Follows the P2/P3/P4 stack-ADR convention.
+- [ADR-0015](../adr/0015-the-case-file-at-n-parties.md) — the case file at N parties (47,
+  49, and the second half of 48): what an export *proves* once there are more than two of
+  them. Extends ADR-0009's join from a pair to all-pairs, carries the hub's converged state
+  into the record via `afp:Archive`, and makes a per-domain check census visible so a
+  bundle that checked nothing cannot pass as a clean one.
+- **An amendment to [ADR-0010](../adr/0010-pinning-without-an-auction.md)** for the first
+  half of 48 — its own open question, that a redacted pin-bearing `Offer` leaves a thread
+  whose pins resolve to nothing. That is a live hole *today* at N=1, not a P5 problem, and
+  it wants closing before P5 widens the redaction surface rather than after.
+
+Build order follows the dependencies rather than the numbering: the ADR-0010 amendment
+first (small, and it is a correctness hole in shipped code), then ADR-0014 with finding 43
+first inside it — it is what unblocks ADR-0013's `hub` reads and therefore the scenario's
+third beat — then ADR-0015, which needs a working three-party flow to have anything to
+replay.
+
 | # | Finding | Candidate |
 |---|---|---|
 | 43 | `afp:MembershipProof` is a noun with no mechanism, and it blocks the read path: a hub-class activity lives in its author's outbox, but the fetching member is enrolled in a hub the author does not host, so ADR-0013's `hub` predicate (scoped to locally-hosted hubs) refuses every cross-member read | Define it — a signed, expiring statement by the hub naming agent, hub and role, presented by the fetcher and verified against the hub's published key |

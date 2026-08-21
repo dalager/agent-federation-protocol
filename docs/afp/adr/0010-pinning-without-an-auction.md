@@ -280,7 +280,18 @@ this ADR adds silently no-ops, in precisely scenario 09's audit deliverable. The
 candidate rule is one line — *a pin-bearing task activity MUST be at least as visible as
 the answers it governs*, enforced at export — but it is a constraint on ADR-0009's
 export-time transform, not on this ADR's pin, and it wants deciding alongside the
-content-inventory question ADR-0012 already has open. **The gate does not cover this, deliberately and visibly.** A test asserting the desired
+content-inventory question ADR-0012 already has open. **Reopened by campaign 7 (2026-08-21), and now scheduled rather than merely noted.**
+Scenario 10 met this again at three parties and found it gets *harder* to see, not easier:
+phase one of a joint replay is per-domain, so a bundle whose pin checks all no-opped reads
+exactly like one whose checks all passed, with two clean bundles' output filling the
+report around it. [ADR-0015](0015-the-case-file-at-n-parties.md) Decision 2 adds the
+per-domain check census that makes the silence visible — but a census reports the hole, it
+does not close it. Closing it is an amendment to *this* ADR, and it is a correctness
+defect at N=1 today, not a P5 problem: the fix belongs where the rule was decided, and it
+should land before P5 widens the redaction surface. Campaign 7 triages it as its own track
+for that reason.
+
+**The gate does not cover this, deliberately and visibly.** A test asserting the desired
 behaviour would fail, because the behaviour is not built: stub the pin-bearing `Offer` and
 the thread simply has no task activity, so the pins resolve to nothing and every check
 here silently no-ops — which is the hole, not a bug to be caught. Writing a test that
