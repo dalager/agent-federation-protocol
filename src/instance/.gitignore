@@ -1,6 +1,7 @@
 node_modules/
 package-lock.json
 data/
+data-p4/
 export/
 # demo outputs: demo:p2, demo:p3, demo:p3:llm
 export-*/

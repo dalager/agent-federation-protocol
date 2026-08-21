@@ -1,4 +1,4 @@
-# AFP reference instance — P1 + P2 + P3
+# AFP reference instance — P1 + P2 + P3 + P4
 
 **P1**: one instance, two agents, one verifiable record — no network
 ([05 § P1](../../docs/afp/05-roadmap.md#p1--one-instance-two-agents-one-verifiable-record)).
@@ -9,6 +9,12 @@ L0 weighted-quorum deliberation closing with a signed `afp:DecisionRecord`
 deterministic selection rule (ranking or coverage set-selection), a
 recomputable `afp:Award` with coalition + synthesizer, ratified `afp:Synthesis`,
 and `afp:Settlement` ([ADR-0003](../../docs/afp/adr/0003-p3-allocation-stack.md)).
+**P4**: federation — two instances, real HTTP, HTTP-Signature-authenticated
+inboxes, `afp:FederationAgreement` handshakes, a grant-checking boundary gate
+with a hash-chained refusal log
+([ADR-0008](../../docs/afp/adr/0008-p4-federation-stack.md)), and the
+federated joint replay with lawful redaction
+([ADR-0009](../../docs/afp/adr/0009-federated-replay.md)).
 
 ```bash
 npm run demo          # P1: writer drafts, reviewer critiques, bundle exported
@@ -16,8 +22,9 @@ npm run demo:offline  # the same, against deterministic brains
 npm run demo:p2       # P2: 30 agents agree on the best policy (-> ./export-p2)
 npm run demo:p3       # P3: two auctions, coalition award, synthesis (-> ./export-p3)
 npm run demo:p3:llm   # the same auction, answers written by a real local model
-npm run gate          # the acceptance gate: P1's 11 checks + CRDT + hub + auction
-npm run serve         # the public HTTP surface
+npm run demo:p4       # P4: three instances over real HTTP, one boundary (-> ./export-p4)
+npm run gate          # the acceptance gate: P1's 11 checks + CRDT + hub + auction + boundary
+npm run serve         # the public HTTP surface + the federation inbox
 ```
 
 Requires **Node 22.5+** (24+ recommended). No build step — Node runs the
@@ -143,6 +150,147 @@ small model occasionally combines the partial ranges wrongly, and that
 discretion is exactly what the L0 round and the recorded dissent exist to
 catch.
 
+## The P4 demo
+
+Three instances come up on real localhost ports, each its own trust boundary —
+Alpha (`a-lead`), Beta (`b-assessor`, `b-private`), and Mallory (`m-probe`).
+Nothing is mocked: real HTTP, real Ed25519 HTTP Signatures on every inbox POST,
+real SQLite state per operator (under `./data-p4/`).
+
+```
+agreement: alpha <-> beta, direct-delegation grant for afp:cap:assess
+           dual-Create, expires 2026-08-17T10:00:05.000Z
+
+mallory's signed probe:   inbox POST … refused: 403
+mallory's unsigned POST:  401 before the gate ever runs
+
+delegation urn:afp:thread:sub-1 — alpha's record:
+   1  a-lead     Offer{afp:Task}  (own outbox)
+   -  b-assessor Accept  (received across the boundary)
+   -  b-assessor Create{afp:Result}  (received across the boundary)
+
+beta's boundary log (1 entries, hash-chained):
+  agreement  no agreement with http://…/actor — hard reject, unopened
+```
+
+The story, in order:
+
+1. **Handshake** — Alpha and Beta each publish a signed
+   `Create{afp:FederationAgreement}` over one byte-identical object
+   (dual-Create). One Create is an offer on the record, not a permission;
+   nothing is active until both exist.
+2. **The gate** — Mallory's Offer is validly signed but party to no agreement:
+   hard 403, and the refusal lands in Beta's hash-chained boundary log. An
+   unsigned POST gets 401 before the gate even runs. A read of a
+   `parties`-scoped record gets **404, not 403** — while actor documents stay
+   public, because fetching a counterparty's key is the bootstrap.
+3. **Delegation** — the P1 Offer/Accept/Result flow, with a firewall in it.
+   Beta's Accept and Result cross back through Alpha's signed inbox; admitted
+   foreign activities live in Alpha's *received* store, never in its own chain.
+4. **Two exports, one engagement** — Alpha exports in full. Beta exports
+   *scoped*: only the handshake and engagement threads, with another client's
+   work replaced in chain position by digest-only `afp:Redacted` stubs and an
+   uninvolved agent (`b-private`) listed as a declared omission in the
+   manifest. Discretion is lawful; deletion is not.
+
+The auditor's two folders become one command:
+
+```bash
+python3 ../verifier/afp_verify.py export-p4/alpha export-p4/beta --verbose
+# PASSED — 100 checks, no gaps
+```
+
+The joint replay checks what neither bundle can prove alone: the agreement
+object is digest-equal in both exports (no two-story agreements), every
+received activity matches the sender's own record byte for byte (no
+divergence), every redaction stub declares the digest it stands in for (no
+silent deletion), and every cross-boundary activity was admitted by a named
+grant. `test/adr0009.test.ts` breaks each of these one at a time and asserts
+the verifier fails by name.
+
+## Using a running instance
+
+`npm run serve` starts the real HTTP surface — the same one the P4 demo runs
+three of. What it exposes:
+
+```
+GET  /actor                     the instance actor document (public — carries the key)
+GET  /roster                    the signed roster, derived from the Vouch trail
+GET  /agents/:name              an agent's actor document (public)
+GET  /agents/:name/outbox       that agent's outbox — public activities only
+POST /actor/inbox               the federation inbox (instance-level)
+POST /agents/:name/inbox        the federation inbox (agent-level)
+```
+
+Reads are open but filtered: an unauthenticated fetch sees only `public`
+activities, and anything above that returns 404 — non-existence and
+non-authorisation are indistinguishable by design.
+
+Writes are the boundary. Every inbox POST passes, in order:
+
+1. **HTTP Signature verification** (`(request-target) host date digest`,
+   Ed25519) — the signer's key is resolved by unauthenticated fetch of its
+   actor document. Fails → 401.
+2. **The agreement gate** — the sender's instance must hold an active
+   `afp:FederationAgreement` with this one, carrying a grant that admits this
+   activity's type/capability. Handshake traffic (`Offer`/`Create` over an
+   `afp:FederationAgreement` object) bypasses the grant check — it is the
+   door-knock — but never the signature check or the deny-list. Fails → 403,
+   and an entry in the hash-chained boundary log.
+3. **The same dispatch local delivery feeds** — dedupe, task table, brains.
+
+### Wiring two instances together
+
+Each operator sets an origin and a port, then serves:
+
+```bash
+# terminal 1 — Alpha
+AFP_ORIGIN=http://127.0.0.1:8787 AFP_PORT=8787 AFP_DATA_DIR=./data-alpha npm run serve
+
+# terminal 2 — Beta
+AFP_ORIGIN=http://127.0.0.1:8788 AFP_PORT=8788 AFP_DATA_DIR=./data-beta npm run serve
+```
+
+`AFP_ORIGIN` must be the URL the *other* side can actually reach — it is baked
+into every actor id and key id, so signature verification resolves keys through
+it. (In production it is your public HTTPS origin; the two `127.0.0.1` origins
+above are the local two-terminal case.)
+
+A cold instance answers GETs immediately:
+
+```bash
+curl -s http://127.0.0.1:8787/actor | python3 -m json.tool   # the key is in assertionMethod
+curl -s http://127.0.0.1:8787/roster | python3 -m json.tool
+curl -s http://127.0.0.1:8787/agents/writer/outbox
+```
+
+But its inbox admits nothing yet — there is no agreement. Establishing one is
+a *recorded act by both operators*, not a config entry: each side publishes a
+signed `Create{afp:FederationAgreement}` over the byte-identical object and
+delivers it to the other's inbox. There is deliberately no
+`afp federate <url>` one-shot command — an agreement that one side could
+manufacture alone would not be an agreement. The programmatic sequence is:
+
+```ts
+const object = agreementObject({ parties: [selfActorId, otherActorId], grants, expires });
+const create = instance.publishAsInstance([otherActorId], thread, "parties",
+  (envelope) => createAgreement(envelope, object));
+federation.recordOwnCreate(object, create.activity);
+await instance.run(transport);   // your Create crosses; theirs activates the row on arrival
+```
+
+`src/demoP4.ts` is the working reference for the full wiring — operator setup
+(~40 lines), handshake, delegation, and the scoped export. Adapt it rather
+than reinventing it; `test/adr0008.test.ts` additionally exercises expiry,
+deny-listing, and the in-flight-work exception.
+
+Once an agreement is active, cross-boundary work is the ordinary P1 flow:
+publish an `Offer{afp:Task}` addressed to the counterparty's agent and run the
+HTTP transport; their Accept/Result arrive back through your inbox, verified
+and gate-checked, into your received store. At any point, export
+(`npm run export`, or `exportBundle(...)` with a scope) and hand the folder —
+or both operators' folders together — to the Python verifier.
+
 ## Defining the agent collection
 
 `src/profiles.ts` is the recipe: **one `AgentProfile` per agent, from which
@@ -221,18 +369,31 @@ src/
     allocator.ts     admission gate, award/reauction sweep, settlements
     store.ts         auctions, bids, declines, admission audit log,
                      pending accepts, settlements — same SQLite file
+  federation/        P4: the boundary (ADR-0008/0009)
+    federation.ts    agreements (dual-Create), gate outcomes, boundary log,
+                     received store, deny-list — all in the same SQLite file
+    httpSig.ts       HTTP Signatures ((request-target) host date digest, Ed25519)
+    transport.ts     the delivery port over real HTTP; local targets short-circuit
+    inbox.ts         the receiving half: verify, then gate, then dispatch
+    grants.ts        which grant admits which activity — and summarize() for logs
+    ingest.ts        what crosses is sandboxed and summarized, never trusted
+    visibility.ts    what an authenticated counterparty may read
   profiles.ts        agent profiles: one declaration per agent — roster
                      capabilities, bid coverage, cost posture, persona — plus
                      the collection-level coverage assertion
   instance.ts        the adapter stack: signing, chain, gate, dedupe, dispatch
   export.ts          the bundle you hand to a third party — hub outboxes included
-  demo.ts, demoP2.ts, demoP3.ts, experimentP3.ts, cli.ts
+  demo.ts, demoP2.ts, demoP3.ts, demoP4.ts, experimentP3.ts, cli.ts
 test/gate.test.ts    the 11 P1 acceptance checks
 test/crdt.test.ts    P2: merge property tests (commutative/associative/idempotent)
 test/hub.test.ts     P2: enrollment, a full L0 round, lifecycle, and the
                      end-to-end replay through the Python verifier
 test/allocation.test.ts  P3: rule determinism, sealed-bid admission, reauction
                      sweep, and the end-to-end replay incl. three mutations
+test/adr0008.test.ts P4: two instances over real HTTP — handshake, probe,
+                     delegation, expiry, deny-list, boundary-log chain
+test/adr0009.test.ts P4: the federated joint replay, plus four named breakages
+                     (silent deletion, divergence, two-story agreement, blank stub)
 ```
 
 ## The boundary
@@ -289,9 +450,9 @@ own identifier there.
 
 ## What this instance deliberately does not do yet
 
-Federation agreements, real HTTP transport between instances, HTTP Signatures,
-gossip anti-entropy, cross-operator bidding, Mastodon visibility. Those are
-P4–P7. What P1 *does* carry is the whole integrity floor —
+Gossip anti-entropy, cross-operator hubs and bidding, Mastodon visibility.
+Those are P5–P7. Federation agreements, real HTTP transport, and HTTP
+Signatures landed with P4. What P1 *does* carry is the whole integrity floor —
 signing, hash-chained outboxes, visibility classes and hash-addressed evidence —
 because those four are nearly free at two agents and cannot be backfilled later.
 

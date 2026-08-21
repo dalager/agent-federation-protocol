@@ -14,6 +14,19 @@ import { exportBundle } from "./export.ts";
 
 const command = process.argv[2] ?? "demo";
 
+/** Last path segment — enough of a name for console narration. */
+const short = (url: unknown): string | undefined => String(url).split("/").pop();
+
+/** `Offer{afp:Task}`-style label for an activity. */
+function activityLabel(activity: { type?: unknown; object?: unknown }): string {
+  const object = activity.object;
+  const objectType =
+    object && typeof object === "object" && !Array.isArray(object)
+      ? String((object as Record<string, unknown>).type ?? "")
+      : "";
+  return objectType ? `${activity.type}{${objectType}}` : String(activity.type);
+}
+
 async function main(): Promise<void> {
   switch (command) {
     case "demo": {
@@ -37,15 +50,8 @@ async function main(): Promise<void> {
 
       console.log(`\nthread ${thread} — ${entries.length} activities\n`);
       for (const entry of entries) {
-        const object = entry.activity.object;
-        const objectType =
-          object && typeof object === "object" && !Array.isArray(object)
-            ? String((object as Record<string, unknown>).type ?? "")
-            : "";
-        const label = objectType ? `${entry.activity.type}{${objectType}}` : String(entry.activity.type);
-        const actor = String(entry.actor).split("/").pop();
         console.log(
-          `  ${String(entry.seq).padStart(2)}  ${actor?.padEnd(9)} ${label.padEnd(20)} ${entry.visibility}`,
+          `  ${String(entry.seq).padStart(2)}  ${short(entry.actor)?.padEnd(9)} ${activityLabel(entry.activity).padEnd(20)} ${entry.visibility}`,
         );
       }
 
@@ -146,6 +152,50 @@ async function main(): Promise<void> {
       break;
     }
 
+    case "p4": {
+      const { runP4Demo } = await import("./demoP4.ts");
+      const demo = await runP4Demo();
+
+      console.log(`\nalpha   ${demo.alpha.origin}  (a-lead)`);
+      console.log(`beta    ${demo.beta.origin}  (b-assessor, b-private)`);
+      console.log(`mallory ${demo.mallory.origin}  (m-probe)\n`);
+
+      console.log(`agreement: alpha <-> beta, direct-delegation grant for afp:cap:assess`);
+      console.log(`           dual-Create, expires ${demo.agreementExpires}`);
+      console.log(`           active on alpha: ${demo.alpha.federation.activeAgreementsWith(demo.beta.actorId).length}, on beta: ${demo.beta.federation.activeAgreementsWith(demo.alpha.actorId).length}\n`);
+
+      console.log(`mallory's signed probe:   ${demo.probeRefusal}`);
+      console.log(`mallory's unsigned POST:  ${demo.unsignedStatus} before the gate ever runs\n`);
+
+      console.log(`delegation ${demo.delegationThread} — alpha's record:`);
+      for (const entry of demo.alpha.instance.outbox.byThread(demo.delegationThread)) {
+        console.log(
+          `  ${String(entry.seq).padStart(2)}  ${short(entry.actor)?.padEnd(10)} ${activityLabel(entry.activity)}  (own outbox)`,
+        );
+      }
+      // What crossed the boundary inbound sits in the received store, verified
+      // and gate-admitted — never in alpha's own chain.
+      for (const received of demo.alpha.federation.receivedActivities()) {
+        if (received.activity.context !== demo.delegationThread) continue;
+        console.log(
+          `   -  ${short(received.activity.actor)?.padEnd(10)} ${activityLabel(received.activity)}  (received across the boundary)`,
+        );
+      }
+
+      console.log(`\nbeta's boundary log (${demo.boundaryLog.length} entries, hash-chained):`);
+      for (const entry of demo.boundaryLog) {
+        console.log(`  ${entry.step.padEnd(10)} ${entry.reason} — ${short(entry.actor)}`);
+      }
+      console.log(`boundary digest: ${demo.boundaryDigest["afp:entryCount"]} entries, root ${String(demo.boundaryDigest["afp:logRoot"]).slice(0, 26)}…\n`);
+
+      console.log(`export:   alpha full     — ${demo.exports.alpha.activities} activities -> ${demo.exports.alpha.dir}`);
+      console.log(`          beta  scoped   — ${demo.exports.beta.activities} activities -> ${demo.exports.beta.dir}`);
+      console.log(`          (beta's other-client thread is redaction stubs; b-private a declared omission)`);
+      console.log(`\nverify it:  python3 ../verifier/afp_verify.py export-p4/alpha export-p4/beta --verbose\n`);
+      await demo.close();
+      break;
+    }
+
     case "export": {
       const config = loadConfig();
       const instance = new AfpInstance(config, agentRegistrations(config));
@@ -158,17 +208,33 @@ async function main(): Promise<void> {
     case "serve": {
       const config = loadConfig();
       const instance = new AfpInstance(config, agentRegistrations(config));
-      const server = createHttpServer(instance);
+
+      // ADR-0008: the federation gate and signed inbox are live on a served
+      // instance — POST {actor}/inbox verifies the HTTP Signature, then the
+      // agreement gate, then dispatches like local delivery.
+      const { Federation } = await import("./federation/federation.ts");
+      const { fetchActorDocument } = await import("./federation/inbox.ts");
+      const actorId = String(instance.instanceDocument().id);
+      const federation = new Federation(instance.db, actorId, () => instance.clock.now());
+
+      const server = createHttpServer(instance, {
+        inbox: {
+          federation,
+          receive: (activity) => instance.receiveAdmitted(activity),
+          fetchDocument: fetchActorDocument,
+        },
+      });
       server.listen(config.httpPort, () => {
-        console.log(`AFP instance on http://localhost:${config.httpPort}`);
-        console.log("  GET /actor  /roster  /agents/:name  /agents/:name/outbox");
+        console.log(`AFP instance on http://localhost:${config.httpPort}  (origin: ${config.origin})`);
+        console.log("  GET  /actor  /roster  /agents/:name  /agents/:name/outbox");
+        console.log("  POST /actor/inbox  /agents/:name/inbox   (HTTP Signature + agreement gate)");
         console.log("  everything above `public` returns 404 to an unauthenticated fetch");
       });
       break;
     }
 
     default:
-      console.error(`unknown command: ${command}\nusage: cli.ts [demo|p2|p3|export|serve]`);
+      console.error(`unknown command: ${command}\nusage: cli.ts [demo|p2|p3|p4|export|serve]`);
       process.exit(1);
   }
 }

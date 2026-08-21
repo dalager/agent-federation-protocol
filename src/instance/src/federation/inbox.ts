@@ -33,6 +33,21 @@ export interface InboxDeps {
   fetchDocument: (url: string) => Promise<{ [key: string]: JsonValue } | null>;
 }
 
+/**
+ * The default `fetchDocument`: the unauthenticated actor-document GET the
+ * whole signature regress bootstraps on. One implementation — a change to it
+ * (timeout, redirect policy, content-type check) is security-relevant and
+ * must not fork between the served instance and the demos.
+ */
+export async function fetchActorDocument(url: string): Promise<{ [key: string]: JsonValue } | null> {
+  try {
+    const response = await fetch(url, { headers: { accept: "application/activity+json" } });
+    return response.ok ? ((await response.json()) as { [key: string]: JsonValue }) : null;
+  } catch {
+    return null;
+  }
+}
+
 export interface InboxOutcome {
   status: number;
   body: { [key: string]: JsonValue };

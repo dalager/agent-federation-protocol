@@ -43,6 +43,15 @@ enforced at bid admission. Both rule families are independently reimplemented in
 Python verifier, which rebuilds the admitted bid pool from the record alone. Stack:
 [ADR-0003](docs/afp/adr/0003-p3-allocation-stack.md).
 
+**P4 is built** — federation. Two instances, each its own trust boundary, over real HTTP:
+HTTP-Signature-authenticated inboxes, `afp:FederationAgreement` established by dual-Create
+over one byte-identical object, a grant-checking gate whose refusals land in a hash-chained
+boundary log, and lawful redaction at export — digest-only stubs in chain position, omitted
+actors declared in the manifest. Both operators' bundles replay as one verifier command
+that catches divergence, silent deletion, and two-story agreements by name. Stack:
+[ADR-0008](docs/afp/adr/0008-p4-federation-stack.md),
+[ADR-0009](docs/afp/adr/0009-federated-replay.md).
+
 | | |
 |---|---|
 | [`src/instance/`](src/instance/) | The instance — TypeScript on Node 22.5+, no dependencies, no build step |
@@ -53,12 +62,14 @@ cd src/instance
 npm run demo:offline   # P1: writer drafts, reviewer critiques, bundle exported
 npm run demo:p2        # P2: 30 agents agree on the best policy — DecisionRecord + export
 npm run demo:p3        # P3: two sealed auctions, a coalition award, a ratified Synthesis
-npm run gate           # the acceptance gate: P1's 11 checks, CRDT property tests, hub, auction
+npm run demo:p4        # P4: three instances over real HTTP — handshake, probe, delegation, joint export
+npm run gate           # the acceptance gate: P1's 11 checks, CRDT property tests, hub, auction, boundary
 
 cd ../verifier
 python3 afp_verify.py ../instance/export --thread urn:afp:thread:doc-1
 python3 afp_verify.py ../instance/export-p2 --thread urn:afp:thread:codebase-integrity
 python3 afp_verify.py ../instance/export-p3 --thread urn:afp:thread:q-88-migration-estimate
+python3 afp_verify.py ../instance/export-p4/alpha ../instance/export-p4/beta --verbose
 ```
 
 The verifier is a deliberately independent second implementation in another language — a
