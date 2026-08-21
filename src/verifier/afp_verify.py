@@ -37,6 +37,7 @@ from asset import check_assets
 from action import check_actions, check_supersession
 from decision import afp_object, check_decision_record, check_enroll_authority, instant_millis
 from federation import check_federation, check_joint
+from pins import check_pins
 from proof import CRYPTOSUITE, decode_multikey, digest_of, verify_proof
 
 
@@ -495,6 +496,11 @@ def verify_export(export: Path, thread: str | None, report: Report) -> dict:
     for name in threads:
         check_thread(report, thread_pool, name)
 
+    # ADR-0010 Decision 1: pin-equality and pins-precede-answers over the
+    # thread pool — the same pool `check_thread` runs over, because a
+    # delegated thread's opening Offer may be authored by the counterparty.
+    check_pins(report, thread_pool)
+
     # ADR-0005 Decision 2: who was entitled to issue each afp:Enroll. Exports
     # with no enrollment (all of P1) run none of this.
     check_enroll_authority(report, authority, all_activities)
@@ -520,7 +526,10 @@ def verify_export(export: Path, thread: str | None, report: Report) -> dict:
 
     # ADR-0006 Decision 1: every action hash-binds to the Synthesis that
     # justified it, and did what the pinned policy said that answer permits.
-    check_actions(report, all_activities)
+    # ADR-0010 extends this: the pin's second root, the DecisionRecord hop,
+    # and the Synthesis-level checks (synthesizer, leg partition, answer
+    # sufficiency) — the last of which needs the thread pool.
+    check_actions(report, all_activities, thread_pool)
     # ADR-0007: answer-level supersession — resolution, ratification parity,
     # and dispositions for actions whose justification was withdrawn.
     check_supersession(report, all_activities)

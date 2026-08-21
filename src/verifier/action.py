@@ -7,25 +7,36 @@ actually check" should not wade through the rest of the replay.
 The record already makes *how an answer was reached* recomputable; this makes
 *what was done about it* the same. An acting activity hash-binds itself to the
 Synthesis it acts on (`afp:actsOn`) and names the action it claims
-(`afp:action`); the governing Announce pinned `afp:actionPolicy` — a closed
-map `category → admissible action` — before any answer existed. Three checks,
-all set-membership and digest resolution:
+(`afp:action`); the governing task activity pinned `afp:actionPolicy` — a
+closed map `category → admissible action` — before any answer existed. Three
+checks, all set-membership and digest resolution:
 
-- a Synthesis under a policy-bearing announce carries a category from the
-  closed set;
-- every `afp:actsOn` resolves to a present Synthesis — acting on a
+- a Synthesis under a policy-bearing task activity carries a category from
+  the closed set;
+- every `afp:actsOn` resolves to a present Synthesis (directly, or through the
+  one DecisionRecord hop ADR-0010 Decision 3 admits) — acting on a
   justification you cannot produce is the actuation-flavored "counted vote
   you cannot produce";
 - the claimed action equals `policy[category]` for the answer it acts on.
 
-The governing announce is found through the record's own chain — Synthesis →
-`afp:award` → Award → `afp:task` → hub-authored Announce — never through a
-side channel. Announces that pin no policy constrain nothing; exports
-predating ADR-0006 run none of this.
+The governing pins are found through the record's own chain, and that chain
+now has two roots (ADR-0010 Decision 1), never a side channel: `Synthesis ->
+afp:award -> Award -> afp:task -> hub-authored Announce` runs first; when the
+Synthesis carries no `afp:award`, the governing pins fall back to the outer
+Synthesis activity's own `context` — the thread's pin-bearing task activities,
+resolved by `pins.governing_pins`. Task activities that pin no policy
+constrain nothing; exports predating ADR-0006 run none of this.
+
+ADR-0010 also adds three checks that are about the *Synthesis*, not the
+action: the pinned/derived synthesizer names who may emit it, a partial
+Synthesis must account for every leg of its thread, and a thread with no
+Award reads its pinned answer-sufficiency as a count over
+`afp:contributingResults` rather than a selection-time coverage score.
 """
 
 from __future__ import annotations
 
+import pins
 from decision import afp_object
 from proof import digest_of
 
@@ -40,57 +51,117 @@ def _synthesis_of(activity: dict) -> dict | None:
     return afp_object(activity, "afp:Synthesis")
 
 
-def _governing_policy(synthesis: dict, all_activities: list[dict]) -> tuple[dict | None, str]:
-    """The pinned afp:actionPolicy for a Synthesis, via Award → Task → Announce.
+def _resolve_synthesis(target: dict | None, all_activities: list[dict]) -> tuple[dict | None, dict | None]:
+    """Resolve an `afp:actsOn` target to the (activity, Synthesis payload) it
+    ultimately names, following at most one hop through a `Create{afp:
+    DecisionRecord}` (ADR-0010 Decision 3): digest -> DecisionRecord ->
+    `afp:outcome` id -> the `Create{afp:Synthesis}` carrying that id.
 
-    Returns (policy or None, detail); a broken link returns None with the
-    reason — the caller decides whether an unresolvable chain matters (it does
-    only when someone acted on the answer).
+    Two hops never resolve: a DecisionRecord whose outcome names another
+    DecisionRecord returns (None, None) here exactly as an unresolvable
+    afp:actsOn does, because the hop only ever looks for a Synthesis.
     """
+    if target is None:
+        return None, None
+    synthesis = _synthesis_of(target)
+    if synthesis is not None:
+        return target, synthesis
+    decision = afp_object(target, "afp:DecisionRecord")
+    if decision is None:
+        return None, None
+    outcome_id = decision.get("afp:outcome")
+    if not isinstance(outcome_id, str):
+        return None, None
+    hop_target = next(
+        (a for a in all_activities if (s := _synthesis_of(a)) is not None and s.get("id") == outcome_id),
+        None,
+    )
+    if hop_target is None:
+        return None, None
+    return hop_target, _synthesis_of(hop_target)
+
+
+def _governing_pins(activity: dict, all_activities: list[dict]) -> tuple[dict | None, str]:
+    """The governing pin set for a Synthesis-bearing activity: the pinned
+    `{afp:actionPolicy, afp:answerSufficiency, afp:synthesizer}` object,
+    restricted to the keys present, resolved via one of two roots.
+
+    Root 1: `Synthesis -> afp:award -> Award -> afp:task -> hub-authored
+    Announce`. When the Award carries its own `afp:synthesizer` (ADR-0003's
+    derived form), that value overrides the Announce's pinned one — the
+    Award is the derived form of the same pin (ADR-0010 Decision 2), and
+    where a rule derives none the Announce's pin governs alone.
+
+    Root 2 (ADR-0010 Decision 1, fallback): when the Synthesis carries no
+    `afp:award`, the governing pins are resolved from the outer activity's
+    own `context` — the thread's agreed pin-bearing task activities.
+    """
+    synthesis = _synthesis_of(activity)
+    if synthesis is None:
+        return None, "not a Synthesis-bearing activity"
+
     award_id = synthesis.get("afp:award")
-    award = next(
-        (
-            o
-            for a in all_activities
-            if isinstance(o := a.get("object"), dict)
-            and o.get("type") == "afp:Award"
-            and o.get("id") == award_id
-        ),
-        None,
-    )
-    if award is None:
-        return None, f"afp:award {award_id!r} resolves to no Award"
-    task_id = award.get("afp:task")
-    hub_actor = award.get("afp:hub")
-    announce = next(
-        (
-            obj
-            for a in all_activities
-            if a.get("actor") == hub_actor
-            and (obj := afp_object(a, "afp:Task")) is not None
-            and obj.get("id") == task_id
-        ),
-        None,
-    )
-    if announce is None:
-        return None, f"afp:task {task_id!r} has no hub-authored Announce"
-    policy = announce.get("afp:actionPolicy")
+    if award_id is not None:
+        award = next(
+            (
+                o
+                for a in all_activities
+                if isinstance(o := a.get("object"), dict)
+                and o.get("type") == "afp:Award"
+                and o.get("id") == award_id
+            ),
+            None,
+        )
+        if award is None:
+            return None, f"afp:award {award_id!r} resolves to no Award"
+        task_id = award.get("afp:task")
+        hub_actor = award.get("afp:hub")
+        announce = next(
+            (
+                obj
+                for a in all_activities
+                if a.get("actor") == hub_actor
+                and (obj := afp_object(a, "afp:Task")) is not None
+                and obj.get("id") == task_id
+            ),
+            None,
+        )
+        if announce is None:
+            return None, f"afp:task {task_id!r} has no hub-authored Announce"
+        governing = pins.pin_set(announce)
+        award_synthesizer = award.get("afp:synthesizer")
+        if award_synthesizer is not None:
+            governing = {**governing, "afp:synthesizer": award_synthesizer}
+        return governing, ""
+
+    context = activity.get("context")
+    if not isinstance(context, str):
+        return None, "Synthesis carries no afp:award and its activity has no context to fall back on"
+    return pins.governing_pins(context, all_activities)
+
+
+def _governing_policy(activity: dict, all_activities: list[dict]) -> tuple[dict | None, str]:
+    """Thin wrapper over `_governing_pins` for the policy-only callers below."""
+    governing, detail = _governing_pins(activity, all_activities)
+    if governing is None:
+        return None, detail
+    policy = governing.get("afp:actionPolicy")
     if not isinstance(policy, dict):
-        return None, "the announce pins no afp:actionPolicy"
+        return None, "the governing pins include no afp:actionPolicy"
     return policy, ""
 
 
-def check_actions(report, all_activities: list[dict]) -> None:
+def check_actions(report, all_activities: list[dict], thread_pool: list[dict]) -> None:
     by_digest = {digest_of(a): a for a in all_activities}
 
-    # 1 — a Synthesis under a policy-bearing announce carries a category from
-    # the closed set. Checked for every such Synthesis, acted on or not: a
-    # policy over categories the answer can ignore constrains nothing.
+    # 1 — a Synthesis under a policy-bearing task activity carries a category
+    # from the closed set. Checked for every such Synthesis, acted on or not:
+    # a policy over categories the answer can ignore constrains nothing.
     for activity in all_activities:
         synthesis = _synthesis_of(activity)
         if synthesis is None:
             continue
-        policy, _ = _governing_policy(synthesis, all_activities)
+        policy, _ = _governing_policy(activity, all_activities)
         if policy is None:
             continue
         label = synthesis.get("id", "<no id>")
@@ -100,29 +171,31 @@ def check_actions(report, all_activities: list[dict]) -> None:
             f"action: {label} answers within the pinned category set",
             ok,
             "" if ok else
-            f"afp:category is {category!r}, but the announce's afp:actionPolicy admits "
+            f"afp:category is {category!r}, but the governing afp:actionPolicy admits "
             f"only {sorted(policy)} (ADR-0006)",
         )
 
-    # 2/3 — every action resolves its justification, and did what the policy
-    # said that justification permits.
+    # 2/3 — every action resolves its justification (directly, or through the
+    # one DecisionRecord hop), and did what the policy said that justification
+    # permits.
     for activity in all_activities:
         acts_on = activity.get("afp:actsOn")
         if not isinstance(acts_on, str):
             continue
         label = activity.get("id", "<no id>")
         target = by_digest.get(acts_on)
-        synthesis = _synthesis_of(target) if isinstance(target, dict) else None
+        resolved_activity, synthesis = _resolve_synthesis(target, all_activities)
         if not report.record(
             f"action: {label} acts on a producible Synthesis",
             synthesis is not None,
             "" if synthesis is not None else
-            f"afp:actsOn names {acts_on[:24]}…, which resolves to no present afp:Synthesis "
-            f"— an action whose justification the record cannot produce (ADR-0006)",
+            f"afp:actsOn names {acts_on[:24]}…, which resolves to no present afp:Synthesis, "
+            f"directly or through a DecisionRecord's afp:outcome — an action whose "
+            f"justification the record cannot produce (ADR-0006/ADR-0010)",
         ):
             continue
 
-        policy, detail = _governing_policy(synthesis, all_activities)
+        policy, detail = _governing_policy(resolved_activity, all_activities)
         if not report.record(
             f"action: {label} traces to a pinned action policy",
             policy is not None,
@@ -143,6 +216,98 @@ def check_actions(report, all_activities: list[dict]) -> None:
             f"category {category!r} (ADR-0006)",
         )
 
+    check_synthesis_pins(report, all_activities, thread_pool)
+
+
+def check_synthesis_pins(report, all_activities: list[dict], thread_pool: list[dict]) -> None:
+    """ADR-0010 Decisions 2 and 4 — checks about the Synthesis itself: who may
+    emit it, whether it accounts for every leg of its thread, and whether it
+    meets a pinned answer-side sufficiency count."""
+    by_digest = {digest_of(a): a for a in all_activities}
+
+    for activity in all_activities:
+        synthesis = _synthesis_of(activity)
+        if synthesis is None:
+            continue
+        label = synthesis.get("id", "<no id>")
+
+        # Admissibility: actor and attributedTo must equal the pinned/derived
+        # synthesizer, when one governs.
+        governing, _ = _governing_pins(activity, all_activities)
+        synthesizer = governing.get("afp:synthesizer") if governing else None
+        if isinstance(synthesizer, str):
+            ok = activity.get("actor") == synthesizer and synthesis.get("attributedTo") == synthesizer
+            report.record(
+                f"synthesis: {label} is emitted by the pinned synthesizer",
+                ok,
+                "" if ok else
+                f"afp:synthesizer names {synthesizer!r}, but this Synthesis has actor "
+                f"{activity.get('actor')!r} / attributedTo {synthesis.get('attributedTo')!r} "
+                f"(ADR-0010)",
+            )
+
+        # Leg partition and answer-side sufficiency both belong to Decision
+        # 4's direct-flow discipline — the fallback root, no Award. An
+        # Award-rooted, multi-performer Synthesis has one task-bearing
+        # activity (the Announce) and several per-performer Results whose
+        # correlationId is a suffixed variant of the task's; the Award-scoped
+        # performer-count/coverage checks in allocation.py already govern
+        # that shape and are untouched.
+        if synthesis.get("afp:award") is not None:
+            continue
+
+        # Leg partition: every distinct correlationId among the thread's
+        # task-bearing activities appears either as a contributing Result or
+        # as a declared afp:absentInputs entry.
+        context = activity.get("context")
+        if isinstance(context, str):
+            legs = {
+                cid
+                for a in thread_pool
+                if a.get("context") == context
+                and pins.is_task_bearing(a) is not None
+                and (cid := pins.correlation_id(a)) is not None
+            }
+            if legs:
+                contributing = synthesis.get("afp:contributingResults", []) or []
+                contributing_cids = {
+                    pins.correlation_id(by_digest[d])
+                    for d in contributing
+                    if d in by_digest and afp_object(by_digest[d], "afp:Result") is not None
+                }
+                absent_cids = {
+                    entry.get("afp:correlationId")
+                    for entry in (synthesis.get("afp:absentInputs", []) or [])
+                    if isinstance(entry, dict)
+                }
+                missing = sorted(legs - contributing_cids - absent_cids)
+                report.record(
+                    f"synthesis: {label} accounts for every leg of its thread",
+                    not missing,
+                    "" if not missing else
+                    f"leg(s) {missing} appear in neither afp:contributingResults nor "
+                    f"afp:absentInputs — a leg silently dropped instead of declared "
+                    f"(ADR-0010)",
+                )
+
+        sufficiency = governing.get("afp:answerSufficiency") if governing else None
+        if not isinstance(sufficiency, dict):
+            continue
+        required_count = sufficiency.get("count")
+        if not isinstance(required_count, (int, float)):
+            continue
+        contributing = synthesis.get("afp:contributingResults", []) or []
+        category = synthesis.get("afp:category")
+        ok = len(contributing) >= required_count or category == "afp:no-verdict"
+        report.record(
+            f"synthesis: {label} meets the pinned answer-sufficiency count",
+            ok,
+            "" if ok else
+            f"Synthesis binds {len(contributing)} contributing result(s), pinned "
+            f"afp:answerSufficiency requires {required_count}, and afp:category is "
+            f"{category!r} — not afp:no-verdict (ADR-0010)",
+        )
+
 
 def check_supersession(report, all_activities: list[dict]) -> None:
     """ADR-0007 — answer-level supersession, checkable end to end.
@@ -151,8 +316,9 @@ def check_supersession(report, all_activities: list[dict]) -> None:
     it withdraws (afp:supersedes resolves, same context); a quorum's answer is
     retracted only by a quorum (ratification parity over DecisionRecords); and
     every action whose justification was withdrawn has a recorded disposition
-    (afp:disposes + afp:actsOn on the superseding answer). Exports with no
-    afp:supersedes run none of this.
+    (afp:disposes + afp:actsOn on the superseding answer, resolved through the
+    same zero-or-one DecisionRecord hop as `check_actions` — ADR-0010 Decision
+    3). Exports with no afp:supersedes run none of this.
     """
     by_digest = {digest_of(a): a for a in all_activities}
 
@@ -162,6 +328,13 @@ def check_supersession(report, all_activities: list[dict]) -> None:
             (o := afp_object(a, "afp:DecisionRecord")) is not None and o.get("afp:outcome") == target
             for a in all_activities
         )
+
+    def acts_on_resolves_to(activity: dict, target_digest: str) -> bool:
+        acts_on = activity.get("afp:actsOn")
+        if not isinstance(acts_on, str):
+            return False
+        resolved_activity, _ = _resolve_synthesis(by_digest.get(acts_on), all_activities)
+        return resolved_activity is not None and digest_of(resolved_activity) == target_digest
 
     for activity in all_activities:
         superseding = _synthesis_of(activity)
@@ -204,17 +377,21 @@ def check_supersession(report, all_activities: list[dict]) -> None:
                 "(ADR-0007)",
             )
 
-        # Decision 3 — actions on the withdrawn answer are dealt with.
+        # Decision 3 — actions on the withdrawn answer are dealt with. The
+        # orphan scan resolves afp:actsOn through zero-or-one DecisionRecord
+        # hop before comparing (ADR-0010 Decision 3): an action bound to the
+        # superseded answer via a DecisionRecord is exactly as orphaned as one
+        # bound to it directly.
         superseding_digest = digest_of(activity)
         for actor_activity in all_activities:
-            if actor_activity.get("afp:actsOn") != supersedes:
+            if not acts_on_resolves_to(actor_activity, supersedes):
                 continue
             if "afp:disposes" in actor_activity:
                 continue  # dispositions of earlier actions are not themselves orphaned
             action_digest = digest_of(actor_activity)
             action_label = actor_activity.get("id", "<no id>")
             disposed = any(
-                a.get("afp:disposes") == action_digest and a.get("afp:actsOn") == superseding_digest
+                a.get("afp:disposes") == action_digest and acts_on_resolves_to(a, superseding_digest)
                 for a in all_activities
             )
             report.record(

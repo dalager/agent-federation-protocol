@@ -70,6 +70,13 @@ export interface AnnounceSpec {
    * prior tasks' Awards are excluded from this auction at admission.
    */
   excludePerformersOf?: readonly string[];
+  /**
+   * ADR-0010 Decision 2: names the one actor whose `Create{afp:Synthesis}` is
+   * admissible for this thread. Where the coverage rule also derives one (via
+   * the Award), the Award's value governs on disagreement — this pin is what
+   * a ranking rule, which derives none, has to name instead.
+   */
+  synthesizer?: string;
 }
 
 /** `Announce{afp:Task}` — broadcast through the hub to enrolled members. */
@@ -94,6 +101,7 @@ export function announceTask(envelope: Envelope, spec: AnnounceSpec): { [key: st
   }
   if (spec.actionPolicy) object["afp:actionPolicy"] = { ...spec.actionPolicy };
   if (spec.excludePerformersOf?.length) object["afp:excludePerformersOf"] = [...spec.excludePerformersOf];
+  if (spec.synthesizer) object["afp:synthesizer"] = spec.synthesizer;
   return { ...base(envelope, "Announce"), object };
 }
 
@@ -222,9 +230,22 @@ export function reauction(
 
 // ---------------------------------------------------- Synthesis and Settlement
 
+/** ADR-0010 Decision 4: one leg of the thread that contributed no Result. */
+export interface AbsentInput {
+  correlationId: string;
+  errorCode: string;
+  /** The leg's terminal `Create{afp:Error}` digest, or null when it simply never terminated. */
+  digest: string | null;
+}
+
 export interface SynthesisSpec {
   synthesisId: string;
-  award: string;
+  /**
+   * ADR-0010 Decision 1: optional — a Synthesis on a direct-flow thread with
+   * no Award resolves its governing pins from the thread's pin-bearing task
+   * activities instead. Emitted only when supplied.
+   */
+  award?: string;
   method: string;
   answer: JsonValue;
   confidence: number;
@@ -242,14 +263,20 @@ export interface SynthesisSpec {
    * input-level revision during reconciliation.
    */
   supersedes?: string;
+  /**
+   * ADR-0010 Decision 4: one entry per leg of the thread that contributed no
+   * Result — a partial Synthesis MUST declare what is missing rather than
+   * silently dropping it, so the leg partition (`afp:contributingResults` +
+   * `afp:absentInputs`) stays recomputable.
+   */
+  absentInputs?: readonly AbsentInput[];
 }
 
-/** `Create{afp:Synthesis}` — emitted by the synthesizer the Award names. */
+/** `Create{afp:Synthesis}` — emitted by the synthesizer the Award (or pin) names. */
 export function createSynthesis(envelope: Envelope, spec: SynthesisSpec): { [key: string]: JsonValue } {
   const object: { [key: string]: JsonValue } = {
     id: spec.synthesisId,
     type: "afp:Synthesis",
-    "afp:award": spec.award,
     "afp:method": spec.method,
     "afp:answer": spec.answer,
     "afp:confidence": spec.confidence,
@@ -258,9 +285,17 @@ export function createSynthesis(envelope: Envelope, spec: SynthesisSpec): { [key
     "afp:dissent": spec.dissent.map((d) => ({ ...d })),
     attributedTo: envelope.actor,
   };
+  if (spec.award) object["afp:award"] = spec.award;
   if (spec.supersededInputs?.length) object["afp:supersededInputs"] = [...spec.supersededInputs];
   if (spec.category) object["afp:category"] = spec.category;
   if (spec.supersedes) object["afp:supersedes"] = spec.supersedes;
+  if (spec.absentInputs?.length) {
+    object["afp:absentInputs"] = spec.absentInputs.map((input) => ({
+      "afp:correlationId": input.correlationId,
+      "afp:errorCode": input.errorCode,
+      "afp:digest": input.digest,
+    }));
+  }
   return { ...base(envelope, "Create"), object };
 }
 

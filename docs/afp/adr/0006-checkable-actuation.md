@@ -69,6 +69,12 @@ commits three things downstream:
   found through the record's own chain (Synthesis → `afp:award` → Award → `afp:task` →
   Announce); and where that Announce pinned a policy, `afp:action` MUST equal
   `policy[category]`. A mismatch is a named failure.
+  *(Amended by [ADR-0010](0010-pinning-without-an-auction.md): that chain now has a
+  second root — a direct `Offer{Task}` may pin the policy, resolved through the thread —
+  and `afp:actsOn` may name a DecisionRecord, resolved one hop to the Synthesis. This
+  ADR's pin-it-up-front discipline is unchanged; only the set of carriers grew, because
+  anchoring solely to the Announce disarmed all of it in the flow the spec recommends
+  first.)*
 - **Opt-in, like everything before it.** An Announce that pins no policy constrains no
   actions, and every existing record reads unchanged.
 

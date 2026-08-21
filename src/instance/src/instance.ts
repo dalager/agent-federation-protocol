@@ -21,6 +21,7 @@ import { DeliveryQueue, type Transport } from "./store/queue.ts";
 import {
   agentActor,
   agentActorId,
+  deriveRoster,
   instanceActor,
   instanceActorId,
   signedRoster,
@@ -35,6 +36,7 @@ import {
   type Envelope,
   type Visibility,
 } from "./ap/activities.ts";
+import { validateActionPolicy, type TaskPins } from "./ap/pins.ts";
 import type { Brain } from "./brains/port.ts";
 import { Inbox } from "./inbox.ts";
 
@@ -151,49 +153,14 @@ export class AfpInstance {
   }
 
   /**
-   * The roster, **derived by replaying the instance's own `Vouch`/`Disown` trail**.
-   *
-   * It is a projection, not a source. Assembling one from configuration would
-   * make admission the side-channel act that trail exists to prevent. Because it
-   * is derived, it is also byte-stable: `created` is the time of the last
-   * membership change, not of this request, so two fetches produce identical
-   * bytes and an auditor comparing copies sees tampering rather than noise
-   * (01 § Vouch / disown).
+   * The roster — a projection of the `Vouch`/`Disown` trail, never a reading of
+   * configuration. The replay itself lives with the other document builders
+   * (`ap/documents.ts` § `deriveRoster`), which is also where its byte-stability
+   * is explained.
    */
   rosterDocument() {
-    const members = new Map<string, AgentSpec>();
-    let lastChange = "";
-
-    for (const entry of this.outbox.byActor(instanceActorId(this.config.origin))) {
-      const type = String(entry.activity.type ?? "");
-      const object = entry.activity.object as Record<string, JsonValue> | undefined;
-      const agentUrl = typeof object?.agent === "string" ? object.agent : null;
-      if (!agentUrl || (type !== "afp:Vouch" && type !== "afp:Disown")) continue;
-
-      const name = agentUrl.split("/").pop() ?? agentUrl;
-      if (type === "afp:Vouch") {
-        const capabilities = Array.isArray(object?.["afp:capabilities"])
-          ? (object["afp:capabilities"] as JsonValue[]).map(String)
-          : [];
-        members.set(name, {
-          name,
-          url: agentUrl,
-          capabilities,
-          keyCustody: String(object?.["afp:keyCustody"] ?? "instance") as AgentSpec["keyCustody"],
-          since: String(object?.since ?? entry.published),
-        });
-      } else {
-        members.delete(name);
-      }
-      lastChange = entry.published;
-    }
-
-    return signedRoster(
-      this.config.origin,
-      [...members.values()],
-      this.key("@instance"),
-      lastChange || undefined,
-    );
+    const { members, lastChange } = deriveRoster(this.outbox.byActor(instanceActorId(this.config.origin)));
+    return signedRoster(this.config.origin, members, this.key("@instance"), lastChange || undefined);
   }
 
   /**
@@ -375,7 +342,15 @@ export class AfpInstance {
     deadline?: string;
     producedBy?: string;
     visibility?: Visibility;
+    /**
+     * ADR-0010 Decision 1: the direct flow's pin carrier. A fan-out passes the
+     * same `pins` value to every Offer of the thread — they are compared as a
+     * whole set at replay, and building one per Offer is how a publisher ships
+     * two stories by accident.
+     */
+    pins?: TaskPins;
   }): OutboxEntry {
+    if (options.pins?.actionPolicy) validateActionPolicy(options.pins.actionPolicy);
     const target = this.actorId(options.to);
     const entry = this.publish(
       options.from,
@@ -391,6 +366,7 @@ export class AfpInstance {
           deadline: options.deadline,
           producedBy: options.producedBy,
           attachments: (options.attachments ?? []).map((ref) => Artifacts.toLink(ref) as JsonValue),
+          pins: options.pins,
         }),
     );
 

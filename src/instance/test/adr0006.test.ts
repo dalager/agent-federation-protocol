@@ -41,6 +41,9 @@ const POLICY = {
   "mechanical-fix": "announce-fix",
   "not-a-bug": "recategorize",
   "needs-elevation": "assign-team",
+  // ADR-0010 Decision 4: every pinned policy declares its non-answer action, so
+  // a panel that cannot answer still releases whatever waits on it.
+  "afp:no-verdict": "request-info",
 } as const;
 
 function setup() {

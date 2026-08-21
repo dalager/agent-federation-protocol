@@ -12,6 +12,7 @@
 
 import type { JsonValue } from "../crypto/jcs.ts";
 import { AFP_CONTEXTS } from "./documents.ts";
+import { buildPinSet, type TaskPins } from "./pins.ts";
 
 export type Visibility = "public" | "hub" | "parties" | "internal";
 
@@ -51,6 +52,13 @@ export interface TaskSpec {
   /** What produced any attached work product — symmetric with `ResultSpec`. */
   producedBy?: string;
   attachments?: JsonValue[];
+  /**
+   * ADR-0010 Decision 1: the direct flow's carrier for the same pins the
+   * Announce carries — published before any answer exists, on the same
+   * `afp:Task` object, so a target-known delegation is checkable without a
+   * degenerate one-bidder auction.
+   */
+  pins?: TaskPins;
 }
 
 export function offerTask(envelope: Envelope, task: TaskSpec): { [key: string]: JsonValue } {
@@ -64,6 +72,10 @@ export function offerTask(envelope: Envelope, task: TaskSpec): { [key: string]: 
   if (task.deadline) object["afp:deadline"] = task.deadline;
   if (task.producedBy) object["afp:producedBy"] = task.producedBy;
   if (task.attachments?.length) object.attachment = task.attachments;
+  // ADR-0010 Decision 1: pins live on the task-bearing activity, and a fan-out
+  // of several Offers on one thread must carry a byte-identical set of them —
+  // which is why they are built once, as one value, rather than field by field.
+  if (task.pins) Object.assign(object, buildPinSet(task.pins));
 
   return { ...base(envelope, "Offer"), object };
 }

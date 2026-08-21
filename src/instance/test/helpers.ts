@@ -7,12 +7,19 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 import { runDemo, fixedClock } from "../src/demo.ts";
-import type { AfpInstance } from "../src/instance.ts";
+import { loadConfig } from "../src/config.ts";
+import { AfpInstance, type AgentRegistration } from "../src/instance.ts";
+import { jumpClock } from "../src/demoP3.ts";
+import { CountingBrain } from "../src/brains/stub.ts";
+import { loadOrCreateHubKeyPair, type KeyPair } from "../src/crypto/keys.ts";
+import { agentActor } from "../src/ap/documents.ts";
+import { Hub } from "../src/hub/hub.ts";
+import type { Envelope, Visibility } from "../src/ap/activities.ts";
 import type { JsonValue } from "../src/crypto/jcs.ts";
 
 const workspaces: string[] = [];
@@ -44,6 +51,107 @@ export function runVerifier(script: string, dir: string, thread: string, extraAr
     const err = error as { status?: number; stdout?: string; stderr?: string };
     return { code: err.status ?? 1, output: `${err.stdout ?? ""}${err.stderr ?? ""}` };
   }
+}
+
+/**
+ * An instance with N same-capability agents on deterministic brains — the bare
+ * P1 shape a gate starts from when it has no hub to set up.
+ */
+export function testInstance(agentNames: readonly string[], capability: string) {
+  const paths = workspace();
+  const config = loadConfig(paths);
+  const clock = jumpClock();
+  const agents: AgentRegistration[] = agentNames.map((name) => ({
+    spec: { name, capabilities: [capability], keyCustody: "instance", since: "2026-08-17T00:00:00Z" },
+    brain: new CountingBrain(name, [capability], () => ({ ok: true, content: "n/a" })),
+  }));
+  return { instance: new AfpInstance(config, agents, clock), config, clock };
+}
+
+/**
+ * A hub over an existing instance, with per-agent hub keys and the actor
+ * resolver wired — the setup every hub-bearing gate repeats verbatim.
+ */
+export function testHub(instance: AfpInstance, agentNames: readonly string[], hubId: string) {
+  const hubKeys = new Map<string, KeyPair>(
+    agentNames.map((name) => [
+      name,
+      loadOrCreateHubKeyPair(instance.config.keyDir, name, instance.actorId(name), hubId),
+    ]),
+  );
+  let hub!: Hub;
+  const fetchActor = (actorId: string) => {
+    if (actorId === hub.actorId) return hub.actorDocument();
+    if (actorId === instance.instanceDocument().id) return instance.instanceDocument();
+    const name = instance.nameOf(actorId);
+    if (!name) return null;
+    const spec = instance.specs.find((s) => s.name === name)!;
+    const hubKey = hubKeys.get(name);
+    return agentActor(instance.config.origin, spec, instance.key(name), hubKey ? [hubKey] : []);
+  };
+  hub = new Hub({
+    origin: instance.config.origin,
+    hubId,
+    db: instance.db,
+    keyDir: instance.config.keyDir,
+    instanceActorId: instance.instanceDocument().id as string,
+    maxDeliveryAttempts: instance.config.maxDeliveryAttempts,
+    backoffBaseMs: instance.config.backoffBaseMs,
+    fetchActor,
+    now: () => instance.clock.now(),
+  });
+  return { hub, hubKeys };
+}
+
+/**
+ * The raw-body escape hatch: an envelope with an arbitrary body spread over
+ * it, for activity shapes the builders deliberately do not emit (`afp:Act`,
+ * `afp:bidCommit`) and for the malformed ones a gate needs to publish on
+ * purpose.
+ */
+export function publishRaw(
+  instance: AfpInstance,
+  name: string,
+  to: readonly string[],
+  thread: string,
+  visibility: Visibility,
+  body: { [key: string]: unknown },
+) {
+  return instance.publish(name, to, thread, visibility, (envelope: Envelope) => ({
+    "@context": ["https://www.w3.org/ns/activitystreams", "https://afp.example/ns/v3"],
+    id: envelope.activityId,
+    actor: envelope.actor,
+    to: [...envelope.to],
+    published: envelope.published,
+    context: envelope.thread,
+    "afp:visibility": envelope.visibility,
+    ...(envelope.prevActivity !== null ? { "afp:prevActivity": envelope.prevActivity } : {}),
+    ...body,
+  }) as never);
+}
+
+/**
+ * Copy a clean export, edit one outbox file, replay the mutated copy.
+ *
+ * Editing a signed activity breaks its signature too, so a caller asserts the
+ * *named* check it meant to break rather than a failure count — the point is
+ * which check noticed, not how many did.
+ */
+export function mutateBundle(
+  script: string,
+  exportDir: string,
+  thread: string,
+  outboxName: string,
+  edit: (outbox: { orderedItems: Record<string, unknown>[] }) => void,
+) {
+  const dir = mkdtempSync(join(tmpdir(), "afp-mut-"));
+  cpSync(exportDir, dir, { recursive: true });
+  const path = join(dir, "outbox", `${outboxName}.jsonld`);
+  const outbox = JSON.parse(readFileSync(path, "utf8"));
+  edit(outbox);
+  outbox.totalItems = outbox.orderedItems.length;
+  writeFileSync(path, JSON.stringify(outbox, null, 2));
+  return runVerifier(script, dir, thread, ["--verbose"]);
 }
 
 export function objectType(activity: { [key: string]: JsonValue }): string {

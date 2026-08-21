@@ -14,8 +14,13 @@
  */
 
 import type { JsonValue } from "../crypto/jcs.ts";
+import type { ActionPolicy } from "../ap/pins.ts";
 
-export type ActionPolicy = Readonly<Record<string, string>>;
+// The pin vocabulary moved down to the P1 layer when ADR-0010 gave the direct
+// flow the same pins (see `ap/pins.ts` for why); re-exported here so ADR-0006's
+// readers find it where it was.
+export { NO_VERDICT_CATEGORY, buildPinSet, validateActionPolicy } from "../ap/pins.ts";
+export type { ActionPolicy, TaskPins } from "../ap/pins.ts";
 
 /**
  * The one admissible action for `category` under a pinned policy. Throws on a

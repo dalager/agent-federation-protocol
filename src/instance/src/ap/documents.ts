@@ -133,6 +133,51 @@ function multikey(key: KeyPair): JsonValue {
 }
 
 /**
+ * The roster's membership, **replayed from the instance's own `Vouch`/`Disown`
+ * trail** rather than read from configuration — admission is a recorded act,
+ * and assembling the roster from config would make it the side-channel the
+ * trail exists to prevent.
+ *
+ * Returns the members and the instant of the last membership change, which is
+ * what makes the signed document byte-stable: `created` is that instant, not
+ * the time of the request, so two fetches produce identical bytes and an
+ * auditor comparing copies sees tampering rather than noise (01 § Vouch /
+ * disown).
+ */
+export function deriveRoster(
+  entries: readonly { activity: { [key: string]: JsonValue }; published: string }[],
+): { members: AgentSpec[]; lastChange: string } {
+  const members = new Map<string, AgentSpec>();
+  let lastChange = "";
+
+  for (const entry of entries) {
+    const type = String(entry.activity.type ?? "");
+    const object = entry.activity.object as Record<string, JsonValue> | undefined;
+    const agentUrl = typeof object?.agent === "string" ? object.agent : null;
+    if (!agentUrl || (type !== "afp:Vouch" && type !== "afp:Disown")) continue;
+
+    const name = agentUrl.split("/").pop() ?? agentUrl;
+    if (type === "afp:Vouch") {
+      const capabilities = Array.isArray(object?.["afp:capabilities"])
+        ? (object["afp:capabilities"] as JsonValue[]).map(String)
+        : [];
+      members.set(name, {
+        name,
+        url: agentUrl,
+        capabilities,
+        keyCustody: String(object?.["afp:keyCustody"] ?? "instance") as AgentSpec["keyCustody"],
+        since: String(object?.since ?? entry.published),
+      });
+    } else {
+      members.delete(name);
+    }
+    lastChange = entry.published;
+  }
+
+  return { members: [...members.values()], lastChange };
+}
+
+/**
  * The roster, signed as a whole so membership verifies from a cached copy with
  * no live roundtrip (gate check 9).
  */

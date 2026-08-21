@@ -36,7 +36,14 @@ after(cleanupWorkspaces);
 const VERIFIER = join(import.meta.dirname, "..", "..", "verifier", "afp_verify.py");
 const HUB_ID = "platform";
 const AGENTS = ["deps", "api"] as const;
-const POLICY = { safe: "publish-advisory", unsafe: "publish-warning", unclear: "hold" } as const;
+// The `afp:no-verdict` entry is ADR-0010 Decision 4's reserved key: a policy that
+// cannot state its non-answer action is not yet a policy.
+const POLICY = {
+  safe: "publish-advisory",
+  unsafe: "publish-warning",
+  unclear: "hold",
+  "afp:no-verdict": "hold",
+} as const;
 
 function setup() {
   const paths = workspace();

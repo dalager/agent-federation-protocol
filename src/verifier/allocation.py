@@ -549,6 +549,21 @@ def check_award(report, award_activity: dict, all_activities: list[dict]) -> Non
             "" if synthesizer_match else
             f"recomputed {r_synthesizer!r} but afp:Award declares {declared_synthesizer!r}",
         )
+        # ADR-0010 Decision 2 — precedence between a pinned afp:synthesizer
+        # (on the Announce) and the rule's derived one. Absent is not unequal:
+        # this only fires when both are present, and only when a rule derived
+        # one at all — a ranking rule derives none, and the pin then governs
+        # alone with nothing to disagree with.
+        pinned_synthesizer = announce.get("afp:synthesizer")
+        if isinstance(pinned_synthesizer, str) and r_synthesizer is not None:
+            synthesizer_agrees = pinned_synthesizer == r_synthesizer
+            report.record(
+                f"award: {label} pinned synthesizer agrees with the recomputed one",
+                synthesizer_agrees,
+                "" if synthesizer_agrees else
+                f"afp:synthesizer pins {pinned_synthesizer!r} but the selection rule "
+                f"derives {r_synthesizer!r} — the derived value governs (ADR-0010)",
+            )
         # Producible is not enough: the declared evidence set must be exactly
         # the winning bids the rule picked, or the award cites someone else's.
         report.record(

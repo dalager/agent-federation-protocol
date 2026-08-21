@@ -150,7 +150,11 @@ declared irreversibility, the `annotate` disposition, panel deltas,
 history in the manifest, rotation vs revocation, conditional retention MUSTs, the
 bundle's content inventory with CRDT state excluded). Findings 31, 33, 36, 41, 42
 are spec-precision edits (no ADR needed); 32's remainder is 06 deployment guidance
-resting on ADR-0012 Decision 4. All three ADRs Proposed, none built.
+resting on ADR-0012 Decision 4. ADR-0010 is **Accepted and built** — findings 34, 35
+and 37 are closed, and the build corrected three of its own rulings on the way (the
+sequential-thread ordering rule, an unconditional outcome check that would have failed
+every governance vote, and the leg partition's scope). ADR-0011 and ADR-0012 remain
+Proposed and unbuilt.
 
 | # | Finding | Candidate |
 |---|---|---|

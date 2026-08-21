@@ -185,6 +185,32 @@ def check_decision_record(
     label = decision.get("id", "<no id>")
     round_id = decision.get("afp:round")
 
+    # ADR-0010 Decision 3 — when a DecisionRecord ratifies a Synthesis, an
+    # action MAY bind to it via afp:actsOn and the verifier follows the one
+    # hop through afp:outcome. That makes afp:outcome load-bearing only for a
+    # DecisionRecord actually used that way; a plain quorum vote (ADR-0002)
+    # carries an arbitrary chosen value in afp:outcome (e.g. a policy option),
+    # not a Synthesis id, and is untouched by this check.
+    decision_digest = digest_of(decision_activity)
+    used_for_actuation = any(a.get("afp:actsOn") == decision_digest for a in all_activities)
+    outcome_id = decision.get("afp:outcome")
+    if used_for_actuation and isinstance(outcome_id, str):
+        outcome_synthesis = next(
+            (
+                obj
+                for a in all_activities
+                if (obj := afp_object(a, "afp:Synthesis")) is not None and obj.get("id") == outcome_id
+            ),
+            None,
+        )
+        report.record(
+            f"decision: {label} outcome names a producible Synthesis",
+            outcome_synthesis is not None,
+            "" if outcome_synthesis is not None else
+            f"afp:outcome names {outcome_id!r}, which resolves to no present "
+            f"afp:Synthesis (ADR-0010)",
+        )
+
     proposal = next(
         (
             obj

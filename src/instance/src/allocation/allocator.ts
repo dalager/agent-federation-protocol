@@ -19,6 +19,7 @@ import {
   settlement,
   type AnnounceSpec,
 } from "./activities.ts";
+import { validateActionPolicy } from "./actions.ts";
 import { knownRule, latencySeconds, runRule, type RevealedBid, type Selection, type SelectionRule } from "./rules.ts";
 import { knownReputationRule, runReputationRule, type PinnedSettlement } from "./reputation.ts";
 import {
@@ -128,6 +129,10 @@ export class Allocator {
         throw new Error(`afp:excludePerformersOf names ${prior}, which has no Award to exclude performers of`);
       }
     }
+    // ADR-0010 Decision 4: a pinned policy that cannot state its no-verdict
+    // action is not yet a policy — checked here, on the writer side, and
+    // again by replay.
+    if (spec.actionPolicy) validateActionPolicy(spec.actionPolicy);
     // One auction per thread (H9). The counterparty check that authorizes an
     // actuals report resolves the auction *by thread*, so two auctions sharing
     // one would let a report settle the wrong task.
@@ -224,6 +229,11 @@ export class Allocator {
       excludePerformersOf: Array.isArray(object["afp:excludePerformersOf"])
         ? (object["afp:excludePerformersOf"] as JsonValue[]).map(String)
         : undefined,
+      // ADR-0010 Decision 2: the pinned synthesizer travels with the rest of
+      // the pin set into the re-fan-out. Dropped here, the hub's re-Announce
+      // and the requester's Announce would carry different pin digests and
+      // every re-fanned thread would fail the pin-equality check.
+      synthesizer: typeof object["afp:synthesizer"] === "string" ? object["afp:synthesizer"] : undefined,
     });
   }
 
