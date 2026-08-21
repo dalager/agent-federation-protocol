@@ -782,14 +782,21 @@ export class Hub {
   /** `afp:Archive` — terminal, read-only close with canonical CRDT state hashes (07). */
   archive(reason: string): OutboxEntry {
     this.status = "archived";
-    const stateHashes: Record<string, string> = {
-      membership: digestOf([...this.membership.getState()].sort()),
-      capabilities: digestOf(
-        [...this.capabilities.getState().entries()].map(([agent, caps]) => [agent, [...caps].sort()]),
-      ),
+    // ADR-0015 Decision 3: the converged state enters the record here, once,
+    // at the moment it stops changing — beside the canonical hashes computed
+    // from the very same values, so replay can recompute one from the other.
+    // Before this, the case file held every operator's activities and not the
+    // thing they had converged on; state that changes stays a projection, and
+    // state that has stopped changing becomes one signed activity.
+    const state: Record<string, JsonValue> = {
+      membership: [...this.membership.getState()].sort(),
+      capabilities: [...this.capabilities.getState().entries()].map(([agent, caps]) => [agent, [...caps].sort()]) as JsonValue,
     };
+    const stateHashes: Record<string, string> = Object.fromEntries(
+      Object.entries(state).map(([key, value]) => [key, digestOf(value as never)]),
+    );
     return this.emit([], "urn:afp:thread:hub-lifecycle", "hub", (envelope) =>
-      archiveHub(envelope, { hub: this.actorId, reason, stateHashes }),
+      archiveHub(envelope, { hub: this.actorId, reason, stateHashes, state }),
     );
   }
 

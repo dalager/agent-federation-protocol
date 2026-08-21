@@ -1,6 +1,9 @@
 # ADR-0015 — The case file at N parties: what an export proves when there are three of them
 
-- **Status:** Proposed
+- **Status:** Accepted, and **built** (2026-08-21) — gated by the first asserted N=3
+  joint replay in this repository, by a sender's two stories surfacing only to the holder
+  of the set, by a foreign decline resolving as received evidence and failing when it is
+  stripped, and by an archived state that fails when tampered while its hashes stand
 - **Date:** 2026-08-21
 - **Applies to:** any audit spanning more than two trust domains — which is every P5
   engagement, and any P4 engagement whose auditor holds a third party's bundle
@@ -44,25 +47,39 @@ honest, and the bundle gains one thing it was missing.
 
 ## Decisions
 
-### 1. The join is all-pairs, and stated as such
+### 1. The join is per-sender at any N — and it gains the two checks only N≥3 can need
 
-For an export set of size N, phase two runs the existing cross-checks over **every ordered
-pair** of domains. At N=2 that is exactly today's behaviour, which is the compatibility
-argument and also the design argument: the pairwise check was never wrong, it was
-under-quantified.
+Grounding this decision against the code corrected its own context: **the implementation
+had already generalized past the pair; only the prose had not.** `check_joint` iterates
+every bundle in the set, resolves each received activity against *the sender's* bundle
+found by `afp:from`, and checks each agreement's digest against *the parties it names* —
+none of that is pairwise-limited, and at N=3 it runs correctly as written. The
+"all-pairs" this ADR's draft called for turns out to mostly exist; what does not exist
+is narrower and sharper, and it is the actual decision:
 
-Two consequences the pair case could not raise:
-
-- **A received activity resolves against its sender, and only its sender.** With three
-  bundles the temptation is to search for matching bytes anywhere; that would let a
-  forged activity be "confirmed" by a domain that merely also holds a copy. The sender is
-  named by `afp:operatedBy` on the actor that signed it, and that is the only bundle whose
-  copy is authority (ADR-0009 Decision 2, now with somewhere else to look).
-- **A divergence between two domains is reported to the auditor, not to a party.** When
-  Alpha's and Gamma's copies of the same activity disagree, Bravo — holding all three
-  bundles — learns something neither Alpha nor Gamma can prove to the other. That is a
-  real finding and it belongs in the report, attributed to both domains, with the
-  observation that the third party is the only one positioned to see it.
+- **A received activity resolves against its sender, and only its sender** — ratified as
+  the rule, now stated rather than incidental. With three bundles the temptation is to
+  search for matching bytes anywhere; that would let a forged activity be "confirmed" by
+  a domain that merely also holds a copy. The sender's bundle is the only authority
+  (ADR-0009 Decision 2, with somewhere else to look).
+- **Cross-receiver consistency — the check only the auditor can run.** When two domains
+  each hold a received copy of *the same activity id* from the same sender, those copies
+  MUST be byte-equal **to each other**, checked directly — not only each-against-sender.
+  The case that makes this load-bearing: the sender's bundle is absent from the set, or
+  the sender lawfully redacted the activity to a stub. Each receiver's copy then has
+  nothing authoritative to fail against individually — but two receivers holding
+  *different* bytes under one id is evidence the sender told two stories, visible only to
+  whoever holds both bundles, and it must surface as a finding attributed to the sender
+  rather than dissolve into two independent passes.
+- **A foreign member's decline resolves as received evidence, not by a new lookup.**
+  M6 parked this: a DecisionRecord in the hub host's bundle declares a foreign member
+  `declined`, and the member's `Reject` lives in *its* operator's outbox. The ruling
+  follows ADR-0009's grain instead of inventing a cross-bundle search: the hub host
+  holds that `Reject` as **received bytes** (it crossed the boundary to reach the hub),
+  so the phase-one declined-check searches the thread pool — own plus received — and the
+  existing phase-two received-check then verifies those bytes against the sender's
+  bundle. The decline crosses the boundary the way everything cross-boundary does, and
+  no verifier check learns a second way to resolve anything.
 
 ### 2. The replay reports what it checked, per domain — a census, not just failures
 
@@ -85,6 +102,12 @@ which condition failed to make the absence legible.
 A census does not decide whether a zero is acceptable — some bundles legitimately contain
 no actuation at all. It makes the zero *visible*, which is the difference between a
 question an auditor can ask and one they never think to.
+
+**The census is output, never checks.** This repository already criticized three
+`report.record` sites that cannot fail for inflating a passing count; a census implemented
+as more of them would repeat the mistake at scale. It is a distinct section of the
+verifier's report — per domain, per check family, a count — printed always, so a zero is
+something a reader sees rather than something absence implies.
 
 ### 3. `afp:Archive` carries the converged state into the record, once
 
@@ -109,6 +132,17 @@ Once, and only at the end, is the whole design:
 A hub that is never archived never emits this, and its members' case files remain what they
 are today — which is the honest consequence of leaving a hub open forever, not a gap in
 this decision.
+
+**The state is checkable because the hashes already are.** `archive()` today computes
+canonical hashes of the converged membership and capabilities and emits them as
+`afp:stateHashes`; this decision adds `afp:state` — the state those hashes are hashes
+*of* — beside them, and a verifier check that recomputes each declared hash from the
+carried state. A bundle whose archive carries state that does not hash to its own
+declared canon fails by name, which is what distinguishes "state entered the record" from
+"a blob rode along". Inline is the built form; the hash-addressed-artifact form for large
+state is specified and deferred until a deployment needs it, which is the same honest
+deferral `afp:MembershipProof` once had — with the difference that this one is written
+down as deferred.
 
 ## Options considered
 
@@ -152,16 +186,16 @@ this decision.
 
 ## Build status
 
-Nothing is built. Depends on ADR-0014: a three-party flow has to exist before there is
-anything to replay three ways.
+Depends on ADR-0014, now built: M6's three-operator gate is the flow this replays three
+ways.
 
-| ID | Task | Stage |
-|---|---|---|
-| **N1** | All-pairs phase two; received-bytes resolution bound to the sender's own bundle | 1 |
-| **N2** | Divergence between two domains reported to the holder of the set, attributed to both | 1 |
-| **N3** | Per-domain check census in the report; counts per named family | 2 |
-| **N4** | `afp:Archive` carries the converged state (inline or artifact) beside its canonical hashes | 2 |
-| **N5** | Gate: three exports joint-verify clean; a forged activity corroborated by a non-sender bundle still fails; a divergence between two domains is reported to the third; a bundle whose pin checks no-op shows a zero census rather than a clean bill | 3 |
+| ID | Task | Where | Stage |
+|---|---|---|---|
+| **N1** ✅ | Cross-receiver consistency in phase two: received copies sharing one activity id from one sender are byte-equal across receivers, checked directly — the finding that survives the sender's absence or lawful redaction. Check name: `joint: received copies of {id} agree across receivers` | `federation.py` `check_joint` | 1 |
+| **N2** ✅ | The declined-check reads the thread pool (own + received), so a foreign member's `Reject` held as received bytes resolves in the hub host's own bundle — and phase two's existing received-check verifies those bytes against the sender. No new resolution path | `decision.py`, `afp_verify.py` (pool plumbing) | 1 |
+| **N3** ✅ | The census: per-domain, per-family check counts as a distinct printed section of the report — output, never `report.record` entries, for the reason the three vacuous transparency records were criticized | `afp_verify.py` `Report`/`main` | 2 |
+| **N4** ✅ | `afp:Archive` gains `afp:state` beside `afp:stateHashes` (inline form); verifier recomputes each declared hash from the carried state. Check name: `archive: {label} state matches its canonical hashes` | `hub/hub.ts` `archive()`, `hub/activities.ts`, verifier | 2 |
+| **N5** ✅ | Gate: M6's three-operator shape exported and joint-verified at N=3 clean; two receivers holding divergent copies of one stubbed sender activity fails by name; a foreign decline resolves through received bytes and fails when they are stripped; an archived hub's carried state fails when tampered while its hashes stand; a bundle whose conditional checks all skipped shows zero-count census lines rather than nothing | `test/adr0015.test.ts` | 3 |
 
 ## References
 

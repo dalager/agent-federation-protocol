@@ -224,6 +224,8 @@ export interface ArchiveSpec {
   reason: string;
   /** Canonical state hashes at close (07) — one per CRDT store. */
   stateHashes: Readonly<Record<string, string>>;
+  /** ADR-0015 Decision 3: the converged state those hashes are hashes of. */
+  state?: Record<string, JsonValue>;
 }
 
 /** `afp:Archive` — terminal, read-only close (03/07). */
@@ -233,5 +235,7 @@ export function archiveHub(envelope: Envelope, spec: ArchiveSpec): { [key: strin
     object: spec.hub,
     summary: spec.reason,
     "afp:stateHashes": { ...spec.stateHashes },
+    // ADR-0015 Decision 3: the state enters the record beside its canon.
+    ...(spec.state !== undefined ? { "afp:state": { ...spec.state } } : {}),
   };
 }

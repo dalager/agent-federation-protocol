@@ -352,3 +352,40 @@ def check_joint(report, bundles: list[dict]) -> None:
                     f"redaction stub for {digest[:24]}… — attributed to the sender, who "
                     f"owns the proof (ADR-0009)",
                 )
+
+    # 3 — cross-receiver consistency (ADR-0015 Decision 1): received copies
+    # sharing one activity id from one sender must be byte-equal to EACH
+    # OTHER, checked directly. Each-against-sender covers the ordinary case;
+    # this covers the one only the auditor can see — the sender's bundle
+    # absent from the set, or the activity lawfully stubbed, leaving each
+    # receiver's copy nothing authoritative to fail against individually
+    # while two receivers hold two stories under one id.
+    copies: dict[tuple[str, str], dict[str, str]] = {}
+    for bundle in bundles:
+        received_path = bundle["path"] / "received.jsonld"
+        if not received_path.exists():
+            continue
+        for item in _json.loads(received_path.read_text()).get("orderedItems", []):
+            sender_actor = item.get("afp:from")
+            activity = item.get("afp:activity")
+            if not (isinstance(sender_actor, str) and isinstance(activity, dict)):
+                continue
+            activity_id = activity.get("id")
+            if not isinstance(activity_id, str):
+                continue
+            copies.setdefault((sender_actor, activity_id), {})[bundle["instance_actor"]] = digest_of(activity)
+    for (sender_actor, activity_id), holders in copies.items():
+        if len(holders) < 2:
+            continue
+        distinct = set(holders.values())
+        agree = len(distinct) == 1
+        report.record(
+            f"joint: received copies of {activity_id} agree across receivers",
+            agree,
+            "" if agree else
+            f"{len(holders)} receivers hold {len(distinct)} distinct byte-forms of one "
+            f"activity received from {sender_actor} — the sender told two stories, and "
+            f"only the holder of the set can see it: "
+            + "; ".join(f"{who} holds {d[:24]}…" for who, d in sorted(holders.items()))
+            + " (ADR-0015)",
+        )

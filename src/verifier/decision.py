@@ -180,6 +180,7 @@ def check_decision_record(
     decision_activity: dict,
     all_activities: list[dict],
     keys: dict[str, bytes],
+    pool: list[dict] | None = None,
 ) -> None:
     decision = afp_object(decision_activity, "afp:DecisionRecord") or {}
     label = decision.get("id", "<no id>")
@@ -364,9 +365,16 @@ def check_decision_record(
                 if obj is not None and obj.get("afp:round") == decision.get("afp:round"):
                     proposal_id = obj.get("id")
                     break
+            # ADR-0015 N2: the Reject may be a foreign member's, held here as
+            # received bytes — a decline crosses the boundary the way
+            # everything cross-boundary does, and phase two then verifies
+            # those bytes against the sender's own bundle like any received
+            # entry. The pool is own-plus-received; absent one, fall back to
+            # the bundle's own activities exactly as before.
+            search = pool if pool is not None else all_activities
             rejected = any(
                 a.get("type") == "Reject" and a.get("actor") == agent and a.get("object") == proposal_id
-                for a in all_activities
+                for a in search
             )
             if not rejected:
                 undeclined.append(agent)
@@ -397,4 +405,35 @@ def check_decision_record(
         values_match,
         "" if values_match else
         f"recomputed {tally!r} but afp:DecisionRecord declares {declared_tally!r}",
+    )
+
+
+def check_archive_state(report, activity: dict) -> None:
+    """ADR-0015 Decision 3 — an archived hub's carried state recomputes to its
+    own declared canon.
+
+    `afp:stateHashes` existed first (07): hashes of the converged CRDT state
+    at close. `afp:state` is the state itself, carried beside them, and this
+    check is what makes it *entered the record* rather than *rode along*: each
+    declared hash must equal `digest_of` over the carried value. An archive
+    with hashes and no state is a pre-ADR-0015 record and passes as before —
+    the state is opt-in; its honesty is not.
+    """
+    hashes = activity.get("afp:stateHashes")
+    state = activity.get("afp:state")
+    if not isinstance(hashes, dict) or not isinstance(state, dict):
+        return
+    label = activity.get("id", "<no id>")
+    wrong = []
+    for key, declared in hashes.items():
+        if key not in state:
+            wrong.append(f"{key}: declared a hash but carries no state for it")
+            continue
+        recomputed = digest_of(state[key])
+        if recomputed != declared:
+            wrong.append(f"{key}: carried state hashes to {recomputed[:24]}…, canon says {str(declared)[:24]}…")
+    report.record(
+        f"archive: {label} state matches its canonical hashes",
+        not wrong,
+        "" if not wrong else "; ".join(wrong) + " (ADR-0015)",
     )

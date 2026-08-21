@@ -35,7 +35,7 @@ from pathlib import Path
 from allocation import check_announce_role, check_award
 from asset import check_assets
 from action import check_actions, check_supersession
-from decision import afp_object, check_decision_record, check_enroll_authority, instant_millis
+from decision import afp_object, check_archive_state, check_decision_record, check_enroll_authority, instant_millis
 from federation import check_federation, check_joint
 from keys import (
     check_key_intervals,
@@ -69,6 +69,41 @@ class Report:
             mark = "  ok  " if ok else " FAIL "
             line = f"[{mark}] {name}"
             print(line if not detail else f"{line}\n           {detail}")
+
+    def census(self) -> None:
+        """ADR-0015 Decision 2 — what ran, per domain, per check family.
+
+        Output, never checks: a family whose count is zero is a silence the
+        reader should see, and recording silences as passing checks is the
+        vacuous-record shape this repository already criticized. A bundle
+        whose conditional checks all skipped prints its zeros here instead of
+        printing nothing — which under several bundles is the difference
+        between a question an auditor can ask and one they never think to.
+        """
+        import re as _re
+
+        domains: dict[str, dict[str, int]] = {}
+        for name, _ok, _detail in self.checks:
+            match = _re.match(r"^(?:\[(?P<dom>[^\]]+)\] )?(?P<family>[a-z-]+):", name)
+            if not match:
+                continue
+            domain = match.group("dom") or "·"
+            family = match.group("family")
+            bucket = domains.setdefault(domain, {})
+            bucket[family] = bucket.get(family, 0) + 1
+        # The conditional families: every one of these can legitimately run
+        # zero times, and zero is exactly what must be VISIBLE — a family
+        # absent from the line reads as nothing, a family printed at :0 reads
+        # as a question. Unconditional families (signature, chain, …) appear
+        # by their counts alone.
+        conditional = ("action", "archive", "decision", "joint", "keys", "pins", "retention", "supersession", "synthesis")
+        print("census — checks run per domain (a zero you expected to be nonzero is a question):")
+        for domain in sorted(domains):
+            families = dict(domains[domain])
+            for family in conditional:
+                families.setdefault(family, 0)
+            line = "  ".join(f"{family}:{count}" for family, count in sorted(families.items()))
+            print(f"  {domain}  {line}")
 
 
 # -------------------------------------------------------------------- loading
@@ -680,7 +715,10 @@ def verify_export(export: Path, thread: str | None, report: Report) -> dict:
     # backward compatible by construction.
     for activity in all_activities:
         if afp_object(activity, "afp:DecisionRecord") is not None:
-            check_decision_record(report, activity, all_activities, keys)
+            check_decision_record(report, activity, all_activities, keys, pool=thread_pool)
+
+        if activity.get("type") == "afp:Archive":
+            check_archive_state(report, activity)
 
     # ADR-0003 Decision 7 / 03 "Bidding & allocation". Exports with no Award
     # (all of P1/P2) run none of this — backward compatible by construction.
@@ -762,6 +800,7 @@ def main() -> int:
         report.record("bundle: readable", False, f"{type(exc).__name__}: {exc}")
 
     report.print(args.verbose)
+    report.census()
     failures = report.failures
     total = len(report.checks)
 

@@ -57,9 +57,9 @@ export function runVerifier(script: string, dir: string, thread: string, extraAr
  * An instance with N same-capability agents on deterministic brains — the bare
  * P1 shape a gate starts from when it has no hub to set up.
  */
-export function testInstance(agentNames: readonly string[], capability: string) {
+export function testInstance(agentNames: readonly string[], capability: string, origin?: string) {
   const paths = workspace();
-  const config = loadConfig(paths);
+  const config = loadConfig(origin ? { ...paths, origin } : paths);
   const clock = jumpClock();
   const agents: AgentRegistration[] = agentNames.map((name) => ({
     spec: { name, capabilities: [capability], keyCustody: "instance", since: "2026-08-17T00:00:00Z" },
