@@ -61,6 +61,28 @@ reaching a decision. What an auditor asks, and the record that answers it:
 | Did the estimate prove right? | `afp:Settlement`, if and when actuals exist |
 | Human-readable trail? | Dual-publish shadow Notes, followable from Mastodon |
 
+### What the record does not answer
+
+Every row above is a question about what was **published**. The record has no answer to
+questions about what was **read**, and the distinction is worth stating because 07's
+phrasing — reads are authenticated the way writes are — invites the opposite inference.
+Authentication is symmetric; accountability is not.
+
+A read leaves no trace. An instance that serves a `parties` activity to a peer with no
+right to it produces exactly the bundle an instance that refuses produces, so replay
+cannot tell them apart, the peer cannot prove it happened, and neither can an auditor.
+Visibility classes are **access control, not an audit trail** ([ADR-0013](adr/0013-authorized-fetch.md)):
+they govern what a correct server hands over, and the record's proof stops at what was
+signed and published.
+
+The one deliberate exception is the auditor's own reach — a fetch under an `afp:AuditGrant`
+is recorded, because a grant is a recorded, expiring credential issued for an audit whose
+scope must itself be auditable (07 § The auditor role, and its build note).
+
+A deployment whose threat model includes its own operator disclosing data by reading it
+needs controls this protocol does not offer, and should not read the audit table above as
+though it did.
+
 ### Federated replay & lawful redaction (ADR-0009)
 
 When an engagement spans trust domains, the audit takes **every party's export at

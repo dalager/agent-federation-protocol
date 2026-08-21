@@ -77,6 +77,14 @@ granting instance's own record, so *the audit itself is auditable*. A grant neve
 `internal`, and it never crosses to another operator's data — each operator grants for
 their own.
 
+> **Also specified, not yet built.** A grant can be issued, recorded and expired today,
+> and it opens nothing: `grantAdmits` — the function that decides whether a grant covers
+> a request — has no caller, because nothing above `public` is ever served (above). No
+> fetch is logged, for the same reason: there are no admitted fetches to log. Both halves
+> land together in [ADR-0013](adr/0013-authorized-fetch.md) A5, and the recorded fetch is
+> the *only* read that ADR logs — see 04 § What the record does not answer for why the
+> others deliberately leave no trace.
+
 > **Confidentiality is not secrecy from the operator.** Every class is readable by the
 > instance hosting the actor. AFP protects data *between* operators and from the public;
 > it offers no mechanism to hide an agent's activity from its own operator, by design.
