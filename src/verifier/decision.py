@@ -102,6 +102,25 @@ def find_proposal_for_round(round_id, all_activities: list[dict]) -> dict | None
     )
 
 
+def proposal_activity_for(round_id, all_activities: list[dict]) -> dict | None:
+    """The `Offer{afp:Proposal}` ACTIVITY for a round id, or `None`.
+
+    `find_proposal_for_round` returns the payload, which carries no
+    `published` — the envelope does. Anything that needs the instant a round
+    was pinned (ADR-0021 Decision 1's membership cutoff, ADR-0005's effective
+    operator) must read it here rather than off the payload.
+    """
+    return next(
+        (
+            a
+            for a in all_activities
+            if (obj := afp_object(a, "afp:Proposal")) is not None
+            and obj.get("afp:round") == round_id
+        ),
+        None,
+    )
+
+
 def _decision_by_digest(digest, all_activities: list[dict]) -> tuple[dict | None, dict | None]:
     """`(activity, payload)` for the `afp:DecisionRecord` matching `digest`, or `(None, None)`."""
     for activity in all_activities:
@@ -195,20 +214,33 @@ def enrolled_roles(hub_actor: str, all_activities: list[dict]) -> dict[str, str]
     return enrolled_roles_at(hub_actor, all_activities, _MAX_MILLIS)
 
 
-def enrolled_instances(hub_actor: str, all_activities: list[dict]) -> dict[str, str]:
-    """agent -> the instance that enrolled it (ADR-0005 Decision 2).
+def enrolled_instances(
+    hub_actor: str, all_activities: list[dict], at_millis: int = _MAX_MILLIS
+) -> dict[str, str]:
+    """agent -> the instance that enrolled it (ADR-0005 Decision 2), as of `at_millis`.
 
     Replayed from the same trail and with the same last-writer-wins rule as
     `enrolled_roles`. ADR-0005 binds the Enroll's actor to the agent's own
     `afp:operatedBy` — checked separately in `check_enroll_authority` — so
     this trail is what says which operator an agent counts for when a round is
     weighted per instance.
+
+    ADR-0021 Decision 1's second corollary: the cutoff is the one
+    `enrolled_roles_at` always had and this fold never did. Without it an
+    Enroll or Unenroll published *after* a round closed still moved the
+    operator bucket that round's weights are recomputed against — a signed,
+    closed round's arithmetic changing because of a later membership act,
+    which is the same defect ADR-0020's forward-scoping rule exists to
+    prevent. Defaulting to `_MAX_MILLIS` keeps every caller that means "as of
+    now" behaving exactly as before.
     """
     instances: dict[str, str] = {}
     trail = [
         a
         for a in all_activities
-        if a.get("type") in ("afp:Enroll", "afp:Unenroll") and a.get("target") == hub_actor
+        if a.get("type") in ("afp:Enroll", "afp:Unenroll")
+        and a.get("target") == hub_actor
+        and instant_millis(a.get("published")) <= at_millis
     ]
     for activity in sorted(trail, key=lambda a: (instant_millis(a.get("published")), digest_of(a))):
         agent = activity.get("object")
@@ -277,7 +309,8 @@ def voter_weights(voters: list[tuple[str, str]]) -> dict[str, int]:
 
 
 def check_enroll_authority(report, authority, all_activities: list[dict]) -> None:
-    """ADR-0005 Decision 2 — an Enroll is issued by the enrolled agent's own instance.
+    """ADR-0005 Decision 2 / ADR-0021 Decision 1 — an Enroll *or Unenroll* is
+    issued by the agent's own instance.
 
     A valid signature proves only that the actor wrote these bytes; it says
     nothing about whether that actor may enroll anyone. Unchecked, an agent
@@ -290,7 +323,8 @@ def check_enroll_authority(report, authority, all_activities: list[dict]) -> Non
     operator cannot be enrolled by anyone: unbound is not a licence.
     """
     for activity in all_activities:
-        if activity.get("type") != "afp:Enroll":
+        kind = activity.get("type")
+        if kind not in ("afp:Enroll", "afp:Unenroll"):
             continue
         agent = activity.get("object")
         if not isinstance(agent, str):
@@ -298,13 +332,21 @@ def check_enroll_authority(report, authority, all_activities: list[dict]) -> Non
         actor = activity.get("actor")
         operator = authority.operated_by.get(agent)
         ok = operator is not None and actor == operator
+        # ADR-0021 Decision 1: the identical binding, on the identical
+        # evidence, for the activity that REMOVES a seat. This loop filtered
+        # `type != "afp:Enroll"` until 2026-08-22, so nothing anywhere asked
+        # who signed an Unenroll — and the hub did not ask either, which made
+        # membership removal an unauthenticated primitive that replayed clean.
+        # Every fold below (`enrolled_roles_at`, `enrolled_instances`) reads
+        # this trail; an unchecked half makes the whole of it advisory.
+        verb, adr = ("enroll", "ADR-0005") if kind == "afp:Enroll" else ("unenroll", "ADR-0021")
         report.record(
-            f"enroll: {agent.split('/')[-1]} enrolled by its own instance",
+            f"{verb}: {agent.split('/')[-1]} {verb}ed by its own instance",
             ok,
             "" if ok else
-            (f"enrolled by {actor!r} but {agent} is operated by {operator!r} (ADR-0005)"
+            (f"{verb}ed by {actor!r} but {agent} is operated by {operator!r} ({adr})"
              if operator is not None else
-             f"{agent} publishes no afp:operatedBy, so no actor is entitled to enroll it"),
+             f"{agent} publishes no afp:operatedBy, so no actor is entitled to {verb} it"),
         )
 
 
@@ -394,8 +436,25 @@ def check_decision_record(
     # Recorded-so-a-verifier-can-see is not the same as checkable: without
     # this a hub simply writes the numbers it wants into its own proposal, and
     # the tally recomputation below would faithfully confirm them.
-    instances = enrolled_instances(hub_actor, all_activities)
-    proposal_published = proposal.get("published") or decision_activity.get("published")
+    # ADR-0021 Decision 1: read the membership trail as of the round being
+    # weighed, never as of "now" — a later Unenroll must not move a closed
+    # round's operator buckets.
+    #
+    # The instant is the PROPOSAL activity's `published`, resolved through
+    # `proposal_activity_for`. `published` lives on the activity envelope and
+    # never on the `afp:Proposal` payload, so the long-standing
+    # `proposal.get("published") or decision_activity.get("published")` idiom
+    # always resolved to the *close* instant — late enough to admit exactly
+    # the membership acts this cutoff exists to exclude. Kept as the last
+    # fallback so a bundle whose proposal activity cannot be located behaves
+    # as it did before.
+    proposal_activity = proposal_activity_for(round_id, all_activities)
+    proposal_published = (
+        (proposal_activity or {}).get("published")
+        or proposal.get("published")
+        or decision_activity.get("published")
+    )
+    instances = enrolled_instances(hub_actor, all_activities, instant_millis(proposal_published))
     # ADR-0005 amendment (declared change of control) — an instance's weight
     # bucket is its *effective* operator as of this proposal's own `published`,
     # not necessarily itself; absent any Create{afp:ControlTransfer} this is
@@ -912,6 +971,51 @@ def check_archive_state(report, activity: dict) -> None:
         f"archive: {label} state matches its canonical hashes",
         not wrong,
         "" if not wrong else "; ".join(wrong) + " (ADR-0015)",
+    )
+
+
+def check_proposal_electorate(report, activity: dict) -> None:
+    """ADR-0021 Decision 2 — V3 and V5, the two halves a single bundle can
+    answer on its own: the snapshot digest is arithmetic over the proposal's
+    own voter list, and the exclusion statuses are a shape check over its own
+    `afp:excluded`. V4 (the partition against the Enroll trail) needs the whole
+    replay and lives in `afp_verify.check_electorate`.
+    """
+    from electorate import EXCLUSION_STATUSES, excluded_entries, snapshot_matches
+
+    proposal = afp_object(activity, "afp:Proposal")
+    if proposal is None:
+        return
+    label = proposal.get("id", activity.get("id", "<no id>"))
+
+    ok = snapshot_matches(proposal)
+    report.record(
+        f"round: {label} quorum snapshot matches its voter list",
+        ok,
+        "" if ok else
+        f"afp:quorumSnapshot {proposal.get('afp:quorumSnapshot')!r} is not the digest of the "
+        f"sorted afp:voters it travels with (ADR-0021)",
+    )
+
+    entries = excluded_entries(proposal)
+    if not entries:
+        return
+    wrong: list[str] = []
+    for entry in entries:
+        status = entry.get("afp:status")
+        agent = entry.get("agent")
+        if not isinstance(agent, str):
+            wrong.append(f"{entry!r} names no agent")
+        elif status not in EXCLUSION_STATUSES:
+            wrong.append(f"{agent}: unknown afp:status {status!r}")
+        elif status == "recused" and not isinstance(entry.get("afp:cause"), dict):
+            wrong.append(f"{agent}: status 'recused' without an afp:cause")
+        elif status != "recused" and entry.get("afp:cause") is not None:
+            wrong.append(f"{agent}: status {status!r} carries an afp:cause, which only 'recused' may")
+    report.record(
+        f"electorate: {label} exclusion statuses are known forms",
+        not wrong,
+        "" if not wrong else "; ".join(wrong) + " (ADR-0021)",
     )
 
 

@@ -36,7 +36,8 @@ campaign 6 had been recording it as resolved while its own prose said otherwise.
 ([scenario 12](12-the-parametric-trigger.md), the P6 shakedown) is **five-eighths closed**:
 findings 58, 60, 61 and 62 landed with [ADR-0020](../adr/0020-p6-hardened-round-stack.md)
 and finding 63 with the [ADR-0005 amendment](../adr/0005-operators-are-equal.md) — all
-built and gated the day the scenario was walked; 59, 64 and 65 stay open for ADR-0021.
+built and gated the day the scenario was walked; 59, 64 and 65 are decided in
+[ADR-0021](../adr/0021-conviction-to-consequence.md), written but not yet built.
 
 A scenario's own text is never rewritten when its findings land — a scenario records what
 was true when it was walked, which is what makes it evidence. So read a walkthrough as
@@ -56,7 +57,7 @@ demo shows the *resolved* world and the walkthrough shows what it cost to get th
 | [09](09-the-screening-sidecar.md) | 12 · closed | [ADR-0010](../adr/0010-pinning-without-an-auction.md), [ADR-0011](../adr/0011-supersession-meets-the-irreversible-world.md), [ADR-0012](../adr/0012-the-long-horizon.md) | — | `adr0010.test.ts`, `adr0010-parity.test.ts`, `adr0011.test.ts`, `adr0012.test.ts` |
 | [10](10-the-incident-bridge.md) | 7 · closed | [ADR-0014](../adr/0014-p5-shared-hub-stack.md), [ADR-0015](../adr/0015-the-case-file-at-n-parties.md) | `npm run demo:p5` | `adr0014.test.ts`, `adr0014-m6.test.ts`, `adr0015.test.ts`, `adr0016.test.ts` |
 | [11](11-the-snow-day.md) | 8 · closed | [ADR-0018](../adr/0018-the-round-as-a-commitment.md), [ADR-0019](../adr/0019-acting-on-a-decision.md) | `npm run demo:p5:llm` | `adr0018.test.ts`, `adr0019.test.ts` |
-| [12](12-the-parametric-trigger.md) | 8 · **5 closed, 3 open** | [ADR-0020](../adr/0020-p6-hardened-round-stack.md) built (58, 60, 61, 62) · [ADR-0005 amendment](../adr/0005-operators-are-equal.md) built (63); ADR-0021 (59, 64, 65) to write | `npm run demo:p6` · `demo:p6:llm` | `adr0020.test.ts`, `adr0005.test.ts` |
+| [12](12-the-parametric-trigger.md) | 8 · **5 closed, 3 open** | [ADR-0020](../adr/0020-p6-hardened-round-stack.md) built (58, 60, 61, 62) · [ADR-0005 amendment](../adr/0005-operators-are-equal.md) built (63); [ADR-0021](../adr/0021-conviction-to-consequence.md) (59, 64, 65) D1-D2 built, D3-D5 written | `npm run demo:p6` · `demo:p6:llm` | `adr0020.test.ts`, `adr0005.test.ts` |
 
 **Where the "See it run" column is empty**, the scenario's shape is covered by its gate
 files rather than by a demo. Three of the four are workloads that live inside another
@@ -418,7 +419,16 @@ decision each finding forces rather than by the subject it touches:
   Triaged separately rather than folded into ADR-0021 because it amends ADR-0005's core
   invariant, and because ADR-0021's recusal needs its recompute-over-a-remainder
   machinery to already exist.
-- **ADR-0021 — after the proof: conviction to consequence** (59, 64, 65): the campaign's
+- **[ADR-0021](../adr/0021-conviction-to-consequence.md) — after the proof: conviction to
+  consequence** (59, 64, 65) — **written 2026-08-22, not built.** Decomposing it turned up a
+  **two** defects older than the campaign and promoted both ahead of the findings that
+  exposed them. The first: `afp:Unenroll` has no authority check in either
+  implementation, so anyone with a verifying key can remove any agent from any hub —
+  which makes every electorate rule built on the Enroll trail theatre until it is fixed.
+  The second: the pinned electorate is never checked. `afp:quorumSnapshot` is a digest nothing recomputes, and
+  omission from `afp:voters` is unlimited and invisible — so a hub already had an
+  undeclared, undetectable recusal, and a declared one layered on top would have bound
+  only the honest. The campaign's
   through-line as one ADR — conviction is cryptographic, consequence is governance, and
   the seam between them is unbuilt. A recorded compromise claim referencing the proof and
   feeding the instance-level governance round that already exists, with restoration a

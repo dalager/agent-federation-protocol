@@ -234,12 +234,13 @@ about a key; every consequence is about a party.** The cryptography held end to 
 finding lives after the moment of conviction. Triaged in the
 [campaign 9 ledger](scenarios/README.md#campaign-9--open-scenario-12-the-p6-shakedown)
 into [ADR-0020](adr/0020-p6-hardened-round-stack.md) (the hardened-round stack —
-**built and gated** (`adr0020.test.ts`, 10 cases): succession pinned in the proposal, the
+**built and gated** (`adr0020.test.ts`, 14 cases): succession pinned in the proposal, the
 equivocation predicate ruled precisely, the provably-doomed round's early close, and
 replay-detected concealment — findings 58, 60, 61 and 62 closed), an ADR-0005 amendment
 (declared change of control — **built and gated**, `adr0005.test.ts`; finding 63 closed), and
-ADR-0021 (conviction to consequence: contest and restoration, recusal, proof
-portability). Two are worth naming here because a P6 build will hit them in its first
+[ADR-0021](adr/0021-conviction-to-consequence.md) (conviction to consequence: a
+recomputable electorate, contest and restoration, recusal, proof portability — Decisions
+1 and 2 **built and gated**, Decisions 3-5 written). Two are worth naming here because a P6 build will hit them in its first
 week, and neither is visible from the phase table above:
 
 - ~~**Finding 62 is a live attack surface, not a gap.**~~ **Closed** — ADR-0020
@@ -265,6 +266,21 @@ week, and neither is visible from the phase table above:
   found a defect no unit gate could reach — V2 verified a proof's embedded votes
   against the announcing bundle's keys alone, and a real conviction always crosses a
   boundary (ADR-0020 W3, gate G14).
+
+- ~~**A membership-removal primitive with no authority check**~~ **Closed** — ADR-0021
+  Decision 1, built and gated the same day it was found (`adr0021.test.ts` G0a-G0d):
+  both implementations now bind an `afp:Unenroll` to the agent's own operating instance,
+  and the membership trail is read as of the round being weighed. Kept below as written,
+  per the standing rule that a blocker which quietly disappears teaches a later reader
+  nothing. (found 2026-08-22 while
+  decomposing [ADR-0021](adr/0021-conviction-to-consequence.md), not by any scenario).
+  `Hub.onUnenroll` performs no issuer binding, `writeAdmitted` puts `afp:Unenroll` in the
+  door-knock class, and no verifier check examines who signed one — so any party holding
+  any key that verifies can remove any agent from any hub, and the bundle replays clean.
+  Measured against the real hub, not inferred. It is ADR-0021 Decision 1, deliberately
+  sized as a standalone first slice: a handful of lines in `hub.ts` and `decision.py`,
+  no new wire property. Worth landing ahead of everything else in that ADR, because
+  every electorate rule above it reads the trail this defect lets anyone edit.
 
 ## Open questions
 

@@ -30,6 +30,7 @@ import {
   offerProposal,
   NO_DECISION,
   type Envelope,
+  type ExclusionStatus,
   type HubRole,
   type SuccessionRule,
   type Visibility,
@@ -440,9 +441,16 @@ export class Hub {
    * Enrollment-class and anti-entropy traffic crosses on the strength of the
    * boundary gate alone — the door-knock analog of the handshake bypass in
    * `handleInboxPost`: an `afp:Enroll` names an agent that is by definition
-   * not yet enrolled (its own handler enforces ADR-0005's issuer binding),
-   * and a digest exchange is transport-level traffic between replicas, the
-   * class of thing 02 sanctions the hub key itself to sign.
+   * not yet enrolled, and a digest exchange is transport-level traffic between
+   * replicas, the class of thing 02 sanctions the hub key itself to sign.
+   *
+   * The exemption is safe only because each admitted type enforces its own
+   * issuer binding in its own handler — `onEnroll` per ADR-0005 Decision 2 and,
+   * since ADR-0021 Decision 1, `onUnenroll` per the same rule. That was written
+   * here as a property of the *pair* while only one of the two had it, which is
+   * how membership removal stayed unauthenticated for four phases. Admitting a
+   * type at this door is a statement that its handler checks authority; do not
+   * add a type here without one.
    */
   writeAdmitted(actor: string, activity: { [key: string]: JsonValue }): boolean {
     const type = String(activity.type ?? "");
@@ -750,7 +758,36 @@ export class Hub {
     if (this.status !== "active") return;
     const agent = String(activity.object ?? "");
     if (!agent) return;
-    this.removeAgent(agent, String(activity.actor ?? ""), String(activity.id));
+    const origin = String(activity.actor ?? "");
+
+    // ADR-0021 Decision 1: an Unenroll is issued by the agent's own operating
+    // instance and by nobody else — the identical binding ADR-0005 Decision 2
+    // imposes on `afp:Enroll`, resolved the identical way, from the document
+    // the agent itself publishes.
+    //
+    // This handler checked nothing until 2026-08-22, which made membership
+    // removal an unauthenticated primitive: `writeAdmitted` puts Unenroll in
+    // the door-knock class (no seat, no membership required), so any party
+    // holding any key that verifies could remove any agent from any hub, and
+    // the resulting bundle replayed clean. Every rule that reads the Enroll
+    // trail — role, operator bucket, the pinned electorate — was reading a
+    // trail anyone could edit.
+    const operatedBy = String(this.fetchActor(agent)?.["afp:operatedBy"] ?? "");
+    if (!operatedBy || origin !== operatedBy) {
+      logAdmission(
+        this.db,
+        this.now().toISOString(),
+        agent,
+        origin,
+        "rejected",
+        operatedBy
+          ? `unenroll issued by ${origin}, but ${agent} is operated by ${operatedBy} (ADR-0021)`
+          : `unenroll for ${agent}, whose actor document names no afp:operatedBy`,
+      );
+      return;
+    }
+
+    this.removeAgent(agent, origin, String(activity.id));
   }
 
   /** The shared body of `onUnenroll` and the seat revocation's mass-unenroll (ADR-0017 D4). */
@@ -1348,6 +1385,27 @@ export class Hub {
     const voters = [...(options.voters ?? this.members())].filter(
       (agent) => this.isLive(agent) && this.roleOf(agent) === "member",
     );
+
+    // ADR-0021 Decision 2: account for every member-role seat this round did
+    // NOT pin. Two reasons exist and the hub can tell them apart from its own
+    // state: a seat it could not reach (`not-live`, hub-local and never
+    // exported, so unfalsifiable — the honest label for an honest absence),
+    // and a live seat the caller deliberately left out (`not-pinned`, which is
+    // 02's proposer-declared electorate saying so out loud).
+    //
+    // Neither is recomputable, and that is the point. The defect this closes
+    // is not that a hub may exclude — 02 has always allowed it — but that the
+    // exclusion was invisible: nothing compared `afp:voters` against the
+    // Enroll trail, so a disenfranchised member and an unreachable one read
+    // identically at replay. Now the hub must sign a statement about which.
+    const pinned = new Set(voters);
+    const excluded = this.members()
+      .filter((agent) => !pinned.has(agent) && this.roleOf(agent) === "member")
+      .sort()
+      .map((agent) => ({
+        agent,
+        "afp:status": (this.isLive(agent) ? "not-pinned" : "not-live") as ExclusionStatus,
+      }));
     // One operator, one weight (ADR-0005 Decision 1): each seated instance
     // carries the same total, divided among its pinned voters. At a single
     // instance this reduces to the liveness-gated uniform weight of 1 that
@@ -1420,6 +1478,7 @@ export class Hub {
         level: options.level,
         successionRule: options.successionRule,
         supersedesRound,
+        excluded,
       }),
     );
 

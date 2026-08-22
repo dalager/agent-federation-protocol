@@ -111,6 +111,24 @@ export function updateAsset(envelope: Envelope, spec: AssetSpec): { [key: string
 
 // ------------------------------------------------------------------- L0 voting
 
+/**
+ * ADR-0021 Decision 2/W1: why a member-role enrolled agent is not in this
+ * round's `afp:voters`. A closed registry — an unrecognised status fails
+ * replay rather than falling through to a default.
+ *
+ * `not-live` and `not-pinned` are signed claims the record cannot falsify
+ * (liveness is hub-local and never exported; a proposer-declared electorate is
+ * 02's own rule). What changes is that the omission must now be *said*:
+ * an undeclared absence is a named replay failure, where before it was
+ * invisible.
+ */
+export type ExclusionStatus = "not-live" | "not-pinned";
+
+export interface ExcludedEntry {
+  agent: string;
+  "afp:status": ExclusionStatus;
+}
+
 /** ADR-0020 W1: the closed registry of pinned succession forms; v1 defines one. */
 export type SuccessionRule = { "afp:form": "snapshot-order" };
 
@@ -146,6 +164,12 @@ export interface ProposalSpec {
   successionRule?: SuccessionRule;
   /** ADR-0020 Decision 3/W1: on a successor round only — digest of the stalled proposal ACTIVITY. */
   supersedesRound?: string;
+  /**
+   * ADR-0021 Decision 2/W1: every member-role enrolled agent this round did
+   * NOT pin, with the reason. Together with `afp:voters` this must partition
+   * the hub's member-role electorate at the proposal's own instant.
+   */
+  excluded?: readonly ExcludedEntry[];
 }
 
 /** `Offer{afp:Proposal}` — opens an L0 round (03 § 8c). */
@@ -174,6 +198,12 @@ export function offerProposal(envelope: Envelope, spec: ProposalSpec): { [key: s
   if (spec.level) object["afp:level"] = spec.level;
   if (spec.successionRule) object["afp:successionRule"] = { ...spec.successionRule };
   if (spec.supersedesRound) object["afp:supersedesRound"] = spec.supersedesRound;
+  // ADR-0021 W1: emitted only when there is something to declare — a round
+  // that pins its whole electorate is byte-identical to one written before
+  // this decision, which is every bundle the repository has shipped (W6).
+  if (spec.excluded && spec.excluded.length > 0) {
+    object["afp:excluded"] = spec.excluded.map((entry) => ({ ...entry }));
+  }
   return { ...base(envelope, "Offer"), object };
 }
 

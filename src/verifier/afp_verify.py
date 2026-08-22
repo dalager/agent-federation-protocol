@@ -43,12 +43,14 @@ from decision import (
     check_departure,
     check_enroll_authority,
     check_equivocation_proof,
+    check_proposal_electorate,
     check_succession,
     check_vote_l1_fields,
     instant_millis,
     settlement_payload,
     wrapped_payload,
 )
+from electorate import partition as electorate_partition
 from equivocation import convicts, equivocation_proof_votes, proof_round, vote_tuple_of
 from federation import check_federation, check_joint
 from keys import (
@@ -118,7 +120,7 @@ class Report:
         conditional = (
             "action", "archive", "decision", "equivocation", "joint", "keys",
             "pins", "proof", "retention", "round", "succession", "supersession",
-            "synthesis", "vote",
+            "electorate", "synthesis", "unenroll", "vote",
         )
         print("census — checks run per domain (a zero you expected to be nonzero is a question):")
         for domain in sorted(domains):
@@ -760,6 +762,10 @@ def verify_export(export: Path, thread: str | None, report: Report) -> dict:
     for activity in all_activities:
         if afp_object(activity, "afp:Proposal") is not None:
             check_succession(report, activity, all_activities)
+            # ADR-0021 Decision 2 V3/V5 — per domain, because a proposal
+            # carries its own voter list and its own exclusions wherever it
+            # sits. V4 needs the hub's Enroll trail and runs replay-wide.
+            check_proposal_electorate(report, activity)
 
     # ADR-0018 W5 V7-V9 / W6: afp:Departure from a binding round. Exports
     # with none (everything before this ADR, and any round without
@@ -825,6 +831,63 @@ def verify_export(export: Path, thread: str | None, report: Report) -> dict:
         # `check_equivocation_proofs`.
         "keys": keys,
     }
+
+
+def check_electorate(report: Report, bundles: list[dict | None]) -> None:
+    """ADR-0021 Decision 2 / V4 — every member-role enrolled agent is either
+    pinned into a round's `afp:voters` or declared in its `afp:excluded`.
+
+    **Replay-wide and three-valued**, and the scoping is the whole subtlety.
+    A hub's membership is the hub's fact: the Enroll trail lives on the host's
+    chain and each member's own, so a peer's bundle holds the proposal it
+    received and its own single Enroll and nothing else. Folding per domain
+    fails every non-host bundle in the repository — measured, not predicted,
+    while writing the ADR. So the trail is folded over the merged pool, and a
+    replay that contains no trail for the hub at all records `unresolvable`
+    rather than a failure.
+
+    This is the same shape as ADR-0020's V2 (a proof convicting a foreign
+    actor whose key lives in another bundle): a check whose evidence is owned
+    by a different party belongs here, not in the per-domain loop.
+    """
+    present = [b for b in bundles if b is not None]
+    pool: list[dict] = []
+    for bundle in present:
+        pool.extend(bundle["activities"])
+
+    for bundle in present:
+        domain = bundle["path"].name or str(bundle["path"])
+        prefix = f"[{domain}] " if len(present) > 1 else ""
+        for activity in bundle["activities"]:
+            proposal = afp_object(activity, "afp:Proposal")
+            if proposal is None:
+                continue
+            label = proposal.get("id", activity.get("id", "<no id>"))
+            missing, overlapping, enrolled = electorate_partition(activity, pool)
+            if not enrolled:
+                # No Enroll trail for this hub anywhere in the replay — the
+                # question cannot be answered here, and saying so is not the
+                # same as saying yes (W0.5).
+                report.record(
+                    f"{prefix}electorate: {label} accounts for every enrolled member",
+                    True,
+                    "unresolvable: this replay carries no Enroll trail for the hub, so the "
+                    "pinned electorate cannot be compared against it (ADR-0021)",
+                )
+                continue
+            ok = not missing and not overlapping
+            detail = ""
+            if missing:
+                detail = ("member-role agent(s) neither pinned nor declared in afp:excluded: "
+                          + ", ".join(sorted(missing)))
+            if overlapping:
+                detail += ("; " if detail else "") + (
+                    "agent(s) both pinned and excluded: " + ", ".join(sorted(overlapping)))
+            report.record(
+                f"{prefix}electorate: {label} accounts for every enrolled member",
+                ok,
+                "" if ok else detail + " (ADR-0021)",
+            )
 
 
 def check_equivocation_proofs(report: Report, bundles: list[dict | None]) -> None:
@@ -998,6 +1061,7 @@ def main() -> int:
             # second export in the replay, only a second copy of a vote.
             check_equivocation_scan(report, [bundle])
             check_equivocation_proofs(report, [bundle])
+            check_electorate(report, [bundle])
         else:
             # ADR-0009 Decision 1: N single-export replays plus a cross-check —
             # never a forked verifier. Phase one runs today's replay per bundle,
@@ -1013,6 +1077,7 @@ def main() -> int:
             # whose key its own bundle never publishes (ADR-0020 Decision 1's
             # "verifies standalone" needs the whole case file's key table).
             check_equivocation_proofs(report, bundles)
+            check_electorate(report, bundles)
     except Exception as exc:  # a malformed bundle is a failed audit, not a crash
         report.record("bundle: readable", False, f"{type(exc).__name__}: {exc}")
 
