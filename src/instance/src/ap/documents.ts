@@ -223,6 +223,10 @@ export function signedRoster(
     totalItems: agents.length,
     "afp:visibility": "public",
     orderedItems: agents.map((agent) => ({
+      // A fragment id under the roster URL: entries are referenced later
+      // (audits cite them), and a referenced AS2 object carries an id
+      // (ADR-0017 Decision 6, critique finding 3.7).
+      id: `${origin}/roster#${agent.name}`,
       type: "afp:RosterEntry",
       agent: agent.url ?? agentActorId(origin, agent.name),
       status: "active",

@@ -190,7 +190,7 @@ finding 41).
 | `afp:Enroll` / `afp:Unenroll` | Activity | Adds/removes one agent to/from a hub's membership CRDT |
 | `afp:hub` | Property | Scopes a CRDTDelta, Task, Bid, etc. to one hub's namespace |
 | `afp:GovernanceDecision` | Activity | Signed, quorum-voted hub-level decision (admission, expulsion, disputes) |
-| `afp:MemberAdmit` / `afp:MemberExpel` | Activity | Specific governance decisions on hub membership |
+| `afp:MemberAdmit` / `afp:MemberExpel` | Activity, dual-typed `["Add", "afp:MemberAdmit"]` / `["Remove", "afp:MemberExpel"]`, `target` = the hub's members collection | Specific governance decisions on hub membership |
 | `afp:Bid` | Activity (reserved in v1, now live) | Signed offer to perform an announced Task, with estimates |
 | `afp:Award` | Activity | Signed, independently-verifiable selection of a winning bid |
 | `afp:Reauction` | Activity | Restarts allocation after award timeout/failure |
@@ -237,6 +237,9 @@ finding 41).
 | `afp:priorQuorumSnapshot` | Property (DecisionRecord) | On a record ratifying a *superseding* Synthesis: the `afp:quorumSnapshot` of the record that ratified the answer being withdrawn. Makes a changed panel visible rather than implied — same electorate or not is a digest comparison (ADR-0011) |
 | `afp:priorThread` | Property (task-bearing activity) | The closed thread this ask continues, when the claim is new information rather than that the old answer was wrong on what it saw. Beside the pins, deliberately not among them; an unresolvable one is an out-of-scope reference under a scoped export, not tampering (ADR-0011) |
 | `afp:disposes` | Property (any acting activity) | The digest of an action whose justification was withdrawn — paired with `afp:actsOn` on the superseding answer, so no acted-on retraction leaves an orphaned consequence (ADR-0007) |
+
+The dual-typing above and every other extension-vs-core-type call for this vocabulary is
+decided normatively in [01 — Deviations from ActivityPub](01-foundations.md#deviations-from-activitypub).
 
 > **Numeric profile.** Signed AFP documents carry **integers only** — the JCS
 > canonicalization this profile signs over ([01](01-foundations.md)) rejects non-integer

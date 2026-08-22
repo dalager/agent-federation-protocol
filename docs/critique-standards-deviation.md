@@ -171,19 +171,42 @@ The roster proof references `verificationMethod: …#main-key` (`01:85`) while t
 
 ## 3. Deviations by design — defensible, but must be stated normatively as deviations
 
-### 3.1 `afp:visibility` replaces AP audience semantics — `status: open`
+### 3.1 `afp:visibility` replaces AP audience semantics — `status: accepted-deviation`
+
+**Resolution (2026-08-22, ADR-0017 Decision 6):** the deviation stands, the silence is
+gone — 01 § "Deviations from ActivityPub" now states normatively that `as:Public`,
+`bto`/`bcc`/`audience`, followers expansion, `sharedInbox`, and §7.1.2 forwarding are
+not part of AFP, and that an AFP instance is not a general-purpose AP server at the
+addressing layer. 07 cross-references it. Original finding follows.
 
 `https://www.w3.org/ns/activitystreams#Public` appears nowhere; `bto`/`bcc`/`audience` are never produced or consumed (`readGate.ts:137` reads only `to`/`cc`); delivery fan-out from addressing — sender-side followers expansion (AP §7.1, a MUST), `sharedInbox` (§7.1.3), and the §7.1.2 inbox-forwarding MUST — is absent. Coherent for a closed federation, but AFP is therefore *not* AP-interoperable at the addressing layer; the spec should say so explicitly instead of implying compatibility. (`07-visibility-and-artifacts.md:16-24` abolishes addressing inference deliberately — the decision is fine, the framing as AP-compatible is not.)
 
-### 3.2 `Update` as a CRDT-delta carrier — `status: open`
+### 3.2 `Update` as a CRDT-delta carrier — `status: accepted-deviation`
+
+**Resolution (2026-08-22, ADR-0017 Decision 6):** declared as AFP-defined semantics in
+01 § Deviations — a generic AP consumer MUST NOT apply §7.3 replacement side effects to
+`Update{afp:CRDTDelta}` or `Update{afp:Asset}`. Original finding follows.
 
 AP §7.3 S2S Update means replacement of the object; AFP's `Update{afp:CRDTDelta}` (`02:110-131`) and `Update{afp:Asset}` (`07:146-148`) carry deltas where the object of the activity is not the object being updated.
 
-### 3.3 `Announce` repurposed — `status: open`
+### 3.3 `Announce` repurposed — `status: accepted-deviation`
+
+**Resolution (2026-08-22, ADR-0017 Decision 6):** declared in 01 § Deviations (AFP
+relies on no AP-side Announce side effects), and 04's boost row is corrected — same
+verb, but the announced object is dropped by Mastodon; reuse is vocabulary-level, not
+mechanism-level. Original finding follows.
 
 AS2 `Announce` is share/boost ("calling attention to"). AFP uses `Announce{afp:Task}` as a call-for-bids (`03:467`) and `Announce{afp:EquivocationProof}` as an accusation (`03:695`). `04-operations.md:538`'s claim that hub fan-out ≡ Mastodon boost, "identical mechanism, reused as-is", is an overstatement — the announced object is a custom type Mastodon drops.
 
-### 3.4 Custom top-level activity verbs — `status: open`
+### 3.4 Custom top-level activity verbs — `status: fixed-spec` (audit complete)
+
+**Resolution (2026-08-22, ADR-0017 Decision 6):** the verb audit ran and its outcomes
+are normative in 01 § Deviations: `afp:MemberAdmit`/`afp:MemberExpel` dual-type as
+`["Add", …]`/`["Remove", …]` with the members collection as `target`; everything else
+stays a pure extension type with its reason stated (`afp:Award` deliberately does NOT
+dual-type as `Accept` — it is a recomputable multi-winner record, not an acceptance of
+one prior activity). The `afp:bidCommit` capitalization defect was fixed under
+Decision 5. Original finding follows.
 
 `afp:Enroll`, `afp:Vouch`, `afp:Award`, `afp:MemberAdmit`, `afp:MemberExpel`, `afp:bidCommit`, … are top-level activity types outside the AS2 vocabulary. AS2 Core §5: an extension type overlapping a core type MUST also specify the core type (dual-typing, e.g. `["Offer", "afp:Bid"]`); Vocab §3 note: avoid extension types that unduly duplicate existing vocabulary. Some AFP verbs genuinely have no AS2 counterpart; others duplicate it (`afp:MemberAdmit`/`afp:MemberExpel` ≈ `Add`/`Remove` with `target`; `afp:Award` ≈ `Accept`). Also `afp:bidCommit` breaks the type-capitalization convention every other type follows (`03:184`).
 
@@ -214,7 +237,13 @@ finding follows.
 
 `Digest: SHA-256=<base64>` (RFC 3230, `httpSig.ts:84`) rather than RFC 9530 `Content-Digest`. Consistent with draft-cavage, but dated; resolves itself with an RFC 9421 migration.
 
-### 3.7 Minor AS2 shape issues — `status: open`
+### 3.7 Minor AS2 shape issues — `status: fixed-code` + `fixed-spec`
+
+**Resolution (2026-08-22, ADR-0017 Decision 6):** roster entries now carry fragment
+`id`s under the roster URL (`documents.ts`, spec example updated); `Offer` gained its
+`target` under finding 1.6; the `Reject`-reason-in-`summary` and double-colon CURIE
+shapes are stated once in 01 § Deviations so they need no re-litigating. Original
+finding follows.
 
 - Roster `orderedItems` contain `afp:RosterEntry` objects with no `id` — AS2 collections should contain Objects/Links (transient objects without `id` are legal, but referenced entries deserve ids).
 - `Reject` reason carried in `summary` (`03:39`) — `summary` is a natural-language summary of the object; stretch, not illegal.

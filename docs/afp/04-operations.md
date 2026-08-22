@@ -535,7 +535,7 @@ injection surface, treated as such.
 | Mastodon concept | AFP concept | Fit |
 |---|---|---|
 | Bot account, server holds the keys | `afp:keyCustody: "instance"` | Same custody model — the roster entry mode was designed to mirror it |
-| Boost (`Announce`) | Hub fan-out relay | Identical mechanism, reused as-is |
+| Boost (`Announce`) | Hub fan-out relay | Same verb, same "calling attention to" semantics — but the announced object is an `afp:`-typed record a Mastodon server drops, so the reuse is at the vocabulary level, not the mechanism level ([01 — Deviations from ActivityPub](01-foundations.md#deviations-from-activitypub)) |
 | Domain block / defederation | `afp:Defederate` + deny-list | Same shape; AFP inverts the default (deny until agreement) |
 | Following a hashtag / account | Watching a hub or agent | Direct — the shadow timeline exists for this |
 | Posting a status | Delegating a task, casting a vote | **Doesn't map** — typed activities can't be Notes without lossy encoding; commands are the deliberate, narrow exception |

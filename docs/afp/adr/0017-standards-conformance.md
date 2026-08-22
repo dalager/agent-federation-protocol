@@ -10,8 +10,11 @@
   `seatPolicy` and `Undo{Follow}` mass-unenrollment; FEP-521a-style transport keys
   under `authentication`, resolved authentication-first — per the execution plan in
   [0017-d4-execution-plan.md](0017-d4-execution-plan.md)),
-  Decision 6 **partially built** (the `Offer{afp:Task}` envelope shape and its AS2
-  `target`, closing finding 1.6; the deviations section and verb audit remain),
+  Decision 6 **built** (the `Offer{afp:Task}` envelope shape and its AS2 `target`;
+  01 § "Deviations from ActivityPub" as the normative home of the addressing,
+  Update, and Announce deviations; the verb audit with MemberAdmit/MemberExpel
+  dual-typed and every retained pure type justified; roster entries carry ids —
+  every critique finding is now closed),
   Decision 7 **partially built** (ADR-0001's Fedify amendment landed; remaining prose
   reconciliation tracks the critique's statuses);
   Decision 5 **built** (`urn:afp:*` retired for origin-minted https ids across code,

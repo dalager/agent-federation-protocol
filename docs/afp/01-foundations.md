@@ -97,9 +97,11 @@ membership is verifiable from a cached copy without a live roundtrip:
   "attributedTo": "https://alpha.operator.example/actor",
   "totalItems": 2,
   "orderedItems": [
-    { "type": "afp:RosterEntry", "agent": "https://alpha.operator.example/agents/a1",
+    { "id": "https://alpha.operator.example/roster#a1", "type": "afp:RosterEntry",
+      "agent": "https://alpha.operator.example/agents/a1",
       "status": "active", "afp:keyCustody": "self", "since": "2026-06-01T00:00:00Z" },
-    { "type": "afp:RosterEntry", "agent": "https://alpha.operator.example/agents/a2",
+    { "id": "https://alpha.operator.example/roster#a2", "type": "afp:RosterEntry",
+      "agent": "https://alpha.operator.example/agents/a2",
       "status": "active", "afp:keyCustody": "instance", "since": "2026-07-15T00:00:00Z" }
   ],
   "proof": { "type": "DataIntegrityProof", "cryptosuite": "eddsa-jcs-2022", "created": "2026-08-16T09:00:00Z",
@@ -279,6 +281,71 @@ ratify a signed `afp:GovernanceDecision` via weighted-quorum vote, with the proo
 as evidence. One bad agent shouldn't get its operator delisted without the other members
 agreeing. An instance can preempt governance by self-issuing `afp:Disown` on the offender —
 voluntary remediation heads off forced action.
+
+## Deviations from ActivityPub
+
+AFP claims ActivityPub compatibility at the level of actors, documents, signatures, and
+vocabulary — not at the level of addressing-driven fan-out. The two boundaries above are
+where that line runs on the wire; this section states, as rules, everywhere AFP's
+behavior departs from what AP §5–7 and AS2 Core specify, so the compatibility claim is
+precise rather than implied.
+
+**Addressing and audience.** `afp:visibility` (07) is AFP's authorization model, not
+`to`/`cc`. AS2 addressing names parties; it never grants access, and nothing in this
+protocol treats it as doing so. Consequently the following AP §5–7 machinery is **not
+part of AFP**: the `as:Public` collection, `bto`/`bcc`/`audience`, sender-side
+followers-collection expansion, `sharedInbox`, and §7.1.2 inbox forwarding. An AFP
+instance is therefore not a general-purpose ActivityPub server at the addressing layer —
+interop with AP software holds at the level of actors, documents, signatures, and
+vocabulary, not audience fan-out. This is deliberate: a closed federation with a
+two-tier admission gate (above) has no anonymous public to fan out to, so the machinery
+AP built for one has nothing to attach to in AFP.
+
+**`Update` as a delta carrier.** `Update{afp:CRDTDelta}` and `Update{afp:Asset}` carry
+AFP-defined semantics distinct from AP §7.3's S2S `Update`, which means replacement of
+the stored object. In both AFP activities the object of the activity is a delta or an
+asset-version record, not a replacement of anything already held — a generic AP consumer
+MUST NOT apply §7.3 side effects (overwrite the referenced object) to them.
+
+**`Announce` repurposed.** `Announce{afp:Task}` is a call for bids and
+`Announce{afp:EquivocationProof}` is an evidence broadcast. Both use `Announce`'s
+"calling attention to" sense honestly — the activity really is drawing recipients'
+attention to the announced object — but the announced objects are `afp:`-typed, and a
+generic AP consumer drops them. AFP does not rely on any AP-side `Announce` side effects
+(populating a shares collection, boost counts) for either use.
+
+**Verb audit.** Every custom top-level activity type was checked against AS2 Core §5,
+which requires an extension type overlapping a core type to also specify the core type.
+Two pairs overlap a core type precisely enough to dual-type:
+
+- `afp:MemberAdmit` and `afp:MemberExpel` are exactly `Add` and `Remove` with governance
+  preconditions attached, targeting the hub's members collection, so they are now typed
+  `["Add", "afp:MemberAdmit"]` and `["Remove", "afp:MemberExpel"]` with that collection
+  as `target` (03).
+
+The rest stay pure extension types, each for a stated reason:
+
+- `afp:Enroll` / `afp:Unenroll` — membership here carries capability declarations and key
+  binding that `Join`/`Leave` have no object/target split to hold, and the hub's `Accept`
+  already answers the instance-level `Follow`; dual-typing would describe a handshake AP
+  already has a name for and miss the part AFP actually adds.
+- `afp:Vouch` / `afp:Disown` — roster attestation, not collection membership; there is no
+  collection being added to or removed from.
+- `afp:Award` — a recomputable multi-winner selection record, not an `Accept` of any
+  single prior activity. Dual-typing it as `Accept` would assert `Accept` side effects
+  (accepting *one* thing) that AFP's multi-winner, recomputable selection forbids.
+- `afp:BidCommit` / `afp:BidReveal` — commit-reveal bidding has no AS2 counterpart.
+- `afp:GovernanceDecision`, `afp:Defederate`, `afp:Freeze`, `afp:Archive`,
+  `afp:Reauction`, `afp:Settlement`, `afp:ContributionDispute` — each names a governance
+  or lifecycle act AS2 does not carry a verb for.
+
+**Minor shapes, stated once so they don't need re-litigating:** `Reject` carries its
+reason in `summary` — a stretch of that property's "natural-language summary" intent,
+not a misuse of it. `afp:cap:*` capability URNs are compact IRIs whose suffix itself
+contains a colon (`afp:cap:image-classification`); unusual to read, but it expands
+correctly under the `afp` prefix and is legal JSON-LD. Roster entries carry `id`s
+(fragment ids under the roster URL) precisely because they are referenced elsewhere,
+unlike AS2's allowance for transient, id-less collection members.
 
 ## Discovery & identity
 

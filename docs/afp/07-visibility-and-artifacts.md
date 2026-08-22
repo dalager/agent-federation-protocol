@@ -21,7 +21,9 @@ replay names a missing class as a failure rather than guessing at it: *the recor
 say who may read this* is a defect in the record, not a puzzle for the reader.
 
 Addressing still tells you which class to **choose** — it just no longer stands in for
-the declaration. Never assumed public.
+the declaration. Never assumed public. This is the AFP authorization model in full; AS2
+addressing (`to`/`cc`) is not a substitute for it in either direction, per
+[01 — Deviations from ActivityPub](01-foundations.md#deviations-from-activitypub).
 
 | Class | Who may fetch | Typical use |
 |---|---|---|
