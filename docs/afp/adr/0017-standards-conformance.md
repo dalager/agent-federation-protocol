@@ -20,7 +20,9 @@
   Decision 5 **built** (`urn:afp:*` retired for origin-minted https ids across code,
   verifier, and spec; policy at `/afp/policy` with the `.well-known` alias; NodeInfo 2.1
   served per FEP-f1d5; `afp:BidCommit` — header registration rides with the FEP);
-  Decision 8 open. Drafted from
+  Decision 8 **deferred deliberately** (2026-08-22): a FEP submission is a public
+  commitment, and the operator holds it until AFP is ready for that audience — the
+  two registrations and the context URL's permanence wait with it. Drafted from
   [docs/critique-standards-deviation.md](../../critique-standards-deviation.md), the
    2026-08-21 four-source audit of the spec and instance against ActivityPub, AS2,
   JSON-LD, WebFinger, and current fediverse signature practice
