@@ -402,6 +402,8 @@
               <tr><td>57</td><td>Where the pinned <code>afp:irrevocableActions</code> names an action already taken, its disposition MAY be <code>afp:disposition: "annotate"</code> &mdash; binding the withdrawn justification to the standing consequence instead of commanding a re-actuation that cannot happen. A <code>DecisionRecord</code> ratifying a superseding Synthesis carries <code>afp:priorQuorumSnapshot</code>, the overturned electorate, so a changed panel is visible rather than implied. And <code>afp:priorThread</code> lets a new ask continue a closed thread on new information without reopening it</td><td>Some consequences cannot be undone once acted on, and the existing disposition duty had no honest answer for them; some records outlive the quorum that made them, and re-deciding silently reads the same as deciding fresh</td></tr>
               <tr><td colspan="3" style="background:var(--surface-2); font-weight:700;">v3.20 &mdash; the long horizon: verifying old exports (ADR-0012; campaign 6 closed, finding 40 and the sharp half of 32)</td></tr>
               <tr><td>58</td><td>Key rotation and revocation are named as opposite claims about the past &mdash; rotation archives (the superseded key's signatures verify forever), revocation cuts (everything after the compromise instant fails). The export manifest is now a signed document in its own right, carrying <code>afp:keyHistory</code> (per-actor key intervals and how each left service), <code>afp:members</code> (an exhaustive, checked-both-ways file inventory), and <code>afp:retentionDuty</code>/<code>afp:anchors</code>. Where a retention duty is declared, artifact bytes &mdash; not just their digests &mdash; MUST be kept for the declared horizon</td><td>A verifier resolving keys from the current actor document alone strands every export signed before the most recent rotation &mdash; instance-custodied fleets rotate centrally, so this would retroactively invalidate a whole corpus. And a bundle's own inventory was, until now, the one part of it left unsigned</td></tr>
+              <tr><td colspan="3" style="background:var(--surface-2); font-weight:700;">v3.21 &mdash; the ADR-0017 standards-conformance campaign closed (all 19 critique findings)</td></tr>
+              <tr><td>59</td><td>The <code>afp:</code> <code>@context</code> published and resolvable at a live URL, referenced in one canonical form; RFC 9421 HTTP Signatures made native, with draft-cavage kept only as a double-knock fallback for legacy peers; delivery made spec-shaped &mdash; inboxes dereferenced rather than assumed, every advertised URL actually served, collections paged; WebFinger served at <code>/.well-known/webfinger</code> and NodeInfo 2.1 at <code>/.well-known/nodeinfo</code>; hub enrollment gains a real instance-level Follow/Accept seat behind the agent-level <code>afp:Enroll</code>; FEP-521a transport keys (<code>#transport-key</code>) added beside the assertion key; the retired <code>urn:afp:</code> namespace replaced everywhere by ordinary <code>https:</code> ids under the naming actor's own origin; and a normative &ldquo;Deviations from ActivityPub&rdquo; section states precisely where AFP departs from AP &sect;5&ndash;7</td><td>A standards-conformance review (<code>docs/critique-standards-deviation.md</code>) found 19 places where the spec's ActivityPub compatibility claim was aspirational rather than checkable &mdash; an unpublished context, a legacy-only signature scheme, undereferenced inboxes, a squatted <code>.well-known</code> path, non-dereferenceable urns, and an enrollment flow with no instance-level handshake underneath it. All 19 are now closed and built (ADR-0017)</td></tr>
             </tbody>
           </table>
         </div>
@@ -441,19 +443,29 @@
   "id": "https://alpha.operator.example/actor",
   "type": ["Application", "afp:Instance"],
   "name": "Alpha Operator Instance",
+  "preferredUsername": "instance",
   "afp:operator": "Alpha Robotics Collective",
-  "inbox": "https://alpha.operator.example/inbox",
-  "outbox": "https://alpha.operator.example/outbox",
+  "inbox": "https://alpha.operator.example/actor/inbox",
+  "outbox": "https://alpha.operator.example/actor/outbox",
+  "following": "https://alpha.operator.example/actor/following",
   "assertionMethod": [{
     "id": "https://alpha.operator.example/actor#ed25519-key",
     "type": "Multikey",
     "controller": "https://alpha.operator.example/actor",
     "publicKeyMultibase": "z6Mkf...ffbq"
   }],
+  "authentication": [{
+    "id": "https://alpha.operator.example/actor#transport-key",
+    "type": "Multikey",
+    "controller": "https://alpha.operator.example/actor",
+    "publicKeyMultibase": "z6Mkg...ttq2"
+  }],
   "afp:roster": "https://alpha.operator.example/roster",
-  "afp:policy": "https://alpha.operator.example/.well-known/afp-policy"
+  "afp:policy": "https://alpha.operator.example/afp/policy"
 }</code></pre>
         </div>
+        <p><strong>Two key formats, two jobs</strong> (ADR-0017 Decision 4). <code>assertionMethod</code> publishes a <strong>Multikey</strong>, which is what <code>eddsa-jcs-2022</code> object integrity proofs verify against — required from P1, because proofs are what survive an export. HTTP Signatures verify against a second Multikey, <code>#transport-key</code>, published under <code>authentication</code> — the same shape as the assertion key, a distinct key. Resolution is <strong>authentication-first, with an assertionMethod fallback</strong> kept open as a compatibility window for actor documents that have not yet published a dedicated transport key. Publishing only <code>assertionMethod</code> — as earlier revisions of this example did — still verifies today through that fallback, but leaves object-integrity and transport-authentication uses sharing one key indefinitely, which the second key exists to end. A <code>publicKey</code>/<code>publicKeyPem</code> entry is a different thing again: the RSA key the Mastodon-facing draft-cavage shim would need, since Mastodon's HTTP Signature implementation expects RSA rather than Ed25519. That shim is not built; the entry appears only if and when it is provisioned.</p>
+        <p>The policy document has moved off the reserved <code>.well-known</code> space it occupied in earlier revisions (<code>/.well-known/afp-policy</code> &rarr; <code>/afp/policy</code>). Registering a name under <code>.well-known</code> is RFC&nbsp;8615 territory — the FEP's job once one exists, not something an instance claims for itself by squatting the path — so the canonical location is ordinary, and the old path stays served as an alias through the transition (ADR-0017 Decisions 5 and 8).</p>
         <p><strong>Agent &rarr; instance link.</strong> Every agent actor document carries <code>afp:operatedBy</code>:</p>
         <div class="snippet">
           <pre><code>{
@@ -472,13 +484,13 @@
   "attributedTo": "https://alpha.operator.example/actor",
   "totalItems": 2,
   "orderedItems": [
-    { "type": "afp:RosterEntry", "agent": "https://alpha.operator.example/agents/a1",
+    { "id": "https://alpha.operator.example/roster#a1", "type": "afp:RosterEntry", "agent": "https://alpha.operator.example/agents/a1",
       "status": "active", "afp:keyCustody": "self", "since": "2026-06-01T00:00:00Z" },
-    { "type": "afp:RosterEntry", "agent": "https://alpha.operator.example/agents/a2",
+    { "id": "https://alpha.operator.example/roster#a2", "type": "afp:RosterEntry", "agent": "https://alpha.operator.example/agents/a2",
       "status": "active", "afp:keyCustody": "instance", "since": "2026-07-15T00:00:00Z" }
   ],
   "proof": { "type": "DataIntegrityProof", "cryptosuite": "eddsa-jcs-2022", "created": "2026-08-16T09:00:00Z",
-    "verificationMethod": "https://alpha.operator.example/actor#main-key", "proofPurpose": "assertionMethod", "proofValue": "z3Fh9..." }
+    "verificationMethod": "https://alpha.operator.example/actor#ed25519-key", "proofPurpose": "assertionMethod", "proofValue": "z3Fh9..." }
 }</code></pre>
         </div>
         <h3>Proving membership</h3>
@@ -547,6 +559,7 @@
           <li><strong>Instance level</strong> — <code>Follow</code>/<code>Accept</code> between instance and hub establishes the instance's seat in hub governance (voting eligibility, visibility). No agents are enrolled yet.</li>
           <li><strong>Agent level</strong> — the instance issues a signed <code>afp:Enroll</code> per agent, carrying that agent's hub-scoped capability declarations:</li>
         </ol>
+        <div class="note"><strong>Migration (ADR-0017 Decision 4).</strong> The hub's <code>Accept</code> answers the Follow with the <em>Follow activity's id</em> as its <code>object</code> — the same convention every other Accept in this spec follows. During the transition a hub MAY run <code>enroll-implies-seat</code>, deriving the instance seat from the <code>afp:Enroll</code> trail as earlier revisions of the reference implementation did; <code>follow-required</code> — an <code>afp:Enroll</code> from an instance holding no live seat is refused by name — is the conformant target, and the reference instance flips its default in the next phase. <code>Undo{Follow}</code> revokes the seat and mass-unenrolls that instance's agents; a later re-Follow revives the seat empty, enrollment starting over per agent.</div>
         <div class="snippet">
           <pre><code>{
   "@context": ["https://www.w3.org/ns/activitystreams", "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"],
@@ -569,21 +582,43 @@
         <p>Member admission and dispute adjudication inevitably concentrate at the hub — unavoidable for a rendezvous point. The mitigation: the hub's governance activities (<code>afp:GovernanceDecision</code>, <code>afp:MemberAdmit</code>, <code>afp:MemberExpel</code>) require a <strong>weighted quorum vote among current instance members</strong>, reusing the L1 machinery — <em>never</em> a signature from the hub's own key. The hub key signs only transport-level things: message forwarding, state storage attestation. Practical consequence: whoever operates the physical hub server has no unilateral power beyond availability — a malicious or compromised hub can censor or go dark, but cannot forge governance outcomes or corrupt history, because everything of consequence is independently signed by members and gossip-replicable. Recovery from a bad hub operator is &ldquo;stand up a replacement hub actor, replay CRDT deltas from surviving members' outboxes&rdquo; — costly, but a liveness failure, not a correctness one.</p>
       </section>
 
+      <section id="deviations">
+        <div class="sec-head"><h2>Deviations from ActivityPub</h2><span class="rev-chip">New — ADR-0017</span></div>
+        <p>AFP claims ActivityPub compatibility at the level of actors, documents, signatures, and vocabulary — not at the level of addressing-driven fan-out. The two boundaries above (&sect;03) are where that line runs on the wire; this section states, as rules, everywhere AFP's behavior departs from what AP &sect;5&ndash;7 and AS2 Core specify, so the compatibility claim is precise rather than implied.</p>
+        <p><strong>Addressing and audience.</strong> <code>afp:visibility</code> (&sect;17) is AFP's authorization model, not <code>to</code>/<code>cc</code>. AS2 addressing names parties; it never grants access, and nothing in this protocol treats it as doing so. Consequently the following AP &sect;5&ndash;7 machinery is <strong>not part of AFP</strong>: the <code>as:Public</code> collection, <code>bto</code>/<code>bcc</code>/<code>audience</code>, sender-side followers-collection expansion, <code>sharedInbox</code>, and &sect;7.1.2 inbox forwarding. An AFP instance is therefore not a general-purpose ActivityPub server at the addressing layer — interop with AP software holds at the level of actors, documents, signatures, and vocabulary, not audience fan-out. This is deliberate: a closed federation with a two-tier admission gate (&sect;04) has no anonymous public to fan out to, so the machinery AP built for one has nothing to attach to in AFP.</p>
+        <p><strong><code>Update</code> as a delta carrier.</strong> <code>Update{afp:CRDTDelta}</code> and <code>Update{afp:Asset}</code> carry AFP-defined semantics distinct from AP &sect;7.3's S2S <code>Update</code>, which means replacement of the stored object. In both AFP activities the object of the activity is a delta or an asset-version record, not a replacement of anything already held — a generic AP consumer MUST NOT apply &sect;7.3 side effects (overwrite the referenced object) to them.</p>
+        <p><strong><code>Announce</code> repurposed.</strong> <code>Announce{afp:Task}</code> is a call for bids and <code>Announce{afp:EquivocationProof}</code> is an evidence broadcast. Both use <code>Announce</code>'s &ldquo;calling attention to&rdquo; sense honestly — the activity really is drawing recipients' attention to the announced object — but the announced objects are <code>afp:</code>-typed, and a generic AP consumer drops them. AFP does not rely on any AP-side <code>Announce</code> side effects (populating a shares collection, boost counts) for either use.</p>
+        <p><strong>Verb audit.</strong> Every custom top-level activity type was checked against AS2 Core &sect;5, which requires an extension type overlapping a core type to also specify the core type. Two pairs overlap a core type precisely enough to dual-type:</p>
+        <ul>
+          <li><code>afp:MemberAdmit</code> and <code>afp:MemberExpel</code> are exactly <code>Add</code> and <code>Remove</code> with governance preconditions attached, targeting the hub's members collection, so they are now typed <code>["Add", "afp:MemberAdmit"]</code> and <code>["Remove", "afp:MemberExpel"]</code> with that collection as <code>target</code> (&sect;07).</li>
+        </ul>
+        <p>The rest stay pure extension types, each for a stated reason:</p>
+        <ul>
+          <li><code>afp:Enroll</code> / <code>afp:Unenroll</code> — membership here carries capability declarations and key binding that <code>Join</code>/<code>Leave</code> have no object/target split to hold, and the hub's <code>Accept</code> already answers the instance-level <code>Follow</code>; dual-typing would describe a handshake AP already has a name for and miss the part AFP actually adds.</li>
+          <li><code>afp:Vouch</code> / <code>afp:Disown</code> — roster attestation, not collection membership; there is no collection being added to or removed from.</li>
+          <li><code>afp:Award</code> — a recomputable multi-winner selection record, not an <code>Accept</code> of any single prior activity. Dual-typing it as <code>Accept</code> would assert <code>Accept</code> side effects (accepting <em>one</em> thing) that AFP's multi-winner, recomputable selection forbids.</li>
+          <li><code>afp:BidCommit</code> / <code>afp:BidReveal</code> — commit-reveal bidding has no AS2 counterpart.</li>
+          <li><code>afp:GovernanceDecision</code>, <code>afp:Defederate</code>, <code>afp:Freeze</code>, <code>afp:Archive</code>, <code>afp:Reauction</code>, <code>afp:Settlement</code>, <code>afp:ContributionDispute</code> — each names a governance or lifecycle act AS2 does not carry a verb for.</li>
+        </ul>
+        <p><strong>Minor shapes, stated once so they don't need re-litigating:</strong> <code>Reject</code> carries its reason in <code>summary</code> — a stretch of that property's &ldquo;natural-language summary&rdquo; intent, not a misuse of it. <code>afp:cap:*</code> capability URNs are compact IRIs whose suffix itself contains a colon (<code>afp:cap:image-classification</code>); unusual to read, but it expands correctly under the <code>afp</code> prefix and is legal JSON-LD. Roster entries carry <code>id</code>s (fragment ids under the roster URL) precisely because they are referenced elsewhere, unlike AS2's allowance for transient, id-less collection members.</p>
+      </section>
+
       <section id="discovery">
         <div class="sec-head"><span class="num">06</span><h2>Discovery &amp; identity</h2></div>
         <p><strong>Identity.</strong> An agent's identity is its actor URL; an instance's identity is its instance-actor URL. Trust attaches to the URL plus the key currently published on the actor document — and, in v3, to the instance standing behind it via <code>afp:operatedBy</code>.</p>
         <ul>
           <li><strong>Direct URL</strong> — already-known actor URLs are simply fetched.</li>
-          <li><strong>WebFinger</strong> — resolve <code>@billing-agent@alpha.operator.example</code> to an actor URL via <code>/.well-known/webfinger</code>.</li>
+          <li><strong>WebFinger</strong> — resolve <code>@billing-agent@alpha.operator.example</code> via <code>/.well-known/webfinger</code> (ADR-0017 Decision 4), served for both <code>acct:</code> and URL resource queries per RFC&nbsp;7033: 400 on a malformed resource, 404 on an unknown one, <code>Access-Control-Allow-Origin: *</code>, <code>application/jrd+json</code>. The instance actor itself resolves under the literal username <code>instance</code> (<code>@instance@alpha.operator.example</code>).</li>
           <li><strong>Within a hub</strong> — the hub's own roster and capability registry <em>are</em> the discovery mechanism; a separate directory actor per hub is redundant and dropped.</li>
           <li><strong>Discovering hubs themselves</strong> — a thin, out-of-band consortium-published list at a well-known URL (NodeInfo-style convention). Flagged open in &sect;25: revisit only if concurrent hub count outgrows a hand-maintained list.</li>
+          <li><strong>Self-description</strong> — the instance itself now serves real NodeInfo 2.1 at <code>/.well-known/nodeinfo</code>, per FEP-f1d5: the standard discovery indirection, software name and version, <code>"protocols": ["activitypub"]</code> (ADR-0017 Decision 5). Self-description is the one place where inventing a bespoke document would have negative value — every consumer of it is, by definition, not AFP — so it reuses the ecosystem's format rather than adding one of its own.</li>
         </ul>
         <h3>Authentication — two mechanisms with different lifetimes</h3>
         <div class="table-wrap">
           <table>
             <thead><tr><th>Mechanism</th><th>Authenticates</th><th>Lives</th></tr></thead>
             <tbody>
-              <tr><td><strong>HTTP Signature</strong> (RFC&nbsp;9421; draft-cavage for legacy peers)</td><td>One hop — method, path, <code>Date</code>, <code>Digest</code>, <code>Host</code></td><td>Consumed on receipt; never appears in an outbox</td></tr>
+              <tr><td><strong>HTTP Signature</strong> (RFC&nbsp;9421 native — <code>Signature-Input</code>/<code>Signature</code>, Ed25519, <code>Content-Digest</code>; draft-cavage emitted only as the double-knock fallback for legacy peers, ADR-0017 Decision 2)</td><td>One hop — method, authority, path, <code>Date</code>, and the body digest for requests that carry one</td><td>Consumed on receipt; never appears in an outbox</td></tr>
               <tr><td><strong>Object integrity proof</strong> (FEP-8b32, <code>eddsa-jcs-2022</code>)</td><td>The activity itself</td><td>Travels with the activity permanently, including through export</td></tr>
             </tbody>
           </table>
@@ -610,7 +645,7 @@
     "afp:capability": "afp:cap:image-classification",
     "afp:deadline": "2026-08-16T14:30:00Z",
     "afp:correlationId": "task-9931",
-    "context": "urn:afp:thread:batch-12",
+    "context": "https://alpha.operator.example/threads/batch-12",
     "afp:visibility": "parties",
     "content": "Classify the attached image set",
     "attachment": [{
@@ -634,7 +669,7 @@
             <tbody>
               <tr><td><code>id</code> (standard AS2)</td><td><strong>One activity</strong>, globally unique</td><td>Transport dedupe: a redelivered POST is dropped at the inbox <em>before</em> dispatch</td></tr>
               <tr><td><code>afp:correlationId</code></td><td><strong>One task</strong>, globally unique</td><td>Matches Offer&rarr;Accept&rarr;Result; the idempotency/replay key (an agent already holding it replays its cached Result)</td></tr>
-              <tr><td><code>context</code> (standard AS2)</td><td><strong>One thread</strong>, spanning many tasks</td><td>Groups every activity of one incident, case, or backlog item — e.g. <code>"urn:afp:incident:inc-4471"</code></td></tr>
+              <tr><td><code>context</code> (standard AS2)</td><td><strong>One thread</strong>, spanning many tasks</td><td>Groups every activity of one incident, case, or backlog item — e.g. <code>"https://alpha.operator.example/incidents/inc-4471"</code>, an <code>https:</code> id minted under the naming actor's own origin, dereferenceable in principle like every other id AFP mints (the retired <code>urn:afp:</code> namespace bought ids that were strictly worse — non-dereferenceable and gated on an IANA process AFP does not need, ADR-0017 Decision 5)</td></tr>
             </tbody>
           </table>
         </div>
@@ -686,7 +721,7 @@
               <tr><td><code>afp:Award</code></td><td>Activity</td><td>Signed, independently-verifiable selection of a winning bid</td></tr>
               <tr><td><code>afp:Reauction</code></td><td>Activity</td><td>Restarts allocation after award timeout/failure</td></tr>
               <tr><td><code>afp:capabilityMatch</code>, <code>afp:estimatedCost</code>, <code>afp:estimatedLatency</code></td><td>Properties (Bid)</td><td>Self-declared fit and estimates, later checked against actuals</td></tr>
-              <tr><td><code>afp:bidCommit</code> / <code>afp:BidReveal</code></td><td>Activity pair</td><td>Commit-reveal sealed bidding, deters sniping</td></tr>
+              <tr><td><code>afp:BidCommit</code> / <code>afp:BidReveal</code></td><td>Activity pair</td><td>Commit-reveal sealed bidding, deters sniping</td></tr>
               <tr><td><code>afp:reputation</code></td><td>Property (hub-scoped, per agent)</td><td>Running score from completions, estimate accuracy, voting integrity</td></tr>
               <tr><td><code>afp:ContributionSummary</code></td><td>Object</td><td>Periodic, independently-recomputable per-operator contribution roll-up</td></tr>
               <tr><td><code>afp:ContributionDispute</code></td><td>Activity</td><td>Challenge to a ContributionSummary, with evidence</td></tr>
@@ -752,7 +787,7 @@ timeout without quorum --> Undo{Vote} / abandon round</pre>
         <div class="note"><strong>What the direct flow skips is the auction, never the pins</strong> (ADR-0010). <code>afp:actionPolicy</code>, <code>afp:answerSufficiency</code> and <code>afp:synthesizer</code> ride the task-bearing activity of whichever activity opens the thread — an <code>Announce</code> here, a direct <code>Offer</code> there — and every task-bearing activity on a thread MUST agree on the whole set. Skipping the auction ceremony costs nothing checkable; it once cost all of it.</div>
         <ol class="plain">
           <li><strong>Announce</strong> — <code>afp:Announce{Task}</code> broadcast to the hub: task spec, required capabilities, deadline, <code>afp:hub</code>, the <code>afp:bidWindow</code>, the <code>afp:answerSufficiency</code> threshold, the hub's <code>afp:estimatorPolicy</code>, and — published up front, not decided after the fact — the <strong><code>afp:selectionRule</code></strong> that will pick the performer(s).</li>
-          <li><strong>Bid, sealed</strong> — inside <code>[opens, closes)</code>, bidders submit only <code>afp:bidCommit</code> with <code>afp:commitment = sha256(JCS(bid payload))</code>; after <code>closes</code> they submit <code>afp:BidReveal</code> carrying the full payload, verified by recomputing the digest. Commit-reveal exists specifically to deter last-moment undercutting off visible bids — open bidding on a hub (needed for auditability) would invite exactly that. Two rules keep the sealing honest, enforced at admission and re-checked at replay: <strong>one commitment per bidder per task</strong> (a second, differing commitment is a free option — commit several bids, reveal whichever looks best — and is rejected on the record), and <strong>reveals land after the window closes</strong>, or the bid showed its hand to later bidders.</li>
+          <li><strong>Bid, sealed</strong> — inside <code>[opens, closes)</code>, bidders submit only <code>afp:BidCommit</code> with <code>afp:commitment = sha256(JCS(bid payload))</code>; after <code>closes</code> they submit <code>afp:BidReveal</code> carrying the full payload, verified by recomputing the digest. Commit-reveal exists specifically to deter last-moment undercutting off visible bids — open bidding on a hub (needed for auditability) would invite exactly that. Two rules keep the sealing honest, enforced at admission and re-checked at replay: <strong>one commitment per bidder per task</strong> (a second, differing commitment is a free option — commit several bids, reveal whichever looks best — and is rejected on the record), and <strong>reveals land after the window closes</strong>, or the bid showed its hand to later bidders.</li>
           <li><strong>Award</strong> — the announcer (or the pre-published deterministic rule) emits <code>afp:Award</code> naming the winning payload digests (<code>afp:winningBids</code>), the <code>afp:performers</code>, the <code>afp:synthesizer</code> where the rule awards several, and <code>afp:acceptBy</code>. Anyone recomputes the published rule over the admitted reveals and must reach the same performer set, synthesizer <em>and</em> winning digests — selection is checkable even when a human made the call.</li>
           <li><strong>Accept / Result</strong> — exactly the v1 flow keyed by <code>correlationId</code>, seeded by a Bid instead of a direct Offer. A coalition gives each performer its own correlation leg; one <code>correlationId</code> is never shared across performers.</li>
         </ol>
@@ -855,7 +890,7 @@ timeout without quorum --> Undo{Vote} / abandon round</pre>
   "object": {
     "id": "https://agent-a.example/votes/round-7f2c9e/agent-a/2",
     "type": "afp:Vote",
-    "afp:round": "urn:afp:round:7f2c9e",
+    "afp:round": "https://agent-a.example/rounds/7f2c9e",
     "afp:phase": "commit",
     "afp:seqNo": 2,
     "afp:proposalHash": "sha256:9d3b1c...e21f",
@@ -1064,7 +1099,7 @@ sequenceDiagram
   "id": "https://hub.local/rounds/round-42/decision",
   "type": "afp:DecisionRecord",
   "afp:hub": "https://hub.local/actor",
-  "afp:round": "urn:afp:round:42",
+  "afp:round": "https://hub.local/rounds/42",
   "afp:outcome": "policy-candidate-7",
   "afp:quorumSnapshot": "sha256:mem-4a71c9...",
   "afp:countedVotes": ["sha256:vote-a01...", "sha256:vote-a02...", "..."],
@@ -1081,7 +1116,7 @@ sequenceDiagram
         <div class="snippet">
           <pre><code>{
   "type": "afp:Synthesis",
-  "context": "urn:afp:question:q-88",
+  "context": "https://alpha.operator.example/threads/q-88",
   "afp:method": "sum-of-disjoint-ranges",
   "afp:answer": { "unit": "kDKK", "low": 9000, "high": 11700 },
   "afp:confidence": 72,
@@ -1477,7 +1512,7 @@ flowchart TB
 
             <h3>The demo — a draft, a critique, a revision, and a stranger who can prove it happened</h3>
             <p>Two agents, <code>writer</code> and <code>reviewer</code>, both instance-custody, wired in-process. A human hands the writer a brief with one source document attached. Then:</p>
-            <pre class="diagram mono">writer  --Offer{Task: "review this draft"}--&gt;  reviewer     context: urn:afp:thread:doc-1
+            <pre class="diagram mono">writer  --Offer{Task: "review this draft"}--&gt;  reviewer     context: https://writer.example/threads/doc-1
         &lt;--Accept--                                          correlationId: task-1
         &lt;--Create{Result: critique}--
 writer  --Offer{Task: "review the revision"}--&gt;  reviewer    correlationId: task-2
