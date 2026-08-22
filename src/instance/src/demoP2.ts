@@ -24,8 +24,6 @@ import type { OutboxEntry } from "./store/outbox.ts";
 
 const HUB_ID = "policy-hub";
 const VOTERS = 30;
-const ROUND = "urn:afp:round:codebase-integrity";
-const THREAD = "urn:afp:thread:codebase-integrity";
 const QUESTION = "Which policy best protects codebase integrity?";
 const OPTIONS = ["signed-commits", "review-quorum", "trunk-freeze"] as const;
 
@@ -48,6 +46,9 @@ export interface P2DemoResult {
 export async function runP2Demo(options: { fresh?: boolean; config?: Partial<Config>; clock?: Clock } = {}): Promise<P2DemoResult> {
   const config = loadConfig(options.config);
   if (options.fresh) rmSync(config.dataDir, { recursive: true, force: true });
+
+  const ROUND = `${config.origin}/rounds/codebase-integrity`;
+  const THREAD = `${config.origin}/threads/codebase-integrity`;
 
   const since = "2026-08-17T00:00:00Z";
   const agents: AgentRegistration[] = Array.from({ length: VOTERS }, (_, i) => ({
@@ -87,7 +88,7 @@ export async function runP2Demo(options: { fresh?: boolean; config?: Partial<Con
 
   // Enroll all thirty, then open the round over the pinned membership.
   for (const { spec } of agents) {
-    instance.publishAsInstance([hub.actorId], "urn:afp:thread:enroll", "hub", (envelope: Envelope) =>
+    instance.publishAsInstance([hub.actorId], `${config.origin}/threads/enroll`, "hub", (envelope: Envelope) =>
       enroll(envelope, {
         agent: instance.actorId(spec.name),
         hub: hub.actorId,
@@ -121,7 +122,7 @@ export async function runP2Demo(options: { fresh?: boolean; config?: Partial<Con
 
   // The hub goes on the record like anyone else: vouched onto the roster,
   // self-custody, so replay authority comes from the record itself.
-  instance.publishAsInstance([], "urn:afp:thread:roster", "public", (envelope: Envelope) =>
+  instance.publishAsInstance([], `${config.origin}/threads/roster`, "public", (envelope: Envelope) =>
     vouch(envelope, { agent: hub.actorId, capabilities: ["afp:cap:hub"], keyCustody: "self" }),
   );
   const exported = exportBundle(instance, config.exportDir, [hub]);

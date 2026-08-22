@@ -17,7 +17,7 @@ vocabulary for. Core object types from v1: `Task`, `Capability`, `Result`, `Erro
   "actor": "https://alpha.operator.example/agents/a1",
   "to": ["https://beta.operator.example/agents/b1"],
   "target": "https://beta.operator.example/agents/b1",
-  "context": "urn:afp:thread:batch-12",
+  "context": "https://alpha.operator.example/threads/batch-12",
   "afp:visibility": "parties",
   "object": {
     "id": "https://alpha.operator.example/agents/a1/tasks/task-9931",
@@ -42,6 +42,13 @@ offering the object *to* someone), `context` (the thread), `afp:visibility` — 
 object carries only the task itself. That split is normative: the gate judges
 envelopes, so a visibility or thread stated only inside an object would be invisible to
 the thing that enforces it (ADR-0017 Decision 6).
+
+Threads, like rounds, incidents, and assets further on, are `https:` URIs minted under
+the naming actor's own origin — dereferenceable in principle, the same as every other id
+AFP mints. An earlier revision minted these under a `urn:afp:` namespace instead; that
+namespace is retired (ADR-0017 Decision 5), because an RFC 8141 URN namespace registration
+buys ids that are strictly worse than the URLs AFP already knows how to mint: non-
+dereferenceable, and gated on an IANA process AFP does not need.
 
 `Accept`/`Reject` answer the Offer (a `summary` carries the reject reason); the worker
 returns `Create{afp:Result}` with the same `correlationId`, or `Create{afp:Error}` on
@@ -75,7 +82,7 @@ These were conflated in earlier revisions; scenario testing surfaced the collisi
 |---|---|---|
 | `id` (standard AS2) | **One activity**, globally unique | Transport dedupe: a redelivered POST is dropped at the inbox *before* dispatch |
 | `afp:correlationId` | **One task**, globally unique | Matches Offer→Accept→Result; the idempotency/replay key (an agent already holding it replays its cached Result) |
-| `context` (standard AS2) | **One thread**, spanning many tasks | Groups every activity belonging to one incident, case, or backlog item — e.g. `"urn:afp:incident:inc-4471"` |
+| `context` (standard AS2) | **One thread**, spanning many tasks | Groups every activity belonging to one incident, case, or backlog item — e.g. `"https://alpha.operator.example/incidents/inc-4471"` |
 
 Never reuse a `correlationId` across tasks to express "same workflow" — that collides with
 the dedupe rule and will cause a second task to be answered with the first one's cached
@@ -188,7 +195,7 @@ finding 41).
 | `afp:Award` | Activity | Signed, independently-verifiable selection of a winning bid |
 | `afp:Reauction` | Activity | Restarts allocation after award timeout/failure |
 | `afp:capabilityMatch`, `afp:estimatedCost`, `afp:estimatedLatency` | Properties (Bid) | Self-declared fit and estimates, later checked against actuals |
-| `afp:bidCommit` / `afp:BidReveal` | Activity pair | Commit-reveal sealed bidding, deters sniping |
+| `afp:BidCommit` / `afp:BidReveal` | Activity pair | Commit-reveal sealed bidding, deters sniping — `afp:BidCommit` corrects an earlier lowercase-initial spelling defect (ADR-0017 Decision 5); every other activity type in this table capitalizes its initial, and the term now matches |
 | `afp:reputation` | Property (hub-scoped, per agent) | Running score from completions, estimate accuracy, voting integrity |
 | `afp:ContributionSummary` | Object | Periodic, independently-recomputable per-operator contribution roll-up |
 | `afp:ContributionDispute` | Activity | Challenge to a ContributionSummary, with evidence |
@@ -208,7 +215,7 @@ finding 41).
 | `afp:selectionRule` | Property (announced Task) | `{name, params}` — a rule from the published registry, pinned before any bid |
 | `afp:answerSufficiency` | Property (task-bearing activity) | Coverage list and/or count that makes an acceptable answer — checkable at replay (ADR-0003). Two readings, one pin: under an Award it is checked against the performers the selection rule picked; in the direct flow, against the count of Results the Synthesis binds. The `coverage` form does not carry over — it is scored against a bid's `afp:coverage` at a rule's `minConfidence`, neither of which exists without an auction (ADR-0010) |
 | `afp:estimatorPolicy`, `afp:estimators` | Properties (announced Task) | The hub's recorded position on estimator/bidder separation, and who it applies to |
-| `afp:commitment` | Property (`afp:bidCommit`) | `sha256(JCS(bid payload))` — the sealed phase carries only this |
+| `afp:commitment` | Property (`afp:BidCommit`) | `sha256(JCS(bid payload))` — the sealed phase carries only this |
 | `afp:winningBids`, `afp:performers`, `afp:synthesizer`, `afp:acceptBy` | Properties (Award) | The recomputable outcome: winning payload digests, performer set, named synthesizer, accept deadline |
 | `afp:priorAward`, `afp:excludedBidders` | Properties (Award, reauction fast path) | Bind a re-award's reduced bid pool to the failed award it supersedes |
 | `afp:role` | Property (`afp:Enroll`) | `member` \| `requester` \| `observer` — participation scope, enforced at bid admission and snapshot-pinning (02, ADR-0004) |
@@ -364,7 +371,7 @@ Evidence bindings — how outcome objects chain back to what justifies them:
 ```mermaid
 flowchart LR
     subgraph auction [allocation]
-        AN[Announce Task<br/>rule + window pinned] --> BC[afp:bidCommit<br/>afp:commitment]
+        AN[Announce Task<br/>rule + window pinned] --> BC[afp:BidCommit<br/>afp:commitment]
         BC -- "sha256(JCS(payload))<br/>must match" --> BR[afp:BidReveal<br/>payload + nonce]
         BR -- "payload digest in<br/>afp:winningBids" --> AW[afp:Award]
         AW -- "afp:priorAward +<br/>afp:excludedBidders" --> AW2[re-auction Award]
@@ -479,7 +486,7 @@ cost all of it (ADR-0010).
    **hub's own re-fan-out is the governing announce**, and a replay that cannot find one
    fails rather than falling back to the requester's terms. One task per thread, so that
    the actuals reported onto a thread settle an unambiguous auction.
-2. **Bid, sealed** — inside `[opens, closes)`, bidders submit only `afp:bidCommit` with
+2. **Bid, sealed** — inside `[opens, closes)`, bidders submit only `afp:BidCommit` with
    `afp:commitment = sha256(JCS(bid payload))`; after `closes` they submit
    `afp:BidReveal` carrying the full payload, verified by recomputing the digest.
    Commit-reveal deters last-moment undercutting off visible bids — open bidding on a
@@ -518,8 +525,8 @@ sequenceDiagram
 
     rect rgb(235, 235, 235)
         Note over H,D: sealed phase — [opens, closes)
-        B1->>H: afp:bidCommit {commitment = sha256(JCS(payload₁))}
-        B2->>H: afp:bidCommit {commitment = sha256(JCS(payload₂))}
+        B1->>H: afp:BidCommit {commitment = sha256(JCS(payload₁))}
+        B2->>H: afp:BidCommit {commitment = sha256(JCS(payload₂))}
         D->>H: Reject — "not my domain" (declining is a record)
     end
 
@@ -714,7 +721,7 @@ hub governance.
   "object": {
     "id": "https://agent-a.example/votes/round-7f2c9e/agent-a/2",
     "type": "afp:Vote",
-    "afp:round": "urn:afp:round:7f2c9e",
+    "afp:round": "https://agent-a.example/rounds/7f2c9e",
     "afp:phase": "commit",
     "afp:seqNo": 2,
     "afp:proposalHash": "sha256:9d3b1c...e21f",

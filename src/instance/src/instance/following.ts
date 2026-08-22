@@ -10,11 +10,11 @@ import { follow, undoFollow } from "../ap/activities.ts";
 import type { OutboxEntry } from "../store/outbox.ts";
 import type { AfpInstance } from "../instance.ts";
 
-const THREAD = "urn:afp:thread:seats";
+const threadFor = (instance: AfpInstance): string => `${instance.config.origin}/threads/seats`;
 
 /** `Follow{actor: instance, object: hubActorId}` — the door-knock for a seat. */
 export function followHub(instance: AfpInstance, hubActorId: string): OutboxEntry {
-  return instance.publishAsInstance([hubActorId], THREAD, "public", (envelope) => follow(envelope, hubActorId));
+  return instance.publishAsInstance([hubActorId], threadFor(instance), "public", (envelope) => follow(envelope, hubActorId));
 }
 
 /**
@@ -25,7 +25,7 @@ export function unfollowHub(instance: AfpInstance, hubActorId: string): OutboxEn
   const selfId = instance.instanceDocument().id as string;
   const priorFollow = latestFollow(instance, selfId, hubActorId);
   if (!priorFollow) throw new Error(`no prior Follow of ${hubActorId} to undo`);
-  return instance.publishAsInstance([hubActorId], THREAD, "public", (envelope) =>
+  return instance.publishAsInstance([hubActorId], threadFor(instance), "public", (envelope) =>
     undoFollow(envelope, priorFollow, hubActorId),
   );
 }

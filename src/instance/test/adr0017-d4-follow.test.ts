@@ -82,7 +82,7 @@ function makeHub(instances: readonly AfpInstance[], options: { db: Db; seatPolic
 
 function enrollAgent(instance: AfpInstance, hub: Hub, name: string) {
   const agentId = instance.actorId(name);
-  return instance.publishAsInstance([hub.actorId], "urn:afp:thread:enroll", "hub", (envelope) =>
+  return instance.publishAsInstance([hub.actorId], `${instance.config.origin}/threads/enroll`, "hub", (envelope) =>
     enroll(envelope, { agent: agentId, hub: hub.actorId, capabilities: ["afp:cap:x"], hubKey: instance.key(name).keyId }),
   );
 }

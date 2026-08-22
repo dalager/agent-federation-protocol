@@ -1,6 +1,6 @@
 /**
  * Activity builders for the P3 allocation flow (ADR-0003):
- * `Announce{afp:Task}` → `afp:bidCommit` → `afp:BidReveal` → `afp:Award`
+ * `Announce{afp:Task}` → `afp:BidCommit` → `afp:BidReveal` → `afp:Award`
  * (→ `afp:Reauction`) → `Create{afp:Synthesis}` → `afp:Settlement`.
  *
  * Mirrors `ap/activities.ts` and `hub/activities.ts`: `visibility` is a
@@ -152,13 +152,13 @@ export function commitmentOf(payload: { [key: string]: JsonValue }): string {
   return digestOf(payload);
 }
 
-/** `afp:bidCommit` — the sealed phase: only the commitment travels. */
+/** `afp:BidCommit` — the sealed phase: only the commitment travels. */
 export function bidCommit(
   envelope: Envelope,
   spec: { task: string; hub: string; commitment: string },
 ): { [key: string]: JsonValue } {
   return {
-    ...base(envelope, "afp:bidCommit"),
+    ...base(envelope, "afp:BidCommit"),
     object: spec.task,
     "afp:hub": spec.hub,
     "afp:commitment": spec.commitment,

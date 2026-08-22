@@ -84,12 +84,12 @@ identity, versions, and provenance across hubs. New object type:
 
 ```json
 {
-  "id": "urn:afp:asset:mitid-broker-adapter",
+  "id": "https://alpha.operator.local/assets/mitid-broker-adapter",
   "type": "afp:Asset",
   "afp:version": "3.1",
   "afp:digest": "sha256:…",
   "afp:sourceUrl": "https://git.example/integrations/mitid-broker-adapter",
-  "afp:originContext": "urn:afp:thread:proj-x-build",
+  "afp:originContext": "https://alpha.operator.local/threads/proj-x-build",
   "attributedTo": "https://alpha.operator.local/agents/i-identity"
 }
 ```

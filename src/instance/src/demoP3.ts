@@ -145,7 +145,7 @@ export async function runP3Demo(
   const transport: Transport = hubTransport(hub, instance.localTransport(), (t) => instance.nameOf(t) !== null);
 
   for (const name of names) {
-    instance.publishAsInstance([hub.actorId], "urn:afp:thread:enroll", "hub", (envelope) =>
+    instance.publishAsInstance([hub.actorId], `${config.origin}/threads/enroll`, "hub", (envelope) =>
       enroll(envelope, {
         agent: instance.actorId(name),
         hub: hub.actorId,
@@ -249,7 +249,7 @@ export async function runP3Demo(
 
   const ranking = await runAuction({
     slug: "load-42",
-    thread: "urn:afp:thread:load-test",
+    thread: `${config.origin}/threads/load-test`,
     capability: "afp:cap:load-test",
     content: "Run the checkout load test against staging",
     rule: { name: "ranking", params: { weights: { capabilityMatch: 10, cost: -1, latencySeconds: -1 } } },
@@ -270,7 +270,7 @@ export async function runP3Demo(
   const partials = new Map<string, string>();
   const estimate = await runAuction({
     slug: "q-88",
-    thread: "urn:afp:thread:q-88-migration-estimate",
+    thread: `${config.origin}/threads/q-88-migration-estimate`,
     capability: "afp:cap:estimate",
     content: "Estimate the total cost of the payments-platform migration",
     rule: { name: "coverage", params: { domains: [...PANEL_DOMAINS], minConfidence: PANEL_MIN_CONFIDENCE } },
@@ -323,7 +323,7 @@ export async function runP3Demo(
         confidence: 72,
         assumptions: ["dual-run parallel period", "network segmentation contains PCI scope"],
       };
-  const synthesis = instance.publish(synthesizerName, [hub.actorId], "urn:afp:thread:q-88-migration-estimate", "hub", (
+  const synthesis = instance.publish(synthesizerName, [hub.actorId], `${config.origin}/threads/q-88-migration-estimate`, "hub", (
     envelope,
   ) =>
     createSynthesis(envelope, {
@@ -341,17 +341,17 @@ export async function runP3Demo(
 
   // Ratification rides P2's L0 voting (Decision 4): the round's outcome
   // literally names the Synthesis.
-  const round = "urn:afp:round:q-88-ratify";
+  const round = `${config.origin}/rounds/q-88-ratify`;
   const synthesisId = String((synthesis.activity.object as Record<string, unknown>).id);
   const proposal = hub.proposeRound({
     round,
-    thread: "urn:afp:thread:q-88-migration-estimate",
+    thread: `${config.origin}/threads/q-88-migration-estimate`,
     question: `Ratify the synthesis ${synthesisId}?`,
     options: [synthesisId, "reject"],
   });
   const quorumSnapshot = String((proposal.activity.object as Record<string, unknown>)["afp:quorumSnapshot"]);
   for (const name of names) {
-    instance.publish(name, [hub.actorId], "urn:afp:thread:q-88-migration-estimate", "hub", (envelope) =>
+    instance.publish(name, [hub.actorId], `${config.origin}/threads/q-88-migration-estimate`, "hub", (envelope) =>
       castVote(envelope, {
         voteId: `${envelope.actor}/votes/${round}`,
         round,
@@ -378,7 +378,7 @@ export async function runP3Demo(
     synthesisId,
   );
 
-  instance.publishAsInstance([], "urn:afp:thread:roster", "public", (envelope) =>
+  instance.publishAsInstance([], `${config.origin}/threads/roster`, "public", (envelope) =>
     vouch(envelope, { agent: hub.actorId, capabilities: ["afp:cap:hub"], keyCustody: "self" }),
   );
   const exported = exportBundle(instance, config.exportDir, [hub]);
@@ -392,6 +392,6 @@ export async function runP3Demo(
     ratification,
     settlement: settlementEntry,
     exported,
-    threads: { ranking: "urn:afp:thread:load-test", estimate: "urn:afp:thread:q-88-migration-estimate" },
+    threads: { ranking: `${config.origin}/threads/load-test`, estimate: `${config.origin}/threads/q-88-migration-estimate` },
   };
 }

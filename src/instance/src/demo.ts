@@ -95,7 +95,7 @@ export async function runDemo(
 
   const clock = options.clock ?? fixedClock();
   const instance = new AfpInstance(config, agentRegistrations(config), clock);
-  const thread = "urn:afp:thread:doc-1";
+  const thread = `${config.origin}/threads/doc-1`;
   const writer = brainOf(instance, "writer");
 
   // The human hands the writer a brief. It entered from outside AFP, so it

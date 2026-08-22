@@ -49,9 +49,16 @@ agreement with.
     "publicKeyMultibase": "z6Mkg...ttq2"
   }],
   "afp:roster": "https://alpha.operator.example/roster",
-  "afp:policy": "https://alpha.operator.example/.well-known/afp-policy"
+  "afp:policy": "https://alpha.operator.example/afp/policy"
 }
 ```
+
+The policy document has moved off the reserved `.well-known` space it occupied in earlier
+revisions (`/.well-known/afp-policy` → `/afp/policy`). Registering a name under
+`.well-known` is RFC 8615 territory — the FEP's job once one exists, not something an
+instance claims for itself by squatting the path — so the canonical location is ordinary,
+and the old path stays served as an alias through the transition (ADR-0017 Decisions 5
+and 8).
 
 **Two key formats, two jobs** (ADR-0017 Decision 4). `assertionMethod` publishes a
 **Multikey**, which is what `eddsa-jcs-2022` object integrity proofs verify against —
@@ -290,6 +297,12 @@ v3, to the instance standing behind it via `afp:operatedBy`.
 - **Discovering hubs themselves** — a thin, out-of-band consortium-published list at a
   well-known URL (NodeInfo-style). Flagged open: revisit only if concurrent hub count
   outgrows a hand-maintained list.
+- **Self-description** — the instance itself now serves real NodeInfo 2.1 at
+  `/.well-known/nodeinfo`, per FEP-f1d5: the standard discovery indirection, software name
+  and version, `"protocols": ["activitypub"]` (ADR-0017 Decision 5). Self-description is
+  the one place where inventing a bespoke document would have negative value — every
+  consumer of it is, by definition, not AFP — so it reuses the ecosystem's format rather
+  than adding one of its own.
 
 ### Authentication — two mechanisms with different lifetimes
 

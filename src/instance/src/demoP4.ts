@@ -162,8 +162,8 @@ export async function runP4Demo(options: { rootDir?: string; exportRoot?: string
   const beta = await operator("beta", ["b-assessor", "b-private"], rootDir, exportRoot, clock);
   const mallory = await operator("mallory", ["m-probe"], rootDir, exportRoot, clock);
 
-  const FED = "urn:afp:thread:fed";
-  const DELEGATION = "urn:afp:thread:sub-1";
+  const FED = `${alpha.origin}/threads/fed`;
+  const DELEGATION = `${alpha.origin}/threads/sub-1`;
 
   // --- 1. The handshake: dual-Create over one byte-identical agreement object.
   const expires = new Date(clock.now().getTime() + 3600_000).toISOString();
@@ -191,11 +191,11 @@ export async function runP4Demo(options: { rootDir?: string; exportRoot?: string
   const probe = mallory.instance.publish(
     "m-probe",
     [beta.instance.actorId("b-assessor")],
-    "urn:afp:thread:probe",
+    `${mallory.origin}/threads/probe`,
     "parties",
     (envelope: Envelope) =>
       offerTask(envelope, {
-        taskId: "urn:afp:task:probe",
+        taskId: `${mallory.origin}/tasks/probe`,
         capability: "afp:cap:assess",
         correlationId: "probe",
         content: "let me in",
@@ -217,9 +217,9 @@ export async function runP4Demo(options: { rootDir?: string; exportRoot?: string
   const unsignedStatus = raw.status;
 
   // --- 3. Beta does something that is none of Alpha's business (redacted later).
-  beta.instance.publish("b-assessor", [], "urn:afp:thread:other-client", "internal", (envelope: Envelope) =>
+  beta.instance.publish("b-assessor", [], `${beta.origin}/threads/other-client`, "internal", (envelope: Envelope) =>
     createResult(envelope, {
-      resultId: "urn:afp:result:other",
+      resultId: `${beta.origin}/results/other`,
       correlationId: "other",
       content: "confidential work for another client",
     }),
@@ -233,7 +233,7 @@ export async function runP4Demo(options: { rootDir?: string; exportRoot?: string
     "parties",
     (envelope: Envelope) =>
       offerTask(envelope, {
-        taskId: "urn:afp:task:sub-1",
+        taskId: `${alpha.origin}/tasks/sub-1`,
         capability: "afp:cap:assess",
         correlationId: "sub-1",
         content: "assess the identity integration",
@@ -273,7 +273,7 @@ export async function runP4Demo(options: { rootDir?: string; exportRoot?: string
   // --- 5. Both sides export. Instance actors are vouched onto the roster first —
   // membership is a recorded act, and the verifier resolves signers through it.
   for (const op of [alpha, beta]) {
-    op.instance.publishAsInstance([], "urn:afp:thread:roster", "public", (envelope: Envelope) =>
+    op.instance.publishAsInstance([], `${op.origin}/threads/roster`, "public", (envelope: Envelope) =>
       vouch(envelope, { agent: op.actorId, capabilities: ["afp:cap:hub"], keyCustody: "self" }),
     );
   }
@@ -282,7 +282,7 @@ export async function runP4Demo(options: { rootDir?: string; exportRoot?: string
     beta.instance,
     beta.exportDir,
     [],
-    { threads: [FED, DELEGATION, "urn:afp:thread:roster"], omitActors: ["b-private"] },
+    { threads: [FED, DELEGATION, `${beta.origin}/threads/roster`], omitActors: ["b-private"] },
     beta.federation,
   );
 

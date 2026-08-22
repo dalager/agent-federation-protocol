@@ -68,13 +68,13 @@ describe("ADR-0015: the case file at N parties", () => {
     const receiverA = testInstance(["ra"], CAPABILITY, "https://receiver-a.example");
     const receiverB = testInstance(["rb"], CAPABILITY, "https://receiver-b.example");
 
-    const shared = "urn:afp:thread:engagement";
-    const own = "urn:afp:thread:other-client";
+    const shared = `${sender.config.origin}/threads/engagement`;
+    const own = `${sender.config.origin}/threads/other-client`;
     const sent = sender.instance.publish("src", [], shared, "parties", (envelope) =>
-      createResult(envelope, { resultId: "urn:afp:result:view", correlationId: "view-1", content: "the leak originates at AS64500" }),
+      createResult(envelope, { resultId: `${sender.config.origin}/results/view`, correlationId: "view-1", content: "the leak originates at AS64500" }),
     );
     sender.instance.publish("src", [], own, "parties", (envelope) =>
-      createResult(envelope, { resultId: "urn:afp:result:other", correlationId: "other-1", content: "unrelated" }),
+      createResult(envelope, { resultId: `${sender.config.origin}/results/other`, correlationId: "other-1", content: "unrelated" }),
     );
     // The sender's export is scoped to its other work: the shared-thread
     // activity becomes a stub, exactly ADR-0009's lawful redaction.
@@ -136,7 +136,7 @@ describe("ADR-0015: the case file at N parties", () => {
       docCache.set(String(inst.instance.instanceDocument().id), inst.instance.instanceDocument());
       docCache.set(inst.instance.actorId(name), inst.instance.agentDocument(name));
       const hubKey = loadOrCreateHubKeyPair(inst.config.keyDir, name, inst.instance.actorId(name), "bridge");
-      const entry = inst.instance.publishAsInstance([hub.actorId], "urn:afp:thread:enroll", "hub", (envelope) =>
+      const entry = inst.instance.publishAsInstance([hub.actorId], `${inst.config.origin}/threads/enroll`, "hub", (envelope) =>
         enroll(envelope, { agent: inst.instance.actorId(name), hub: hub.actorId, capabilities: [CAPABILITY], hubKey: hubKey.keyId }),
       );
       await hub.receive(entry.activity);
@@ -149,23 +149,23 @@ describe("ADR-0015: the case file at N parties", () => {
       grants: [{ "afp:grantType": "hub", "afp:hub": hub.actorId }],
       expires: new Date(alpha.clock.now().getTime() + 6 * 3600_000).toISOString(),
     });
-    const alphaCreate = alpha.instance.publishAsInstance([bravoActor], "urn:afp:thread:fed", "parties", (envelope) =>
+    const alphaCreate = alpha.instance.publishAsInstance([bravoActor], `${alpha.config.origin}/threads/fed`, "parties", (envelope) =>
       createAgreement(envelope, object),
     );
     void alphaCreate;
 
-    const thread = "urn:afp:thread:sev1";
-    const proposal = hub.proposeRound({ round: "urn:afp:round:sev1", thread, question: "sev-1?", options: ["yes", "no"] });
+    const thread = `${alpha.config.origin}/threads/sev1`;
+    const proposal = hub.proposeRound({ round: `${alpha.config.origin}/rounds/sev1`, thread, question: "sev-1?", options: ["yes", "no"] });
     const proposalId = String((proposal.activity.object as Record<string, unknown>).id);
     const snapshot = String((proposal.activity.object as Record<string, unknown>)["afp:quorumSnapshot"]);
     await hub.receive(
       alpha.instance.publish("n-noc", [hub.actorId], thread, "hub", (envelope) =>
-        castVote(envelope, { voteId: `${envelope.actor}/votes/sev1`, round: "urn:afp:round:sev1", proposalHash: proposal.digest, quorumSnapshot: snapshot, value: "yes" }),
+        castVote(envelope, { voteId: `${envelope.actor}/votes/sev1`, round: `${alpha.config.origin}/rounds/sev1`, proposalHash: proposal.digest, quorumSnapshot: snapshot, value: "yes" }),
       ).activity,
     );
     await hub.receive(
       alpha.instance.publish("n-telemetry", [hub.actorId], thread, "hub", (envelope) =>
-        castVote(envelope, { voteId: `${envelope.actor}/votes/sev1`, round: "urn:afp:round:sev1", proposalHash: proposal.digest, quorumSnapshot: snapshot, value: "yes" }),
+        castVote(envelope, { voteId: `${envelope.actor}/votes/sev1`, round: `${alpha.config.origin}/rounds/sev1`, proposalHash: proposal.digest, quorumSnapshot: snapshot, value: "yes" }),
       ).activity,
     );
     // Bravo's member declines — a genuinely foreign-signed Reject.
@@ -185,16 +185,16 @@ describe("ADR-0015: the case file at N parties", () => {
       }) as never,
     );
     await hub.receive(reject.activity);
-    const decision = hub.closeRound("urn:afp:round:sev1");
+    const decision = hub.closeRound(`${alpha.config.origin}/rounds/sev1`);
     const uncounted = (decision.activity.object as Record<string, unknown>)["afp:uncounted"] as { agent: string; "afp:status": string }[];
     assert.equal(uncounted.length, 1);
     assert.equal(uncounted[0].agent, snoc);
     assert.equal(uncounted[0]["afp:status"], "declined");
 
     alpha.instance.publish("n-noc", [], thread, "parties", (envelope) =>
-      createResult(envelope, { resultId: "urn:afp:result:sev1", correlationId: "sev1", content: "closed" }),
+      createResult(envelope, { resultId: `${alpha.config.origin}/results/sev1`, correlationId: "sev1", content: "closed" }),
     );
-    alpha.instance.publishAsInstance([], "urn:afp:thread:roster", "public", (envelope) =>
+    alpha.instance.publishAsInstance([], `${alpha.config.origin}/threads/roster`, "public", (envelope) =>
       vouch(envelope, { agent: hub.actorId, capabilities: ["afp:cap:hub"], keyCustody: "self" }),
     );
 
@@ -235,7 +235,7 @@ describe("ADR-0015: the case file at N parties", () => {
     docCache.set(String(instance.instanceDocument().id), instance.instanceDocument());
     docCache.set(instance.actorId("a1"), instance.agentDocument("a1"));
     const hubKey = loadOrCreateHubKeyPair(config.keyDir, "a1", instance.actorId("a1"), "done");
-    const entry = instance.publishAsInstance([hub.actorId], "urn:afp:thread:enroll", "hub", (envelope) =>
+    const entry = instance.publishAsInstance([hub.actorId], `${config.origin}/threads/enroll`, "hub", (envelope) =>
       enroll(envelope, { agent: instance.actorId("a1"), hub: hub.actorId, capabilities: [CAPABILITY], hubKey: hubKey.keyId }),
     );
     await hub.receive(entry.activity);
@@ -243,11 +243,11 @@ describe("ADR-0015: the case file at N parties", () => {
     const archived = hub.outbox.byActor(hub.actorId).at(-1)!.activity as Record<string, unknown>;
     assert.ok(archived["afp:state"], "the converged state entered the record");
 
-    instance.publishAsInstance([], "urn:afp:thread:roster", "public", (envelope) =>
+    instance.publishAsInstance([], `${config.origin}/threads/roster`, "public", (envelope) =>
       vouch(envelope, { agent: hub.actorId, capabilities: ["afp:cap:hub"], keyCustody: "self" }),
     );
     const exported = exportBundle(instance, config.exportDir, [hub]);
-    const clean = runVerifier(VERIFIER, config.exportDir, "urn:afp:thread:hub-lifecycle", ["--verbose"]);
+    const clean = runVerifier(VERIFIER, config.exportDir, `${config.origin}/threads/hub-lifecycle`, ["--verbose"]);
     assert.equal(clean.code, 0, `verifier failed:\n${clean.output}`);
     assert.match(clean.output, /archive: .*state matches its canonical hashes/);
     // N3: the census makes silence visible — this bundle ran no actuation
@@ -257,7 +257,7 @@ describe("ADR-0015: the case file at N parties", () => {
 
     // Tampered state under standing hashes: a blob riding along is not state
     // entering the record, and the difference is exactly this check.
-    const tampered = mutateBundle(VERIFIER, exported.dir, "urn:afp:thread:hub-lifecycle", "hub-done", (outbox) => {
+    const tampered = mutateBundle(VERIFIER, exported.dir, `${config.origin}/threads/hub-lifecycle`, "hub-done", (outbox) => {
       for (const activity of outbox.orderedItems) {
         const state = activity["afp:state"] as { membership?: unknown } | undefined;
         if (state?.membership) state.membership = ["https://elsewhere.example/agents/ghost"];

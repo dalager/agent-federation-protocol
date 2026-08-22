@@ -33,8 +33,8 @@ HUB = "https://hub.example/actor"
 PROPOSER = "https://hub.example/agents/proposer"
 VOTERS = [f"https://hub.example/agents/voter-{c}" for c in "abc"]
 OUTSIDER = "https://hub.example/agents/voter-outsider"  # on the roster, never in the round's pinned snapshot
-ROUND = "urn:afp:round:1"
-THREAD = "urn:afp:thread:round-1"
+ROUND = "https://hub.example/rounds/1"
+THREAD = "https://hub.example/threads/round-1"
 CREATED = "2026-08-18T00:00:00.000Z"
 
 CONTEXT = [

@@ -73,7 +73,7 @@ export function instanceActor(
     // R5: derived collection replaying this actor's own Follow/Undo trail.
     following: `${id}/following`,
     "afp:roster": `${origin}/roster`,
-    "afp:policy": `${origin}/.well-known/afp-policy`,
+    "afp:policy": `${origin}/afp/policy`,
     "afp:visibility": "public",
     assertionMethod: [multikey(key)],
     authentication: [multikey(transportKey)],

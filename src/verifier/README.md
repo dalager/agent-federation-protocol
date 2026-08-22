@@ -5,7 +5,7 @@ Replays an AFP export and says whether it holds up. Run it as the person who
 access, no private keys, no network.
 
 ```bash
-python3 afp_verify.py ../instance/export --thread urn:afp:thread:doc-1
+python3 afp_verify.py ../instance/export --thread https://alpha.operator.local/threads/doc-1
 python3 afp_verify.py ../instance/export -v      # show passing checks too
 ```
 
@@ -54,7 +54,7 @@ another implementation.
 | **(P2) `afp:DecisionRecord`'s `afp:weightTally` recomputes from `afp:countedVotes`** | The declared outcome doesn't match the arithmetic over the votes actually cast |
 | **(P2) Every hash in `afp:countedVotes` resolves to a present, validly signed `afp:Vote`** | A counted vote you cannot produce — evidence for the outcome does not exist |
 | **(P2) Every counted vote's `actor` is in the pinned `afp:quorumSnapshot` voter set** | A vote from outside the snapshot was counted — the mid-round-enrollment attack 02 names |
-| **(P3) Every `afp:BidReveal` hashes to a prior in-window `afp:bidCommit` by the same actor** | A reveal with no sealed commitment behind it, or a commit snuck in outside the bid window |
+| **(P3) Every `afp:BidReveal` hashes to a prior in-window `afp:BidCommit` by the same actor** | A reveal with no sealed commitment behind it, or a commit snuck in outside the bid window |
 | **(P3) Every digest in `afp:winningBids` resolves to a present reveal** | An unproducible winning bid — the auction's version of a counted vote you cannot produce |
 | **(P3) The announced selection rule recomputes to the Award's performer set and synthesizer** | The published rule did not actually pick these winners (rules reimplemented here from spec: `ranking`, `coverage`) |
 | **(P3) A multi-performer Award's `afp:Synthesis` binds present Results, a method, and dissent** | The combined answer floats free of its evidence, or dissent was summarized away |
@@ -196,18 +196,18 @@ and derives the three mutations ADR-0002 Decision 3 calls for:
 
 ```bash
 python3 test/fixtures/mutate_decision_fixture.py /tmp/decision-fixtures
-python3 afp_verify.py /tmp/decision-fixtures/clean --thread urn:afp:thread:round-1
+python3 afp_verify.py /tmp/decision-fixtures/clean --thread https://hub.example/threads/round-1
 # PASSED
 
-python3 afp_verify.py /tmp/decision-fixtures/mistally --thread urn:afp:thread:round-1
+python3 afp_verify.py /tmp/decision-fixtures/mistally --thread https://hub.example/threads/round-1
 # [ FAIL ] decision: …/decision weightTally recomputes from countedVotes
 #          recomputed {'candidate-x': 2.0, 'candidate-y': 1.0} but afp:DecisionRecord declares {'candidate-x': 99.0, ...}
 
-python3 afp_verify.py /tmp/decision-fixtures/missing-vote --thread urn:afp:thread:round-1
+python3 afp_verify.py /tmp/decision-fixtures/missing-vote --thread https://hub.example/threads/round-1
 # [ FAIL ] decision: …/decision evidence-set completeness
 #          afp:countedVotes names a hash with no present, valid afp:Vote to back it: sha256:6fc7e552…
 
-python3 afp_verify.py /tmp/decision-fixtures/outside-snapshot --thread urn:afp:thread:round-1
+python3 afp_verify.py /tmp/decision-fixtures/outside-snapshot --thread https://hub.example/threads/round-1
 # [ FAIL ] decision: …/decision snapshot discipline
 #          counted vote from outside the pinned quorum snapshot: …/agents/voter-outsider (sha256:b46a57ff…)
 ```

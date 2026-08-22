@@ -94,7 +94,7 @@ function enrollAgent(
 ) {
   const agentId = instance.actorId(name);
   const hubKey = hubKeys.get(name)!;
-  return instance.publishAsInstance([hub.actorId], "urn:afp:thread:enroll", "hub", (envelope: Envelope) =>
+  return instance.publishAsInstance([hub.actorId], `${instance.config.origin}/threads/enroll`, "hub", (envelope: Envelope) =>
     enroll(envelope, { agent: agentId, hub: hub.actorId, capabilities: ["afp:cap:vote"], hubKey: hubKey.keyId, role }),
   );
 }
@@ -109,7 +109,7 @@ function agentVotes(
   name: string,
   value: string,
 ) {
-  return instance.publish(name, [hub.actorId], "urn:afp:thread:policy-1", "hub", (envelope: Envelope) =>
+  return instance.publish(name, [hub.actorId], `${instance.config.origin}/threads/policy-1`, "hub", (envelope: Envelope) =>
     castVote(envelope, {
       voteId: `${envelope.actor}/votes/${round}`,
       round,
@@ -143,10 +143,10 @@ describe("P2 hub: enrollment and an L0 weighted-quorum round", () => {
     assert.ok(!hub.members().includes(instance.actorId(OUTSIDER)), "the outsider was never enrolled");
 
     // --- Open an L0 round over the enrolled membership.
-    const round = "urn:afp:round:policy-1";
+    const round = `${config.origin}/rounds/policy-1`;
     const proposalEntry = hub.proposeRound({
       round,
-      thread: "urn:afp:thread:policy-1",
+      thread: `${config.origin}/threads/policy-1`,
       question: "Which policy should we adopt?",
       options: ["candidate-7", "candidate-2"],
     });
@@ -230,13 +230,13 @@ describe("P2 hub: enrollment and an L0 weighted-quorum round", () => {
     // the independent Python verifier, decision checks and all. The hub is
     // vouched onto the roster first (self-custody): authority for its
     // DecisionRecord comes from the record, not from a verifier special case.
-    instance.publishAsInstance([], "urn:afp:thread:roster", "public", (envelope: Envelope) =>
+    instance.publishAsInstance([], `${config.origin}/threads/roster`, "public", (envelope: Envelope) =>
       vouch(envelope, { agent: hub.actorId, capabilities: ["afp:cap:hub"], keyCustody: "self" }),
     );
     const exported = exportBundle(instance, config.exportDir, [hub]);
     assert.ok(exported.activities > 0);
     const verifier = join(import.meta.dirname, "..", "..", "verifier", "afp_verify.py");
-    const clean = runVerifier(verifier, config.exportDir, "urn:afp:thread:policy-1", ["--verbose"]);
+    const clean = runVerifier(verifier, config.exportDir, `${config.origin}/threads/policy-1`, ["--verbose"]);
     assert.equal(clean.code, 0, clean.output);
     assert.match(clean.output, /decision: .* weightTally recomputes from countedVotes/);
     assert.match(clean.output, /decision: .* voter weights recompute per instance/);
@@ -252,7 +252,7 @@ describe("P2 hub: enrollment and an L0 weighted-quorum round", () => {
       edit(outbox);
       outbox.totalItems = outbox.orderedItems.length;
       writeFileSync(path, JSON.stringify(outbox, null, 2));
-      return runVerifier(verifier, dir, "urn:afp:thread:policy-1", ["--verbose"]);
+      return runVerifier(verifier, dir, `${config.origin}/threads/policy-1`, ["--verbose"]);
     };
 
     // A hub that writes the weights it wants into its own proposal — the exact
@@ -282,10 +282,10 @@ describe("P2 hub: enrollment and an L0 weighted-quorum round", () => {
 
     // --- Lifecycle: Freeze suspends new work but existing rounds still close;
     // Archive is terminal and read-only.
-    const round2 = "urn:afp:round:policy-2";
-    hub.proposeRound({ round: round2, thread: "urn:afp:thread:policy-2", question: "Second question?", options: ["yes", "no"] });
+    const round2 = `${config.origin}/rounds/policy-2`;
+    hub.proposeRound({ round: round2, thread: `${config.origin}/threads/policy-2`, question: "Second question?", options: ["yes", "no"] });
     hub.freeze("maintenance window");
-    assert.throws(() => hub.proposeRound({ round: "urn:afp:round:policy-3", thread: "t", question: "?", options: ["a"] }), /frozen/);
+    assert.throws(() => hub.proposeRound({ round: `${config.origin}/rounds/policy-3`, thread: "t", question: "?", options: ["a"] }), /frozen/);
     const frozenEnroll = enrollAgent(instance, hub, hubKeys, "a1");
     await hub.receive(frozenEnroll.activity);
     assert.deepEqual(hub.versionVector("membership"), { [instanceActor]: 4 }, "enrollment is new work — refused while frozen");
@@ -316,10 +316,10 @@ describe("P2 hub: enrollment and an L0 weighted-quorum round", () => {
     for (const name of ENROLLED) enrollAgent(instance, hub, hubKeys, name);
     await instance.run(transport);
 
-    const round = "urn:afp:round:restart-1";
+    const round = `${config.origin}/rounds/restart-1`;
     const proposalEntry = hub.proposeRound({
       round,
-      thread: "urn:afp:thread:restart-1",
+      thread: `${config.origin}/threads/restart-1`,
       question: "Restart-safe?",
       options: ["yes", "no"],
     });
@@ -374,8 +374,8 @@ describe("P2 hub: enrollment and an L0 weighted-quorum round", () => {
 
     // Snapshot-pinning: only member-role agents are ever pinned into voters.
     const proposal = hub.proposeRound({
-      round: "urn:afp:round:role-1",
-      thread: "urn:afp:thread:role-1",
+      round: `${config.origin}/rounds/role-1`,
+      thread: `${config.origin}/threads/role-1`,
       question: "Roles?",
       options: ["yes", "no"],
     });
@@ -384,7 +384,7 @@ describe("P2 hub: enrollment and an L0 weighted-quorum round", () => {
 
     // Requester announces a task through the inbound dispatch path; the hub
     // re-fans it out and records the requester as the settlement counterparty.
-    const thread = "urn:afp:thread:req-ask-1";
+    const thread = `${config.origin}/threads/req-ask-1`;
     const window = {
       opens: instance.clock.now().toISOString(),
       closes: new Date(instance.clock.now().getTime() + 600_000).toISOString(),
@@ -400,7 +400,7 @@ describe("P2 hub: enrollment and an L0 weighted-quorum round", () => {
       "afp:visibility": envelope.visibility,
       ...(envelope.prevActivity !== null ? { "afp:prevActivity": envelope.prevActivity } : {}),
       object: {
-        id: "urn:afp:task:req-ask-1",
+        id: `${config.origin}/tasks/req-ask-1`,
         type: "afp:Task",
         "afp:hub": hub.actorId,
         "afp:capability": "afp:cap:vote",
@@ -415,12 +415,12 @@ describe("P2 hub: enrollment and an L0 weighted-quorum round", () => {
     }));
     const announceOutcome = await hub.receive(inboundAnnounce.activity);
     assert.equal(announceOutcome.status, "dispatched");
-    const auction = hub.allocation.auction("urn:afp:task:req-ask-1");
+    const auction = hub.allocation.auction(`${config.origin}/tasks/req-ask-1`);
     assert.ok(auction, "the requester's announce opened an auction");
     assert.equal(auction!.requester, a3, "the announcing actor is the settlement's counterparty");
 
     // An observer's announce is rejected and audit-logged — never an auction.
-    const observerAnnounce = instance.publish("a4", [hub.actorId], "urn:afp:thread:obs-ask", "hub", (envelope: Envelope) => ({
+    const observerAnnounce = instance.publish("a4", [hub.actorId], `${config.origin}/threads/obs-ask`, "hub", (envelope: Envelope) => ({
       "@context": ["https://www.w3.org/ns/activitystreams", "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"],
       id: envelope.activityId,
       type: "Announce",
@@ -431,7 +431,7 @@ describe("P2 hub: enrollment and an L0 weighted-quorum round", () => {
       "afp:visibility": envelope.visibility,
       ...(envelope.prevActivity !== null ? { "afp:prevActivity": envelope.prevActivity } : {}),
       object: {
-        id: "urn:afp:task:obs-ask",
+        id: `${config.origin}/tasks/obs-ask`,
         type: "afp:Task",
         "afp:hub": hub.actorId,
         "afp:bidWindow": window,
@@ -439,9 +439,9 @@ describe("P2 hub: enrollment and an L0 weighted-quorum round", () => {
       },
     }));
     await hub.receive(observerAnnounce.activity);
-    assert.equal(hub.allocation.auction("urn:afp:task:obs-ask"), null, "an observer cannot announce");
+    assert.equal(hub.allocation.auction(`${config.origin}/tasks/obs-ask`), null, "an observer cannot announce");
     assert.ok(
-      hub.allocation.admissions("urn:afp:task:obs-ask").some((a) => a.outcome === "rejected" && /role/.test(a.reason)),
+      hub.allocation.admissions(`${config.origin}/tasks/obs-ask`).some((a) => a.outcome === "rejected" && /role/.test(a.reason)),
       "the observer's announce rejection is audit-logged",
     );
 
@@ -449,22 +449,22 @@ describe("P2 hub: enrollment and an L0 weighted-quorum round", () => {
     const requesterCommit = instance.publish("a3", [hub.actorId], thread, "hub", (envelope: Envelope) => ({
       "@context": ["https://www.w3.org/ns/activitystreams", "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"],
       id: envelope.activityId,
-      type: "afp:bidCommit",
+      type: "afp:BidCommit",
       actor: envelope.actor,
       to: [...envelope.to],
       published: envelope.published,
       context: envelope.thread,
       "afp:visibility": envelope.visibility,
       ...(envelope.prevActivity !== null ? { "afp:prevActivity": envelope.prevActivity } : {}),
-      object: "urn:afp:task:req-ask-1",
+      object: `${config.origin}/tasks/req-ask-1`,
       "afp:hub": hub.actorId,
       "afp:commitment": "sha256:whatever",
     }));
     await hub.receive(requesterCommit.activity);
-    assert.equal(hub.allocation.bids("urn:afp:task:req-ask-1").length, 0, "a requester cannot bid");
+    assert.equal(hub.allocation.bids(`${config.origin}/tasks/req-ask-1`).length, 0, "a requester cannot bid");
     assert.ok(
       hub.allocation
-        .admissions("urn:afp:task:req-ask-1")
+        .admissions(`${config.origin}/tasks/req-ask-1`)
         .some((a) => a.outcome === "rejected" && /only member-role/.test(a.reason)),
       "the non-member commit rejection is audit-logged",
     );
@@ -481,7 +481,7 @@ describe("P2 hub: enrollment and an L0 weighted-quorum round", () => {
       "afp:visibility": envelope.visibility,
       ...(envelope.prevActivity !== null ? { "afp:prevActivity": envelope.prevActivity } : {}),
       object: {
-        id: "urn:afp:result:req-ask-1-actuals",
+        id: `${config.origin}/results/req-ask-1-actuals`,
         type: "afp:Result",
         "afp:actuals": { [a1]: { unit: "EUR", value: 120 } },
       },
@@ -499,7 +499,7 @@ describe("P2 hub: enrollment and an L0 weighted-quorum round", () => {
     );
     assert.ok(
       hub.allocation
-        .admissions("urn:afp:task:req-ask-1")
+        .admissions(`${config.origin}/tasks/req-ask-1`)
         .some((a) => a.outcome === "rejected" && /settlement follows an award/.test(a.reason)),
       "the premature actuals report is rejected on the record",
     );
@@ -517,7 +517,7 @@ describe("P2 hub: enrollment and an L0 weighted-quorum round", () => {
     enrollAgent(instance, hub, hubKeys, "a1", "requester");
     await instance.run(transport);
 
-    const thread = "urn:afp:thread:shared";
+    const thread = `${config.origin}/threads/shared`;
     const now = instance.clock.now();
     const announceOf = (taskId: string, thread: string, window: { opens: string; closes: string }) =>
       instance.publish("a1", [hub.actorId], thread, "hub", (envelope: Envelope) => ({
@@ -543,16 +543,16 @@ describe("P2 hub: enrollment and an L0 weighted-quorum round", () => {
       }));
 
     const open = { opens: now.toISOString(), closes: new Date(now.getTime() + 600_000).toISOString() };
-    await hub.receive(announceOf("urn:afp:task:first", thread, open).activity);
-    assert.ok(hub.allocation.auction("urn:afp:task:first"), "the first auction opens");
+    await hub.receive(announceOf(`${config.origin}/tasks/first`, thread, open).activity);
+    assert.ok(hub.allocation.auction(`${config.origin}/tasks/first`), "the first auction opens");
 
     // A second auction on the same thread would make "which auction does this
     // actuals report settle?" unanswerable.
-    await hub.receive(announceOf("urn:afp:task:second", thread, open).activity);
-    assert.equal(hub.allocation.auction("urn:afp:task:second"), null, "one auction per thread");
+    await hub.receive(announceOf(`${config.origin}/tasks/second`, thread, open).activity);
+    assert.equal(hub.allocation.auction(`${config.origin}/tasks/second`), null, "one auction per thread");
     assert.ok(
       hub.allocation
-        .admissions("urn:afp:task:second")
+        .admissions(`${config.origin}/tasks/second`)
         .some((a) => /one auction per thread/.test(a.reason)),
       "the collision is rejected on the record",
     );
@@ -560,19 +560,19 @@ describe("P2 hub: enrollment and an L0 weighted-quorum round", () => {
     // An inverted window, and one that already closed: no commit could ever
     // land inside either.
     await hub.receive(
-      announceOf("urn:afp:task:inverted", "urn:afp:thread:inv", { opens: open.closes, closes: open.opens }).activity,
+      announceOf(`${config.origin}/tasks/inverted`, `${config.origin}/threads/inv`, { opens: open.closes, closes: open.opens }).activity,
     );
-    assert.equal(hub.allocation.auction("urn:afp:task:inverted"), null);
-    assert.ok(hub.allocation.admissions("urn:afp:task:inverted").some((a) => /at or after it closes/.test(a.reason)));
+    assert.equal(hub.allocation.auction(`${config.origin}/tasks/inverted`), null);
+    assert.ok(hub.allocation.admissions(`${config.origin}/tasks/inverted`).some((a) => /at or after it closes/.test(a.reason)));
 
     await hub.receive(
-      announceOf("urn:afp:task:past", "urn:afp:thread:past", {
+      announceOf(`${config.origin}/tasks/past`, `${config.origin}/threads/past`, {
         opens: new Date(now.getTime() - 600_000).toISOString(),
         closes: new Date(now.getTime() - 300_000).toISOString(),
       }).activity,
     );
-    assert.equal(hub.allocation.auction("urn:afp:task:past"), null);
-    assert.ok(hub.allocation.admissions("urn:afp:task:past").some((a) => /closed at/.test(a.reason)));
+    assert.equal(hub.allocation.auction(`${config.origin}/tasks/past`), null);
+    assert.ok(hub.allocation.admissions(`${config.origin}/tasks/past`).some((a) => /closed at/.test(a.reason)));
 
     instance.close();
   });
@@ -592,7 +592,7 @@ describe("P2 hub: enrollment and an L0 weighted-quorum round", () => {
     const [a1, a2] = ["a1", "a2"].map((n) => instance.actorId(n));
 
     const assetUpdate = (name: string, digest: string) =>
-      instance.publish(name, [hub.actorId], "urn:afp:thread:assets", "hub", (envelope: Envelope) => ({
+      instance.publish(name, [hub.actorId], `${config.origin}/threads/assets`, "hub", (envelope: Envelope) => ({
         "@context": ["https://www.w3.org/ns/activitystreams", "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"],
         id: envelope.activityId,
         type: "Update",
@@ -604,7 +604,7 @@ describe("P2 hub: enrollment and an L0 weighted-quorum round", () => {
         ...(envelope.prevActivity !== null ? { "afp:prevActivity": envelope.prevActivity } : {}),
         "afp:hub": hub.actorId,
         object: {
-          id: "urn:afp:asset:a",
+          id: `${config.origin}/assets/a`,
           type: "afp:Asset",
           "afp:version": "1.0",
           "afp:digest": digest,
@@ -621,20 +621,20 @@ describe("P2 hub: enrollment and an L0 weighted-quorum round", () => {
     assert.equal(restarted.roleOf(a2), "observer", "a non-default role survives");
     assert.deepEqual(restarted.capabilitiesOf(a1), ["afp:cap:vote"], "capabilities survive");
     assert.ok(restarted.isLive(a1), "liveness survives");
-    assert.equal(restarted.assetOf("urn:afp:asset:a", "1.0")?.["afp:digest"], "sha256:original", "the registry survives");
+    assert.equal(restarted.assetOf(`${config.origin}/assets/a`, "1.0")?.["afp:digest"], "sha256:original", "the registry survives");
 
     // The point of all that: immutability still holds across the restart.
     await restarted.receive(assetUpdate("a1", "sha256:rewritten").activity);
     assert.equal(
-      restarted.assetOf("urn:afp:asset:a", "1.0")?.["afp:digest"],
+      restarted.assetOf(`${config.origin}/assets/a`, "1.0")?.["afp:digest"],
       "sha256:original",
       "a restarted hub still refuses to mutate a registered (id, version)",
     );
 
     // And a restarted hub can still open a round — impossible with empty membership.
     const proposal = restarted.proposeRound({
-      round: "urn:afp:round:after-restart",
-      thread: "urn:afp:thread:after-restart",
+      round: `${config.origin}/rounds/after-restart`,
+      thread: `${config.origin}/threads/after-restart`,
       question: "Still working?",
       options: ["yes", "no"],
     });
@@ -668,7 +668,7 @@ describe("P2 hub: enrollment and an L0 weighted-quorum round", () => {
     const a1 = instance.actorId("a1");
 
     const assetUpdate = (name: string, version: string, digest: string) =>
-      instance.publish(name, [hub.actorId], "urn:afp:thread:assets", "hub", (envelope: Envelope) => ({
+      instance.publish(name, [hub.actorId], `${config.origin}/threads/assets`, "hub", (envelope: Envelope) => ({
         "@context": ["https://www.w3.org/ns/activitystreams", "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"],
         id: envelope.activityId,
         type: "Update",
@@ -680,7 +680,7 @@ describe("P2 hub: enrollment and an L0 weighted-quorum round", () => {
         ...(envelope.prevActivity !== null ? { "afp:prevActivity": envelope.prevActivity } : {}),
         "afp:hub": hub.actorId,
         object: {
-          id: "urn:afp:asset:mitid-broker-adapter",
+          id: `${config.origin}/assets/mitid-broker-adapter`,
           type: "afp:Asset",
           "afp:version": version,
           "afp:digest": digest,
@@ -691,27 +691,27 @@ describe("P2 hub: enrollment and an L0 weighted-quorum round", () => {
 
     // A member registers version 3.1.
     await hub.receive(assetUpdate("a1", "3.1", "sha256:aaa").activity);
-    assert.deepEqual(hub.assetOf("urn:afp:asset:mitid-broker-adapter", "3.1")?.["afp:digest"], "sha256:aaa");
+    assert.deepEqual(hub.assetOf(`${config.origin}/assets/mitid-broker-adapter`, "3.1")?.["afp:digest"], "sha256:aaa");
 
     // A second Update with the same (id, version) but a different digest is rejected.
     await hub.receive(assetUpdate("a1", "3.1", "sha256:bbb").activity);
     assert.equal(
-      hub.assetOf("urn:afp:asset:mitid-broker-adapter", "3.1")?.["afp:digest"],
+      hub.assetOf(`${config.origin}/assets/mitid-broker-adapter`, "3.1")?.["afp:digest"],
       "sha256:aaa",
       "one (id, version) is immutable once registered",
     );
 
     // A new version is a new entry.
     await hub.receive(assetUpdate("a1", "3.2", "sha256:ccc").activity);
-    assert.equal(hub.assetOf("urn:afp:asset:mitid-broker-adapter", "3.2")?.["afp:digest"], "sha256:ccc");
+    assert.equal(hub.assetOf(`${config.origin}/assets/mitid-broker-adapter`, "3.2")?.["afp:digest"], "sha256:ccc");
     assert.equal(hub.assetRegistry().size, 2);
 
     // A requester cannot register.
     await hub.receive(assetUpdate("a3", "4.0", "sha256:ddd").activity);
-    assert.equal(hub.assetOf("urn:afp:asset:mitid-broker-adapter", "4.0"), null, "only members register assets");
+    assert.equal(hub.assetOf(`${config.origin}/assets/mitid-broker-adapter`, "4.0"), null, "only members register assets");
 
     // The steward is on the record.
-    assert.equal(hub.assetOf("urn:afp:asset:mitid-broker-adapter", "3.1")?.attributedTo, a1);
+    assert.equal(hub.assetOf(`${config.origin}/assets/mitid-broker-adapter`, "3.1")?.attributedTo, a1);
 
     instance.close();
   });

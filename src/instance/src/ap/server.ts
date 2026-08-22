@@ -22,6 +22,7 @@ import { handleInboxPost, type InboxDeps } from "../federation/inbox.ts";
 import { authorizeRead, type ReadAuthorization, type ReadGateDeps } from "../federation/readGate.ts";
 import { AFP_CONTEXTS } from "./documents.ts";
 import { webfingerResponse } from "./webfinger.ts";
+import { nodeinfoDiscovery, nodeinfoDocument } from "./nodeinfo.ts";
 import type { OutboxEntry } from "../store/outbox.ts";
 import type { JsonValue } from "../crypto/jcs.ts";
 
@@ -215,7 +216,7 @@ export function createHttpServer(instance: AfpInstance, options: ServerOptions =
 
     (async () => {
       try {
-        // `/actor`, `/roster`, `/agents/:name`, `/.well-known/afp-policy`
+        // `/actor`, `/roster`, `/agents/:name`, `/afp/policy`
         // stay unauthenticated forever (Decision 2, the bootstrap invariant):
         // verifying a signature requires fetching a key over one of these
         // routes, so gating them would make every signature unverifiable in
@@ -366,7 +367,10 @@ export function createHttpServer(instance: AfpInstance, options: ServerOptions =
           return res.end(Buffer.from(bytes));
         }
 
-        if (path === "/.well-known/afp-policy") {
+        // ADR-0017 Decision 5: the canonical path lives at an unreserved
+        // location; the old `/.well-known/` path keeps serving the same body
+        // as a transition alias.
+        if (path === "/afp/policy" || path === "/.well-known/afp-policy") {
           return send(
             200,
             {
@@ -377,6 +381,16 @@ export function createHttpServer(instance: AfpInstance, options: ServerOptions =
             },
             "application/json",
           );
+        }
+
+        // ADR-0017 Decision 5: FEP-f1d5 NodeInfo — the discovery link and the
+        // version document it points at, both unauthenticated like every
+        // other bootstrap route.
+        if (path === "/.well-known/nodeinfo") {
+          return send(200, nodeinfoDiscovery(instance.config.origin), "application/json");
+        }
+        if (path === "/nodeinfo/2.1") {
+          return send(200, nodeinfoDocument(instance.specs.length), "application/json");
         }
 
         return notFound();

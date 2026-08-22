@@ -105,7 +105,7 @@ describe("ADR-0013 gate: admission by class", () => {
       path: "/agents/w/outbox",
       headers: {},
     });
-    assert.equal(auth.admits(activity("internal", { context: "urn:afp:thread:t1" })), false);
+    assert.equal(auth.admits(activity("internal", { context: "https://alpha.example/threads/t1" })), false);
     assert.equal(auth.viaGrant, undefined, "nothing about internal is recorded as a granted read");
   });
 });
@@ -122,7 +122,7 @@ describe("ADR-0013 gate: admission by class", () => {
  */
 function everythingGrant(auditor: string = B_AGENT): { [key: string]: JsonValue } {
   return {
-    id: "urn:afp:activity:grant-1",
+    id: "https://alpha.example/activities/grant-1",
     type: "Create",
     object: {
       type: "afp:AuditGrant",
@@ -150,8 +150,8 @@ describe("ADR-0013 gate: a grant widens entitlement, and never past a refusal", 
     const auth = await authorizeRead(g.deps, { path: g.path, headers: g.headers });
     assert.notEqual(auth.requester, null, "the signature must resolve, or this proves nothing");
 
-    assert.equal(auth.admits(activity("hub", { "afp:hub": HUB, context: "urn:afp:thread:t1" })), false);
-    assert.equal(auth.admits(activity("parties", { to: [g.agentId], context: "urn:afp:thread:t1" })), false);
+    assert.equal(auth.admits(activity("hub", { "afp:hub": HUB, context: "https://alpha.example/threads/t1" })), false);
+    assert.equal(auth.admits(activity("parties", { to: [g.agentId], context: "https://alpha.example/threads/t1" })), false);
     assert.equal(auth.viaGrant, undefined, "a refused read is never recorded as a granted one");
     g.instance.close();
   });

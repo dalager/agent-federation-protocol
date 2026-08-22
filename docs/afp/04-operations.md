@@ -166,7 +166,7 @@ check it by recomputing the tally over the referenced votes:
   "id": "https://hub.local/rounds/round-42/decision",
   "type": "afp:DecisionRecord",
   "afp:hub": "https://hub.local/actor",
-  "afp:round": "urn:afp:round:42",
+  "afp:round": "https://hub.local/rounds/42",
   "afp:outcome": "policy-candidate-7",
   "afp:quorumSnapshot": "sha256:mem-4a71c9...",
   "afp:countedVotes": ["sha256:vote-a01...", "sha256:vote-a02...", "..."],
@@ -215,7 +215,7 @@ fields:
 ```json
 {
   "type": "afp:Synthesis",
-  "context": "urn:afp:question:q-88",
+  "context": "https://alpha.operator.example/threads/q-88",
   "afp:method": "sum-of-disjoint-ranges",
   "afp:answer": { "unit": "kDKK", "low": 9000, "high": 11700 },
   "afp:confidence": 72,

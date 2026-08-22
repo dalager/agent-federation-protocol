@@ -34,7 +34,7 @@ import { VERIFIER } from "./adr0010-fixtures.ts";
 after(cleanupWorkspaces);
 
 const CAPABILITY = "afp:cap:assess";
-const THREAD = "urn:afp:thread:horizon";
+const THREAD = "https://alpha.operator.local/threads/horizon";
 
 /** Read/patch/rewrite a copied bundle's manifest, then replay it. */
 function withManifest(dir: string, edit: (m: Record<string, unknown>) => void) {
@@ -53,7 +53,7 @@ describe("ADR-0012 gate: an export outlives the key that signed it", () => {
     const writer = "writer";
 
     instance.publish(writer, [], THREAD, "parties", (envelope) =>
-      createResult(envelope, { resultId: "urn:afp:result:before", correlationId: "leg-before", content: "signed by key one" }),
+      createResult(envelope, { resultId: `${config.origin}/results/before`, correlationId: "leg-before", content: "signed by key one" }),
     );
     const before = mkdtempSync(join(tmpdir(), "afp-adr12-before-"));
     exportBundle(instance, before);
@@ -89,7 +89,7 @@ describe("ADR-0012 gate: an export outlives the key that signed it", () => {
   it("the history and the inventory are claims the record checks", async () => {
     const { instance, config } = testInstance(["writer"], CAPABILITY);
     instance.publish("writer", [], THREAD, "parties", (envelope) =>
-      createResult(envelope, { resultId: "urn:afp:result:claims", correlationId: "leg-claims", content: "one" }),
+      createResult(envelope, { resultId: `${config.origin}/results/claims`, correlationId: "leg-claims", content: "one" }),
     );
     const exported = exportBundle(instance, config.exportDir);
     assert.equal(runVerifier(VERIFIER, exported.dir, THREAD).code, 0);
@@ -148,7 +148,7 @@ describe("ADR-0012 gate: an export outlives the key that signed it", () => {
   it("a bundle written before any of this existed still verifies, unchanged", async () => {
     const { instance, config } = testInstance(["writer"], CAPABILITY);
     instance.publish("writer", [], THREAD, "parties", (envelope) =>
-      createResult(envelope, { resultId: "urn:afp:result:legacy", correlationId: "leg-legacy", content: "old world" }),
+      createResult(envelope, { resultId: `${config.origin}/results/legacy`, correlationId: "leg-legacy", content: "old world" }),
     );
     const exported = exportBundle(instance, config.exportDir);
 

@@ -68,7 +68,7 @@ CREATE TABLE IF NOT EXISTS hub_seats (
 ```
    plus `saveSeat(db, actor, followId, at)`, `revokeSeat(db, actor, at)`, `liveSeats(db): string[]`, `hasSeat(db, actor): boolean` (revive on re-Follow: upsert clearing `revoked_at`).
 2. `ap/activities.ts`: builders `follow(envelope, target)` → `{...base(envelope,"Follow"), object: target}`; `undoFollow(envelope, followActivityId, target)` → `{...base(envelope,"Undo"), object: followActivityId, target}`.
-3. `instance.ts`: `followHub(hubActorId): OutboxEntry` → publish-as-instance to `[hubActorId]`, thread `urn:afp:thread:seats`, visibility `"public"`; `unfollowHub(hubActorId)` finds its own latest prior Follow in the outbox and publishes the Undo; `followingIds(): string[]` replays Follow/Undo for `/actor/following`.
+3. `instance.ts`: `followHub(hubActorId): OutboxEntry` → publish-as-instance to `[hubActorId]`, thread `${origin}/threads/seats`, visibility `"public"`; `unfollowHub(hubActorId)` finds its own latest prior Follow in the outbox and publishes the Undo; `followingIds(): string[]` replays Follow/Undo for `/actor/following`.
 4. `hub/hub.ts`:
    - `HubDeps` gains `seatPolicy?: "follow-required" | "enroll-implies-seat"` (default `"enroll-implies-seat"`).
    - `dispatch`: BEFORE the existing `Accept` line, add `if (type === "Follow") return this.onFollow(activity);` and `if (type === "Undo") return this.onUndoFollow(activity);`.

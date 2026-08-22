@@ -22,10 +22,10 @@ import {
 import type { Envelope } from "../src/ap/activities.ts";
 
 const ENVELOPE: Envelope = {
-  activityId: "urn:afp:activity:1",
+  activityId: "https://alpha.example/activities/1",
   actor: "https://alpha.example/agents/a1",
   to: ["https://bravo.example/instance"],
-  thread: "urn:afp:thread:libfoo-v4",
+  thread: "https://alpha.example/threads/libfoo-v4",
   visibility: "hub",
   published: "2026-08-20T00:00:00Z",
   prevActivity: null,
@@ -39,18 +39,18 @@ describe("shadow Notes", () => {
       published: "2026-08-20T00:00:00Z",
       object: { "afp:price": 42, "afp:clientName": "Contoso" },
     };
-    const note = shadowNote(activity, { type: "afp:Bid", actor: activity.actor, thread: "urn:afp:thread:libfoo-v4" });
+    const note = shadowNote(activity, { type: "afp:Bid", actor: activity.actor, thread: "https://alpha.example/threads/libfoo-v4" });
     const object = note.object as { [key: string]: unknown };
     const content = String(object.content);
     assert.equal(content.includes("42"), false);
     assert.equal(content.includes("Contoso"), false);
     assert.match(content, /afp:Bid/);
-    assert.match(content, /urn:afp:thread:libfoo-v4/);
+    assert.match(content, /alpha\.example\/threads\/libfoo-v4/);
   });
 
   it("afp:shadowOf digest resolves to the shadowed activity", () => {
     const activity = { type: "afp:Bid", actor: ENVELOPE.actor, published: ENVELOPE.published, object: { x: 1 } };
-    const note = shadowNote(activity, { type: "afp:Bid", actor: activity.actor, thread: "urn:afp:thread:t" });
+    const note = shadowNote(activity, { type: "afp:Bid", actor: activity.actor, thread: "https://alpha.example/threads/t" });
     assert.equal(note["afp:shadowOf"], digestOf(activity));
   });
 });
@@ -88,7 +88,7 @@ describe("afp:AuditGrant", () => {
   function grant(overrides: Partial<Parameters<typeof auditGrant>[1]> = {}) {
     return auditGrant(ENVELOPE, {
       auditor: "https://audit.example/agents/inspector",
-      scope: { thread: "urn:afp:thread:libfoo-v4" },
+      scope: { thread: "https://alpha.example/threads/libfoo-v4" },
       visibilityClasses: ["hub", "parties"],
       expires: "2026-09-01T00:00:00Z",
       ...overrides,
@@ -97,7 +97,7 @@ describe("afp:AuditGrant", () => {
 
   const baseRequest = {
     auditor: "https://audit.example/agents/inspector",
-    thread: "urn:afp:thread:libfoo-v4",
+    thread: "https://alpha.example/threads/libfoo-v4",
     visibility: "hub",
     at: "2026-08-21T00:00:00Z",
   };
@@ -111,7 +111,7 @@ describe("afp:AuditGrant", () => {
   });
 
   it("refuses the wrong thread", () => {
-    assert.equal(grantAdmits(grant(), { ...baseRequest, thread: "urn:afp:thread:other" }), false);
+    assert.equal(grantAdmits(grant(), { ...baseRequest, thread: "https://alpha.example/threads/other" }), false);
   });
 
   it("refuses an unlisted visibility class", () => {
@@ -141,7 +141,7 @@ describe("afp:AuditGrant", () => {
 
   it("hub-scoped grants admit any thread under that hub", () => {
     const hubGrant = grant({ scope: { hub: "platform" } });
-    assert.equal(grantAdmits(hubGrant, { ...baseRequest, thread: "urn:afp:thread:anything" }), true);
+    assert.equal(grantAdmits(hubGrant, { ...baseRequest, thread: "https://alpha.example/threads/anything" }), true);
   });
 
   it("period-scoped grants admit only within the window", () => {

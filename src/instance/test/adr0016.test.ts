@@ -53,7 +53,6 @@ import { cleanupWorkspaces, workspace } from "./helpers.ts";
 after(cleanupWorkspaces);
 
 const CAPABILITY = "afp:cap:assess";
-const FED = "urn:afp:thread:fed";
 
 function freePort(): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -177,13 +176,13 @@ describe("ADR-0016: the hub's inbox and cross-instance CRDT sync, over real sock
         ],
         expires,
       });
-      a.instance.publishAsInstance([b.actorId], FED, "parties", (envelope: Envelope) => offerAgreement(envelope, object));
-      const aCreate = a.instance.publishAsInstance([b.actorId], FED, "parties", (envelope: Envelope) =>
+      a.instance.publishAsInstance([b.actorId], `${a.origin}/threads/fed`, "parties", (envelope: Envelope) => offerAgreement(envelope, object));
+      const aCreate = a.instance.publishAsInstance([b.actorId], `${a.origin}/threads/fed`, "parties", (envelope: Envelope) =>
         createAgreement(envelope, object),
       );
       a.federation.recordOwnCreate(object, aCreate.activity);
       await a.instance.run(a.transport);
-      const bCreate = b.instance.publishAsInstance([a.actorId], FED, "parties", (envelope: Envelope) =>
+      const bCreate = b.instance.publishAsInstance([a.actorId], `${a.origin}/threads/fed`, "parties", (envelope: Envelope) =>
         createAgreement(envelope, object),
       );
       b.federation.recordOwnCreate(object, bCreate.activity);
@@ -206,7 +205,7 @@ describe("ADR-0016: the hub's inbox and cross-instance CRDT sync, over real sock
     ] as const) {
       for (const url of [op.actorId, op.instance.actorId(agent)]) await cacheDoc(url);
       const hubKey = loadOrCreateHubKeyPair(op.config.keyDir, agent, op.instance.actorId(agent), "bridge");
-      const entry = op.instance.publishAsInstance([hub.actorId], "urn:afp:thread:enroll", "hub", (envelope: Envelope) =>
+      const entry = op.instance.publishAsInstance([hub.actorId], `${alpha.origin}/threads/enroll`, "hub", (envelope: Envelope) =>
         enroll(envelope, { agent: op.instance.actorId(agent), hub: hub.actorId, capabilities: [CAPABILITY], hubKey: hubKey.keyId, role }),
       );
       if (op === alpha) {
@@ -224,8 +223,8 @@ describe("ADR-0016: the hub's inbox and cross-instance CRDT sync, over real sock
     // valid membership proof on the write is refused JUST THE SAME. The proof
     // widens a read predicate for someone who cannot ask; the hub can always
     // ask itself.
-    const incident = "urn:afp:thread:incident-7";
-    const proposal = hub.proposeRound({ round: "urn:afp:round:r1", thread: incident, question: "declare sev-1?", options: ["yes", "no"] });
+    const incident = `${alpha.origin}/threads/incident-7`;
+    const proposal = hub.proposeRound({ round: `${alpha.origin}/rounds/r1`, thread: incident, question: "declare sev-1?", options: ["yes", "no"] });
     const proposalId = String((proposal.activity.object as Record<string, unknown>).id);
     void proposalId;
     const snapshot = String((proposal.activity.object as Record<string, unknown>)["afp:quorumSnapshot"]);
@@ -233,7 +232,7 @@ describe("ADR-0016: the hub's inbox and cross-instance CRDT sync, over real sock
     // bravo's instance actor is party to an agreement but "b-rogue" is nobody:
     // an unenrolled agent under a valid operator. Its vote must die at the door.
     const rogueVote = bravo.instance.publishAsInstance([hub.actorId], incident, "hub", (envelope: Envelope) =>
-      castVote(envelope, { voteId: `${envelope.actor}/votes/rogue`, round: "urn:afp:round:r1", hub: hub.actorId, proposalHash: proposal.digest, quorumSnapshot: snapshot, value: "yes" }),
+      castVote(envelope, { voteId: `${envelope.actor}/votes/rogue`, round: `${alpha.origin}/rounds/r1`, hub: hub.actorId, proposalHash: proposal.digest, quorumSnapshot: snapshot, value: "yes" }),
     );
     const refused = await postToHubInbox(bravo, alpha.origin, rogueVote.activity, clock);
     assert.equal(refused.status, 403, "unenrolled write refused");
@@ -253,17 +252,17 @@ describe("ADR-0016: the hub's inbox and cross-instance CRDT sync, over real sock
     const votes: { [key: string]: JsonValue }[] = [];
     const castThrough = async (op: Operator, agent: string) => {
       const entry = op.instance.publish(agent, [hub.actorId], incident, "hub", (envelope) =>
-        castVote(envelope, { voteId: `${envelope.actor}/votes/r1`, round: "urn:afp:round:r1", hub: hub.actorId, proposalHash: proposal.digest, quorumSnapshot: snapshot, value: "yes" }),
+        castVote(envelope, { voteId: `${envelope.actor}/votes/r1`, round: `${alpha.origin}/rounds/r1`, hub: hub.actorId, proposalHash: proposal.digest, quorumSnapshot: snapshot, value: "yes" }),
       );
       votes.push(entry.activity);
       return postToHubInbox(op, alpha.origin, entry.activity, clock);
     };
     const observerVote = await castThrough(gamma, "e-watcher");
     assert.equal(observerVote.status, 202, "the observer's vote crosses the door — it IS enrolled");
-    assert.equal(hub.roundVotes("urn:afp:round:r1").length, 0, "and dies in the handler: outside the pinned snapshot, never tallied");
+    assert.equal(hub.roundVotes(`${alpha.origin}/rounds/r1`).length, 0, "and dies in the handler: outside the pinned snapshot, never tallied");
 
     const nnocVote = alpha.instance.publish("n-noc", [hub.actorId], incident, "hub", (envelope) =>
-      castVote(envelope, { voteId: `${envelope.actor}/votes/r1`, round: "urn:afp:round:r1", hub: hub.actorId, proposalHash: proposal.digest, quorumSnapshot: snapshot, value: "yes" }),
+      castVote(envelope, { voteId: `${envelope.actor}/votes/r1`, round: `${alpha.origin}/rounds/r1`, hub: hub.actorId, proposalHash: proposal.digest, quorumSnapshot: snapshot, value: "yes" }),
     );
     await hub.receive(nnocVote.activity); // the host's own agent: in-process, as deployed
     for (const [op, agent] of [
@@ -273,7 +272,7 @@ describe("ADR-0016: the hub's inbox and cross-instance CRDT sync, over real sock
       const posted = await castThrough(op, agent);
       assert.equal(posted.status, 202, `${agent}'s vote admitted through the real inbox`);
     }
-    assert.equal(hub.roundVotes("urn:afp:round:r1").length, 3, "three member votes tallied, the observer's not among them");
+    assert.equal(hub.roundVotes(`${alpha.origin}/rounds/r1`).length, 3, "three member votes tallied, the observer's not among them");
 
     // --- Decision 3, second population: an application-defined store mutated
     // by its own explicit signed Update{afp:CRDTDelta}, through the same door.
@@ -371,7 +370,7 @@ describe("ADR-0016: the hub's inbox and cross-instance CRDT sync, over real sock
     // --- Decision 5 / the kill criterion: kill the hub mid-task. In-flight
     // mesh work (payload path: member to member, never through the hub)
     // completes; new allocation toward the hub stalls.
-    const mesh = "urn:afp:thread:mesh-1";
+    const mesh = `${gamma.origin}/threads/mesh-1`;
     gamma.instance.publish("e-noc", [alpha.instance.actorId("n-noc")], mesh, "parties", (envelope: Envelope) =>
       offerTask(envelope, { taskId: `${envelope.actor}/tasks/m1`, capability: CAPABILITY, correlationId: "m1", content: "correlate views" }),
     );
@@ -380,7 +379,7 @@ describe("ADR-0016: the hub's inbox and cross-instance CRDT sync, over real sock
 
     // In-flight completes: gamma→alpha? alpha's server is down — the honest
     // in-flight path is bravo↔gamma, the pair that is still standing.
-    const mesh2 = "urn:afp:thread:mesh-2";
+    const mesh2 = `${bravo.origin}/threads/mesh-2`;
     bravo.instance.publish("s-noc", [gamma.instance.actorId("e-noc")], mesh2, "parties", (envelope: Envelope) =>
       offerTask(envelope, { taskId: `${envelope.actor}/tasks/m2`, capability: CAPABILITY, correlationId: "m2", content: "correlate our two views" }),
     );

@@ -106,7 +106,7 @@ export function testHub(instance: AfpInstance, agentNames: readonly string[], hu
 /**
  * The raw-body escape hatch: an envelope with an arbitrary body spread over
  * it, for activity shapes the builders deliberately do not emit (`afp:Act`,
- * `afp:bidCommit`) and for the malformed ones a gate needs to publish on
+ * `afp:BidCommit`) and for the malformed ones a gate needs to publish on
  * purpose.
  */
 export function publishRaw(

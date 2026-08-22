@@ -52,7 +52,7 @@ import { VERIFIER } from "./adr0010-fixtures.ts";
 after(cleanupWorkspaces);
 
 const CAPABILITY = "afp:cap:assess";
-const FED = "urn:afp:thread:fed";
+const FED = (origin: string) => `${origin}/threads/fed`;
 
 function freePort(): Promise<number> {
   return new Promise((resolve, reject) => {
@@ -180,13 +180,13 @@ describe("ADR-0014 M6: three operators, one hub, one partition", () => {
         ],
         expires,
       });
-      a.instance.publishAsInstance([b.actorId], FED, "parties", (envelope: Envelope) => offerAgreement(envelope, object));
-      const aCreate = a.instance.publishAsInstance([b.actorId], FED, "parties", (envelope: Envelope) =>
+      a.instance.publishAsInstance([b.actorId], FED(a.origin), "parties", (envelope: Envelope) => offerAgreement(envelope, object));
+      const aCreate = a.instance.publishAsInstance([b.actorId], FED(a.origin), "parties", (envelope: Envelope) =>
         createAgreement(envelope, object),
       );
       a.federation.recordOwnCreate(object, aCreate.activity);
       await a.instance.run(a.transport);
-      const bCreate = b.instance.publishAsInstance([a.actorId], FED, "parties", (envelope: Envelope) =>
+      const bCreate = b.instance.publishAsInstance([a.actorId], FED(a.origin), "parties", (envelope: Envelope) =>
         createAgreement(envelope, object),
       );
       b.federation.recordOwnCreate(object, bCreate.activity);
@@ -211,7 +211,7 @@ describe("ADR-0014 M6: three operators, one hub, one partition", () => {
         docCache.set(url, doc as { [key: string]: JsonValue });
       }
       const hubKey = loadOrCreateHubKeyPair(op.config.keyDir, agent, op.instance.actorId(agent), "bridge");
-      const entry = op.instance.publishAsInstance([hub.actorId], "urn:afp:thread:enroll", "hub", (envelope: Envelope) =>
+      const entry = op.instance.publishAsInstance([hub.actorId], `${op.origin}/threads/enroll`, "hub", (envelope: Envelope) =>
         enroll(envelope, { agent: op.instance.actorId(agent), hub: hub.actorId, capabilities: [CAPABILITY], hubKey: hubKey.keyId }),
       );
       await hub.receive(entry.activity);
@@ -220,7 +220,7 @@ describe("ADR-0014 M6: three operators, one hub, one partition", () => {
 
     // --- Gamma's telemetry lands as a hub-class activity in Gamma's outbox —
     // evidence stays where it was produced (scenario beat 2).
-    const incident = "urn:afp:thread:incident-4471";
+    const incident = `${gamma.origin}/threads/incident-4471`;
     gamma.instance.publish("e-noc", [], incident, "hub", (envelope) =>
       ({
         "@context": ["https://www.w3.org/ns/activitystreams", "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"],
@@ -233,7 +233,7 @@ describe("ADR-0014 M6: three operators, one hub, one partition", () => {
         "afp:visibility": "hub",
         "afp:hub": hub.actorId,
         ...(envelope.prevActivity !== null ? { "afp:prevActivity": envelope.prevActivity } : {}),
-        object: { id: "urn:afp:result:e-view", type: "afp:Result", "afp:correlationId": "leak-view-e", content: "routes for 203.0.113.0/24 arriving at our edge", attributedTo: envelope.actor },
+        object: { id: `${gamma.origin}/results/e-view`, type: "afp:Result", "afp:correlationId": "leak-view-e", content: "routes for 203.0.113.0/24 arriving at our edge", attributedTo: envelope.actor },
       }) as never,
     );
 
@@ -272,7 +272,7 @@ describe("ADR-0014 M6: three operators, one hub, one partition", () => {
 
     // The mesh carries real work meanwhile: a genuine delegation over the
     // pairwise agreement, through the real inbox gate.
-    const mesh = "urn:afp:thread:mesh-during-partition";
+    const mesh = `${bravo.origin}/threads/mesh-during-partition`;
     bravo.instance.publish("s-noc", [gamma.instance.actorId("e-noc")], mesh, "parties", (envelope: Envelope) =>
       offerTask(envelope, { taskId: `${envelope.actor}/tasks/mesh-1`, capability: CAPABILITY, correlationId: "mesh-1", content: "correlate our two views pairwise" }),
     );
@@ -288,7 +288,7 @@ describe("ADR-0014 M6: three operators, one hub, one partition", () => {
       hubs: [hub],
     });
     await new Promise<void>((resolve) => alphaServer3.listen(alpha.port, "127.0.0.1", resolve));
-    bravo.instance.publish("s-noc", [gamma.instance.actorId("e-noc")], "urn:afp:thread:bridge-resumed", "parties", (envelope: Envelope) =>
+    bravo.instance.publish("s-noc", [gamma.instance.actorId("e-noc")], `${bravo.origin}/threads/bridge-resumed`, "parties", (envelope: Envelope) =>
       offerTask(envelope, {
         taskId: `${envelope.actor}/tasks/mesh-2`,
         capability: CAPABILITY,
@@ -304,12 +304,12 @@ describe("ADR-0014 M6: three operators, one hub, one partition", () => {
     // --- Beat 6: a round after the storm. Alpha's agents participate — one
     // votes, one declines on the record; the foreign members stay silent,
     // which is the partition's echo and must not read as abstention.
-    const proposal = hub.proposeRound({ round: "urn:afp:round:sev1", thread: incident, question: "declare sev-1?", options: ["yes", "no"] });
+    const proposal = hub.proposeRound({ round: `${alpha.origin}/rounds/sev1`, thread: incident, question: "declare sev-1?", options: ["yes", "no"] });
     const proposalId = String((proposal.activity.object as Record<string, unknown>).id);
     const snapshot = String((proposal.activity.object as Record<string, unknown>)["afp:quorumSnapshot"]);
     await hub.receive(
       alpha.instance.publish("n-noc", [hub.actorId], incident, "hub", (envelope) =>
-        castVote(envelope, { voteId: `${envelope.actor}/votes/sev1`, round: "urn:afp:round:sev1", proposalHash: proposal.digest, quorumSnapshot: snapshot, value: "yes" }),
+        castVote(envelope, { voteId: `${envelope.actor}/votes/sev1`, round: `${alpha.origin}/rounds/sev1`, proposalHash: proposal.digest, quorumSnapshot: snapshot, value: "yes" }),
       ).activity,
     );
     await hub.receive(
@@ -329,7 +329,7 @@ describe("ADR-0014 M6: three operators, one hub, one partition", () => {
         }) as never,
       ).activity,
     );
-    const decision = hub.closeRound("urn:afp:round:sev1");
+    const decision = hub.closeRound(`${alpha.origin}/rounds/sev1`);
     const uncounted = (decision.activity.object as Record<string, unknown>)["afp:uncounted"] as { agent: string; "afp:status": string }[];
     const byAgent = Object.fromEntries(uncounted.map((u) => [u.agent, u["afp:status"]]));
     assert.equal(byAgent[alpha.instance.actorId("n-telemetry")], "declined");
@@ -339,7 +339,7 @@ describe("ADR-0014 M6: three operators, one hub, one partition", () => {
     // --- The audits: each operator's bundle stands alone; the mesh pair
     // joint-verifies. (Three bundles at once is ADR-0015's finding 49 —
     // deliberately unasserted here, in either direction.)
-    alpha.instance.publishAsInstance([], "urn:afp:thread:roster", "public", (envelope: Envelope) =>
+    alpha.instance.publishAsInstance([], `${alpha.origin}/threads/roster`, "public", (envelope: Envelope) =>
       vouch(envelope, { agent: hub.actorId, capabilities: ["afp:cap:hub"], keyCustody: "self" }),
     );
     exportBundle(alpha.instance, alpha.config.exportDir, [hub]);
@@ -349,7 +349,7 @@ describe("ADR-0014 M6: three operators, one hub, one partition", () => {
     assert.equal(alphaVerify.code, 0, `alpha failed:\n${alphaVerify.output}`);
     assert.match(alphaVerify.output, /decision: .*afp:uncounted partitions the pinned electorate/);
     assert.match(alphaVerify.output, /decision: .*declined members declined on the record/);
-    const bravoVerify = runVerifier(VERIFIER, bravo.config.exportDir, "urn:afp:thread:bridge-resumed", ["--verbose"]);
+    const bravoVerify = runVerifier(VERIFIER, bravo.config.exportDir, `${bravo.origin}/threads/bridge-resumed`, ["--verbose"]);
     assert.equal(bravoVerify.code, 0, `bravo failed:\n${bravoVerify.output}`);
     assert.match(bravoVerify.output, /afp:priorThread resolves to a closed, unretracted thread/);
 

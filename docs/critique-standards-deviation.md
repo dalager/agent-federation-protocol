@@ -187,7 +187,18 @@ AS2 `Announce` is share/boost ("calling attention to"). AFP uses `Announce{afp:T
 
 `afp:Enroll`, `afp:Vouch`, `afp:Award`, `afp:MemberAdmit`, `afp:MemberExpel`, `afp:bidCommit`, … are top-level activity types outside the AS2 vocabulary. AS2 Core §5: an extension type overlapping a core type MUST also specify the core type (dual-typing, e.g. `["Offer", "afp:Bid"]`); Vocab §3 note: avoid extension types that unduly duplicate existing vocabulary. Some AFP verbs genuinely have no AS2 counterpart; others duplicate it (`afp:MemberAdmit`/`afp:MemberExpel` ≈ `Add`/`Remove` with `target`; `afp:Award` ≈ `Accept`). Also `afp:bidCommit` breaks the type-capitalization convention every other type follows (`03:184`).
 
-### 3.5 Unregistered namespace minting — `status: open`
+### 3.5 Unregistered namespace minting — `status: fixed-code` + `fixed-spec` (header registration deferred to the FEP)
+
+**Resolution (2026-08-22, ADR-0017 Decision 5):** `urn:afp:*` is retired — threads,
+rounds, incidents, and assets are https URIs minted under the naming actor's origin,
+swept through code, tests, the Python verifier, and every spec example, with the
+normative minting rule now in 03. The policy document moved off the reserved space to
+`/afp/policy` (`/.well-known/afp-policy` stays as a serving alias through the
+transition). NodeInfo 2.1 is served at `/.well-known/nodeinfo` per FEP-f1d5. The
+`afp-membership-proof` header keeps its name; its HTTP field registration rides with
+the FEP (Decision 8), as the ADR provides. Also fixed under this decision:
+`afp:bidCommit` → `afp:BidCommit` (see 3.4's capitalization note). Original finding
+follows.
 
 Never acknowledged in the docs:
 

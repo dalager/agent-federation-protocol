@@ -44,7 +44,7 @@ describe("P1 acceptance gate", () => {
     const reviewer = agents.find((a) => a.spec.name === "reviewer")!;
     const instance = new AfpInstance(config, agents, fixedClock());
 
-    const thread = "urn:afp:thread:replay";
+    const thread = `${config.origin}/threads/replay`;
     instance.delegate({
       from: "writer", to: "reviewer", capability: "afp:cap:review",
       content: "review this", thread, correlationId: "task-r1",
@@ -81,7 +81,7 @@ describe("P1 acceptance gate", () => {
 
     const entry = instance.delegate({
       from: "writer", to: "reviewer", capability: "afp:cap:review",
-      content: "review this", thread: "urn:afp:thread:dupe", correlationId: "task-d1",
+      content: "review this", thread: `${config.origin}/threads/dupe`, correlationId: "task-d1",
     });
     await instance.run();
     const invocations = (reviewer.brain as { invocations: number }).invocations;
@@ -102,7 +102,7 @@ describe("P1 acceptance gate", () => {
 
     const entry = instance.delegate({
       from: "writer", to: "reviewer", capability: "afp:cap:review",
-      content: "review this", thread: "urn:afp:thread:sig", correlationId: "task-s1",
+      content: "review this", thread: `${config.origin}/threads/sig`, correlationId: "task-s1",
     });
     await instance.run();
 
@@ -131,7 +131,7 @@ describe("P1 acceptance gate", () => {
 
     instance.delegate({
       from: "writer", to: "reviewer", capability: "afp:cap:review",
-      content: "review this", thread: "urn:afp:thread:dead", correlationId: "task-x1",
+      content: "review this", thread: `${config.origin}/threads/dead`, correlationId: "task-x1",
     });
 
     // A transport that always fails — the network being down, in P1 terms.

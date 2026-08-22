@@ -36,7 +36,7 @@ Ed25519, `node:sqlite` covers the store, and the model endpoint is plain
 ## The demo
 
 ```
-thread urn:afp:thread:doc-1 — 6 activities
+thread https://alpha.operator.local/threads/doc-1 — 6 activities
 
    1  writer    Offer{afp:Task}      parties     review the draft
    1  reviewer  Accept               parties
@@ -57,7 +57,7 @@ membership is a recorded act, not a config entry.
 Then hand `export/` to someone who was not there:
 
 ```bash
-python3 ../verifier/afp_verify.py export --thread urn:afp:thread:doc-1
+python3 ../verifier/afp_verify.py export --thread https://alpha.operator.local/threads/doc-1
 # PASSED — 62 checks, no gaps
 ```
 
@@ -76,7 +76,7 @@ agents abstain by omission, and the hub closes the round with a signed
 
 ```
 hub https://alpha.operator.local/hubs/policy-hub
-round urn:afp:round:codebase-integrity — 30 enrolled, 27 votes counted
+round https://alpha.operator.local/rounds/codebase-integrity — 30 enrolled, 27 votes counted
 
   signed-commits   ███████████████ 15
   review-quorum    █████████ 9
@@ -90,7 +90,7 @@ The hub is vouched onto the roster like any agent (self-custody), so the
 export replays with no special case:
 
 ```bash
-python3 ../verifier/afp_verify.py export-p2 --thread urn:afp:thread:codebase-integrity
+python3 ../verifier/afp_verify.py export-p2 --thread https://alpha.operator.local/threads/codebase-integrity
 # PASSED — 466 checks, no gaps
 ```
 
@@ -105,7 +105,7 @@ Two auctions on one hub — scenario 04's federated estimation, at one operator.
 A `ranking` auction picks a single load-test performer by published linear
 weights; a `coverage` auction over four estimation domains awards a two-agent
 coalition and deterministically names the synthesizer. Bids are sealed
-commit-reveal (`afp:bidCommit` → `afp:BidReveal`, commitment =
+commit-reveal (`afp:BidCommit` → `afp:BidReveal`, commitment =
 `sha256(JCS(bid payload))` with a mandatory nonce), one agent declines on the
 record, and the estimator who framed the budget is rejected at bid admission
 under `afp:estimatorPolicy: exclude` — audit-logged, and checkable at replay:
@@ -125,7 +125,7 @@ whose `DecisionRecord` outcome literally names the Synthesis; and an
 recorded signals, never a live score (ADR-0003 Decision 5).
 
 ```bash
-python3 ../verifier/afp_verify.py export-p3 --thread urn:afp:thread:q-88-migration-estimate
+python3 ../verifier/afp_verify.py export-p3 --thread https://alpha.operator.local/threads/q-88-migration-estimate
 # PASSED — 324 checks, no gaps
 ```
 
@@ -165,7 +165,7 @@ agreement: alpha <-> beta, direct-delegation grant for afp:cap:assess
 mallory's signed probe:   inbox POST … refused: 403
 mallory's unsigned POST:  401 before the gate ever runs
 
-delegation urn:afp:thread:sub-1 — alpha's record:
+delegation https://alpha.operator.local/threads/sub-1 — alpha's record:
    1  a-lead     Offer{afp:Task}  (own outbox)
    -  b-assessor Accept  (received across the boundary)
    -  b-assessor Create{afp:Result}  (received across the boundary)
@@ -251,7 +251,7 @@ each sender's own bundle (ADR-0016's T8 amendment):
 
 ```bash
 python3 ../verifier/afp_verify.py export-p5/alpha export-p5/bravo export-p5/gamma \
-    --thread urn:afp:thread:incident-9 --verbose
+    --thread https://alpha.operator.local/threads/incident-9 --verbose
 # PASSED — 365 checks, no gaps
 ```
 

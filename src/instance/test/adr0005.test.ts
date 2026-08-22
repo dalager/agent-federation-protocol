@@ -61,7 +61,7 @@ function actorResolver(hub: () => Hub, operators: readonly Operator[]) {
 
 /** An operator enrolls one of its own agents — the only enrollment ADR-0005 admits. */
 function enrolls(op: Operator, hub: Hub, name: string, role?: "member" | "requester" | "observer") {
-  return op.instance.publishAsInstance([hub.actorId], "urn:afp:thread:enroll", "hub", (envelope: Envelope) =>
+  return op.instance.publishAsInstance([hub.actorId], `${op.config.origin}/threads/enroll`, "hub", (envelope: Envelope) =>
     enroll(envelope, {
       agent: op.instance.actorId(name),
       hub: hub.actorId,
@@ -102,8 +102,8 @@ describe("ADR-0005 gate: operators are equal against a hub", () => {
 
     // --- The round: four voters, two operators, equal say.
     const proposal = hub.proposeRound({
-      round: "urn:afp:round:equal-1",
-      thread: "urn:afp:thread:equal-1",
+      round: `${alpha.config.origin}/rounds/equal-1`,
+      thread: `${alpha.config.origin}/threads/equal-1`,
       question: "Whose weight decides?",
       options: ["alpha", "beta"],
     });
@@ -122,8 +122,8 @@ describe("ADR-0005 gate: operators are equal against a hub", () => {
     assert.ok(hub.members().includes(b4), "the fourth agent really is enrolled — or the next assertion proves nothing");
 
     const after2 = hub.proposeRound({
-      round: "urn:afp:round:equal-2",
-      thread: "urn:afp:thread:equal-2",
+      round: `${alpha.config.origin}/rounds/equal-2`,
+      thread: `${alpha.config.origin}/threads/equal-2`,
       question: "And now?",
       options: ["alpha", "beta"],
     });
@@ -159,7 +159,7 @@ describe("ADR-0005 gate: operators are equal against a hub", () => {
 
     // Alpha tries to enroll one of Beta's agents — validly signed by Alpha,
     // and refused anyway: a signature is not an entitlement to enroll.
-    const poached = alpha.instance.publishAsInstance([hub.actorId], "urn:afp:thread:enroll", "hub", (envelope: Envelope) =>
+    const poached = alpha.instance.publishAsInstance([hub.actorId], `${alpha.config.origin}/threads/enroll`, "hub", (envelope: Envelope) =>
       enroll(envelope, { agent: b1, hub: hub.actorId, capabilities: ["afp:cap:vote"], hubKey: "x", role: "member" }),
     );
     const outcome = await hub.receive(poached.activity);
@@ -167,7 +167,7 @@ describe("ADR-0005 gate: operators are equal against a hub", () => {
     assert.ok(!hub.members().includes(b1), "Beta's agent is not enrolled by Alpha");
 
     // An agent enrolling itself as a member is the self-promotion this closes.
-    const selfEnroll = beta.instance.publish("b1", [hub.actorId], "urn:afp:thread:enroll", "hub", (envelope: Envelope) =>
+    const selfEnroll = beta.instance.publish("b1", [hub.actorId], `${beta.config.origin}/threads/enroll`, "hub", (envelope: Envelope) =>
       enroll(envelope, { agent: b1, hub: hub.actorId, capabilities: ["afp:cap:vote"], hubKey: "x", role: "member" }),
     );
     await hub.receive(selfEnroll.activity);

@@ -14,7 +14,10 @@
   `target`, closing finding 1.6; the deviations section and verb audit remain),
   Decision 7 **partially built** (ADR-0001's Fedify amendment landed; remaining prose
   reconciliation tracks the critique's statuses);
-  Decisions 5, 8 open. Drafted from
+  Decision 5 **built** (`urn:afp:*` retired for origin-minted https ids across code,
+  verifier, and spec; policy at `/afp/policy` with the `.well-known` alias; NodeInfo 2.1
+  served per FEP-f1d5; `afp:BidCommit` — header registration rides with the FEP);
+  Decision 8 open. Drafted from
   [docs/critique-standards-deviation.md](../../critique-standards-deviation.md), the
    2026-08-21 four-source audit of the spec and instance against ActivityPub, AS2,
   JSON-LD, WebFinger, and current fediverse signature practice

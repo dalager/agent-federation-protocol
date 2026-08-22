@@ -174,7 +174,7 @@ export class AfpInstance {
     for (const agent of this.agents.values()) {
       const agentUrl = this.actorId(agent.spec.name);
       if (vouched.has(agentUrl)) continue;
-      this.publishAsInstance([], "urn:afp:thread:roster", "public", (envelope) =>
+      this.publishAsInstance([], `${this.config.origin}/threads/roster`, "public", (envelope) =>
         vouch(envelope, {
           agent: agentUrl,
           capabilities: agent.spec.capabilities,
@@ -200,7 +200,7 @@ export class AfpInstance {
 
   /** Remove an agent from the roster, on the record. */
   disownAgent(name: string, reason: string): OutboxEntry {
-    return this.publishAsInstance([], "urn:afp:thread:roster", "public", (envelope) =>
+    return this.publishAsInstance([], `${this.config.origin}/threads/roster`, "public", (envelope) =>
       disown(envelope, this.actorId(name), reason),
     );
   }
@@ -443,7 +443,7 @@ export class AfpInstance {
         this.publish(
           sender,
           [],
-          String(dead.activity.context ?? "urn:afp:thread:local"),
+          String(dead.activity.context ?? `${this.config.origin}/threads/local`),
           "internal",
           (envelope) =>
             createError(envelope, {

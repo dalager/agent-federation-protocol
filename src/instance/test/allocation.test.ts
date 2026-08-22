@@ -68,7 +68,7 @@ const WINDOW = { opens: "2026-08-17T09:00:00.000Z", closes: "2026-08-17T09:10:00
 function announceOn(allocator: Allocator, hubActor: string, rule: { name: string; params: never }) {
   allocator.announce({
     taskId: "https://hub.test/tasks/t1",
-    thread: "urn:afp:thread:t1",
+    thread: "https://hub.test/threads/t1",
     hub: hubActor,
     capability: "afp:cap:x",
     content: "do t1",
@@ -171,7 +171,7 @@ describe("P3 admission: sealed bids, windows, and the estimator wall", () => {
       nonce: "n-1",
     });
     const commit = (actor: string, commitment: string, published: string) =>
-      allocator.onCommit({ id: `c-${actor}`, type: "afp:bidCommit", actor, object: "https://hub.test/tasks/t1", published, "afp:commitment": commitment });
+      allocator.onCommit({ id: `c-${actor}`, type: "afp:BidCommit", actor, object: "https://hub.test/tasks/t1", published, "afp:commitment": commitment });
 
     commit("https://a.test/a", commitmentOf(payload), "2026-08-17T09:01:00.000Z");
     commit("https://a.test/a", "sha256:free-option", "2026-08-17T09:02:00.000Z"); // second, differing — a free option
@@ -208,7 +208,7 @@ describe("P3 admission: sealed bids, windows, and the estimator wall", () => {
         task: "https://hub.test/tasks/t1", bidder: actor, capabilityMatch: match,
         estimatedCost: { unit: "u", value: 10 }, estimatedLatency: "PT1M", nonce,
       });
-      allocator.onCommit({ id: `c-${actor}`, type: "afp:bidCommit", actor, object: "https://hub.test/tasks/t1", published: "2026-08-17T09:01:00.000Z", "afp:commitment": commitmentOf(payload) });
+      allocator.onCommit({ id: `c-${actor}`, type: "afp:BidCommit", actor, object: "https://hub.test/tasks/t1", published: "2026-08-17T09:01:00.000Z", "afp:commitment": commitmentOf(payload) });
       allocator.onReveal({ id: `r-${actor}`, type: "afp:BidReveal", actor, object: payload, published: "2026-08-17T09:10:05.000Z" });
     }
     jumpTo("2026-08-17T09:10:10.000Z");
@@ -235,7 +235,7 @@ describe("P3 admission: sealed bids, windows, and the estimator wall", () => {
     const allocator = new Allocator(hub);
     allocator.announce({
       taskId: "https://hub.test/tasks/t1",
-      thread: "urn:afp:thread:t1",
+      thread: "https://hub.test/threads/t1",
       hub: hub.actorId,
       capability: "afp:cap:x",
       content: "do t1",
@@ -250,7 +250,7 @@ describe("P3 admission: sealed bids, windows, and the estimator wall", () => {
       task: "https://hub.test/tasks/t1", bidder: "https://a.test/a", capabilityMatch: 80,
       estimatedCost: { unit: "u", value: 10 }, estimatedLatency: "PT1M", nonce: "n",
     });
-    allocator.onCommit({ id: "c", type: "afp:bidCommit", actor: "https://a.test/a", object: "https://hub.test/tasks/t1", published: "2026-08-17T09:01:00.000Z", "afp:commitment": commitmentOf(payload) });
+    allocator.onCommit({ id: "c", type: "afp:BidCommit", actor: "https://a.test/a", object: "https://hub.test/tasks/t1", published: "2026-08-17T09:01:00.000Z", "afp:commitment": commitmentOf(payload) });
     allocator.onReveal({ id: "r", type: "afp:BidReveal", actor: "https://a.test/a", object: payload, published: "2026-08-17T09:10:05.000Z" });
 
     assert.equal(allocator.closeAuction("https://hub.test/tasks/t1", "2026-08-17T09:20:00.000Z"), null);
@@ -410,13 +410,13 @@ describe("divergence-decay reputation (ADR-0004)", () => {
     ];
     const withRep = runRule(
       { name: "ranking", params: { weights: { capabilityMatch: 1, reputation: 1 } } as never },
-      "urn:afp:task:rep",
+      "https://hub.test/tasks/rep",
       bids,
     );
     assert.deepEqual(withRep?.performers, ["X"], "126 beats 110 once standing counts");
     const withoutRep = runRule(
       { name: "ranking", params: { weights: { capabilityMatch: 1 } } as never },
-      "urn:afp:task:rep",
+      "https://hub.test/tasks/rep",
       bids,
     );
     assert.deepEqual(withoutRep?.performers, ["Y"], "without the weight, raw capabilityMatch decides");

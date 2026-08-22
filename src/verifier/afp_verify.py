@@ -7,7 +7,7 @@ network. It is a deliberately independent second implementation of the record
 format (ADR-0001) — if it disagrees with the writer, that disagreement is the
 finding rather than a nuisance.
 
-    python3 afp_verify.py <export-dir> [--thread urn:afp:thread:...] [-v]
+    python3 afp_verify.py <export-dir> [--thread https://example.org/threads/...] [-v]
 
 Exit status is 0 only if every check passes.
 

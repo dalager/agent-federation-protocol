@@ -107,7 +107,7 @@ describe("ADR-0006 gate: the action policy and the performer wall replay end to 
     const { instance, config, clock, hub, hubKeys } = setup();
     const transport = hubTransport(hub, instance.localTransport(), (target) => instance.nameOf(target) !== null);
     for (const name of AGENTS) {
-      instance.publishAsInstance([hub.actorId], "urn:afp:thread:enroll", "hub", (envelope: Envelope) =>
+      instance.publishAsInstance([hub.actorId], `${config.origin}/threads/enroll`, "hub", (envelope: Envelope) =>
         enroll(envelope, {
           agent: instance.actorId(name),
           hub: hub.actorId,
@@ -156,7 +156,7 @@ describe("ADR-0006 gate: the action policy and the performer wall replay end to 
         payloads.push({ name, payload });
         await hub.receive(
           publish(instance, hub, name, thread, {
-            type: "afp:bidCommit",
+            type: "afp:BidCommit",
             object: taskId,
             "afp:hub": hub.actorId,
             "afp:commitment": commitmentOf(payload),
@@ -173,8 +173,8 @@ describe("ADR-0006 gate: the action policy and the performer wall replay end to 
     };
 
     // --- The triage auction pins the action policy; m1 wins.
-    const t1 = "urn:afp:task:triage-1";
-    const t1Thread = "urn:afp:thread:triage-1";
+    const t1 = `${config.origin}/tasks/triage-1`;
+    const t1Thread = `${config.origin}/threads/triage-1`;
     const award1 = await runAuction(t1, t1Thread, [{ name: "m1", match: 90 }, { name: "m2", match: 50 }], {
       actionPolicy: POLICY,
     });
@@ -185,7 +185,7 @@ describe("ADR-0006 gate: the action policy and the performer wall replay end to 
     const synthesis = publish(instance, hub, "m1", t1Thread, {
       type: "Create",
       object: {
-        id: "urn:afp:synthesis:triage-1",
+        id: `${config.origin}/syntheses/triage-1`,
         type: "afp:Synthesis",
         "afp:award": award1Object.id,
         "afp:method": "triage",
@@ -217,7 +217,7 @@ describe("ADR-0006 gate: the action policy and the performer wall replay end to 
     publish(instance, hub, "m1", t1Thread, {
       type: "Create",
       object: {
-        id: "urn:afp:result:triage-1",
+        id: `${config.origin}/results/triage-1`,
         type: "afp:Result",
         "afp:correlationId": "triage-1",
         content: "triage complete — see the Synthesis",
@@ -226,12 +226,12 @@ describe("ADR-0006 gate: the action policy and the performer wall replay end to 
     });
 
     // --- The review auction excludes t1's performer: m1's commit is refused.
-    const t2 = "urn:afp:task:review-1";
+    const t2 = `${config.origin}/tasks/review-1`;
     assert.throws(
       () =>
         hub.allocation.announce({
-          taskId: "urn:afp:task:bad",
-          thread: "urn:afp:thread:bad",
+          taskId: `${config.origin}/tasks/bad`,
+          thread: `${config.origin}/threads/bad`,
           hub: hub.actorId,
           capability: "afp:cap:fix",
           content: "x",
@@ -241,11 +241,11 @@ describe("ADR-0006 gate: the action policy and the performer wall replay end to 
           answerSufficiency: {} as never,
           estimatorPolicy: "exclude",
           estimators: [],
-          excludePerformersOf: ["urn:afp:task:never-awarded"],
+          excludePerformersOf: [`${config.origin}/tasks/never-awarded`],
         }),
       /no Award to exclude performers of/,
     );
-    const award2 = await runAuction(t2, "urn:afp:thread:review-1", [{ name: "m1", match: 95 }, { name: "m2", match: 40 }], {
+    const award2 = await runAuction(t2, `${config.origin}/threads/review-1`, [{ name: "m1", match: 95 }, { name: "m2", match: 40 }], {
       excludePerformersOf: [t1],
     });
     assert.deepEqual(
@@ -259,7 +259,7 @@ describe("ADR-0006 gate: the action policy and the performer wall replay end to 
     );
 
     // --- Export; the independent verifier passes the whole binding.
-    instance.publishAsInstance([], "urn:afp:thread:roster", "public", (envelope: Envelope) =>
+    instance.publishAsInstance([], `${config.origin}/threads/roster`, "public", (envelope: Envelope) =>
       vouch(envelope, { agent: hub.actorId, capabilities: ["afp:cap:hub"], keyCustody: "self" }),
     );
     const exported = exportBundle(instance, config.exportDir, [hub]);
@@ -326,7 +326,7 @@ describe("ADR-0006 gate: the action policy and the performer wall replay end to 
     const ghostExclusion = mutate(hubOutbox, (outbox) => {
       for (const activity of outbox.orderedItems) {
         const object = activity.object as Record<string, unknown> | undefined;
-        if (object?.type === "afp:Task" && object.id === t2) object["afp:excludePerformersOf"] = ["urn:afp:task:ghost"];
+        if (object?.type === "afp:Task" && object.id === t2) object["afp:excludePerformersOf"] = [`${config.origin}/tasks/ghost`];
       }
     });
     assert.notEqual(ghostExclusion.code, 0);

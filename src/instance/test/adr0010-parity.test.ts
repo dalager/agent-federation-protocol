@@ -66,7 +66,7 @@ describe("ADR-0010 gate: the auction root and the direct root mean the same thin
     } = setupWithHub(AUCTION_AGENTS, "screening-auction");
     const transport = hubTransport(hub, auctionInstance.localTransport(), (target) => auctionInstance.nameOf(target) !== null);
     for (const name of AUCTION_AGENTS) {
-      auctionInstance.publishAsInstance([hub.actorId], "urn:afp:thread:enroll", "hub", (envelope: HubEnvelope) =>
+      auctionInstance.publishAsInstance([hub.actorId], `${auctionConfig.origin}/threads/enroll`, "hub", (envelope: HubEnvelope) =>
         enroll(envelope, {
           agent: auctionInstance.actorId(name),
           hub: hub.actorId,
@@ -77,8 +77,8 @@ describe("ADR-0010 gate: the auction root and the direct root mean the same thin
     }
     await auctionInstance.run(transport);
 
-    const thread = "urn:afp:thread:screen-auction";
-    const taskId = "urn:afp:task:screen-auction";
+    const thread = `${auctionConfig.origin}/threads/screen-auction`;
+    const taskId = `${auctionConfig.origin}/tasks/screen-auction`;
     const window = { opens: auctionClock.now().toISOString(), closes: new Date(auctionClock.now().getTime() + 600_000).toISOString() };
     hub.allocation.announce({
       taskId,
@@ -120,7 +120,7 @@ describe("ADR-0010 gate: the auction root and the direct root mean the same thin
           context: envelope.thread,
           "afp:visibility": envelope.visibility,
           ...(envelope.prevActivity !== null ? { "afp:prevActivity": envelope.prevActivity } : {}),
-          type: "afp:bidCommit",
+          type: "afp:BidCommit",
           object: taskId,
           "afp:hub": hub.actorId,
           "afp:commitment": commitmentOf(payload),
@@ -156,12 +156,12 @@ describe("ADR-0010 gate: the auction root and the direct root mean the same thin
     // ADR's leg-partition check explicitly steps aside for).
     const results = bids.map(({ name }) =>
       auctionInstance.publish(name, [], thread, "parties", (envelope) =>
-        createResult(envelope, { resultId: `urn:afp:result:auction-${name}`, correlationId: `screen-auction-${name}`, content: "clean record" }),
+        createResult(envelope, { resultId: `${auctionConfig.origin}/results/auction-${name}`, correlationId: `screen-auction-${name}`, content: "clean record" }),
       ),
     );
     const synthesis = auctionInstance.publish(synthesizerName, [], thread, "parties", (envelope) =>
       createSynthesis(envelope, {
-        synthesisId: "urn:afp:synthesis:screen-auction",
+        synthesisId: `${auctionConfig.origin}/syntheses/screen-auction`,
         award: awardObject.id as string,
         method: "panel",
         answer: "cleared for onboarding",
@@ -179,7 +179,7 @@ describe("ADR-0010 gate: the auction root and the direct root mean the same thin
       ...actionStamp("advance", synthesisDigest, { policy: POLICY, category: "afp:screen-ok" }),
     });
 
-    auctionInstance.publishAsInstance([], "urn:afp:thread:roster", "public", (envelope: HubEnvelope) =>
+    auctionInstance.publishAsInstance([], `${auctionConfig.origin}/threads/roster`, "public", (envelope: HubEnvelope) =>
       vouch(envelope, { agent: hub.actorId, capabilities: ["afp:cap:hub"], keyCustody: "self" }),
     );
     const auctionExported = exportBundle(auctionInstance, auctionConfig.exportDir, [hub]);
@@ -192,7 +192,7 @@ describe("ADR-0010 gate: the auction root and the direct root mean the same thin
     // --- Root 2: the direct flow — the same claim, no auction underneath.
     const DIRECT_AGENTS = ["coordinator", "s1"] as const;
     const { instance: directInstance, config: directConfig } = setupPlain(DIRECT_AGENTS);
-    const directThread = "urn:afp:thread:screen-auction-parity";
+    const directThread = `${directConfig.origin}/threads/screen-auction-parity`;
     const directCoordinatorId = directInstance.actorId("coordinator");
     const directPins: TaskPins = {
       actionPolicy: POLICY,
@@ -209,11 +209,11 @@ describe("ADR-0010 gate: the auction root and the direct root mean the same thin
       pins: directPins,
     });
     const directResult = directInstance.publish("s1", [], directThread, "parties", (envelope) =>
-      createResult(envelope, { resultId: "urn:afp:result:direct-parity", correlationId: "leg-s1", content: "clean record" }),
+      createResult(envelope, { resultId: `${directConfig.origin}/results/direct-parity`, correlationId: "leg-s1", content: "clean record" }),
     );
     const directSynthesis = directInstance.publish("coordinator", [], directThread, "parties", (envelope) =>
       createSynthesis(envelope, {
-        synthesisId: "urn:afp:synthesis:screen-auction-parity",
+        synthesisId: `${directConfig.origin}/syntheses/screen-auction-parity`,
         method: "panel",
         answer: "cleared for onboarding",
         confidence: 88,
@@ -226,7 +226,7 @@ describe("ADR-0010 gate: the auction root and the direct root mean the same thin
     const directSynthesisDigest = digestOf(directSynthesis.activity);
     publish(directInstance, "coordinator", [], directThread, {
       type: "afp:Act",
-      object: "urn:afp:task:screen-auction-parity",
+      object: `${directConfig.origin}/tasks/screen-auction-parity`,
       ...actionStamp("advance", directSynthesisDigest, { policy: POLICY, category: "afp:screen-ok" }),
     });
     const directExported = exportBundle(directInstance, directConfig.exportDir);

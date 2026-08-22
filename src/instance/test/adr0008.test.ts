@@ -117,10 +117,10 @@ describe("ADR-0008 gate: two instances, one boundary, over real HTTP", () => {
         expires,
       });
 
-      const alphaOffer = alpha.instance.publishAsInstance([beta.actorId], "urn:afp:thread:fed", "parties", (envelope: Envelope) =>
+      const alphaOffer = alpha.instance.publishAsInstance([beta.actorId], `${alpha.origin}/threads/fed`, "parties", (envelope: Envelope) =>
         offerAgreement(envelope, object),
       );
-      const alphaCreate = alpha.instance.publishAsInstance([beta.actorId], "urn:afp:thread:fed", "parties", (envelope: Envelope) =>
+      const alphaCreate = alpha.instance.publishAsInstance([beta.actorId], `${alpha.origin}/threads/fed`, "parties", (envelope: Envelope) =>
         createAgreement(envelope, object),
       );
       alpha.federation.recordOwnCreate(object, alphaCreate.activity);
@@ -131,7 +131,7 @@ describe("ADR-0008 gate: two instances, one boundary, over real HTTP", () => {
 
       await alpha.instance.run(boundaryTransport(alpha, clock)); // Offer + Create cross the wire
 
-      const betaCreate = beta.instance.publishAsInstance([alpha.actorId], "urn:afp:thread:fed", "parties", (envelope: Envelope) =>
+      const betaCreate = beta.instance.publishAsInstance([alpha.actorId], `${beta.origin}/threads/fed`, "parties", (envelope: Envelope) =>
         createAgreement(envelope, object),
       );
       beta.federation.recordOwnCreate(object, betaCreate.activity);
@@ -141,7 +141,7 @@ describe("ADR-0008 gate: two instances, one boundary, over real HTTP", () => {
       assert.equal(beta.federation.activeAgreementsWith(alpha.actorId).length, 1, "beta holds both Creates");
 
       // --- Mallory probes: validly signed, party to nothing.
-      const probe = mallory.instance.publish("m-probe", [beta.instance.actorId("b-assessor")], "urn:afp:thread:probe", "parties", (envelope: Envelope) => ({
+      const probe = mallory.instance.publish("m-probe", [beta.instance.actorId("b-assessor")], `${mallory.origin}/threads/probe`, "parties", (envelope: Envelope) => ({
         "@context": ["https://www.w3.org/ns/activitystreams", "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"],
         id: envelope.activityId,
         type: "Offer",
@@ -151,7 +151,7 @@ describe("ADR-0008 gate: two instances, one boundary, over real HTTP", () => {
         context: envelope.thread,
         "afp:visibility": envelope.visibility,
         ...(envelope.prevActivity !== null ? { "afp:prevActivity": envelope.prevActivity } : {}),
-        object: { id: "urn:afp:task:probe", type: "afp:Task", "afp:capability": "afp:cap:assess", "afp:correlationId": "probe" },
+        object: { id: `${mallory.origin}/tasks/probe`, type: "afp:Task", "afp:capability": "afp:cap:assess", "afp:correlationId": "probe" },
       }));
       const probeDelivery = boundaryTransport(mallory, clock);
       await assert.rejects(
@@ -181,7 +181,7 @@ describe("ADR-0008 gate: two instances, one boundary, over real HTTP", () => {
       assert.equal(actorDoc.status, 200, "actor documents stay public — the bootstrap");
 
       // --- Direct delegation: the P1 flow with a firewall in it.
-      const offer = alpha.instance.publish("a-lead", [beta.instance.actorId("b-assessor")], "urn:afp:thread:sub-1", "parties", (envelope: Envelope) => ({
+      const offer = alpha.instance.publish("a-lead", [beta.instance.actorId("b-assessor")], `${alpha.origin}/threads/sub-1`, "parties", (envelope: Envelope) => ({
         "@context": ["https://www.w3.org/ns/activitystreams", "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"],
         id: envelope.activityId,
         type: "Offer",
@@ -192,7 +192,7 @@ describe("ADR-0008 gate: two instances, one boundary, over real HTTP", () => {
         "afp:visibility": envelope.visibility,
         ...(envelope.prevActivity !== null ? { "afp:prevActivity": envelope.prevActivity } : {}),
         object: {
-          id: "urn:afp:task:sub-1",
+          id: `${alpha.origin}/tasks/sub-1`,
           type: "afp:Task",
           "afp:capability": "afp:cap:assess",
           "afp:correlationId": "sub-1",
@@ -204,7 +204,7 @@ describe("ADR-0008 gate: two instances, one boundary, over real HTTP", () => {
       await beta.instance.run(boundaryTransport(beta, clock));
       await alpha.instance.run(boundaryTransport(alpha, clock));
 
-      const alphaSeen = alpha.instance.outbox.byThread("urn:afp:thread:sub-1");
+      const alphaSeen = alpha.instance.outbox.byThread(`${alpha.origin}/threads/sub-1`);
       assert.ok(alphaSeen.length >= 1, "the delegation is on alpha's record");
       assert.ok(offer);
 
@@ -219,7 +219,7 @@ describe("ADR-0008 gate: two instances, one boundary, over real HTTP", () => {
 
       // --- Expiry stalls new work…
       clock.jumpTo(new Date(new Date(expires).getTime() + 1000).toISOString());
-      const lateOffer = alpha.instance.publish("a-lead", [beta.instance.actorId("b-assessor")], "urn:afp:thread:sub-2", "parties", (envelope: Envelope) => ({
+      const lateOffer = alpha.instance.publish("a-lead", [beta.instance.actorId("b-assessor")], `${alpha.origin}/threads/sub-2`, "parties", (envelope: Envelope) => ({
         "@context": ["https://www.w3.org/ns/activitystreams", "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"],
         id: envelope.activityId,
         type: "Offer",
@@ -229,7 +229,7 @@ describe("ADR-0008 gate: two instances, one boundary, over real HTTP", () => {
         context: envelope.thread,
         "afp:visibility": envelope.visibility,
         ...(envelope.prevActivity !== null ? { "afp:prevActivity": envelope.prevActivity } : {}),
-        object: { id: "urn:afp:task:sub-2", type: "afp:Task", "afp:capability": "afp:cap:assess", "afp:correlationId": "sub-2" },
+        object: { id: `${alpha.origin}/tasks/sub-2`, type: "afp:Task", "afp:capability": "afp:cap:assess", "afp:correlationId": "sub-2" },
       }));
       await assert.rejects(
         () => boundaryTransport(alpha, clock).deliver(beta.instance.actorId("b-assessor"), lateOffer.activity),
@@ -250,7 +250,7 @@ describe("ADR-0008 gate: two instances, one boundary, over real HTTP", () => {
 
       // --- Defederate: expiry now plus a deny-list entry; even the handshake closes.
       beta.federation.denylist(mallory.actorId, "probing");
-      const malloryHandshake = mallory.instance.publishAsInstance([beta.actorId], "urn:afp:thread:fed", "parties", (envelope: Envelope) =>
+      const malloryHandshake = mallory.instance.publishAsInstance([beta.actorId], `${mallory.origin}/threads/fed`, "parties", (envelope: Envelope) =>
         createAgreement(envelope, agreementObject({ parties: [mallory.actorId, beta.actorId], grants: [], expires })),
       );
       await assert.rejects(

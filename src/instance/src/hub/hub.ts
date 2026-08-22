@@ -476,7 +476,7 @@ export class Hub {
     // Allocation (ADR-0003 Decision 1): commits, reveals, declines and award
     // Accepts route to the allocator beside the hub. Each handler ignores
     // activities that reference no open auction of ours.
-    if (type === "afp:bidCommit") return this.allocation.onCommit(activity);
+    if (type === "afp:BidCommit") return this.allocation.onCommit(activity);
     if (type === "afp:BidReveal") return this.allocation.onReveal(activity);
     if (type === "Reject") {
       // A Reject may decline a round's proposal (ADR-0014 Decision 4) or an
@@ -778,7 +778,7 @@ export class Hub {
       .activitiesBehind(this.hubId, remote)
       .map((id) => this.resolveActivity(id))
       .filter((a): a is { [key: string]: JsonValue } => a !== null);
-    this.emit([String(activity.actor ?? "")], String(activity.context ?? "urn:afp:thread:anti-entropy"), "hub", (envelope) =>
+    this.emit([String(activity.actor ?? "")], String(activity.context ?? `${this.origin}/threads/anti-entropy`), "hub", (envelope) =>
       acceptStateDeltas(envelope, { hub: this.hubIdentity, inReplyTo: String(activity.id), activities: missing }),
     );
   }
@@ -807,7 +807,7 @@ export class Hub {
   }
 
   /** Open one anti-entropy round toward `target`: an emitted `Offer{afp:Digest}` over this replica's counts. */
-  offerSync(target: string, thread = "urn:afp:thread:anti-entropy"): OutboxEntry {
+  offerSync(target: string, thread = `${this.origin}/threads/anti-entropy`): OutboxEntry {
     return this.emit([target], thread, "hub", (envelope) =>
       offerDigest(envelope, { hub: this.hubIdentity, versionVectors: this.syncVector() }),
     );
@@ -1000,7 +1000,7 @@ export class Hub {
   /** `afp:Freeze` — suspend new work; existing rounds may still close. */
   freeze(reason: string): OutboxEntry {
     this.status = "frozen";
-    return this.emit([], "urn:afp:thread:hub-lifecycle", "hub", (envelope) => freezeHub(envelope, this.actorId, reason));
+    return this.emit([], `${this.origin}/threads/hub-lifecycle`, "hub", (envelope) => freezeHub(envelope, this.actorId, reason));
   }
 
   /** `afp:Archive` — terminal, read-only close with canonical CRDT state hashes (07). */
@@ -1019,7 +1019,7 @@ export class Hub {
     const stateHashes: Record<string, string> = Object.fromEntries(
       Object.entries(state).map(([key, value]) => [key, digestOf(value as never)]),
     );
-    return this.emit([], "urn:afp:thread:hub-lifecycle", "hub", (envelope) =>
+    return this.emit([], `${this.origin}/threads/hub-lifecycle`, "hub", (envelope) =>
       archiveHub(envelope, { hub: this.actorId, reason, stateHashes, state }),
     );
   }

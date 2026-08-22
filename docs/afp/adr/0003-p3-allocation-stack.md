@@ -20,7 +20,7 @@ matches its commitment hash"):
 
 | Requirement | Stack consequence |
 |---|---|
-| Sealed bids: `afp:bidCommit` → `afp:BidReveal` | A commitment is a digest over the canonicalized bid payload — JCS + SHA-256 already exist (P1); **no new crypto** |
+| Sealed bids: `afp:BidCommit` → `afp:BidReveal` | A commitment is a digest over the canonicalized bid payload — JCS + SHA-256 already exist (P1); **no new crypto** |
 | Published, deterministic selection rules, both families | Pure functions from the revealed bid set to a performer set, named + parameterized in the Announce; independently reimplemented in the verifier |
 | Deterministic tie-break | `hash(taskId \|\| bidderId)` as a protocol constant — same digest primitive |
 | Award timeout → Reauction | The P1 delivery queue's timeout sweep pattern, applied to awards |
@@ -43,7 +43,7 @@ is new tables in the same SQLite file, mirroring how P2 added rounds.
 
 ### 2. Commitments: digest over the canonicalized bid, nothing fancier
 
-`afp:bidCommit` carries `afp:commitment = sha256(JCS(bid payload))` — the digest and
+`afp:BidCommit` carries `afp:commitment = sha256(JCS(bid payload))` — the digest and
 canonicalization P1 already ships. The reveal is the full signed `afp:Bid`; verification
 is recomputing the digest and comparing. No threshold/blind-signature machinery —
 commit-reveal deters sniping, not cryptanalysis (03 "Sniping and lying, honestly
@@ -123,7 +123,7 @@ itself is recorded in the hub's announce, so a verifier can check it was applied
 Mirroring P2's three checks, the P3 replay adds:
 
 1. **Commitment integrity** — every revealed bid's digest matches its prior in-window
-   `afp:bidCommit`. Failures, separately named: a reveal whose digest matches no commit;
+   `afp:BidCommit`. Failures, separately named: a reveal whose digest matches no commit;
    a reveal whose commit landed outside the bid window; and an Award naming a bid whose
    reveal is absent from the export — an unproducible winning bid is the auction's
    version of *"a counted vote you cannot produce."*

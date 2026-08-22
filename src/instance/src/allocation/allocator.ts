@@ -1,7 +1,7 @@
 /**
  * The allocation engine, living beside the hub — same process, same dispatch
  * port, same SQLite file (ADR-0003 Decision 1). The hub routes inbound
- * `afp:bidCommit` / `afp:BidReveal` / `Reject` / `Accept` activities here and
+ * `afp:BidCommit` / `afp:BidReveal` / `Reject` / `Accept` activities here and
  * lends its outbox for everything outbound, so allocation records ride the
  * hub's signed chain like every round before them.
  */
@@ -279,7 +279,7 @@ export class Allocator {
   // ---------------------------------------------------------------- admission
 
   /**
-   * `afp:bidCommit` admission (Decisions 2 and 6): enrolled bidder, inside the
+   * `afp:BidCommit` admission (Decisions 2 and 6): enrolled bidder, inside the
    * window, not an excluded estimator, first commit per bidder wins. Every
    * rejection is audit-logged — enforcement that leaves no trace is policy
    * nobody can verify was applied.

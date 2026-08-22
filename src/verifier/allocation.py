@@ -265,7 +265,7 @@ def check_award(report, award_activity: dict, all_activities: list[dict]) -> Non
     roles = enrolled_roles(hub_actor, all_activities)
     members = {agent for agent, role in roles.items() if role == "member"}
 
-    commits = [a for a in all_activities if a.get("type") == "afp:bidCommit" and a.get("object") == task_id]
+    commits = [a for a in all_activities if a.get("type") == "afp:BidCommit" and a.get("object") == task_id]
     reveals = [
         a
         for a in all_activities
@@ -325,7 +325,7 @@ def check_award(report, award_activity: dict, all_activities: list[dict]) -> Non
         f"award: {label} every reveal matches a prior commitment",
         not unmatched_reveals,
         "" if not unmatched_reveals else
-        "afp:BidReveal with no matching afp:bidCommit by the same actor: "
+        "afp:BidReveal with no matching afp:BidCommit by the same actor: "
         + ", ".join(unmatched_reveals),
     )
     report.record(
@@ -354,7 +354,7 @@ def check_award(report, award_activity: dict, all_activities: list[dict]) -> Non
         f"award: {label} matching commitments land inside the bid window",
         not outside_window,
         "" if not outside_window else
-        "afp:bidCommit published outside the announced [opens, closes) window: "
+        "afp:BidCommit published outside the announced [opens, closes) window: "
         + ", ".join(outside_window),
     )
 

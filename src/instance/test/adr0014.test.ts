@@ -49,7 +49,7 @@ async function threeParty() {
   // own transport path so `roleOf`/`membershipProof` answer from real state —
   // the same shape every hub-bearing gate test uses.
   const transport = hubTransport(hub, instance.localTransport(), (target) => instance.nameOf(target) !== null);
-  instance.publishAsInstance([hub.actorId], "urn:afp:thread:enroll", "hub", (envelope) =>
+  instance.publishAsInstance([hub.actorId], `${instance.config.origin}/threads/enroll`, "hub", (envelope) =>
     enroll(envelope, {
       agent: agentId,
       hub: hub.actorId,
@@ -197,21 +197,21 @@ describe("ADR-0014 Decisions 2-4: the mesh edge, the hub's head, and the two sil
     const { hub, hubKeys } = testHub(instance, AGENTS, "bridge");
     const transport = hubTransport(hub, instance.localTransport(), (t) => instance.nameOf(t) !== null);
     for (const name of AGENTS) {
-      instance.publishAsInstance([hub.actorId], "urn:afp:thread:enroll", "hub", (envelope) =>
+      instance.publishAsInstance([hub.actorId], `${config.origin}/threads/enroll`, "hub", (envelope) =>
         enroll(envelope, { agent: instance.actorId(name), hub: hub.actorId, capabilities: [CAPABILITY], hubKey: hubKeys.get(name)!.keyId }),
       );
     }
     await instance.run(transport);
-    const thread = "urn:afp:thread:round-1";
+    const thread = `${config.origin}/threads/round-1`;
 
-    const proposal = hub.proposeRound({ round: "urn:afp:round:r1", thread, question: "sev-1?", options: ["yes", "no"] });
+    const proposal = hub.proposeRound({ round: `${config.origin}/rounds/r1`, thread, question: "sev-1?", options: ["yes", "no"] });
     const proposalId = String((proposal.activity.object as Record<string, unknown>).id);
     const snapshot = String((proposal.activity.object as Record<string, unknown>)["afp:quorumSnapshot"]);
 
     // a1 votes; a2 declines on the record; a3 says nothing at all.
     await hub.receive(
       instance.publish("a1", [hub.actorId], thread, "hub", (envelope) =>
-        castVote(envelope, { voteId: `${envelope.actor}/votes/r1`, round: "urn:afp:round:r1", proposalHash: proposal.digest, quorumSnapshot: snapshot, value: "yes" }),
+        castVote(envelope, { voteId: `${envelope.actor}/votes/r1`, round: `${config.origin}/rounds/r1`, proposalHash: proposal.digest, quorumSnapshot: snapshot, value: "yes" }),
       ).activity,
     );
     await hub.receive(
@@ -231,7 +231,7 @@ describe("ADR-0014 Decisions 2-4: the mesh edge, the hub's head, and the two sil
         }) as never,
       ).activity,
     );
-    const decision = hub.closeRound("urn:afp:round:r1");
+    const decision = hub.closeRound(`${config.origin}/rounds/r1`);
     const record = decision.activity.object as Record<string, unknown>;
     const uncounted = record["afp:uncounted"] as { agent: string; "afp:status": string }[];
     assert.equal(uncounted.length, 2);
@@ -241,10 +241,10 @@ describe("ADR-0014 Decisions 2-4: the mesh edge, the hub's head, and the two sil
 
     // Terminal outcome, vouch the hub, export, verify.
     instance.publish("a1", [], thread, "parties", (envelope) =>
-      createResult(envelope, { resultId: "urn:afp:result:r1", correlationId: "r1", content: "closed" }),
+      createResult(envelope, { resultId: `${config.origin}/results/r1`, correlationId: "r1", content: "closed" }),
     );
     const { vouch } = await import("../src/ap/activities.ts");
-    instance.publishAsInstance([], "urn:afp:thread:roster", "public", (envelope) =>
+    instance.publishAsInstance([], `${config.origin}/threads/roster`, "public", (envelope) =>
       vouch(envelope, { agent: hub.actorId, capabilities: ["afp:cap:hub"], keyCustody: "self" }),
     );
     const exported = exportBundle(instance, config.exportDir, [hub]);
@@ -282,22 +282,22 @@ describe("ADR-0014 Decisions 2-4: the mesh edge, the hub's head, and the two sil
     // thread, and the reconciliation on the hub's return is ADR-0011's
     // priorThread edge, not new machinery.
     const { instance, config } = testInstance(["a1", "a2"], CAPABILITY);
-    const mesh = "urn:afp:thread:mesh-during-partition";
+    const mesh = `${config.origin}/threads/mesh-during-partition`;
     instance.delegate({ from: "a1", to: "a2", capability: CAPABILITY, content: "carry on pairwise", thread: mesh, correlationId: "m1" });
     instance.publish("a2", [], mesh, "parties", (envelope) =>
-      createResult(envelope, { resultId: "urn:afp:result:m1", correlationId: "m1", content: "done off-hub" }),
+      createResult(envelope, { resultId: `${config.origin}/results/m1`, correlationId: "m1", content: "done off-hub" }),
     );
     instance.delegate({
       from: "a1", to: "a2", capability: CAPABILITY,
       content: "reconcile: the mesh stretch, rejoining the bridge",
-      thread: "urn:afp:thread:bridge-resumed", correlationId: "m2",
+      thread: `${config.origin}/threads/bridge-resumed`, correlationId: "m2",
       priorThread: mesh,
     });
-    instance.publish("a2", [], "urn:afp:thread:bridge-resumed", "parties", (envelope) =>
-      createResult(envelope, { resultId: "urn:afp:result:m2", correlationId: "m2", content: "rejoined" }),
+    instance.publish("a2", [], `${config.origin}/threads/bridge-resumed`, "parties", (envelope) =>
+      createResult(envelope, { resultId: `${config.origin}/results/m2`, correlationId: "m2", content: "rejoined" }),
     );
     exportBundle(instance, config.exportDir);
-    const clean = runVerifier(VERIFIER, config.exportDir, "urn:afp:thread:bridge-resumed", ["--verbose"]);
+    const clean = runVerifier(VERIFIER, config.exportDir, `${config.origin}/threads/bridge-resumed`, ["--verbose"]);
     assert.equal(clean.code, 0, `verifier failed:\n${clean.output}`);
     assert.match(clean.output, /afp:priorThread resolves to a closed, unretracted thread/);
     instance.close();
@@ -307,19 +307,19 @@ describe("ADR-0014 Decisions 2-4: the mesh edge, the hub's head, and the two sil
     const t = await threeParty();
     assert.equal(t.hub.chainHead(), null, "a hub that never emitted has no head — receiving is not emitting");
     // The head exists once the hub authors something of its own.
-    t.hub.proposeRound({ round: "urn:afp:round:anchor-me", thread: "urn:afp:thread:enroll", question: "q?", options: ["yes", "no"] });
+    const config = (t.instance as unknown as { config: { origin: string; exportDir: string } }).config;
+    t.hub.proposeRound({ round: `${config.origin}/rounds/anchor-me`, thread: `${config.origin}/threads/enroll`, question: "q?", options: ["yes", "no"] });
     const head = t.hub.chainHead();
     assert.ok(head, "a hub that has emitted has a head to anchor");
     const { vouch } = await import("../src/ap/activities.ts");
-    t.instance.publishAsInstance([], "urn:afp:thread:roster", "public", (envelope) =>
+    t.instance.publishAsInstance([], `${config.origin}/threads/roster`, "public", (envelope) =>
       vouch(envelope, { agent: t.hub.actorId, capabilities: ["afp:cap:hub"], keyCustody: "self" }),
     );
-    const config = (t.instance as unknown as { config: { exportDir: string } }).config;
     exportBundle(t.instance, config.exportDir, [t.hub], undefined, undefined, {
       retentionDuty: { horizon: "P5Y", basis: "test" },
       anchors: [{ actor: t.hub.actorId, head: t.hub.chainHead()!, instant: NOW.toISOString(), anchorRef: "https://ts.example/1" }],
     });
-    const clean = runVerifier(VERIFIER, config.exportDir, "urn:afp:thread:enroll", ["--verbose"]);
+    const clean = runVerifier(VERIFIER, config.exportDir, `${config.origin}/threads/enroll`, ["--verbose"]);
     assert.equal(clean.code, 0, `verifier failed:\n${clean.output}`);
     assert.match(clean.output, /retention: every anchor names a chain head this bundle contains/);
     t.instance.close();

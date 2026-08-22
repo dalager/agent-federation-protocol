@@ -106,7 +106,7 @@ describe("ADR-0004 acceptance gate: roles, assets, reputation replay end to end"
 
     // --- Enrollment with roles.
     for (const name of AGENTS) {
-      instance.publishAsInstance([hub.actorId], "urn:afp:thread:enroll", "hub", (envelope: Envelope) =>
+      instance.publishAsInstance([hub.actorId], `${config.origin}/threads/enroll`, "hub", (envelope: Envelope) =>
         enroll(envelope, {
           agent: instance.actorId(name),
           hub: hub.actorId,
@@ -120,9 +120,9 @@ describe("ADR-0004 acceptance gate: roles, assets, reputation replay end to end"
     const [m1, m2, req] = ["m1", "m2", "req"].map((n) => instance.actorId(n));
 
     // --- A member registers an asset (Decision 2).
-    const assetId = "urn:afp:asset:broker-adapter";
+    const assetId = `${config.origin}/assets/broker-adapter`;
     await hub.receive(
-      publish(instance, hub, "m1", "urn:afp:thread:assets", () => ({
+      publish(instance, hub, "m1", `${config.origin}/threads/assets`, () => ({
         type: "Update",
         "afp:hub": hub.actorId,
         object: {
@@ -137,7 +137,7 @@ describe("ADR-0004 acceptance gate: roles, assets, reputation replay end to end"
     assert.ok(hub.assetOf(assetId, "3.1"));
 
     // --- The requester announces its own ask (Decision 1's inbound path).
-    const reqThread = "urn:afp:thread:req-ask";
+    const reqThread = `${config.origin}/threads/req-ask`;
     const reqWindow = {
       opens: clock.now().toISOString(),
       closes: new Date(clock.now().getTime() + 600_000).toISOString(),
@@ -146,7 +146,7 @@ describe("ADR-0004 acceptance gate: roles, assets, reputation replay end to end"
       publish(instance, hub, "req", reqThread, () => ({
         type: "Announce",
         object: {
-          id: "urn:afp:task:req-ask",
+          id: `${config.origin}/tasks/req-ask`,
           type: "afp:Task",
           "afp:hub": hub.actorId,
           "afp:capability": "afp:cap:build",
@@ -160,11 +160,11 @@ describe("ADR-0004 acceptance gate: roles, assets, reputation replay end to end"
         },
       })).activity,
     );
-    assert.equal(hub.allocation.auction("urn:afp:task:req-ask")!.requester, req);
+    assert.equal(hub.allocation.auction(`${config.origin}/tasks/req-ask`)!.requester, req);
 
     // --- Auction 1 (no reputation): m1's bid claims asset reuse under the seal.
-    const t1 = "urn:afp:task:t1";
-    const t1Thread = "urn:afp:thread:t1";
+    const t1 = `${config.origin}/tasks/t1`;
+    const t1Thread = `${config.origin}/threads/t1`;
     const window1 = {
       opens: clock.now().toISOString(),
       closes: new Date(clock.now().getTime() + 600_000).toISOString(),
@@ -197,7 +197,7 @@ describe("ADR-0004 acceptance gate: roles, assets, reputation replay end to end"
       payloads.set(`${task}:${name}`, payload);
       await hub.receive(
         publish(instance, hub, name, thread, () => ({
-          type: "afp:bidCommit",
+          type: "afp:BidCommit",
           object: task,
           "afp:hub": hub.actorId,
           "afp:commitment": commitmentOf(payload),
@@ -239,8 +239,8 @@ describe("ADR-0004 acceptance gate: roles, assets, reputation replay end to end"
     );
 
     // --- Auction 2 pins divergence-decay: standing flips the outcome.
-    const t2 = "urn:afp:task:t2";
-    const t2Thread = "urn:afp:thread:t2";
+    const t2 = `${config.origin}/tasks/t2`;
+    const t2Thread = `${config.origin}/threads/t2`;
     const window2 = {
       opens: clock.now().toISOString(),
       closes: new Date(clock.now().getTime() + 600_000).toISOString(),
@@ -278,7 +278,7 @@ describe("ADR-0004 acceptance gate: roles, assets, reputation replay end to end"
     publish(instance, hub, "m2", t2Thread, (envelope) => ({
       type: "Create",
       object: {
-        id: "urn:afp:result:t2",
+        id: `${config.origin}/results/t2`,
         type: "afp:Result",
         "afp:correlationId": "t2",
         content: "delivered",
@@ -291,8 +291,8 @@ describe("ADR-0004 acceptance gate: roles, assets, reputation replay end to end"
     assert.throws(
       () =>
         hub.allocation.announce({
-          taskId: "urn:afp:task:bad",
-          thread: "urn:afp:thread:bad",
+          taskId: `${config.origin}/tasks/bad`,
+          thread: `${config.origin}/threads/bad`,
           hub: hub.actorId,
           capability: "afp:cap:build",
           content: "x",
@@ -307,7 +307,7 @@ describe("ADR-0004 acceptance gate: roles, assets, reputation replay end to end"
     );
 
     // --- Export the real record and hand it to the independent verifier.
-    instance.publishAsInstance([], "urn:afp:thread:roster", "public", (envelope: Envelope) =>
+    instance.publishAsInstance([], `${config.origin}/threads/roster`, "public", (envelope: Envelope) =>
       vouch(envelope, { agent: hub.actorId, capabilities: ["afp:cap:hub"], keyCustody: "self" }),
     );
     const exported = exportBundle(instance, config.exportDir, [hub]);

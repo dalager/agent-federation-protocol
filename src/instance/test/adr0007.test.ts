@@ -100,7 +100,7 @@ describe("ADR-0007 gate: supersession replays end to end", () => {
     const { instance, config, clock, hub, hubKeys } = setup();
     const transport = hubTransport(hub, instance.localTransport(), (target) => instance.nameOf(target) !== null);
     for (const name of AGENTS) {
-      instance.publishAsInstance([hub.actorId], "urn:afp:thread:enroll", "hub", (envelope: Envelope) =>
+      instance.publishAsInstance([hub.actorId], `${config.origin}/threads/enroll`, "hub", (envelope: Envelope) =>
         enroll(envelope, {
           agent: instance.actorId(name),
           hub: hub.actorId,
@@ -113,8 +113,8 @@ describe("ADR-0007 gate: supersession replays end to end", () => {
     const deps = instance.actorId("deps");
 
     // --- The question with consequences: policy pinned, auction run.
-    const task = "urn:afp:task:libfoo-v4";
-    const thread = "urn:afp:thread:libfoo-v4";
+    const task = `${config.origin}/tasks/libfoo-v4`;
+    const thread = `${config.origin}/threads/libfoo-v4`;
     const window = { opens: clock.now().toISOString(), closes: new Date(clock.now().getTime() + 600_000).toISOString() };
     hub.allocation.announce({
       taskId: task,
@@ -135,7 +135,7 @@ describe("ADR-0007 gate: supersession replays end to end", () => {
       estimatedCost: { unit: "EUR", value: 100 }, estimatedLatency: "PT1H", nonce: "n-1",
     });
     await hub.receive(publish(instance, hub, "deps", thread, {
-      type: "afp:bidCommit", object: task, "afp:hub": hub.actorId, "afp:commitment": commitmentOf(payload),
+      type: "afp:BidCommit", object: task, "afp:hub": hub.actorId, "afp:commitment": commitmentOf(payload),
     }).activity);
     clock.jumpTo(new Date(new Date(window.closes).getTime() + 1000).toISOString());
     await hub.receive(publish(instance, hub, "deps", thread, {
@@ -145,7 +145,7 @@ describe("ADR-0007 gate: supersession replays end to end", () => {
     const awardId = (award.activity.object as Record<string, unknown>).id;
 
     // --- The `safe` answer, ratified by a round whose outcome names it.
-    const synthesisId = "urn:afp:synthesis:libfoo-v4-safe";
+    const synthesisId = `${config.origin}/syntheses/libfoo-v4-safe`;
     const safeSynthesis = publish(instance, hub, "deps", thread, {
       type: "Create",
       object: {
@@ -172,7 +172,7 @@ describe("ADR-0007 gate: supersession replays end to end", () => {
       }
       return hub.closeRound(round, priorQuorumSnapshot ? { priorQuorumSnapshot } : undefined);
     };
-    const decision1 = await ratify("urn:afp:round:ratify-safe", synthesisId);
+    const decision1 = await ratify(`${config.origin}/rounds/ratify-safe`, synthesisId);
     assert.equal((decision1.activity.object as Record<string, unknown>)["afp:outcome"], synthesisId);
 
     // --- The world moves: the advisory, hash-bound and admissible.
@@ -184,7 +184,7 @@ describe("ADR-0007 gate: supersession replays end to end", () => {
     const advisoryDigest = digestOf(advisory.activity);
 
     // --- The retraction: supersedes + parity round + disposition.
-    const unsafeId = "urn:afp:synthesis:libfoo-v4-unsafe";
+    const unsafeId = `${config.origin}/syntheses/libfoo-v4-unsafe`;
     const unsafeSynthesis = publish(instance, hub, "deps", thread, {
       type: "Create",
       object: {
@@ -196,7 +196,7 @@ describe("ADR-0007 gate: supersession replays end to end", () => {
     });
     const unsafeDigest = digestOf(unsafeSynthesis.activity);
     const safeSnapshot = String((decision1.activity.object as Record<string, unknown>)["afp:quorumSnapshot"]);
-    await ratify("urn:afp:round:ratify-unsafe", unsafeId, safeSnapshot);
+    await ratify(`${config.origin}/rounds/ratify-unsafe`, unsafeId, safeSnapshot);
 
     publish(instance, hub, "api", thread, {
       type: "afp:Act",
@@ -207,9 +207,9 @@ describe("ADR-0007 gate: supersession replays end to end", () => {
     // Terminal outcome for the thread, then export and verify.
     publish(instance, hub, "deps", thread, {
       type: "Create",
-      object: { id: "urn:afp:result:libfoo-v4", type: "afp:Result", "afp:correlationId": "libfoo-v4", content: "assessment revised — see the superseding Synthesis", attributedTo: deps },
+      object: { id: `${config.origin}/results/libfoo-v4`, type: "afp:Result", "afp:correlationId": "libfoo-v4", content: "assessment revised — see the superseding Synthesis", attributedTo: deps },
     });
-    instance.publishAsInstance([], "urn:afp:thread:roster", "public", (envelope: Envelope) =>
+    instance.publishAsInstance([], `${config.origin}/threads/roster`, "public", (envelope: Envelope) =>
       vouch(envelope, { agent: hub.actorId, capabilities: ["afp:cap:hub"], keyCustody: "self" }),
     );
     const exported = exportBundle(instance, config.exportDir, [hub]);

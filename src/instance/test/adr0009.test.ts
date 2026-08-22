@@ -108,19 +108,20 @@ describe("ADR-0009 gate: two exports, one engagement", () => {
         grants: [{ "afp:grantType": "direct-delegation", "afp:capabilities": ["afp:cap:assess"] }],
         expires,
       });
-      const alphaCreate = alpha.instance.publishAsInstance([beta.actorId], "urn:afp:thread:fed", "parties", (envelope: Envelope) =>
+      const fedThread = `${alpha.instance.config.origin}/threads/fed`;
+      const alphaCreate = alpha.instance.publishAsInstance([beta.actorId], fedThread, "parties", (envelope: Envelope) =>
         createAgreement(envelope, object),
       );
       alpha.federation.recordOwnCreate(object, alphaCreate.activity);
       await alpha.instance.run(alpha.transport);
-      const betaCreate = beta.instance.publishAsInstance([alpha.actorId], "urn:afp:thread:fed", "parties", (envelope: Envelope) =>
+      const betaCreate = beta.instance.publishAsInstance([alpha.actorId], fedThread, "parties", (envelope: Envelope) =>
         createAgreement(envelope, object),
       );
       beta.federation.recordOwnCreate(object, betaCreate.activity);
       await beta.instance.run(beta.transport);
 
       // --- Bravo does something that is none of Alpha's business.
-      beta.instance.publish("b-assessor", [], "urn:afp:thread:other-client", "internal", (envelope: Envelope) => ({
+      beta.instance.publish("b-assessor", [], `${beta.instance.config.origin}/threads/other-client`, "internal", (envelope: Envelope) => ({
         "@context": ["https://www.w3.org/ns/activitystreams", "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"],
         id: envelope.activityId,
         type: "Create",
@@ -130,11 +131,12 @@ describe("ADR-0009 gate: two exports, one engagement", () => {
         context: envelope.thread,
         "afp:visibility": envelope.visibility,
         ...(envelope.prevActivity !== null ? { "afp:prevActivity": envelope.prevActivity } : {}),
-        object: { id: "urn:afp:result:other", type: "afp:Result", "afp:correlationId": "other", content: "confidential", attributedTo: envelope.actor },
+        object: { id: `${beta.instance.config.origin}/results/other`, type: "afp:Result", "afp:correlationId": "other", content: "confidential", attributedTo: envelope.actor },
       }));
 
       // --- The delegation, and Bravo's engagement-thread answer.
-      const offer = alpha.instance.publish("a-lead", [beta.instance.actorId("b-assessor")], "urn:afp:thread:sub-1", "parties", (envelope: Envelope) => ({
+      const subThread = `${alpha.instance.config.origin}/threads/sub-1`;
+      const offer = alpha.instance.publish("a-lead", [beta.instance.actorId("b-assessor")], subThread, "parties", (envelope: Envelope) => ({
         "@context": ["https://www.w3.org/ns/activitystreams", "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"],
         id: envelope.activityId,
         type: "Offer",
@@ -144,7 +146,7 @@ describe("ADR-0009 gate: two exports, one engagement", () => {
         context: envelope.thread,
         "afp:visibility": envelope.visibility,
         ...(envelope.prevActivity !== null ? { "afp:prevActivity": envelope.prevActivity } : {}),
-        object: { id: "urn:afp:task:sub-1", type: "afp:Task", "afp:capability": "afp:cap:assess", "afp:correlationId": "sub-1", content: "assess it" },
+        object: { id: `${alpha.instance.config.origin}/tasks/sub-1`, type: "afp:Task", "afp:capability": "afp:cap:assess", "afp:correlationId": "sub-1", content: "assess it" },
       }));
       assert.ok(offer);
       await alpha.instance.run(alpha.transport);
@@ -155,7 +157,7 @@ describe("ADR-0009 gate: two exports, one engagement", () => {
       // the handshake, its other client's thread as stubs, its uninvolved
       // agent as a declared omission.
       for (const op of [alpha, beta]) {
-        op.instance.publishAsInstance([], "urn:afp:thread:roster", "public", (envelope: Envelope) =>
+        op.instance.publishAsInstance([], `${op.instance.config.origin}/threads/roster`, "public", (envelope: Envelope) =>
           vouch(envelope, { agent: `${op.actorId}`, capabilities: ["afp:cap:hub"], keyCustody: "self" }),
         );
       }
@@ -166,7 +168,7 @@ describe("ADR-0009 gate: two exports, one engagement", () => {
         beta.instance,
         betaDir,
         [],
-        { threads: ["urn:afp:thread:fed", "urn:afp:thread:sub-1", "urn:afp:thread:roster"], omitActors: ["b-private"] },
+        { threads: [fedThread, subThread, `${beta.instance.config.origin}/threads/roster`], omitActors: ["b-private"] },
         beta.federation,
       );
 
@@ -255,11 +257,11 @@ describe("ADR-0009: a scope covers the whole bundle, received bytes included", (
     const { testInstance } = await import("./helpers.ts");
     const { exportBundle } = await import("../src/export.ts");
     const { instance, config } = testInstance(["writer"], "afp:cap:assess");
-    const inThread = "urn:afp:thread:this-client";
-    const outThread = "urn:afp:thread:other-client";
+    const inThread = `${config.origin}/threads/this-client`;
+    const outThread = `${config.origin}/threads/other-client`;
     instance.publish("writer", [], inThread, "parties", (envelope) =>
       // any local activity, so the scoped thread is non-empty
-      ({ ...envelope, id: envelope.activityId, type: "Create", actor: envelope.actor, to: [], published: envelope.published, context: envelope.thread, "afp:visibility": "parties", object: { id: "urn:afp:result:x", type: "afp:Result", "afp:correlationId": "x", content: "ok", attributedTo: envelope.actor } }) as never,
+      ({ ...envelope, id: envelope.activityId, type: "Create", actor: envelope.actor, to: [], published: envelope.published, context: envelope.thread, "afp:visibility": "parties", object: { id: `${config.origin}/results/x`, type: "afp:Result", "afp:correlationId": "x", content: "ok", attributedTo: envelope.actor } }) as never,
     );
 
     const received = {

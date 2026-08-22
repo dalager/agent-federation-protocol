@@ -72,7 +72,7 @@ const mutate = (
 describe("ADR-0011 gate: the irreversible world, on the record", () => {
   it("an irrevocable consequence is disposed of by annotation — and only where declared", async () => {
     const { instance, config } = testInstance(["coordinator", "s1", "port"], CAPABILITY);
-    const thread = "urn:afp:thread:irrevocable-1";
+    const thread = `${config.origin}/threads/irrevocable-1`;
     const coordinatorId = instance.actorId("coordinator");
 
     // The writer refuses a declaration that names no action — the dead clause
@@ -98,11 +98,11 @@ describe("ADR-0011 gate: the irreversible world, on the record", () => {
       pins,
     });
     const result = instance.publish("s1", [], thread, "parties", (envelope) =>
-      createResult(envelope, { resultId: "urn:afp:result:leg-1", correlationId: "leg-1", content: "clears" }),
+      createResult(envelope, { resultId: `${config.origin}/results/leg-1`, correlationId: "leg-1", content: "clears" }),
     );
     const first = instance.publish("coordinator", [], thread, "parties", (envelope) =>
       createSynthesis(envelope, {
-        synthesisId: "urn:afp:synthesis:irrevocable-first",
+        synthesisId: `${config.origin}/syntheses/irrevocable-first`,
         method: "assessment",
         answer: "clear to advance",
         confidence: 90,
@@ -117,7 +117,7 @@ describe("ADR-0011 gate: the irreversible world, on the record", () => {
     // The irrevocable act: the application moves, and the world keeps it.
     const advance = publish(instance, "port", thread, {
       type: "afp:Act",
-      object: "urn:afp:task:irrevocable-1",
+      object: `${config.origin}/tasks/irrevocable-1`,
       ...actionStamp("advance", firstDigest, { policy: POLICY, category: "assess-ok" }),
     });
     const advanceDigest = digestOf(advance.activity);
@@ -125,7 +125,7 @@ describe("ADR-0011 gate: the irreversible world, on the record", () => {
     // The answer is withdrawn — but the transition cannot be.
     const revised = instance.publish("coordinator", [], thread, "parties", (envelope) =>
       createSynthesis(envelope, {
-        synthesisId: "urn:afp:synthesis:irrevocable-revised",
+        synthesisId: `${config.origin}/syntheses/irrevocable-revised`,
         method: "assessment",
         answer: "the schedule evidence was misread — this should have been flagged",
         confidence: 95,
@@ -149,7 +149,7 @@ describe("ADR-0011 gate: the irreversible world, on the record", () => {
     );
     publish(instance, "port", thread, {
       type: "afp:Act",
-      object: "urn:afp:task:irrevocable-1",
+      object: `${config.origin}/tasks/irrevocable-1`,
       ...annotateStamp(advanceDigest, revisedDigest, {
         irrevocableActions: [...IRREVOCABLE],
         disposedAction: "advance",
@@ -204,7 +204,7 @@ describe("ADR-0011 gate: the irreversible world, on the record", () => {
     const { hub, hubKeys } = testHub(instance, AGENTS, "assess");
     const transport = hubTransport(hub, instance.localTransport(), (t) => instance.nameOf(t) !== null);
     for (const name of AGENTS) {
-      instance.publishAsInstance([hub.actorId], "urn:afp:thread:enroll", "hub", (envelope: HubEnvelope) =>
+      instance.publishAsInstance([hub.actorId], `${config.origin}/threads/enroll`, "hub", (envelope: HubEnvelope) =>
         enroll(envelope, {
           agent: instance.actorId(name),
           hub: hub.actorId,
@@ -216,8 +216,8 @@ describe("ADR-0011 gate: the irreversible world, on the record", () => {
     await instance.run(transport);
     const deps = instance.actorId("deps");
 
-    const task = "urn:afp:task:panel-1";
-    const thread = "urn:afp:thread:panel-1";
+    const task = `${config.origin}/tasks/panel-1`;
+    const thread = `${config.origin}/threads/panel-1`;
     const window = { opens: clock.now().toISOString(), closes: new Date(clock.now().getTime() + 600_000).toISOString() };
     hub.allocation.announce({
       taskId: task,
@@ -248,7 +248,7 @@ describe("ADR-0011 gate: the irreversible world, on the record", () => {
     const toHub = (name: string, body: { [key: string]: unknown }) =>
       publishRaw(instance, name, [hub.actorId], thread, "hub", body);
     await hub.receive(
-      toHub("deps", { type: "afp:bidCommit", object: task, "afp:hub": hub.actorId, "afp:commitment": commitmentOf(payload) }).activity,
+      toHub("deps", { type: "afp:BidCommit", object: task, "afp:hub": hub.actorId, "afp:commitment": commitmentOf(payload) }).activity,
     );
     clock.jumpTo(new Date(new Date(window.closes).getTime() + 1000).toISOString());
     await hub.receive(toHub("deps", { type: "afp:BidReveal", object: { ...payload }, "afp:hub": hub.actorId }).activity);
@@ -293,10 +293,10 @@ describe("ADR-0011 gate: the irreversible world, on the record", () => {
       return { decision: hub.closeRound(round, { priorQuorumSnapshot }), snapshot };
     };
 
-    const firstId = "urn:afp:synthesis:panel-first";
+    const firstId = `${config.origin}/syntheses/panel-first`;
     const first = synth(firstId, "assess-ok", "clear to advance");
     const firstDigest = digestOf(first.activity);
-    const ratified = await ratify("urn:afp:round:panel-first", firstId);
+    const ratified = await ratify(`${config.origin}/rounds/panel-first`, firstId);
 
     const act = toHub("api", {
       type: "afp:Act",
@@ -304,7 +304,7 @@ describe("ADR-0011 gate: the irreversible world, on the record", () => {
       ...actionStamp("advance", firstDigest, { policy: POLICY, category: "assess-ok" }),
     });
 
-    const revisedId = "urn:afp:synthesis:panel-revised";
+    const revisedId = `${config.origin}/syntheses/panel-revised`;
     // ADR-0011 Decision 3: the superseding answer is emitted by `sec`, NOT the
     // pinned synthesizer. It is admissible only because the round below
     // ratifies it — a convened quorum outranks a pin written before the panel
@@ -312,7 +312,7 @@ describe("ADR-0011 gate: the irreversible world, on the record", () => {
     // by simply being somebody else.
     const revised = synth(revisedId, "assess-flag", "the evidence was misread", firstDigest, "sec");
     const revisedDigest = digestOf(revised.activity);
-    await ratify("urn:afp:round:panel-revised", revisedId, ratified.snapshot);
+    await ratify(`${config.origin}/rounds/panel-revised`, revisedId, ratified.snapshot);
 
     toHub("api", {
       type: "afp:Act",
@@ -325,14 +325,14 @@ describe("ADR-0011 gate: the irreversible world, on the record", () => {
     toHub("deps", {
       type: "Create",
       object: {
-        id: "urn:afp:result:panel-1",
+        id: `${config.origin}/results/panel-1`,
         type: "afp:Result",
         "afp:correlationId": "panel-1",
         content: "assessment revised",
         attributedTo: deps,
       },
     });
-    instance.publishAsInstance([], "urn:afp:thread:roster", "public", (envelope: HubEnvelope) =>
+    instance.publishAsInstance([], `${config.origin}/threads/roster`, "public", (envelope: HubEnvelope) =>
       vouch(envelope, { agent: hub.actorId, capabilities: ["afp:cap:hub"], keyCustody: "self" }),
     );
 
@@ -390,8 +390,8 @@ describe("ADR-0011 gate: the irreversible world, on the record", () => {
 
   it("a new ask names the closed thread it continues, and the edge resolves", async () => {
     const { instance, config } = testInstance(["coordinator", "s1"], CAPABILITY);
-    const closed = "urn:afp:thread:prior-closed";
-    const continued = "urn:afp:thread:prior-continued";
+    const closed = `${config.origin}/threads/prior-closed`;
+    const continued = `${config.origin}/threads/prior-continued`;
     const pins: TaskPins = { actionPolicy: POLICY, synthesizer: instance.actorId("coordinator") };
 
     // --- The first ask, answered and closed.
@@ -405,11 +405,11 @@ describe("ADR-0011 gate: the irreversible world, on the record", () => {
       pins,
     });
     const priorResult = instance.publish("s1", [], closed, "parties", (envelope) =>
-      createResult(envelope, { resultId: "urn:afp:result:prior", correlationId: "prior-leg", content: "flagged" }),
+      createResult(envelope, { resultId: `${config.origin}/results/prior`, correlationId: "prior-leg", content: "flagged" }),
     );
     instance.publish("coordinator", [], closed, "parties", (envelope) =>
       createSynthesis(envelope, {
-        synthesisId: "urn:afp:synthesis:prior",
+        synthesisId: `${config.origin}/syntheses/prior`,
         method: "assessment",
         answer: "flagged for review",
         confidence: 80,
@@ -434,7 +434,7 @@ describe("ADR-0011 gate: the irreversible world, on the record", () => {
       priorThread: closed,
     });
     instance.publish("s1", [], continued, "parties", (envelope) =>
-      createResult(envelope, { resultId: "urn:afp:result:continued", correlationId: "continued-leg", content: "clears" }),
+      createResult(envelope, { resultId: `${config.origin}/results/continued`, correlationId: "continued-leg", content: "clears" }),
     );
 
     const exported = exportBundle(instance, config.exportDir);

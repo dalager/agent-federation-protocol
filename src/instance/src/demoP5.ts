@@ -43,7 +43,6 @@ import { jumpClock } from "./demoP3.ts";
 import type { JsonValue } from "./crypto/jcs.ts";
 
 const CAPABILITY = "afp:cap:assess";
-const FED = "urn:afp:thread:fed";
 
 function freePort(): Promise<number> {
   return new Promise((resolvePort, reject) => {
@@ -173,6 +172,8 @@ export async function runP5Demo(options: { rootDir?: string; exportRoot?: string
   const bravo = await operator("bravo", ["s-noc"], rootDir, exportRoot, clock);
   const gamma = await operator("gamma", ["e-noc", "e-watcher"], rootDir, exportRoot, clock);
 
+  const FED = `${alpha.origin}/threads/fed`;
+
   // --- Alpha hosts the bridge, served at a real inbox (ADR-0016 Decision 1).
   const docCache = new Map<string, { [key: string]: JsonValue }>();
   const cacheDoc = async (url: string): Promise<void> => {
@@ -239,7 +240,7 @@ export async function runP5Demo(options: { rootDir?: string; exportRoot?: string
   ] as const) {
     for (const url of [op.actorId, op.instance.actorId(agent)]) await cacheDoc(url);
     const hubKey = loadOrCreateHubKeyPair(op.config.keyDir, agent, op.instance.actorId(agent), "bridge");
-    const entry = op.instance.publishAsInstance([hub.actorId], "urn:afp:thread:enroll", "hub", (envelope: Envelope) =>
+    const entry = op.instance.publishAsInstance([hub.actorId], `${alpha.origin}/threads/enroll`, "hub", (envelope: Envelope) =>
       enroll(envelope, { agent: op.instance.actorId(agent), hub: hub.actorId, capabilities: [CAPABILITY], hubKey: hubKey.keyId, role }),
     );
     if (op === alpha) await hub.receive(entry.activity);
@@ -247,14 +248,14 @@ export async function runP5Demo(options: { rootDir?: string; exportRoot?: string
   }
 
   // --- A round, voted across the boundary.
-  const incident = "urn:afp:thread:incident-9";
-  const proposal = hub.proposeRound({ round: "urn:afp:round:sev", thread: incident, question: "declare sev-1?", options: ["yes", "no"] });
+  const incident = `${alpha.origin}/threads/incident-9`;
+  const proposal = hub.proposeRound({ round: `${alpha.origin}/rounds/sev`, thread: incident, question: "declare sev-1?", options: ["yes", "no"] });
   const snapshot = String((proposal.activity.object as Record<string, unknown>)["afp:quorumSnapshot"]);
   const vote = (op: Operator, agent: string) =>
     op.instance.publish(agent, [hub.actorId], incident, "hub", (envelope) =>
       castVote(envelope, {
         voteId: `${envelope.actor}/votes/sev`,
-        round: "urn:afp:round:sev",
+        round: `${alpha.origin}/rounds/sev`,
         hub: hub.actorId,
         proposalHash: proposal.digest,
         quorumSnapshot: snapshot,
@@ -265,7 +266,7 @@ export async function runP5Demo(options: { rootDir?: string; exportRoot?: string
   // The write door, three ways (ADR-0016 Decision 2):
   // 1. an unenrolled agent under a valid operator — refused opaquely;
   const rogue = bravo.instance.publishAsInstance([hub.actorId], incident, "hub", (envelope: Envelope) =>
-    castVote(envelope, { voteId: `${envelope.actor}/votes/rogue`, round: "urn:afp:round:sev", hub: hub.actorId, proposalHash: proposal.digest, quorumSnapshot: snapshot, value: "yes" }),
+    castVote(envelope, { voteId: `${envelope.actor}/votes/rogue`, round: `${alpha.origin}/rounds/sev`, hub: hub.actorId, proposalHash: proposal.digest, quorumSnapshot: snapshot, value: "yes" }),
   );
   const rogueStatus = (await postToHubInbox(bravo, alpha.origin, rogue.activity, clock)).status;
   // 2. the same write waving s-noc's valid membership proof — refused just the same;
@@ -281,8 +282,8 @@ export async function runP5Demo(options: { rootDir?: string; exportRoot?: string
   await hub.receive(vote(alpha, "n-noc"));
   await postToHubInbox(bravo, alpha.origin, vote(bravo, "s-noc"), clock);
   await postToHubInbox(gamma, alpha.origin, vote(gamma, "e-noc"), clock);
-  const talliedVotes = hub.roundVotes("urn:afp:round:sev").length;
-  const decision = hub.closeRound("urn:afp:round:sev");
+  const talliedVotes = hub.roundVotes(`${alpha.origin}/rounds/sev`).length;
+  const decision = hub.closeRound(`${alpha.origin}/rounds/sev`);
   const uncountedRaw = ((decision.activity.object as Record<string, unknown>)["afp:uncounted"] ?? []) as {
     agent: string;
     "afp:status": string;
@@ -354,7 +355,7 @@ export async function runP5Demo(options: { rootDir?: string; exportRoot?: string
   const seatsAfterSecondPull = replica.members().length;
 
   // --- Kill the hub mid-task (the roadmap's P5 kill criterion).
-  const mesh = "urn:afp:thread:mesh-9";
+  const mesh = `${bravo.origin}/threads/mesh-9`;
   bravo.instance.publish("s-noc", [gamma.instance.actorId("e-noc")], mesh, "parties", (envelope: Envelope) =>
     offerTask(envelope, { taskId: `${envelope.actor}/tasks/m9`, capability: CAPABILITY, correlationId: "m9", content: "correlate our two views" }),
   );
@@ -379,7 +380,7 @@ export async function runP5Demo(options: { rootDir?: string; exportRoot?: string
   }
 
   // --- Exports: three case files, the hub host's including the bridge.
-  alpha.instance.publishAsInstance([], "urn:afp:thread:roster", "public", (envelope: Envelope) =>
+  alpha.instance.publishAsInstance([], `${alpha.origin}/threads/roster`, "public", (envelope: Envelope) =>
     vouch(envelope, { agent: hub.actorId, capabilities: ["afp:cap:hub"], keyCustody: "self" }),
   );
   const exports = {

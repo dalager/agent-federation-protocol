@@ -66,7 +66,7 @@ describe("ADR-0010 gate: pins on the direct Offer replay end to end", () => {
   it("the fan-out replays clean; each mutation fails its named pin/synthesis/action check", async () => {
     const AGENTS = ["coordinator", "s1", "s2", "s3", "s4", "helper"] as const;
     const { instance, config } = setupPlain(AGENTS);
-    const thread = "urn:afp:thread:screen-1";
+    const thread = `${config.origin}/threads/screen-1`;
     const coordinatorId = instance.actorId("coordinator");
 
     // A policy missing its non-answer key is not yet a policy — the writer
@@ -112,26 +112,26 @@ describe("ADR-0010 gate: pins on the direct Offer replay end to end", () => {
 
     const results = [
       instance.publish("s1", [], thread, "parties", (envelope) =>
-        createResult(envelope, { resultId: "urn:afp:result:leg-s1", correlationId: "leg-s1", content: "clean record" }),
+        createResult(envelope, { resultId: `${config.origin}/results/leg-s1`, correlationId: "leg-s1", content: "clean record" }),
       ),
       instance.publish("s2", [], thread, "parties", (envelope) =>
-        createResult(envelope, { resultId: "urn:afp:result:leg-s2", correlationId: "leg-s2", content: "clean record" }),
+        createResult(envelope, { resultId: `${config.origin}/results/leg-s2`, correlationId: "leg-s2", content: "clean record" }),
       ),
       instance.publish("s3", [], thread, "parties", (envelope) =>
-        createResult(envelope, { resultId: "urn:afp:result:leg-s3", correlationId: "leg-s3", content: "clean record" }),
+        createResult(envelope, { resultId: `${config.origin}/results/leg-s3`, correlationId: "leg-s3", content: "clean record" }),
       ),
       instance.publish("s4", [], thread, "parties", (envelope) =>
-        createResult(envelope, { resultId: "urn:afp:result:leg-s4", correlationId: "leg-s4", content: "clean record" }),
+        createResult(envelope, { resultId: `${config.origin}/results/leg-s4`, correlationId: "leg-s4", content: "clean record" }),
       ),
       instance.publish("helper", [], thread, "parties", (envelope) =>
-        createResult(envelope, { resultId: "urn:afp:result:leg-s1-sub", correlationId: "leg-s1-sub", content: "concurs" }),
+        createResult(envelope, { resultId: `${config.origin}/results/leg-s1-sub`, correlationId: "leg-s1-sub", content: "concurs" }),
       ),
     ];
 
     // --- The pinned synthesizer answers — no afp:award, the fallback root.
     const synthesis = instance.publish("coordinator", [], thread, "parties", (envelope) =>
       createSynthesis(envelope, {
-        synthesisId: "urn:afp:synthesis:screen-1",
+        synthesisId: `${config.origin}/syntheses/screen-1`,
         method: "panel",
         answer: "cleared for onboarding",
         confidence: 92,
@@ -146,7 +146,7 @@ describe("ADR-0010 gate: pins on the direct Offer replay end to end", () => {
     // --- The action: hash-bound, admissible under the pinned policy.
     publish(instance, "coordinator", [], thread, {
       type: "afp:Act",
-      object: "urn:afp:task:screen-1",
+      object: `${config.origin}/tasks/screen-1`,
       ...actionStamp("advance", synthesisDigest, { policy: POLICY, category: "afp:screen-ok" }),
     });
 
@@ -184,9 +184,9 @@ describe("ADR-0010 gate: pins on the direct Offer replay end to end", () => {
         (a) => (a.object as Record<string, unknown> | undefined)?.["afp:correlationId"] === "leg-s3",
       )!;
       const clone = JSON.parse(JSON.stringify(template));
-      clone.id = "urn:afp:coordinator/activities/9999";
+      clone.id = `${config.origin}/coordinator/activities/9999`;
       const object = clone.object as Record<string, unknown>;
-      object.id = "urn:afp:coordinator/tasks/leg-extra";
+      object.id = `${config.origin}/coordinator/tasks/leg-extra`;
       object["afp:correlationId"] = "leg-extra";
       delete object["afp:actionPolicy"];
       delete object["afp:answerSufficiency"];
@@ -261,7 +261,7 @@ describe("ADR-0010 gate: pins on the direct Offer replay end to end", () => {
     const { instance, config, clock, hub, hubKeys } = setupWithHub(AGENTS, "screening");
     const transport = hubTransport(hub, instance.localTransport(), (target) => instance.nameOf(target) !== null);
     for (const name of AGENTS) {
-      instance.publishAsInstance([hub.actorId], "urn:afp:thread:enroll", "hub", (envelope: HubEnvelope) =>
+      instance.publishAsInstance([hub.actorId], `${config.origin}/threads/enroll`, "hub", (envelope: HubEnvelope) =>
         enroll(envelope, {
           agent: instance.actorId(name),
           hub: hub.actorId,
@@ -272,7 +272,7 @@ describe("ADR-0010 gate: pins on the direct Offer replay end to end", () => {
     }
     await instance.run(transport);
 
-    const thread = "urn:afp:thread:screen-2";
+    const thread = `${config.origin}/threads/screen-2`;
     const coordinatorId = instance.actorId("coordinator");
     const pins: TaskPins = {
       actionPolicy: POLICY,
@@ -292,10 +292,10 @@ describe("ADR-0010 gate: pins on the direct Offer replay end to end", () => {
     }
     const results = (["s1", "s2", "s3", "s4"] as const).map((name) =>
       instance.publish(name, [], thread, "parties", (envelope) =>
-        createResult(envelope, { resultId: `urn:afp:result:hop-${name}`, correlationId: `leg-${name}`, content: "clean record" }),
+        createResult(envelope, { resultId: `${config.origin}/results/hop-${name}`, correlationId: `leg-${name}`, content: "clean record" }),
       ),
     );
-    const synthesisId = "urn:afp:synthesis:screen-2";
+    const synthesisId = `${config.origin}/syntheses/screen-2`;
     const synthesis = instance.publish("coordinator", [], thread, "parties", (envelope) =>
       createSynthesis(envelope, {
         synthesisId,
@@ -330,16 +330,16 @@ describe("ADR-0010 gate: pins on the direct Offer replay end to end", () => {
 
     // --- Case 6: afp:actsOn names a DecisionRecord whose afp:outcome names
     // the Synthesis — the one hop the verifier follows, and it resolves.
-    const decision1 = await ratify("urn:afp:round:ratify-screen-2", synthesisId);
+    const decision1 = await ratify(`${config.origin}/rounds/ratify-screen-2`, synthesisId);
     const decision1Id = (decision1.activity.object as Record<string, unknown>).id as string;
     const decision1Digest = digestOf(decision1.activity);
     publish(instance, "coordinator", [], thread, {
       type: "afp:Act",
-      object: "urn:afp:task:screen-2",
+      object: `${config.origin}/tasks/screen-2`,
       ...actionStamp("advance", decision1Digest, { policy: POLICY, category: "afp:screen-ok" }),
     });
 
-    instance.publishAsInstance([], "urn:afp:thread:roster", "public", (envelope: HubEnvelope) =>
+    instance.publishAsInstance([], `${config.origin}/threads/roster`, "public", (envelope: HubEnvelope) =>
       vouch(envelope, { agent: hub.actorId, capabilities: ["afp:cap:hub"], keyCustody: "self" }),
     );
     const exported = exportBundle(instance, config.exportDir, [hub]);
@@ -353,11 +353,11 @@ describe("ADR-0010 gate: pins on the direct Offer replay end to end", () => {
     // DecisionRecord, not a Synthesis — two hops never resolve. Built as its
     // own round in the same instance, exported and replayed separately so
     // the clean pass above stays clean.
-    const decision2 = await ratify("urn:afp:round:ratify-screen-2-hop2", decision1Id);
+    const decision2 = await ratify(`${config.origin}/rounds/ratify-screen-2-hop2`, decision1Id);
     const decision2Digest = digestOf(decision2.activity);
     publish(instance, "s1", [], thread, {
       type: "afp:Act",
-      object: "urn:afp:task:screen-2-hop2",
+      object: `${config.origin}/tasks/screen-2-hop2`,
       "afp:action": "advance",
       "afp:actsOn": decision2Digest,
     });
@@ -372,7 +372,7 @@ describe("ADR-0010 gate: pins on the direct Offer replay end to end", () => {
   it("a partial panel closes afp:no-verdict, declaring the leg it could not fill", async () => {
     const AGENTS = ["coordinator", "s1", "s2", "s3", "s4"] as const;
     const { instance, config } = setupPlain(AGENTS);
-    const thread = "urn:afp:thread:screen-3";
+    const thread = `${config.origin}/threads/screen-3`;
     const coordinatorId = instance.actorId("coordinator");
     const pins: TaskPins = {
       actionPolicy: POLICY,
@@ -394,12 +394,12 @@ describe("ADR-0010 gate: pins on the direct Offer replay end to end", () => {
     // with a typed Error instead of a Result.
     const results = (["s1", "s2", "s3"] as const).map((name) =>
       instance.publish(name, [], thread, "parties", (envelope) =>
-        createResult(envelope, { resultId: `urn:afp:result:partial-${name}`, correlationId: `leg-${name}`, content: "clean record" }),
+        createResult(envelope, { resultId: `${config.origin}/results/partial-${name}`, correlationId: `leg-${name}`, content: "clean record" }),
       ),
     );
     const errorS4 = instance.publish("s4", [], thread, "parties", (envelope) =>
       createError(envelope, {
-        errorId: "urn:afp:error:leg-s4",
+        errorId: `${config.origin}/errors/leg-s4`,
         correlationId: "leg-s4",
         reason: "screening brain failed to return a verdict",
         code: "afp:err:brain-failed",
@@ -408,7 +408,7 @@ describe("ADR-0010 gate: pins on the direct Offer replay end to end", () => {
 
     const synthesis = instance.publish("coordinator", [], thread, "parties", (envelope) =>
       createSynthesis(envelope, {
-        synthesisId: "urn:afp:synthesis:screen-3",
+        synthesisId: `${config.origin}/syntheses/screen-3`,
         method: "panel",
         answer: "panel could not reach a verdict on every seat",
         confidence: 40,
@@ -422,7 +422,7 @@ describe("ADR-0010 gate: pins on the direct Offer replay end to end", () => {
     const synthesisDigest = digestOf(synthesis.activity);
     publish(instance, "coordinator", [], thread, {
       type: "afp:Act",
-      object: "urn:afp:task:screen-3",
+      object: `${config.origin}/tasks/screen-3`,
       ...actionStamp("hold-for-review", synthesisDigest, { policy: POLICY, category: "afp:no-verdict" }),
     });
 
@@ -467,7 +467,7 @@ describe("ADR-0010 gate: pins on the direct Offer replay end to end", () => {
 describe("ADR-0010 Decision 5: an answer may not be disclosed without its pins", () => {
   it("a bundle whose pins were redacted out from under its answer fails by name", async () => {
     const { instance, config } = setupPlain(["coordinator", "s1"]);
-    const thread = "urn:afp:thread:redacted-pins";
+    const thread = `${config.origin}/threads/redacted-pins`;
     const pins: TaskPins = { actionPolicy: POLICY, synthesizer: instance.actorId("coordinator") };
 
     instance.delegate({
@@ -480,11 +480,11 @@ describe("ADR-0010 Decision 5: an answer may not be disclosed without its pins",
       pins,
     });
     const result = instance.publish("s1", [], thread, "parties", (envelope) =>
-      createResult(envelope, { resultId: "urn:afp:result:r", correlationId: "leg-r", content: "clears" }),
+      createResult(envelope, { resultId: `${config.origin}/results/r`, correlationId: "leg-r", content: "clears" }),
     );
     instance.publish("coordinator", [], thread, "parties", (envelope) =>
       createSynthesis(envelope, {
-        synthesisId: "urn:afp:synthesis:r",
+        synthesisId: `${config.origin}/syntheses/r`,
         method: "panel",
         answer: "cleared",
         confidence: 90,
@@ -523,7 +523,7 @@ describe("ADR-0010 Decision 5: an answer may not be disclosed without its pins",
     // absent, never on the pins being absent — otherwise it would fail every
     // unpinned P1 thread ever written, which is most of them.
     const { instance, config } = setupPlain(["coordinator", "s1"]);
-    const thread = "urn:afp:thread:unpinned";
+    const thread = `${config.origin}/threads/unpinned`;
     instance.delegate({
       from: "coordinator",
       to: "s1",
@@ -533,11 +533,11 @@ describe("ADR-0010 Decision 5: an answer may not be disclosed without its pins",
       correlationId: "leg-u",
     });
     const result = instance.publish("s1", [], thread, "parties", (envelope) =>
-      createResult(envelope, { resultId: "urn:afp:result:u", correlationId: "leg-u", content: "clears" }),
+      createResult(envelope, { resultId: `${config.origin}/results/u`, correlationId: "leg-u", content: "clears" }),
     );
     instance.publish("coordinator", [], thread, "parties", (envelope) =>
       createSynthesis(envelope, {
-        synthesisId: "urn:afp:synthesis:u",
+        synthesisId: `${config.origin}/syntheses/u`,
         method: "panel",
         answer: "cleared",
         confidence: 90,

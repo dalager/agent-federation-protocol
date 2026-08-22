@@ -102,7 +102,7 @@ describe("ADR-0017 Decision 3: spec-shaped delivery", () => {
     const { origin, instance, server, clock } = await serve();
     try {
       for (let i = 0; i < 120; i++) {
-        publishRaw(instance, "d3", [], "urn:afp:thread:d3-page", "public", { type: "Create", content: `item ${i}` });
+        publishRaw(instance, "d3", [], `${origin}/threads/d3-page`, "public", { type: "Create", content: `item ${i}` });
       }
       const collection = (await (await fetch(`${origin}/agents/d3/outbox`)).json()) as {
         totalItems: number;

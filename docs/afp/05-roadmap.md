@@ -66,7 +66,7 @@ Two agents, `writer` and `reviewer`, both instance-custody, wired in-process. A 
 the writer a brief with one source document attached. Then:
 
 ```
-writer  --Offer{Task: "review this draft"}-->  reviewer     context: urn:afp:thread:doc-1
+writer  --Offer{Task: "review this draft"}-->  reviewer     context: https://writer.example/threads/doc-1
         <--Accept--                                          correlationId: task-1
         <--Create{Result: critique}--
 writer  --Offer{Task: "review the revision"}-->  reviewer    correlationId: task-2

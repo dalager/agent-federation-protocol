@@ -79,7 +79,7 @@ describe("spec conformance — findings from the P1 review", () => {
     // "thinking" and "dead" are indistinguishable, so the delegator must decide.
     instance.delegate({
       from: "writer", to: "reviewer", capability: "afp:cap:review",
-      content: "review", thread: "urn:afp:thread:late", correlationId: "task-late",
+      content: "review", thread: `${config.origin}/threads/late`, correlationId: "task-late",
       deadline: "2020-01-01T00:00:00.000Z",
     });
 
