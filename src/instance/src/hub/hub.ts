@@ -13,7 +13,7 @@
 
 import type { KeyObject } from "node:crypto";
 import type { JsonValue } from "../crypto/jcs.ts";
-import { keyHistory, loadOrCreateKeyPair, publicKeyFromMultibase, type KeyHistoryEntry, type KeyPair } from "../crypto/keys.ts";
+import { keyHistory, loadOrCreateKeyPair, loadOrCreateTransportKeyPair, publicKeyFromMultibase, type KeyHistoryEntry, type KeyPair } from "../crypto/keys.ts";
 import { attachProof, digestOf, verifyProof } from "../crypto/proof.ts";
 import { instantMillis } from "../crypto/time.ts";
 import type { Db } from "../store/db.ts";
@@ -99,6 +99,7 @@ export class Hub {
   private readonly origin: string;
   private readonly instanceActorId: string;
   private readonly key: KeyPair;
+  private readonly transportKey: KeyPair;
   private readonly fetchActor: HubDeps["fetchActor"];
   private readonly resolveActivity: (activityId: string) => { [key: string]: JsonValue } | null;
   private readonly now: () => Date;
@@ -161,6 +162,7 @@ export class Hub {
     this.crdt = new CRDTStore(this.db);
     this.keyDir = deps.keyDir;
     this.key = loadOrCreateKeyPair(deps.keyDir, `hub-${deps.hubId}`, this.actorId);
+    this.transportKey = loadOrCreateTransportKeyPair(deps.keyDir, `hub-${deps.hubId}`, this.actorId);
     this.outbox = new Outbox(this.db);
     this.queue = new DeliveryQueue(this.db, deps.maxDeliveryAttempts, deps.backoffBaseMs);
     this.allocation = new Allocator({
@@ -226,7 +228,7 @@ export class Hub {
   }
 
   actorDocument(): ActorDocument {
-    return hubActor(this.origin, this.hubId, this.key, this.instanceActorId);
+    return hubActor(this.origin, this.hubId, this.key, this.instanceActorId, this.transportKey);
   }
 
   /**

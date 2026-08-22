@@ -13,8 +13,9 @@
  * Identity resolution (`resolveRequester`) is lifted from the inline block
  * in `handleInboxPost` (`federation/inbox.ts`), parameterized for a
  * body-less `GET`: keyId → controller's actor document (unauthenticated —
- * the bootstrap invariant, Decision 2) → matching `assertionMethod` key →
- * `verifyRequest`. Any failure anywhere in that chain yields an anonymous
+ * the bootstrap invariant, Decision 2) → matching transport key, resolved
+ * `authentication`-first with an `assertionMethod` fallback (ADR-0017
+ * Decision 4, R1; `resolveTransportKey.ts`) → `verifyRequest`. Any failure anywhere in that chain yields an anonymous
  * authorization, never an exception: a bad signature is a caller with fewer
  * rights, not an error condition.
  *
@@ -37,6 +38,7 @@ import { extractKeyId, verifyRequest, type RequestAuthHeaders } from "./httpSig.
 import { verifyProof } from "../crypto/proof.ts";
 import { instantMillis } from "../crypto/time.ts";
 import { admittingGrant, type ActivitySummary } from "./grants.ts";
+import { transportKeyFromDocument } from "./resolveTransportKey.ts";
 import { grantAdmits } from "./visibility.ts";
 
 /** The requesting agent, and the operator (instance) it resolves to via
@@ -94,23 +96,10 @@ async function resolveRequester(
   const controllerDoc = await deps.fetchDocument(controller);
   if (!controllerDoc) return null;
 
-  const resolvedKeys = new Map<string, KeyObject>();
-  const methods = Array.isArray(controllerDoc.assertionMethod) ? (controllerDoc.assertionMethod as JsonValue[]) : [];
-  for (const entry of methods) {
-    if (entry && typeof entry === "object" && !Array.isArray(entry)) {
-      const method = entry as { id?: JsonValue; publicKeyMultibase?: JsonValue };
-      if (method.id === keyId && typeof method.publicKeyMultibase === "string") {
-        try {
-          resolvedKeys.set(keyId, publicKeyFromMultibase(method.publicKeyMultibase));
-        } catch {
-          /* undecodable key: verification below fails on its own */
-        }
-      }
-    }
-  }
-  if (!resolvedKeys.has(keyId)) return null;
+  const resolvedKey = transportKeyFromDocument(controllerDoc, keyId);
+  if (!resolvedKey) return null;
 
-  const resolveKey = (id: string): KeyObject | null => resolvedKeys.get(id) ?? null;
+  const resolveKey = (id: string): KeyObject | null => (id === keyId ? resolvedKey : null);
   const verified = verifyRequest("GET", path, headers, "", resolveKey, deps.now());
   if (!verified.ok) return null;
 

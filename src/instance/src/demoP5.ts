@@ -101,8 +101,8 @@ async function operator(
   });
   await new Promise<void>((resolveListen) => server.listen(port, "127.0.0.1", resolveListen));
   const transport = httpTransport({
-    keyId: instance.key("@instance").keyId,
-    privateKey: instance.key("@instance").privateKey,
+    keyId: instance.transportKey("@instance").keyId,
+    privateKey: instance.transportKey("@instance").privateKey,
     now: () => clock.now(),
     isLocal: (target) => instance.nameOf(target) !== null || target === actorId,
     local: instance.localTransport(),
@@ -120,7 +120,7 @@ async function postToHubInbox(
 ): Promise<{ status: number; body: { [key: string]: JsonValue } }> {
   const path = "/hubs/bridge/inbox";
   const body = JSON.stringify(activity);
-  const key = op.instance.key("@instance");
+  const key = op.instance.transportKey("@instance");
   const signed = signRequest("POST", path, new URL(hubOrigin).host, body, key.keyId, key.privateKey, clock.now());
   const response = await fetch(`${hubOrigin}${path}`, {
     method: "POST",
@@ -337,8 +337,8 @@ export async function runP5Demo(options: { rootDir?: string; exportRoot?: string
 
   const seatsBefore = replica.members().length;
   const alphaHubTransport = httpTransport({
-    keyId: alpha.instance.key("@instance").keyId,
-    privateKey: alpha.instance.key("@instance").privateKey,
+    keyId: alpha.instance.transportKey("@instance").keyId,
+    privateKey: alpha.instance.transportKey("@instance").privateKey,
     now: () => clock.now(),
     isLocal: () => false,
     local: { name: "none", deliver: async () => {} },

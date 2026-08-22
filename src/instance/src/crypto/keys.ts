@@ -196,6 +196,22 @@ export function loadOrCreateHubKeyPair(
 }
 
 /**
+ * Load or create a transport keypair for `controller` (ADR-0017 Decision 4,
+ * R1): a second Ed25519 key, published under `authentication` rather than
+ * `assertionMethod`, that HTTP-signs requests instead of AS2 object proofs.
+ * File suffix keeps it out of the `assertionMethod` key's own file; the
+ * `keyId` follows the fragment R1 fixes so verifiers can tell the two apart.
+ */
+export function loadOrCreateTransportKeyPair(
+  keyDir: string,
+  name: string,
+  controller: string,
+): KeyPair {
+  const pair = loadOrCreateKeyPair(keyDir, `${name}--transport`, controller);
+  return { ...pair, keyId: `${controller}#transport-key` };
+}
+
+/**
  * Load the *currently active* keypair for `controller`, generating and
  * persisting an ordinal-1 key on first use.
  *

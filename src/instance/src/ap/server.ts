@@ -21,6 +21,7 @@ import type { AfpInstance } from "../instance.ts";
 import { handleInboxPost, type InboxDeps } from "../federation/inbox.ts";
 import { authorizeRead, type ReadAuthorization, type ReadGateDeps } from "../federation/readGate.ts";
 import { AFP_CONTEXTS } from "./documents.ts";
+import { webfingerResponse } from "./webfinger.ts";
 import type { OutboxEntry } from "../store/outbox.ts";
 import type { JsonValue } from "../crypto/jcs.ts";
 
@@ -218,6 +219,22 @@ export function createHttpServer(instance: AfpInstance, options: ServerOptions =
         // routes, so gating them would make every signature unverifiable in
         // one move. This is not an oversight — it is load-bearing.
         if (path === "/actor") return send(200, instance.instanceDocument());
+
+        // ADR-0017 Decision 4: WebFinger, the same unauthenticated bootstrap
+        // class as `/actor` — a stranger needs a way in before it has any
+        // key to verify a signature with.
+        if (path === "/.well-known/webfinger") {
+          const result = webfingerResponse(
+            {
+              origin: instance.config.origin,
+              agentNames: instance.specs.map((s) => s.name),
+              hubIds: (options.hubs ?? []).map((h) => h.hubId),
+            },
+            url.searchParams.get("resource"),
+          );
+          res.setHeader("Access-Control-Allow-Origin", "*");
+          return send(result.status, result.body, "application/jrd+json");
+        }
 
         const hubMatch = path.match(/^\/hubs\/([\w-]+)$/);
         if (hubMatch) {

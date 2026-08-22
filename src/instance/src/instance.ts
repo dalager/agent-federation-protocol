@@ -10,7 +10,7 @@
 import { mkdirSync } from "node:fs";
 import type { Config } from "./config.ts";
 import type { JsonValue } from "./crypto/jcs.ts";
-import { loadOrCreateKeyPair, type KeyPair } from "./crypto/keys.ts";
+import { loadOrCreateKeyPair, loadOrCreateTransportKeyPair, type KeyPair } from "./crypto/keys.ts";
 import { attachProof, digestOf } from "./crypto/proof.ts";
 import { openDb, type Db } from "./store/db.ts";
 import { Outbox, type OutboxEntry } from "./store/outbox.ts";
@@ -90,20 +90,14 @@ export class AfpInstance {
     this.artifacts = new Artifacts(this.db, config.artifactDir, config.origin);
     this.queue = new DeliveryQueue(this.db, config.maxDeliveryAttempts, config.backoffBaseMs);
 
-    this.keys.set(
-      "@instance",
-      loadOrCreateKeyPair(config.keyDir, "instance", instanceActorId(config.origin)),
-    );
+    const instanceId = instanceActorId(config.origin);
+    this.keys.set("@instance", loadOrCreateKeyPair(config.keyDir, "instance", instanceId));
+    this.keys.set("@instance:transport", loadOrCreateTransportKeyPair(config.keyDir, "instance", instanceId));
     for (const agent of agents) {
       this.agents.set(agent.spec.name, agent);
-      this.keys.set(
-        agent.spec.name,
-        loadOrCreateKeyPair(
-          config.keyDir,
-          agent.spec.name,
-          agentActorId(config.origin, agent.spec.name),
-        ),
-      );
+      const agentId = agentActorId(config.origin, agent.spec.name);
+      this.keys.set(agent.spec.name, loadOrCreateKeyPair(config.keyDir, agent.spec.name, agentId));
+      this.keys.set(`${agent.spec.name}:transport`, loadOrCreateTransportKeyPair(config.keyDir, agent.spec.name, agentId));
     }
 
     this.provision();
@@ -146,13 +140,14 @@ export class AfpInstance {
       this.config.operator,
       this.config.instanceName,
       this.key("@instance"),
+      this.transportKey("@instance"),
     );
   }
 
   agentDocument(name: string): { [key: string]: JsonValue } {
     const agent = this.agents.get(name);
     if (!agent) throw new Error(`unknown agent ${name}`);
-    return agentActor(this.config.origin, agent.spec, this.key(name));
+    return agentActor(this.config.origin, agent.spec, this.key(name), [], this.transportKey(name));
   }
 
   /**
@@ -236,6 +231,11 @@ export class AfpInstance {
     const key = this.keys.get(name);
     if (!key) throw new Error(`no key for ${name}`);
     return key;
+  }
+
+  /** The transport (HTTP-signature) key for `"@instance"` or an agent name. */
+  transportKey(name: string): KeyPair {
+    return this.key(`${name}:transport`);
   }
 
   // ----------------------------------------------------------------- outbound

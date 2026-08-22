@@ -53,6 +53,8 @@ export function instanceActor(
   operator: string,
   name: string,
   key: KeyPair,
+  /** ADR-0017 Decision 4 (R1): HTTP-signature key, published under `authentication`. */
+  transportKey: KeyPair,
 ): { [key: string]: JsonValue } {
   const id = instanceActorId(origin);
   return {
@@ -60,16 +62,21 @@ export function instanceActor(
     id,
     type: ["Application", "afp:Instance"],
     name,
+    // R4: the literal WebFinger username for the instance actor.
+    preferredUsername: "instance",
     "afp:operator": operator,
     // `<id>/inbox` and `<id>/outbox`, matching the routes the server actually
     // mounts — an actor document must never advertise a URL that is not
     // served (ADR-0017 Decision 3).
     inbox: `${id}/inbox`,
     outbox: `${id}/outbox`,
+    // R5: derived collection replaying this actor's own Follow/Undo trail.
+    following: `${id}/following`,
     "afp:roster": `${origin}/roster`,
     "afp:policy": `${origin}/.well-known/afp-policy`,
     "afp:visibility": "public",
     assertionMethod: [multikey(key)],
+    authentication: [multikey(transportKey)],
   };
 }
 
@@ -83,6 +90,8 @@ export function agentActor(
    * backfilled onto an already-published actor document.
    */
   hubKeys: readonly KeyPair[] = [],
+  /** ADR-0017 Decision 4 (R1): HTTP-signature key, published under `authentication`. */
+  transportKey?: KeyPair,
 ): { [key: string]: JsonValue } {
   const id = agentActorId(origin, spec.name);
   return {
@@ -90,12 +99,15 @@ export function agentActor(
     id,
     type: "Service",
     name: spec.name,
+    // R4: the WebFinger username for an agent is its spec name.
+    preferredUsername: spec.name,
     "afp:operatedBy": instanceActorId(origin),
     "afp:capabilities": [...spec.capabilities],
     inbox: `${id}/inbox`,
     outbox: `${id}/outbox`,
     "afp:visibility": "public",
     assertionMethod: [multikey(key), ...hubKeys.map(multikey)],
+    ...(transportKey ? { authentication: [multikey(transportKey)] } : {}),
   };
 }
 
@@ -113,6 +125,8 @@ export function hubActor(
   hubId: string,
   key: KeyPair,
   operatedBy?: string,
+  /** ADR-0017 Decision 4 (R1): HTTP-signature key, published under `authentication`. */
+  transportKey?: KeyPair,
 ): { [key: string]: JsonValue } {
   const id = hubActorId(origin, hubId);
   return {
@@ -120,8 +134,12 @@ export function hubActor(
     id,
     type: ["Group", "afp:Hub"],
     name: hubId,
+    // R4: the WebFinger username for a hub is its hub id.
+    preferredUsername: hubId,
     inbox: `${id}/inbox`,
     outbox: `${id}/outbox`,
+    // R5: derived collection — active seats, served publicly.
+    followers: `${id}/followers`,
     "afp:visibility": "public",
     // ADR-0016: the shared hub is one member's server (ADR-0014's headline),
     // and the document now says whose — which is also what lets hub-authored
@@ -129,6 +147,7 @@ export function hubActor(
     // that judges operators.
     ...(operatedBy ? { "afp:operatedBy": operatedBy } : {}),
     assertionMethod: [multikey(key)],
+    ...(transportKey ? { authentication: [multikey(transportKey)] } : {}),
   };
 }
 

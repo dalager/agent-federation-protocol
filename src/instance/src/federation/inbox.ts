@@ -21,6 +21,7 @@ import type { JsonValue } from "../crypto/jcs.ts";
 import { publicKeyFromMultibase } from "../crypto/keys.ts";
 import { verifyProof } from "../crypto/proof.ts";
 import { extractKeyId, verifyRequest, type RequestAuthHeaders } from "./httpSig.ts";
+import { transportKeyFromDocument } from "./resolveTransportKey.ts";
 import type { Federation } from "./federation.ts";
 
 export interface InboxDeps {
@@ -87,19 +88,8 @@ export async function handleInboxPost(
   if (keyId) {
     const controller = keyId.split("#")[0];
     const doc = await deps.fetchDocument(controller);
-    const methods = Array.isArray(doc?.assertionMethod) ? (doc!.assertionMethod as JsonValue[]) : [];
-    for (const entry of methods) {
-      if (entry && typeof entry === "object" && !Array.isArray(entry)) {
-        const method = entry as { id?: JsonValue; publicKeyMultibase?: JsonValue };
-        if (method.id === keyId && typeof method.publicKeyMultibase === "string") {
-          try {
-            resolvedKeys.set(keyId, publicKeyFromMultibase(method.publicKeyMultibase));
-          } catch {
-            /* undecodable key: verification below fails with its own reason */
-          }
-        }
-      }
-    }
+    const resolved = transportKeyFromDocument(doc, keyId);
+    if (resolved) resolvedKeys.set(keyId, resolved);
   }
 
   const transport = verifyRequest("POST", path, headers, body, resolveKey, deps.now());

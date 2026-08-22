@@ -117,8 +117,8 @@ async function operator(
   await new Promise<void>((resolveListen) => server.listen(port, "127.0.0.1", resolveListen));
 
   const transport = httpTransport({
-    keyId: instance.key("@instance").keyId,
-    privateKey: instance.key("@instance").privateKey,
+    keyId: instance.transportKey("@instance").keyId,
+    privateKey: instance.transportKey("@instance").privateKey,
     now: () => clock.now(),
     isLocal: (target) => instance.nameOf(target) !== null || target === actorId,
     local: instance.localTransport(),
@@ -258,7 +258,7 @@ export async function runP4Demo(options: { rootDir?: string; exportRoot?: string
     const url = new URL(target);
     let headers: Record<string, string> = { accept: "application/activity+json" };
     if (as !== null) {
-      const key = as.operator.instance.key(as.agent);
+      const key = as.operator.instance.transportKey(as.agent);
       const signed = signRequest("GET", url.pathname, url.host, "", key.keyId, key.privateKey, clock.now());
       headers = { ...headers, ...signed };
     }
