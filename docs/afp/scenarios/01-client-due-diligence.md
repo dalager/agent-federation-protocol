@@ -4,6 +4,20 @@
 > deadlines, rationale externalization, L0 weighted voting, `afp:DecisionRecord`,
 > Mastodon human-in-the-loop, audit replay. Verdict at the end.
 
+| **Support status** | **Supported — all findings closed** |
+|---|---|
+| Findings raised | 3 |
+| Resolved by | spec v3.4 — [07 Audience & visibility](../07-visibility-and-artifacts.md), [03 External systems](../03-coordination.md) |
+| See it run | `npm run demo:offline` |
+| Gated by | `gate.test.ts` |
+
+**Read the walkthrough below as history.** It records what strained when this workload was
+first walked, and is deliberately left as written — that is what makes a scenario evidence
+rather than a brochure. Every strain it names is now built; the
+[support index](README.md#is-this-workload-supported) is the current-status view, and the
+ledger there names the decision that closed each finding.
+
+
 ## User story
 
 **As** the managing partner of an IT consultancy,

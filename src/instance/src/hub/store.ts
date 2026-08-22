@@ -10,6 +10,7 @@
  */
 
 import type { Db } from "../store/db.ts";
+import type { QuorumRule } from "./quorum.ts";
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS hub_rounds (
@@ -23,7 +24,10 @@ CREATE TABLE IF NOT EXISTS hub_rounds (
   quorum_snapshot TEXT NOT NULL,
   proposal_hash  TEXT NOT NULL,
   status         TEXT NOT NULL,          -- open | closed
-  created_at     TEXT NOT NULL
+  created_at     TEXT NOT NULL,
+  deadline       TEXT,                   -- ADR-0018 W7: ISO instant, nullable
+  quorum_rule    TEXT,                   -- ADR-0018 W7: JSON QuorumRule, nullable
+  binding        TEXT                    -- ADR-0018 W7: 'joint', nullable
 );
 
 -- The G-Set of counted vote receipts, one row per (round, voter) — evidence-set
@@ -60,10 +64,33 @@ CREATE TABLE IF NOT EXISTS hub_seats (
   followed_at     TEXT NOT NULL,
   revoked_at      TEXT
 );
+
+-- ADR-0018 W1/W7: one row per pinned voter who publishes an afp:Departure
+-- from a binding decision -- mirrors hub_round_declines exactly.
+CREATE TABLE IF NOT EXISTS hub_departures (
+  round_id         TEXT NOT NULL,
+  actor            TEXT NOT NULL,
+  departure_digest TEXT NOT NULL,
+  PRIMARY KEY (round_id, actor)
+);
 `;
 
 export function ensureHubSchema(db: Db): void {
   db.exec(SCHEMA);
+  // ADR-0018 W7: additive migration for a pre-ADR-0018 `afp.db` — probe with
+  // PRAGMA table_info and ALTER TABLE only the columns actually missing, so
+  // an existing database opens unchanged and CREATE TABLE above still covers
+  // a fresh one.
+  const existing = new Set(
+    (db.prepare("PRAGMA table_info(hub_rounds)").all() as { name: string }[]).map((col) => col.name),
+  );
+  for (const [column, ddl] of [
+    ["deadline", "deadline TEXT"],
+    ["quorum_rule", "quorum_rule TEXT"],
+    ["binding", "binding TEXT"],
+  ] as const) {
+    if (!existing.has(column)) db.exec(`ALTER TABLE hub_rounds ADD COLUMN ${ddl}`);
+  }
 }
 
 export interface RoundRow {
@@ -77,13 +104,19 @@ export interface RoundRow {
   quorumSnapshot: string;
   proposalHash: string;
   status: "open" | "closed";
+  /** ADR-0018 W7: ISO instant, or null/absent for "no deadline" — today's behaviour. */
+  deadline?: string | null;
+  /** ADR-0018 W7: the pinned bar, or null/absent for "no rule" — argmax decides as today. */
+  quorumRule?: QuorumRule | null;
+  /** ADR-0018 W7: 'joint', or null/absent for advisory. */
+  binding?: "joint" | null;
 }
 
 export function saveRound(db: Db, row: RoundRow, now: string): void {
   db.prepare(
     `INSERT INTO hub_rounds
-       (round_id, hub_id, proposal_id, thread, options_json, voters_json, weights_json, quorum_snapshot, proposal_hash, status, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       (round_id, hub_id, proposal_id, thread, options_json, voters_json, weights_json, quorum_snapshot, proposal_hash, status, created_at, deadline, quorum_rule, binding)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT (round_id) DO UPDATE SET status = excluded.status`,
   ).run(
     row.roundId,
@@ -97,6 +130,9 @@ export function saveRound(db: Db, row: RoundRow, now: string): void {
     row.proposalHash,
     row.status,
     now,
+    row.deadline ?? null,
+    row.quorumRule ? JSON.stringify(row.quorumRule) : null,
+    row.binding ?? null,
   );
 }
 
@@ -116,6 +152,9 @@ export function loadRound(db: Db, roundId: string): RoundRow | null {
     quorumSnapshot: String(row.quorum_snapshot),
     proposalHash: String(row.proposal_hash),
     status: String(row.status) as "open" | "closed",
+    deadline: row.deadline === null || row.deadline === undefined ? null : String(row.deadline),
+    quorumRule: row.quorum_rule === null || row.quorum_rule === undefined ? null : JSON.parse(String(row.quorum_rule)),
+    binding: row.binding === null || row.binding === undefined ? null : (String(row.binding) as "joint"),
   };
 }
 
@@ -163,6 +202,27 @@ export function roundDeclinesFor(db: Db, roundId: string): string[] {
   return (db.prepare("SELECT actor FROM hub_round_declines WHERE round_id = ?").all(roundId) as { actor: string }[]).map(
     (row) => String(row.actor),
   );
+}
+
+// ------------------------------------------------------------------ departures (ADR-0018 W1)
+
+/** Record a pinned voter's `afp:Departure` from a binding decision. */
+export function saveDeparture(db: Db, roundId: string, actor: string, digest: string): void {
+  db.prepare(
+    `INSERT INTO hub_departures (round_id, actor, departure_digest)
+       VALUES (?, ?, ?)
+       ON CONFLICT (round_id, actor) DO NOTHING`,
+  ).run(roundId, actor, digest);
+}
+
+/** Departures recorded for a round, for `roundDepartures`. */
+export function departuresFor(db: Db, roundId: string): { actor: string; digest: string }[] {
+  return (
+    db.prepare("SELECT actor, departure_digest FROM hub_departures WHERE round_id = ?").all(roundId) as {
+      actor: string;
+      departure_digest: string;
+    }[]
+  ).map((row) => ({ actor: String(row.actor), digest: String(row.departure_digest) }));
 }
 
 // ------------------------------------------------------------------ hub seats (ADR-0017 D4)

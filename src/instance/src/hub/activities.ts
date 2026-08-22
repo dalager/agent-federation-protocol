@@ -11,6 +11,9 @@
 import type { JsonValue } from "../crypto/jcs.ts";
 import { AFP_CONTEXTS } from "../ap/documents.ts";
 import type { Envelope } from "../ap/activities.ts";
+import type { QuorumRule } from "./quorum.ts";
+import { buildPinSet } from "../ap/pins.ts";
+import type { TaskPins } from "../ap/pins.ts";
 
 export type { Envelope, Visibility } from "../ap/activities.ts";
 
@@ -32,7 +35,7 @@ function base(envelope: Envelope, type: string): { [key: string]: JsonValue } {
 // ------------------------------------------------------------------- Enrollment
 
 /** Participation role (02, ADR-0004 Decision 1): default `member` so every existing record reads unchanged. */
-export type HubRole = "member" | "requester" | "observer";
+export type HubRole = "member" | "requester" | "observer" | "actuator";
 
 export interface EnrollSpec {
   agent: string;
@@ -120,24 +123,44 @@ export interface ProposalSpec {
   voters: readonly string[];
   /** Liveness-gated uniform weight per voter, recorded so recomputation needs no live state (ADR-0002 Decision 3). */
   weights: Readonly<Record<string, number>>;
+  /** ADR-0018 W1: an RFC 3339 instant, milliseconds + `Z`. Absent means no deadline — today's behaviour. */
+  deadline?: string;
+  /** ADR-0018 W1: closed registry of forms (see `quorum.ts`). Absent means no bar — `argmax` decides as today. */
+  quorumRule?: QuorumRule;
+  /** ADR-0018 W1: closed set, currently just `"joint"`. Absent means advisory. */
+  binding?: "joint";
+  /**
+   * ADR-0019 Decisions 1 and W1: the round's own pin set — `actionPolicy`
+   * (keyed by outcome, not category) and `irrevocableActions` only;
+   * `answerSufficiency` and `afp:synthesizer` mean nothing for a round and are
+   * refused by the caller before this is built (`proposeRound`'s job, not
+   * this builder's). Absent means unpinned — today's behaviour, byte-identical.
+   */
+  pins?: TaskPins;
 }
 
 /** `Offer{afp:Proposal}` — opens an L0 round (03 § 8c). */
 export function offerProposal(envelope: Envelope, spec: ProposalSpec): { [key: string]: JsonValue } {
-  return {
-    ...base(envelope, "Offer"),
-    object: {
-      id: spec.proposalId,
-      type: "afp:Proposal",
-      "afp:hub": spec.hub,
-      "afp:round": spec.round,
-      content: spec.question,
-      "afp:options": [...spec.options],
-      "afp:quorumSnapshot": spec.quorumSnapshot,
-      "afp:voters": [...spec.voters],
-      "afp:voterWeights": { ...spec.weights },
-    },
+  const object: { [key: string]: JsonValue } = {
+    id: spec.proposalId,
+    type: "afp:Proposal",
+    "afp:hub": spec.hub,
+    "afp:round": spec.round,
+    content: spec.question,
+    "afp:options": [...spec.options],
+    "afp:quorumSnapshot": spec.quorumSnapshot,
+    "afp:voters": [...spec.voters],
+    "afp:voterWeights": { ...spec.weights },
   };
+  // Emitted only when supplied — an unchanged caller must produce
+  // byte-identical output (ADR-0018 W1, the G12 compatibility gate).
+  if (spec.deadline) object["afp:deadline"] = spec.deadline;
+  if (spec.quorumRule) object["afp:quorumRule"] = { ...spec.quorumRule };
+  if (spec.binding) object["afp:binding"] = spec.binding;
+  // ADR-0019 Decision 1/W1: emitted only when supplied — an unchanged caller
+  // must produce byte-identical output.
+  if (spec.pins) Object.assign(object, buildPinSet(spec.pins));
+  return { ...base(envelope, "Offer"), object };
 }
 
 export interface VoteSpec {
@@ -195,7 +218,16 @@ export interface DecisionRecordSpec {
    * turnout is distinguishable from a record that never accounted for anyone.
    */
   uncounted?: readonly { agent: string; status: "declined" | "silent" }[];
+  /**
+   * ADR-0018 W1: REQUIRED iff `outcome` is `afp:no-decision` — `"expired"` or
+   * `"threshold-not-met"`. Emitted only when supplied, so a pre-ADR-0018
+   * record is byte-identical.
+   */
+  noDecisionReason?: "expired" | "threshold-not-met";
 }
+
+/** ADR-0018 W1: the reserved `afp:outcome` value a pinned quorum rule can produce. */
+export const NO_DECISION = "afp:no-decision";
 
 /** `Create{afp:DecisionRecord}` — closes every round, L0 or L1 (04 § Decision records). */
 export function decisionRecord(envelope: Envelope, spec: DecisionRecordSpec): { [key: string]: JsonValue } {
@@ -214,7 +246,39 @@ export function decisionRecord(envelope: Envelope, spec: DecisionRecordSpec): { 
   if (spec.uncounted !== undefined) {
     object["afp:uncounted"] = spec.uncounted.map((u) => ({ agent: u.agent, "afp:status": u.status }));
   }
+  if (spec.noDecisionReason) object["afp:noDecisionReason"] = spec.noDecisionReason;
   return { ...base(envelope, "Create"), object };
+}
+
+// ------------------------------------------------------------------- Departure (ADR-0018 W1)
+
+export interface DepartureSpec {
+  departureId: string;
+  hub: string;
+  round: string;
+  /** Digest of the DecisionRecord *activity* being departed — the same grain `afp:countedVotes` uses. */
+  decision: string;
+  reason: string;
+}
+
+/**
+ * `afp:Departure` — a top-level activity, shaped like `afp:Settlement`: a
+ * bare `afp:`-typed activity carrying an object, published by a pinned voter
+ * on its own chain, on the round's thread, when it dissents from a binding
+ * (`afp:binding: "joint"`) decision.
+ */
+export function departure(envelope: Envelope, spec: DepartureSpec): { [key: string]: JsonValue } {
+  return {
+    ...base(envelope, "afp:Departure"),
+    object: {
+      id: spec.departureId,
+      type: "afp:Departure",
+      "afp:hub": spec.hub,
+      "afp:round": spec.round,
+      "afp:decision": spec.decision,
+      content: spec.reason,
+    },
+  };
 }
 
 // ------------------------------------------------------------------- Anti-entropy (ADR-0016)

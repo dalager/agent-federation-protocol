@@ -9,6 +9,20 @@
 > Written before the P5 stack ADR, deliberately: every useful finding in this repository
 > came from a scenario that went first. Verdict at the end.
 
+| **Support status** | **Supported — all findings closed** |
+|---|---|
+| Findings raised | 7 |
+| Resolved by | [ADR-0014](../adr/0014-p5-shared-hub-stack.md), [ADR-0015](../adr/0015-the-case-file-at-n-parties.md) |
+| See it run | `npm run demo:p5` |
+| Gated by | `adr0014.test.ts`, `adr0014-m6.test.ts`, `adr0015.test.ts`, `adr0016.test.ts` |
+
+**Read the walkthrough below as history.** It records what strained when this workload was
+first walked, and is deliberately left as written — that is what makes a scenario evidence
+rather than a brochure. Every strain it names is now built; the
+[support index](README.md#is-this-workload-supported) is the current-status view, and the
+ledger there names the decision that closed each finding.
+
+
 ## User story
 
 **As** the NOC lead of one of three interconnected transit operators — who during a route

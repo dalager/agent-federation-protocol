@@ -449,13 +449,23 @@ sequenceDiagram
     V2->>P: Create{afp:Vote, proposalHash, quorumSnapshot}
     L--xP: Create{afp:Vote} — outside the snapshot: dropped, never tallied
     Note over P: tally from counted votes alone — absent pinned voter = abstain
-    alt weighted quorum reached
+    alt pinned quorum rule cleared (or no rule pinned)
         P->>V1: Create{afp:DecisionRecord, countedVotes, weightTally}
         P->>V2: Create{afp:DecisionRecord, countedVotes, weightTally}
-    else timeout without quorum
-        Note over P: Undo{Vote} / abandon round
+    else deadline passed, or the bar not cleared
+        P->>V1: Create{afp:DecisionRecord, outcome afp:no-decision}
+        P->>V2: Create{afp:DecisionRecord, outcome afp:no-decision}
     end
 ```
+
+A round that runs out of time or falls short of its pinned bar **still closes with a
+`DecisionRecord`** — outcome `afp:no-decision`, carrying `afp:noDecisionReason`
+(`expired` or `threshold-not-met`) beside the same tally and the same `afp:uncounted`
+accounting (ADR-0018 Decision 2). Earlier revisions of this diagram abandoned such a round
+with an `Undo{Vote}`, which contradicted the paragraph below it and left "we were asked and
+did not manage to decide" indistinguishable from nobody having asked. `afp:no-decision`
+is terminal and inert: it ratifies nothing, may not be acted on, and supersedes nothing —
+a failed round is re-run as a new round, never retracted.
 
 Default consensus level — eventually-consistent, reorder-tolerant, not linearizable;
 adequate *within* one operator's trust boundary. Any round whose voters span two or more

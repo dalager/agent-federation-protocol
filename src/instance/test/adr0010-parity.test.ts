@@ -186,7 +186,7 @@ describe("ADR-0010 gate: the auction root and the direct root mean the same thin
     const auctionClean = runVerifier(VERIFIER, auctionConfig.exportDir, thread, ["--verbose"]);
     assert.equal(auctionClean.code, 0, `verifier failed:\n${auctionClean.output}`);
     assert.match(auctionClean.output, /action: .*answers within the pinned category set/);
-    assert.match(auctionClean.output, /action: .*acts on a producible Synthesis/);
+    assert.match(auctionClean.output, /action: .*acts on a producible justification/);
     assert.match(auctionClean.output, /action: .*is the action the answer permitted/);
 
     // --- Root 2: the direct flow — the same claim, no auction underneath.

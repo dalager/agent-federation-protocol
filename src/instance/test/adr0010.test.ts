@@ -160,7 +160,7 @@ describe("ADR-0010 gate: pins on the direct Offer replay end to end", () => {
     assert.match(clean.output, /synthesis: .*accounts for every leg of its thread/);
     assert.match(clean.output, /synthesis: .*meets the pinned answer-sufficiency count/);
     assert.match(clean.output, /action: .*answers within the pinned category set/);
-    assert.match(clean.output, /action: .*acts on a producible Synthesis/);
+    assert.match(clean.output, /action: .*acts on a producible justification/);
     assert.match(clean.output, /action: .*is the action the answer permitted/);
 
     // 1 — divergent pins across the fan-out: s2's Offer pins a different
@@ -346,7 +346,7 @@ describe("ADR-0010 gate: pins on the direct Offer replay end to end", () => {
     const clean = runVerifier(VERIFIER, config.exportDir, thread, ["--verbose"]);
     assert.equal(clean.code, 0, `verifier failed:\n${clean.output}`);
     assert.match(clean.output, /decision: .*outcome names a producible Synthesis/);
-    assert.match(clean.output, /action: .*acts on a producible Synthesis/);
+    assert.match(clean.output, /action: .*acts on a producible justification/);
     assert.match(clean.output, /action: .*is the action the answer permitted/);
 
     // --- Case 7: a second DecisionRecord whose afp:outcome names the FIRST
@@ -364,7 +364,7 @@ describe("ADR-0010 gate: pins on the direct Offer replay end to end", () => {
     const exportedTwoHop = exportBundle(instance, config.exportDir, [hub]);
     const twoHop = runVerifier(VERIFIER, exportedTwoHop.dir, thread, ["--verbose"]);
     assert.notEqual(twoHop.code, 0);
-    assert.match(twoHop.output, /FAIL \] action: .*acts on a producible Synthesis/);
+    assert.match(twoHop.output, /FAIL \] action: .*acts on a producible justification/);
 
     instance.close();
   });

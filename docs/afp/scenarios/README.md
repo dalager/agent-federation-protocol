@@ -22,7 +22,63 @@ protocol does; that review tested whether the build order still matched it.
 | [08 · story](08-the-subcontract-story.md) | The same subcontract, outside-in | A first: the scenario retold through its human actors — the double sale, the near-miss, the seams. No findings machinery; a readability check on the whole design | — |
 | [09](09-the-screening-sidecar.md) | The screening sidecar: an auditable agentic subsystem inside someone else's workflow | Solo profile behind a pre-existing actuation boundary, external initiator, fixed-panel fan-out, polyglot brains behind the port, dissent into the verdict, checkable actuation against an external API, subject-scoped audit export (EU AI Act) | 12 |
 | [10](10-the-incident-bridge.md) | The incident bridge: three operators, one hub, and the host is the one on fire | The P5 shakedown — a shared hub across three trust domains, hub reads across the boundary, CRDT convergence after the host partitions, a quorum round with a member unreachable, membership churn mid-decision, and the first three-export replay | 7 |
+| [11](11-the-snow-day.md) | The snow day: three parties, one decision, and a clock nobody controls | A hub that binds action rather than pooling information — an indivisible outcome, an externally imposed deadline, unverifiable local evidence held by the losing party, actuation by a party with no vote, and grading a decision the morning after. First scenario with a running counterpart (`npm run demo:p5:llm`) | 8 |
 | [· tuesday](the-operators-tuesday.md) | The operator's Tuesday | The built stack's ordinary day, every noun pointing at a file — commands, tables, outputs and warts of the solo profile as it runs today; the hard-focus baseline the P4 build will be measured against | — |
+
+## Is this workload supported?
+
+Every scenario above was written to *break* something, and each one did. This table is the
+answer to the question the walkthroughs deliberately do not answer: **what holds today, and
+how can you see it.** All fifty-seven findings raised across eight campaigns are closed —
+finding 32's remainder last (2026-08-22), when building this index caught that campaign 6
+had been recording it as resolved while its own prose said otherwise.
+
+A scenario's own text is never rewritten when its findings land — a scenario records what
+was true when it was walked, which is what makes it evidence. So read a walkthrough as
+history and read this table as status; where a scenario has a runnable demonstration, the
+demo shows the *resolved* world and the walkthrough shows what it cost to get there.
+
+| Scenario | Findings | Resolved by | See it run | Gated by |
+|---|---|---|---|---|
+| [01](01-client-due-diligence.md) | 3 · closed | spec v3.4 ([07](../07-visibility-and-artifacts.md), [03](../03-coordination.md)) | `npm run demo:offline` | `gate.test.ts` |
+| [02](02-observability-fix-pipeline.md) | 3 · closed | spec v3.4 | `npm run demo:offline` | `gate.test.ts` |
+| [03](03-co-staffed-project.md) | 4 + 2 · closed | spec v3.4, [ADR-0005](../adr/0005-operators-are-equal.md) | `npm run demo:p2` | `hub.test.ts`, `adr0005.test.ts` |
+| [04](04-federated-estimation.md) | 6 · closed | spec v3.5 ([03](../03-coordination.md), [04](../04-operations.md)) | `npm run demo:p3` · `demo:p3:llm` | `allocation.test.ts` |
+| [05](05-integration-practice.md) | 3 · closed | [ADR-0004](../adr/0004-solo-foundation-hardening.md) | — | `adr0004.test.ts` |
+| [06](06-issue-triage-loop.md) | 6 · closed | [ADR-0006](../adr/0006-checkable-actuation.md), [ADR-0007](../adr/0007-supersession.md), spec v3.13–v3.14 | — | `adr0006.test.ts`, `adr0007.test.ts` |
+| [07](07-the-retraction.md) | 0 · sharpened 24 | [ADR-0007](../adr/0007-supersession.md) | — | `adr0007.test.ts` |
+| [08](08-the-subcontract.md) | 7 · closed | [ADR-0008](../adr/0008-p4-federation-stack.md), [ADR-0009](../adr/0009-federated-replay.md) | `npm run demo:p4` | `adr0008.test.ts`, `adr0008b.test.ts`, `adr0009.test.ts` |
+| [09](09-the-screening-sidecar.md) | 12 · closed | [ADR-0010](../adr/0010-pinning-without-an-auction.md), [ADR-0011](../adr/0011-supersession-meets-the-irreversible-world.md), [ADR-0012](../adr/0012-the-long-horizon.md) | — | `adr0010.test.ts`, `adr0010-parity.test.ts`, `adr0011.test.ts`, `adr0012.test.ts` |
+| [10](10-the-incident-bridge.md) | 7 · closed | [ADR-0014](../adr/0014-p5-shared-hub-stack.md), [ADR-0015](../adr/0015-the-case-file-at-n-parties.md) | `npm run demo:p5` | `adr0014.test.ts`, `adr0014-m6.test.ts`, `adr0015.test.ts`, `adr0016.test.ts` |
+| [11](11-the-snow-day.md) | 8 · closed | [ADR-0018](../adr/0018-the-round-as-a-commitment.md), [ADR-0019](../adr/0019-acting-on-a-decision.md) | `npm run demo:p5:llm` | `adr0018.test.ts`, `adr0019.test.ts` |
+
+**Where the "See it run" column is empty**, the scenario's shape is covered by its gate
+files rather than by a demo. Three of the four are workloads that live inside another
+system — 05's internal service answering other teams, 06's bug tracker, 09's caseworker
+sidecar — where a standalone demo would have to simulate the host system before it could
+show anything; 07 is a mechanism test with no standalone workload of its own. The gates
+exercise the same machinery against real exports and the real verifier, so what is missing
+is the narrative walkthrough, not the coverage. A demo for any of them would be a genuine
+improvement, not a formality.
+
+**The last one to close — finding 32.** ADR-0012 landed its sharp half in v3.20 (the
+bundle's declared content inventory, CRDT state stated to be outside it) and the other half
+was triaged as "06 deployment guidance", then never written: campaign 6's prose has said
+both "32's remainder is 06 deployment guidance" and "all twelve findings resolved" ever
+since. Writing this index is what caught the contradiction. Closed 2026-08-22 in
+[06 — Designing for per-subject disclosure](../06-deployment-profiles.md#designing-for-per-subject-disclosure):
+where disclosure is per-subject the thread SHOULD be the subject-scoped unit, and
+cross-thread carriers SHOULD hold references rather than subject content. The build-out
+sharpened it beyond the original candidate — ADR-0015 Decision 3 now carries a hub's
+converged state into the record at `afp:Archive`, so a store that quietly accumulated
+subject content is excluded right up until the hub closes and then published wholesale,
+which makes what may go in a hub-scoped store a disclosure decision taken at design time.
+
+Three ADRs are **not** scenario-driven and appear nowhere above:
+[ADR-0013](../adr/0013-authorized-fetch.md) (a sync audit),
+[ADR-0016](../adr/0016-p5-transport.md) (the roadmap's P5 row) and
+[ADR-0017](../adr/0017-standards-conformance.md) (a standards-deviation critique). Scenarios
+are one source of pressure on this spec, not the only one.
 
 ## Findings ledger
 
@@ -165,7 +221,9 @@ red, which was the requirement working rather than a regression.
 [ADR-0012](../adr/0012-the-long-horizon.md) is **Accepted and built** as well — key
 history in a now-signed manifest, rotation distinguished from revocation, declared
 retention duties, and the bundle's content inventory with CRDT state stated to be outside
-it. **Campaign 6 is closed**: all twelve findings resolved, three ADRs built and swept
+it. **Campaign 6 is closed**: all twelve findings resolved — 32's deployment-guidance
+remainder last, in v3.28, after this directory's support index caught it standing open;
+three ADRs built and swept
 into the spec body.
 
 | # | Finding | Candidate |
@@ -239,3 +297,65 @@ replay.
 | 47 | *(**closed** — ADR-0015, built)* The case file omits the state the operators worked from: ADR-0012 keeps CRDT state out of the export correctly, and at P5 that state *is* the coordinated timeline | Make ADR-0012's own revisit trigger concrete — `afp:Archive` carries the final converged state into the record as an activity, once, when it stops changing |
 | 48 | *(**closed** — first half ADR-0010 Decision 5, second half ADR-0015's census)* A no-op check hides better in three bundles than in one — ADR-0010's unresolved redaction question means a stubbed pin-bearing `Offer` leaves checks silently passing, and per-domain phase one makes that indistinguishable from clean | Resolve ADR-0010's open question before P5 widens the redaction surface; have the joint replay report a per-domain check census, so a bundle that checked nothing is visible |
 | 49 | *(**closed** — ADR-0015, built)* ADR-0009's join was specified for a pair — received bytes resolve against *the* sender, agreements are digest-equal across *two* copies — and at N=3 a party can observe a divergence between two others | State the join as all-pairs, and decide whether a divergence between two domains is reported to the third |
+
+### Campaign 8 → built (scenario 11 → ADR-0018, ADR-0019)
+
+**Closed 2026-08-22.** Eight findings from [scenario 11](11-the-snow-day.md), the first workload where the hub's
+output is a **binding decision** rather than a pooled conclusion: three parties who must
+close their schools together or not at all, before a deadline the world sets, on evidence
+only one of them can see. It is also the first scenario with a **running counterpart** —
+`npm run demo:p5:llm` in the reference instance — so its numbers are copied from an actual
+run rather than imagined, which is how finding 51 was noticed at all (a decision closing on
+exactly half the electorate, with the record unable to say whether that sufficed).
+
+**The through-line: campaign 6 found that the machinery had anchored itself to the
+Announce/Award pair and that the degenerate direct flow lost all of it. ADR-0010 extended
+the anchor to the direct `Offer{Task}` and stopped there — and the governance round, opened
+with `Offer{afp:Proposal}`, has no task-bearing activity at all.** It therefore inherits no
+pinning, no action policy, no sufficiency and no irrevocability declaration. Nobody noticed,
+because until this scenario every recorded decision was about work rather than about the
+world.
+
+**Triaged into two proposed ADRs and one lighter track**, grouped by the decision each
+finding forces rather than by the subject it touches:
+
+- [ADR-0018](../adr/0018-the-round-as-a-commitment.md) — **the round as a commitment**
+  (50, 51, 56, 57) — **accepted and built**, findings 50, 51, 52, 56 and 57 closed: everything that makes a round answerable to the world it decides for.
+  A proposal that pins its own deadline and quorum rule; the 03 diagram/prose
+  contradiction ruled for the prose — an expired or under-threshold round closes with a
+  reserved `afp:no-decision` outcome (ADR-0010 Decision 4's release, arriving at the
+  round); a declared `afp:binding` with `afp:Departure` as the recorded act of not
+  following an outcome — visible non-compliance over unenforceable compliance; and the
+  `DecisionRecord` as a settleable subject, so 04's dissent credit finally reaches the
+  arena where dissent is most expensive.
+- [ADR-0019](../adr/0019-acting-on-a-decision.md) — **acting on a decision** (53, 54,
+  55) — **accepted and built**, all three closed: the campaign's through-line as one ADR. `Offer{afp:Proposal}` becomes a pin site
+  under ADR-0010 Decision 1's discipline, rooting the resolution chain for actions on
+  `DecisionRecord`s; the role table gains an `actuator` — reads everything, influences
+  nothing, publishes only `afp:actsOn`-bearing activities; and the actor of a
+  decision-actuation is checked at replay against the Enroll trail the verifier already
+  rebuilds.
+- **Spec precision, no ADR** — finding 52 lands as two sentences in 02, folded into
+  ADR-0018's Decision 5: the dilution consequence stated plainly (a silent seat spends
+  its own operator's weight — the cure is not to pin it), and the electorate stated as
+  proposer-declared and visible, which the implementation's explicit-voters parameter
+  already is.
+
+Built in that order — ADR-0018's finding 51 first (a pinned, recomputable quorum rule —
+the one live gap in shipped records, found by reading a demo's output), then the rest of
+ADR-0018, then ADR-0019. **The seam between them resolved against ADR-0018.** It had
+ruled that a `no-decision` outcome admits no action; grounding ADR-0019 in ADR-0010
+Decision 4 showed that ruling was the parked-application failure wearing a safety hat, so
+a round that fails to decide *does* release its actuator, through the policy's reserved
+`afp:no-decision` key. ADR-0018's clause is amended in place with the reasoning kept.
+
+| # | Finding | Candidate |
+|---|---|---|
+| 50 | *(**closed** — ADR-0018 Decision 1 + 2, built)* A round has no clock, and the deadline that matters is not the hub's — `afp:Proposal` pins no voting window, and 03's diagram abandons a timed-out round (`Undo{Vote}`) while the prose four lines below states every round closes with a `DecisionRecord` | Pin an optional deadline; rule the contradiction for the prose — an expired round closes with a non-answer outcome, the shape ADR-0010's `afp:no-verdict` release already has |
+| 51 | *(**closed** — ADR-0018 Decision 1, built)* The quorum threshold is specified everywhere and pinned nowhere — 02 calls quorum "a weight-sum threshold" with two named minimums, and no proposal carries one, no close checks one, no replay recomputes one | Pin the rule beside the weights it is computed over, recomputable at replay; failing to clear it becomes a defined outcome |
+| 52 | *(**closed** — ADR-0018 Decision 5, spec precision in 02)* A silent seat spends its own operator's weight — ADR-0005's per-operator total is preserved but split per pinned voter, so seating an agent that never votes halves the voice of the one that does; `afp:uncounted` names the silence, not its price | State the deployment consequence in 02; better, let a snapshot exclude by declared participation |
+| 53 | *(**closed** — ADR-0019 Decision 1, built)* `Offer{afp:Proposal}` is not a task-bearing activity, so a decision reached by a round alone can pin no `afp:actionPolicy` and declare no `afp:irrevocableActions` — finding 34 one flow further out | Extend ADR-0010 Decision 1's fallback to the proposal, same whole-object equality rule |
+| 54 | *(**closed** — ADR-0019 Decision 2, built)* The role vocabulary has no actuator — a party whose function is to carry out a decision it must not influence has no seat; `observer` cannot publish, `member` hands it a vote | An `actuator` role, or a narrow `observer` write-path restricted to `afp:actsOn`-bearing activities, mirroring the requester's |
+| 55 | *(**closed** — ADR-0019 Decision 3, built)* Nothing constrains who may act — replay checks the binding, the category and the admissibility, never the actor | Require the actor to be enrolled in the hub whose round produced the outcome, checked from the Enroll trail replay already rebuilds |
+| 56 | *(**closed** — ADR-0018 Decision 4, built)* A `DecisionRecord` cannot be settled, so a correct dissenter cannot be credited — settlement binds to estimates or a Synthesis, follows an award, once per task; 04 states the stake itself ("a swarm that penalizes accurate minority objections will stop producing them") | Let a settlement take a `DecisionRecord` as its subject, keeping the award-follows precondition for the allocation case |
+| 57 | *(**closed** — ADR-0018 Decision 3, built)* An outcome that binds jointly has no expression, and defection has no record — harmless while outcomes were divisible, load-bearing once a decision is indivisible by construction | A declared joint-binding property on the proposal, plus a recorded act by which a member states it is not following an outcome it was pinned into — visible non-compliance beats unenforceable compliance |

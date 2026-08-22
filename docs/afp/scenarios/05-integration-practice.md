@@ -10,6 +10,20 @@
 > distinguishes "runs on the built stack today" from "needs a later phase." Verdict at
 > the end.
 
+| **Support status** | **Supported — all findings closed** |
+|---|---|
+| Findings raised | 3 |
+| Resolved by | [ADR-0004](../adr/0004-solo-foundation-hardening.md) |
+| See it run | no standalone demo — covered by the gate(s) below ([why](README.md#is-this-workload-supported)) |
+| Gated by | `adr0004.test.ts` |
+
+**Read the walkthrough below as history.** It records what strained when this workload was
+first walked, and is deliberately left as written — that is what makes a scenario evidence
+rather than a brochure. Every strain it names is now built; the
+[support index](README.md#is-this-workload-supported) is the current-status view, and the
+ledger there names the decision that closed each finding.
+
+
 ## User story
 
 **As** the lead of an IT consultancy's integration practice — a team with a portfolio of

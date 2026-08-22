@@ -266,7 +266,7 @@ describe("ADR-0006 gate: the action policy and the performer wall replay end to 
     const clean = runVerifier(VERIFIER, config.exportDir, t1Thread, ["--verbose"]);
     assert.equal(clean.code, 0, `verifier failed:\n${clean.output}`);
     assert.match(clean.output, /action: .*answers within the pinned category set/);
-    assert.match(clean.output, /action: .*acts on a producible Synthesis/);
+    assert.match(clean.output, /action: .*acts on a producible justification/);
     assert.match(clean.output, /action: .*is the action the answer permitted/);
     assert.match(clean.output, /award: .*prior-task exclusion .*resolves to an Award/);
     assert.match(clean.output, /award: .*respects prior-performer separation/);
@@ -310,7 +310,7 @@ describe("ADR-0006 gate: the action policy and the performer wall replay end to 
       }
     });
     assert.notEqual(danglingActsOn.code, 0);
-    assert.match(danglingActsOn.output, /FAIL \] action: .*acts on a producible Synthesis/);
+    assert.match(danglingActsOn.output, /FAIL \] action: .*acts on a producible justification/);
 
     // 4 — the excluded performer awarded anyway.
     const walledPerformer = mutate(hubOutbox, (outbox) => {

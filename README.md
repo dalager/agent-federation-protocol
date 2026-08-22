@@ -16,8 +16,15 @@ holding no keys.
 
 ## The spec
 
-**[docs/afp/](docs/afp/README.md)** — Revision 3.9, in seven parts, with scenario tests
+**[docs/afp/](docs/afp/README.md)** — Revision 3.29, in seven parts, with scenario tests
 and ADRs.
+
+Eleven **spec-test scenarios** walk real workloads end to end and record what strained;
+every finding they raised is closed, and the
+[support index](docs/afp/scenarios/README.md#is-this-workload-supported) says which decision
+closed it and what to run to watch it work. The scenarios themselves are never rewritten
+when their findings land — a walkthrough is the record of what was true when it was walked,
+which is what makes it evidence rather than a brochure.
 
 ## The implementation
 
@@ -78,6 +85,7 @@ npm run demo:p2        # P2: 30 agents agree on the best policy — DecisionReco
 npm run demo:p3        # P3: two sealed auctions, a coalition award, a ratified Synthesis
 npm run demo:p4        # P4: three instances over real HTTP — handshake, probe, delegation, joint export
 npm run demo:p5        # P5: a shared hub with a real inbox — the write door, replica sync, the kill criterion
+npm run demo:p5:llm    # the same hub, told as a snow day: three schools, one bus company, one decision
 npm run gate           # the acceptance gate: P1's 11 checks, CRDT property tests, hub, auction, boundary
 
 cd ../verifier

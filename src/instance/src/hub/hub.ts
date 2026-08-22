@@ -27,11 +27,14 @@ import {
   freezeHub,
   offerDigest,
   offerProposal,
+  NO_DECISION,
   type Envelope,
   type HubRole,
   type Visibility,
 } from "./activities.ts";
+import { validateIrrevocableActions, validateProposalActionPolicy, type TaskPins } from "../ap/pins.ts";
 import { LWWRegister, ORMap, ORMapLWW, ORSet } from "./crdtAdapter.ts";
+import { thresholdOf, type QuorumRule } from "./quorum.ts";
 import { voterWeights } from "./weights.ts";
 import { CRDTStore, type LWWState, type ORMapState, type ORSetState } from "../crdt/index.ts";
 import {
@@ -41,9 +44,11 @@ import {
   loadRound,
   roundByProposal,
   roundDeclinesFor,
+  saveDeparture,
   saveRound,
   saveRoundDecline,
   saveVoteReceipt,
+  departuresFor,
   voteReceiptsFor,
   type RoundRow,
 } from "./store.ts";
@@ -104,6 +109,18 @@ export interface HubDeps {
 interface LivenessValue {
   status: "live" | "suspected";
   load: number;
+}
+
+/**
+ * Is `at` past a round's `afp:deadline` (ADR-0018 W4)? False when no deadline
+ * was pinned, and false for a deadline nobody can parse — a round whose clock
+ * is unreadable has no clock, which is the pre-ADR-0018 behaviour rather than
+ * an every-vote-is-late trap. Instants, never strings: see `onVote`.
+ */
+function pastDeadline(at: Date, deadline: string | null | undefined): boolean {
+  if (!deadline) return false;
+  const limit = Date.parse(deadline);
+  return Number.isFinite(limit) && at.getTime() > limit;
 }
 
 export class Hub {
@@ -453,6 +470,10 @@ export class Hub {
     if (type === "afp:Enroll") return this.onEnroll(activity);
     if (type === "afp:Unenroll") return this.onUnenroll(activity);
     if (type === "Create" && objectType === "afp:Vote") return this.onVote(activity);
+    // ADR-0018 Decision 3: a departure from a binding decision, published on
+    // the round's own thread by a pinned voter — shaped like afp:Settlement,
+    // a bare afp:-typed activity rather than a Create wrapper.
+    if (type === "afp:Departure") return this.onDeparture(activity);
     // ADR-0016 Decision 4: the anti-entropy exchange, activity-shaped like
     // everything else. Both branch on objectType before the allocation
     // fallthroughs below, because an Accept is also the award path's verb.
@@ -671,6 +692,21 @@ export class Hub {
     if (String(object["afp:proposalHash"] ?? "") !== row.proposalHash) return;
     if (String(object["afp:quorumSnapshot"] ?? "") !== row.quorumSnapshot) return;
 
+    // ADR-0018 W4: the deadline is enforced twice, in two currencies — this is
+    // the hub's own-clock half. A vote arriving after `afp:deadline`, judged
+    // by `this.now()` rather than the vote's claimed `published`, is dropped
+    // exactly as an out-of-snapshot vote is: no receipt, no tally. The
+    // verifier's half (V5) catches the complementary lie — a vote that
+    // arrived late but claims an early `published`.
+    //
+    // Compared as instants, never as strings: the deadline is caller-supplied
+    // and `2026-02-11T06:00:00Z` and `…06:00:00.000Z` are the same moment that
+    // string comparison orders differently ('.' < 'Z'), while a negative UTC
+    // offset sorts before 'Z' and is chronologically later. The verifier reads
+    // this same field through `instant_millis` for exactly that reason, and a
+    // writer that ordered it differently would disagree with its own replay.
+    if (pastDeadline(this.now(), row.deadline)) return;
+
     const digest = digestOf(activity);
     const value = String(object.value ?? "");
 
@@ -681,6 +717,27 @@ export class Hub {
       String(activity.id),
     );
     saveVoteReceipt(this.db, round, actor, digest, value);
+  }
+
+  /**
+   * ADR-0018 Decision 3: a departure from a binding decision — the recorded
+   * act of an operator that lost the vote and refuses to be bound. Restricted
+   * exactly as V8/V9 (W5) check it on replay: only a voter this round itself
+   * pinned may depart it, and only a round whose proposal declared
+   * `afp:binding: "joint"` has anything to depart from — an advisory round's
+   * dissent needs no such record, because nothing bound the loser in the
+   * first place.
+   */
+  private onDeparture(activity: { [key: string]: JsonValue }): void {
+    const object = activity.object as Record<string, JsonValue>;
+    const round = String(object["afp:round"] ?? "");
+    const row = loadRound(this.db, round);
+    if (!row || row.binding !== "joint") return;
+
+    const actor = String(activity.actor ?? "");
+    if (!row.voters.includes(actor)) return; // outside this round's pinned electorate
+
+    saveDeparture(this.db, round, actor, digestOf(activity));
   }
 
   /**
@@ -866,9 +923,42 @@ export class Hub {
     question: string;
     options: readonly string[];
     voters?: readonly string[];
+    /** ADR-0018 Decision 1: an RFC 3339 instant after which a vote is dropped, not tallied. */
+    deadline?: string;
+    /** ADR-0018 Decision 1: the bar the outcome must clear — absent means today's plain argmax. */
+    quorumRule?: QuorumRule;
+    /** ADR-0018 Decision 3: `"joint"` opens the round to `afp:Departure`; absent means advisory. */
+    binding?: "joint";
+    /**
+     * ADR-0019 W3: the round's own rulebook — `afp:actionPolicy` keyed by
+     * outcome (including `afp:no-decision`) and `afp:irrevocableActions`.
+     * `afp:answerSufficiency`/`afp:synthesizer` mean nothing for a round (W3)
+     * and are refused below rather than emitted.
+     */
+    pins?: TaskPins;
   }): OutboxEntry {
     if (this.status !== "active") {
       throw new Error(`hub is ${this.status} — no new rounds (afp:${this.status === "frozen" ? "Freeze" : "Archive"})`);
+    }
+    // ADR-0018 W1: the reserved outcome names no proposal's option — a
+    // proposal that lists it is rejected at propose time, not merely at replay.
+    if (options.options.includes(NO_DECISION)) {
+      throw new Error(`afp:options may not contain the reserved value ${NO_DECISION} (ADR-0018)`);
+    }
+    // ADR-0019 W3: validated before signing, refusing rather than emitting a
+    // pin nothing will ever read or a policy silent on one of the round's own
+    // outcomes.
+    if (options.pins?.answerSufficiency || options.pins?.synthesizer) {
+      throw new Error("afp:answerSufficiency and afp:synthesizer pin nothing for a round (ADR-0019)");
+    }
+    if (options.pins?.actionPolicy) {
+      validateProposalActionPolicy(options.pins.actionPolicy, options.options);
+    }
+    if (options.pins?.irrevocableActions) {
+      if (!options.pins.actionPolicy) {
+        throw new Error("afp:irrevocableActions requires a pinned afp:actionPolicy (ADR-0011)");
+      }
+      validateIrrevocableActions(options.pins.actionPolicy, options.pins.irrevocableActions);
     }
     // Snapshot-pinning (ADR-0004 Decision 1): only member-role agents are ever
     // pinned into afp:voters — a requester or observer can never appear in a
@@ -881,6 +971,13 @@ export class Hub {
     // instance this reduces to the liveness-gated uniform weight of 1 that
     // ADR-0002 Decision 3 pinned, so the solo profile is unchanged.
     const weights = voterWeights(voters.map((agent) => ({ agent, instance: this.instanceOf(agent) ?? agent })));
+
+    // ADR-0018 W2: never sign a rule nobody can recompute — an unknown form
+    // fails here, at propose time, rather than surfacing only when the round
+    // closes or a verifier tries to recompute the bar it cannot resolve.
+    if (options.quorumRule && thresholdOf(options.quorumRule, weights) === null) {
+      throw new Error(`afp:quorumRule names an unknown form (ADR-0018): ${JSON.stringify(options.quorumRule)}`);
+    }
 
     const quorumSnapshot = digestOf([...voters].sort());
     const proposalId = `${this.actorId}/proposals/${options.round}`;
@@ -895,6 +992,10 @@ export class Hub {
         quorumSnapshot,
         voters,
         weights,
+        deadline: options.deadline,
+        quorumRule: options.quorumRule,
+        binding: options.binding,
+        pins: options.pins,
       }),
     );
 
@@ -909,6 +1010,9 @@ export class Hub {
       quorumSnapshot,
       proposalHash: digestOf(entry.activity),
       status: "open",
+      deadline: options.deadline ?? null,
+      quorumRule: options.quorumRule ?? null,
+      binding: options.binding ?? null,
     };
     saveRound(this.db, row, this.now().toISOString());
 
@@ -939,8 +1043,28 @@ export class Hub {
 
     const votes = this.roundVotes(round);
     const tally = this.tally(row, votes);
-    const outcome = Object.entries(tally).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "abstain";
+    // Options in declared order, then abstain; first wins ties — Array#sort is
+    // stable, and `tally`'s own keys are built in that order (this.tally),
+    // so the plain argmax already reads the entries in the ADR-0018 order.
+    let outcome = Object.entries(tally).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "abstain";
     const countedVotes = votes.map((vote) => vote.digest);
+
+    // ADR-0018 W3: with a quorum rule pinned, the plain argmax is not yet the
+    // outcome — it must also clear the bar, and `abstain` can never win under
+    // a rule (it is a residual bucket, not an option). A round with no rule
+    // takes none of this branch, so its signed bytes are unchanged to the byte.
+    let noDecisionReason: "expired" | "threshold-not-met" | undefined;
+    if (row.quorumRule) {
+      const bar = thresholdOf(row.quorumRule, row.weights);
+      if (bar === null) throw new Error(`round ${round} pins an unresolvable afp:quorumRule (ADR-0018)`);
+      if (outcome === "abstain" || (tally[outcome] ?? 0) < bar) {
+        // Which kind of failure this was is decided by the close instant, not
+        // by guesswork — and compared as instants for the reason `onVote`'s
+        // deadline gate spells out.
+        noDecisionReason = pastDeadline(this.now(), row.deadline) ? "expired" : "threshold-not-met";
+        outcome = NO_DECISION;
+      }
+    }
 
     // ADR-0014 Decision 4: account for every pinned voter the tally did not
     // hear from, and say which kind of not-hearing it was. A recorded Reject
@@ -964,6 +1088,7 @@ export class Hub {
         weightTally: tally,
         priorQuorumSnapshot: options?.priorQuorumSnapshot,
         uncounted,
+        noDecisionReason,
       }),
     );
 
@@ -995,6 +1120,11 @@ export class Hub {
 
   roundVoters(round: string): string[] {
     return loadRound(this.db, round)?.voters ?? [];
+  }
+
+  /** Read-only view mirroring `roundVotes` — every recorded departure from this round's binding decision. */
+  roundDepartures(round: string): { actor: string; digest: string }[] {
+    return departuresFor(this.db, round);
   }
 
   /** `afp:Freeze` — suspend new work; existing rounds may still close. */

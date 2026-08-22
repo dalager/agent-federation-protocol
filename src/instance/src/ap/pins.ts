@@ -68,6 +68,25 @@ export function validateIrrevocableActions(policy: ActionPolicy, names: readonly
   }
 }
 
+/** ADR-0019 W1: the reserved category releasing an actuator when a round did not decide. */
+export const NO_DECISION_CATEGORY = "afp:no-decision";
+
+/**
+ * A proposal-pinned policy MUST name an admissible action for every option the
+ * round offers AND for `afp:no-decision`. Refused at pin time, like
+ * `validateActionPolicy`'s no-verdict rule — a round whose policy cannot answer
+ * one of its own outcomes leaves the actuator parked on exactly the morning it
+ * mattered.
+ */
+export function validateProposalActionPolicy(policy: ActionPolicy, options: readonly string[]): void {
+  for (const option of [...options, NO_DECISION_CATEGORY]) {
+    const action = policy[option];
+    if (typeof action !== "string" || !action) {
+      throw new Error(`afp:actionPolicy is missing a declared, non-empty action for outcome ${option} (ADR-0019)`);
+    }
+  }
+}
+
 /**
  * The pin set as it goes onto the wire — keys present only when supplied.
  *

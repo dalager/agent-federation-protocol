@@ -7,6 +7,12 @@
 > output shape below exists; where the fiction of scenarios 05–08 exceeds the build,
 > this document stops. The warts are load-bearing and listed at the end.
 
+| **Support status** | **Snapshot — no findings of its own** |
+|---|---|
+| What it is | the built stack's ordinary day, every noun pointing at a file. A baseline record, not a spec test |
+| Caveat | it describes the stack **as it ran when written**; the [support index](README.md#is-this-workload-supported) is the current view |
+
+
 Kasper operates the integration practice's instance. "Operates" flatters it, he says:
 the whole system is one Node process he starts when something needs it, one SQLite
 file, a directory of keys, and a Python script that keeps everyone honest. This is his

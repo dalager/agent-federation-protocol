@@ -6,6 +6,12 @@
 > way. Same fictive frame as every scenario — a plausible telling, not a case study.
 > The protocol appears only where a person would actually meet it.
 
+| **Support status** | **Companion piece — no findings of its own** |
+|---|---|
+| What it is | [Scenario 08](08-the-subcontract.md) retold through its human actors: a readability check on the design, not a spec test |
+| Support | inherits scenario 08's — see its [support block](08-the-subcontract.md) |
+
+
 ---
 
 Mette runs the integration practice at a consultancy in Aarhus. Fourteen people, a

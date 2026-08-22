@@ -210,10 +210,17 @@ async function main(): Promise<void> {
 
       console.log(`\nalpha  ${demo.alpha.origin}  (n-noc, n-telemetry) — hosts the bridge at /hubs/bridge/inbox`);
       console.log(`bravo  ${demo.bravo.origin}  (s-noc)`);
-      console.log(`gamma  ${demo.gamma.origin}  (e-noc, e-watcher)\n`);
+      console.log(`gamma  ${demo.gamma.origin}  (e-noc, e-watcher, e-notify)\n`);
 
       console.log(`the bridge seats ${demo.members.length}, foreign seats enrolled through the real inbox`);
-      console.log(`  observer: ${shortAgent(demo.observer)} — reads at hub visibility, never decides\n`);
+      console.log(`  observer: ${shortAgent(demo.observer)} — reads at hub visibility, never decides`);
+      console.log(`  actuator: ${shortAgent(demo.actuation.actor)} — reads everything, decides nothing, carries the outcome out\n`);
+
+      console.log("the round declares its own terms before a vote exists (ADR-0018, ADR-0019):");
+      console.log(`  bar       ${demo.quorumBar.rule} over a pinned total of ${demo.quorumBar.total}`);
+      console.log(`  deadline  ${demo.deadline}`);
+      console.log(`  binding   joint — an outvoted member departs on the record or the record shows nothing`);
+      console.log(`  policy    one admissible action per outcome, afp:no-decision included\n`);
 
       console.log("the write door (ADR-0016 Decision 2):");
       console.log(`  unenrolled agent, valid operator      ${demo.rogueStatus} {"error":"refused"}`);
@@ -221,9 +228,23 @@ async function main(): Promise<void> {
       console.log(`  enrolled observer's vote              ${demo.observerVoteStatus} at the door, dead in the handler`);
       console.log(`  member votes tallied                  ${demo.talliedVotes} (the observer's not among them)\n`);
 
-      console.log("afp:uncounted on the closing DecisionRecord:");
+      console.log(`outcome:  ${demo.outcome}${demo.noDecisionReason ? ` (${demo.noDecisionReason})` : ""}`);
+      for (const [option, weight] of Object.entries(demo.weightTally).sort((a, b) => b[1] - a[1])) {
+        console.log(`  ${option.padEnd(16)} ${"█".repeat(Math.round(weight))} ${weight}`);
+      }
+
+      console.log("\nafp:uncounted on the closing DecisionRecord:");
       for (const [agent, status] of Object.entries(demo.uncounted)) {
         console.log(`  ${shortAgent(agent).padEnd(12)} ${status}`);
+      }
+
+      console.log(`\nthe consequence (ADR-0019) — bound to the decision, not improvised:`);
+      console.log(`  ${shortAgent(demo.actuation.actor)} published afp:action ${demo.actuation.action}`);
+      console.log(`  the round itself declared that action admissible for outcome "${demo.outcome}"`);
+      if (demo.departed.length) {
+        console.log(`  departure recorded: ${demo.departed.map(shortAgent).join(", ")} — bound, and saying otherwise`);
+      } else {
+        console.log("  no departures: nobody was outvoted on a binding outcome");
       }
 
       console.log(`\nreplica convergence (Offer{afp:Digest} / Accept{afp:StateDeltas}, over sockets):`);
@@ -239,6 +260,104 @@ async function main(): Promise<void> {
       console.log(`         bravo                   — ${demo.exports.bravo.activities} activities -> ${demo.exports.bravo.dir}`);
       console.log(`         gamma                   — ${demo.exports.gamma.activities} activities -> ${demo.exports.gamma.dir}`);
       console.log(`\nverify it:  python3 ../verifier/afp_verify.py export-p5/alpha export-p5/bravo export-p5/gamma --thread ${demo.incidentThread} --verbose\n`);
+      await demo.close();
+      break;
+    }
+
+    case "p5:llm": {
+      const config = loadConfig();
+      const { runP5Experiment } = await import("./experimentP5.ts");
+      const shortAgent = (url: string): string => url.split("/").pop() ?? url;
+      const wrap = (text: string, indent: string): string =>
+        text
+          .split(/\s+/)
+          .reduce<string[]>((lines, word) => {
+            const last = lines[lines.length - 1];
+            if (last !== undefined && `${last} ${word}`.length <= 76) lines[lines.length - 1] = `${last} ${word}`;
+            else lines.push(word);
+            return lines;
+          }, [])
+          .join(`\n${indent}`);
+
+      console.log(`brains: ${config.llmModel} @ ${config.llmBaseUrl}\n`);
+      console.log("It snowed overnight. Three schools share one bus company, so the buses can only");
+      console.log("run one timetable: the three of them close together, or none of them does.");
+      console.log("It is 05:30. The message to parents has to go out at 06:00.\n");
+      console.log("Each head teacher can see their own car park, their own roads, their own staff —");
+      console.log("and nobody else's. That is why they need somewhere shared to decide.\n");
+
+      const demo = await runP5Experiment({ endpoint: endpointOf(config) });
+      const who = (agent: string): string => demo.labels[agent] ?? agent;
+
+      console.log(`  Hilltop   ${demo.alpha.origin}  in town — also hosts the shared noticeboard`);
+      console.log(`  Riverside ${demo.bravo.origin}  out in the valley`);
+      console.log(`  Central   ${demo.gamma.origin}  middle of town\n`);
+      console.log(`the question:  ${demo.question}\n`);
+
+      console.log("each head teacher read what was in front of them, and answered:\n");
+      for (const [agent, assessment] of Object.entries(demo.assessments)) {
+        console.log(`  ${who(agent)} — ${assessment.verdict.toUpperCase()}`);
+        console.log(`    "${wrap(assessment.rationale, "     ")}"`);
+        console.log(`    (written by ${assessment.producedBy})\n`);
+      }
+
+      console.log("what the noticeboard did with those answers:");
+      console.log(`  votes counted     ${demo.talliedVotes} of ${demo.members.length} seats`);
+      for (const [option, weight] of Object.entries(demo.weightTally).sort((a, b) => b[1] - a[1])) {
+        console.log(`    ${option.padEnd(10)} ${"█".repeat(Math.round(weight))} ${weight}`);
+      }
+      console.log(`  the decision      ${demo.outcome}`);
+      console.log("    it was told each answer and none of the reasons, so anyone can recount");
+      console.log("    the vote later without being able to see a single school's car park.\n");
+      for (const [agent, status] of Object.entries(demo.uncounted)) {
+        console.log(`  ${status}: ${who(shortAgent(agent))}`);
+        console.log(`    recorded as "${status}", not as an abstention — the record does not`);
+        console.log("    pretend to know what someone who never answered would have said.\n");
+      }
+      console.log(`  ${who("e-watcher")} was let in the door (${demo.observerVoteStatus}) and its vote thrown away.`);
+      console.log("    It reads every school's traffic and formed the strongest opinion in the");
+      console.log("    room. Reading and deciding are separate permissions, and the count above");
+      console.log("    is where you can see which one it actually holds.\n");
+      console.log(`  someone with no seat at all was refused (${demo.rogueStatus}) — and refused again (${demo.provenRogueStatus})`);
+      console.log("    while holding up a genuine pass, because a pass proves you may read.\n");
+
+      console.log("the bar, and the message that had to go out either way:");
+      console.log(`  the round pinned ${demo.quorumBar.rule} over a total of ${demo.quorumBar.total}, before anyone voted`);
+      console.log(`  and a deadline of ${demo.deadline} — the world's clock, not the noticeboard's`);
+      if (demo.noDecisionReason) {
+        console.log(`  the schools did not clear it (${demo.noDecisionReason}), so nothing was decided —`);
+        console.log("  which is a recorded fact, not a silence, and it still releases the desk:");
+      } else {
+        console.log(`  the outcome cleared it, so "${demo.outcome}" is the decision:`);
+      }
+      console.log(`\n    "${wrap(demo.actuation.notice, "     ")}"`);
+      console.log(`\n  sent by ${who("e-notify")}, under the action the round itself declared`);
+      console.log(`  admissible for this outcome (${demo.actuation.action}). It votes on nothing,`);
+      console.log("  and this is the only kind of thing it is allowed to publish.");
+      if (demo.departed.length) {
+        console.log(`\n  ${demo.departed.map((a) => who(shortAgent(a))).join(", ")} recorded a departure: bound by a`);
+        console.log("  joint decision it voted against, and saying so on its own chain rather");
+        console.log("  than quietly doing otherwise.\n");
+      } else {
+        console.log("");
+      }
+
+      console.log("then the school hosting the noticeboard loses power:");
+      console.log(`  a new vote sent to it     bounces back to the sender (${demo.deadHubWriteError || "connection refused"})`);
+      console.log("    it fails loudly at whoever sent it, instead of disappearing quietly.");
+      console.log(`  a question already in the air  still gets answered: ${demo.meshCompleted}`);
+      if (demo.meshResult) {
+        console.log("\n  Riverside had already asked Central why the three of them disagreed. That");
+        console.log("  question went school to school and never through the noticeboard, so the");
+        console.log("  answer arrived anyway — and it is on the record:\n");
+        console.log(`    ${wrap(demo.meshResult.content.trim(), "    ")}`);
+        console.log(`\n    the record also says what wrote it: ${demo.meshResult.producedBy}`);
+      }
+
+      console.log(`\nexport:  alpha (with the bridge) — ${demo.exports.alpha.activities} activities -> ${demo.exports.alpha.dir}`);
+      console.log(`         bravo                   — ${demo.exports.bravo.activities} activities -> ${demo.exports.bravo.dir}`);
+      console.log(`         gamma                   — ${demo.exports.gamma.activities} activities -> ${demo.exports.gamma.dir}`);
+      console.log(`\nverify it:  python3 ../verifier/afp_verify.py export-p5-llm/alpha export-p5-llm/bravo export-p5-llm/gamma --thread ${demo.incidentThread} --verbose\n`);
       await demo.close();
       break;
     }
@@ -296,7 +415,7 @@ async function main(): Promise<void> {
     }
 
     default:
-      console.error(`unknown command: ${command}\nusage: cli.ts [demo|p2|p3|p4|p5|export|serve]`);
+      console.error(`unknown command: ${command}\nusage: cli.ts [demo|p2|p3|p4|p5|p5:llm|export|serve]`);
       process.exit(1);
   }
 }

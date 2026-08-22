@@ -50,6 +50,88 @@ def instant_millis(published) -> int:
     return delta.days * 86_400_000 + delta.seconds * 1000 + delta.microseconds // 1000
 
 
+def threshold_of(rule: dict, weights: dict[str, float]) -> int | None:
+    """ADR-0018 W2 — the quorum bar, in integers, from the proposal alone.
+
+    Mirrors TypeScript `thresholdOf` (`src/instance/src/hub/quorum.ts`) byte
+    for byte: `T` is the pinned total (every seat in `afp:voterWeights`, not
+    just the seats that voted), `//` throughout — never a ratio, a percentage
+    or a float, because the JCS numeric profile a signed object rides on
+    forbids non-integers. An unrecognised `afp:form` returns `None`
+    (`UNKNOWN_FORM`) rather than a guess: a rule a verifier cannot compute is
+    worse than no rule, because it reads like a bar was set.
+    """
+    if not isinstance(rule, dict):
+        return None
+    total = sum(weights.values())
+    form = rule.get("afp:form")
+    if form == "majority-of-total":
+        return total // 2 + 1
+    if form == "two-thirds-of-total":
+        return (2 * total) // 3 + 1
+    if form == "explicit":
+        threshold = rule.get("afp:threshold")
+        # Same convention as `reputation._usable_cost`: a bool is an int in
+        # Python but never a threshold, and an integer-valued float (legal on
+        # the wire — JCS forbids only non-integers) is accepted like one.
+        if isinstance(threshold, bool):
+            return None
+        if isinstance(threshold, int) and threshold >= 1:
+            return threshold
+        if isinstance(threshold, float) and threshold.is_integer() and threshold >= 1:
+            return int(threshold)
+        return None
+    return None
+
+
+def find_proposal_for_round(round_id, all_activities: list[dict]) -> dict | None:
+    """The `afp:Proposal` payload for a round id, or `None`.
+
+    Factored out of `check_decision_record` so the ADR-0018 W5 V7-V14
+    functions (`check_departure`, `check_decision_settlement`) can resolve a
+    round's proposal the same way, without a second lookup convention.
+    """
+    return next(
+        (
+            obj
+            for a in all_activities
+            if (obj := afp_object(a, "afp:Proposal")) is not None
+            and obj.get("afp:round") == round_id
+        ),
+        None,
+    )
+
+
+def _decision_by_digest(digest, all_activities: list[dict]) -> tuple[dict | None, dict | None]:
+    """`(activity, payload)` for the `afp:DecisionRecord` matching `digest`, or `(None, None)`."""
+    for activity in all_activities:
+        obj = afp_object(activity, "afp:DecisionRecord")
+        if obj is not None and digest_of(activity) == digest:
+            return activity, obj
+    return None, None
+
+
+def wrapped_payload(activity: dict, afp_type: str) -> dict | None:
+    """An `afp:*` payload, preferring the wrapped `object` over the wrapper.
+
+    Like `afp:Award` (see `allocation.py`), `afp:Settlement` and
+    `afp:Departure` type their outer activity the same as their payload, so
+    `afp_object`'s bare-or-wrapped preference for the outer shape would return
+    the wrapper — which carries none of the fields being checked. Every
+    double-typed activity must read through here; reading one through
+    `afp_object` yields an empty payload and a check that passes on nothing.
+    """
+    obj = activity.get("object")
+    if isinstance(obj, dict) and obj.get("type") == afp_type:
+        return obj
+    return afp_object(activity, afp_type)
+
+
+def settlement_payload(activity: dict) -> dict | None:
+    """An `afp:Settlement`'s payload — see `wrapped_payload`."""
+    return wrapped_payload(activity, "afp:Settlement")
+
+
 def afp_object(activity: dict, afp_type: str) -> dict | None:
     """The `afp:*` payload of an activity, whether it travels bare or wrapped.
 
@@ -65,19 +147,30 @@ def afp_object(activity: dict, afp_type: str) -> dict | None:
     return None
 
 
-def enrolled_roles(hub_actor: str, all_activities: list[dict]) -> dict[str, str]:
-    """agent -> role for the hub's currently enrolled agents (ADR-0004 Decision 1).
+# A sentinel later than any instant a record can carry, so `enrolled_roles`
+# can be `enrolled_roles_at`'s zero-argument-equivalent caller without a
+# second fold — ADR-0019 W5 V3's note: "no existing check shifts."
+_MAX_MILLIS = 2**62
 
-    Replayed from the Enroll/Unenroll trail: role is per-agent last-writer-wins
-    — latest `published` wins, equal timestamps break by higher activity digest.
-    An Enroll without `afp:role` reads as `member`, so every pre-ADR-0004
-    record is unchanged.
+
+def enrolled_roles_at(hub_actor: str, all_activities: list[dict], at_millis: int) -> dict[str, str]:
+    """agent -> role for the hub's enrolled agents as of `at_millis` (ADR-0019
+    W5 V3), replayed from the Enroll/Unenroll trail.
+
+    The same last-writer-wins fold `enrolled_roles` uses — latest `published`
+    wins, equal timestamps break by higher activity digest — stopped at
+    `at_millis`: an Enroll/Unenroll published after that instant never enters
+    the fold. `enrolled_roles` is this function at `at_millis = _MAX_MILLIS`,
+    i.e. "as of now" — so there is one fold, not two, and no existing check
+    shifts behaviour.
     """
     roles: dict[str, str] = {}
     trail = [
         a
         for a in all_activities
-        if a.get("type") in ("afp:Enroll", "afp:Unenroll") and a.get("target") == hub_actor
+        if a.get("type") in ("afp:Enroll", "afp:Unenroll")
+        and a.get("target") == hub_actor
+        and instant_millis(a.get("published")) <= at_millis
     ]
     for activity in sorted(trail, key=lambda a: (instant_millis(a.get("published")), digest_of(a))):
         agent = activity.get("object")
@@ -88,6 +181,18 @@ def enrolled_roles(hub_actor: str, all_activities: list[dict]) -> dict[str, str]
         else:
             roles.pop(agent, None)
     return roles
+
+
+def enrolled_roles(hub_actor: str, all_activities: list[dict]) -> dict[str, str]:
+    """agent -> role for the hub's currently enrolled agents (ADR-0004 Decision 1).
+
+    Replayed from the Enroll/Unenroll trail: role is per-agent last-writer-wins
+    — latest `published` wins, equal timestamps break by higher activity digest.
+    An Enroll without `afp:role` reads as `member`, so every pre-ADR-0004
+    record is unchanged. `enrolled_roles_at`'s zero-argument-equivalent caller
+    (ADR-0019 W5 V3) — the same fold, "as of now."
+    """
+    return enrolled_roles_at(hub_actor, all_activities, _MAX_MILLIS)
 
 
 def enrolled_instances(hub_actor: str, all_activities: list[dict]) -> dict[str, str]:
@@ -196,7 +301,25 @@ def check_decision_record(
     decision_digest = digest_of(decision_activity)
     used_for_actuation = any(a.get("afp:actsOn") == decision_digest for a in all_activities)
     outcome_id = decision.get("afp:outcome")
-    if used_for_actuation and isinstance(outcome_id, str):
+    # ADR-0019 W1/W2 — a round whose own proposal pins an afp:actionPolicy is
+    # a governance round: afp:outcome is one of its options (or afp:no-
+    # decision), never a Synthesis id, and W2's third resolution root reads
+    # it that way. This check is for the other shape — a DecisionRecord that
+    # ratifies a Synthesis (ADR-0010 Decision 3) — so a proposal-pinned round
+    # skips it entirely rather than failing an expectation that never applied.
+    governing_proposal = find_proposal_for_round(round_id, all_activities)
+    is_governance_round = isinstance(governing_proposal, dict) and isinstance(
+        governing_proposal.get("afp:actionPolicy"), dict
+    )
+    # ADR-0018 W6 — afp:no-decision is a terminal that ratifies nothing; it is
+    # never a Synthesis id to resolve, however this branch's actuation trigger
+    # got tripped.
+    if (
+        used_for_actuation
+        and not is_governance_round
+        and isinstance(outcome_id, str)
+        and outcome_id != "afp:no-decision"
+    ):
         outcome_synthesis = next(
             (
                 obj
@@ -213,15 +336,7 @@ def check_decision_record(
             f"afp:Synthesis (ADR-0010)",
         )
 
-    proposal = next(
-        (
-            obj
-            for a in all_activities
-            if (obj := afp_object(a, "afp:Proposal")) is not None
-            and obj.get("afp:round") == round_id
-        ),
-        None,
-    )
+    proposal = governing_proposal
     if not report.record(
         f"decision: {label} has a matching afp:Proposal",
         proposal is not None,
@@ -281,6 +396,8 @@ def check_decision_record(
     outside: list[tuple[str, str]] = []
     unsigned: list[str] = []
     tally: dict[str, float] = {}
+    proposal_deadline = proposal.get("afp:deadline")
+    late: list[tuple[str, str]] = []
 
     for vote_hash in decision.get("afp:countedVotes", []):
         vote_activity = by_digest.get(vote_hash)
@@ -316,6 +433,14 @@ def check_decision_record(
         value = vote_obj.get("value")
         tally[value] = tally.get(value, 0) + declared_weights.get(voter, 0)
         counted_voters.add(voter)
+
+        # ADR-0018 W4/V5 — a counted vote whose own `published` is after the
+        # proposal's `afp:deadline` closes the "signed lie" half of the
+        # double enforcement: the hub's own clock gate (W4) is not evidence a
+        # verifier holding only the bundle can recompute, but the vote's
+        # self-signed `published` is.
+        if isinstance(proposal_deadline, str) and instant_millis(vote_activity.get("published")) > instant_millis(proposal_deadline):
+            late.append((vote_hash, voter))
 
     report.record(
         f"decision: {label} evidence-set completeness",
@@ -419,6 +544,257 @@ def check_decision_record(
         "" if values_match else
         f"recomputed {tally!r} but afp:DecisionRecord declares {declared_tally!r}",
     )
+
+    # ADR-0018 W5 — V1-V6, the round-as-a-commitment checks. Every one of
+    # these is conditional on the W1 property it reads being present on the
+    # proposal or the record, so a pre-ADR-0018 record — no afp:quorumRule,
+    # no afp:deadline, no afp:binding, outcome never afp:no-decision —
+    # triggers none of them, and the shipped export/, export-p2, export-p3
+    # bundles replay with the same check counts as before this ADR.
+    quorum_rule = proposal.get("afp:quorumRule")
+    options = proposal.get("afp:options") or []
+    outcome = decision.get("afp:outcome")
+
+    if isinstance(quorum_rule, dict):
+        # V1 — a rule a verifier cannot compute is a failure, not a skip
+        # (W2): silently ignoring an unknown afp:form would let a bar read as
+        # set when nothing was checkable.
+        bar = threshold_of(quorum_rule, declared_weights)
+        report.record(
+            f"decision: {label} quorum rule is a known form",
+            bar is not None,
+            "" if bar is not None else
+            f"afp:quorumRule names an unrecognised afp:form {quorum_rule.get('afp:form')!r} (ADR-0018)",
+        )
+        # V2 — the check finding 51 exists for: a real-option outcome that
+        # did not in fact clear the pinned bar.
+        if bar is not None and isinstance(outcome, str) and outcome in options:
+            cleared = tally.get(outcome, 0) >= bar
+            report.record(
+                f"decision: {label} outcome cleared the pinned quorum rule",
+                cleared,
+                "" if cleared else
+                f"afp:outcome {outcome!r} tallies {tally.get(outcome, 0)!r}, below the pinned "
+                f"bar {bar} (ADR-0018)",
+            )
+
+    if outcome == "afp:no-decision":
+        # V3 — the reserved outcome always carries a reason from the closed
+        # set; anything else is an outcome that reads as decided-nothing with
+        # no recomputable account of why.
+        reason = decision.get("afp:noDecisionReason")
+        reason_known = reason in ("expired", "threshold-not-met")
+        report.record(
+            f"decision: {label} no-decision carries a reason",
+            reason_known,
+            "" if reason_known else
+            f"afp:outcome is afp:no-decision but afp:noDecisionReason is {reason!r}, not "
+            f"'expired' or 'threshold-not-met' (ADR-0018)",
+        )
+        # V4 — the reason is recomputable, not asserted: `threshold-not-met`
+        # requires the actual winner to have missed the bar, `expired`
+        # requires the record's own `published` to be past the deadline —
+        # W3's `at` is the close instant, and the record's `published` is the
+        # verifier's only stand-in for it.
+        if reason_known:
+            winner = None
+            winner_weight = None
+            for opt in list(options) + ["abstain"]:
+                weight = tally.get(opt, 0)
+                if winner_weight is None or weight > winner_weight:
+                    winner, winner_weight = opt, weight
+            bar = threshold_of(quorum_rule, declared_weights) if isinstance(quorum_rule, dict) else None
+            if reason == "threshold-not-met":
+                justified = bar is None or winner == "abstain" or (winner_weight or 0) < bar
+            else:  # "expired"
+                deadline = proposal.get("afp:deadline")
+                justified = isinstance(deadline, str) and instant_millis(decision_activity.get("published")) > instant_millis(deadline)
+            report.record(
+                f"decision: {label} no-decision reason is justified",
+                justified,
+                "" if justified else
+                (f"reason is 'threshold-not-met' but the winning option {winner!r} tallies "
+                 f"{winner_weight!r}, at or above the bar {bar} (ADR-0018)"
+                 if reason == "threshold-not-met" else
+                 f"reason is 'expired' but the record's published {decision.get('published')!r} is "
+                 f"at or before afp:deadline {proposal.get('afp:deadline')!r} (ADR-0018)"),
+            )
+
+    if isinstance(proposal_deadline, str):
+        # V5 — the other half of W4's double enforcement: a counted vote
+        # whose own signed published is after the deadline.
+        report.record(
+            f"decision: {label} counted votes respect the deadline",
+            not late,
+            "" if not late else
+            "counted vote published after afp:deadline: "
+            + ", ".join(f"{voter} ({h[:24]}…)" for h, voter in late) + " (ADR-0018)",
+        )
+
+    if isinstance(quorum_rule, dict) or isinstance(proposal_deadline, str) or isinstance(proposal.get("afp:binding"), str):
+        # V6 — the reserved value can never be a real option; a proposal that
+        # lists it fails replay rather than being silently disambiguated.
+        reserved_listed = "afp:no-decision" in options
+        report.record(
+            f"decision: {label} afp:no-decision is not an option",
+            not reserved_listed,
+            "" if not reserved_listed else
+            "afp:options lists the reserved value afp:no-decision (ADR-0018)",
+        )
+
+
+def check_departure(report, activity: dict, all_activities: list[dict]) -> None:
+    """ADR-0018 W5/W6 — V7-V9, the `afp:Departure` checks.
+
+    A Departure is a pinned voter's public record of leaving a binding
+    decision it lost. Unchecked it is a bare claim; V7-V9 make it
+    recomputable: the decision it names must actually be present, the
+    departing actor must actually have been pinned to vote on that round, and
+    the round must actually have been declared `afp:binding: "joint"` — a
+    Departure from an advisory round, or from an agent that was never seated,
+    departs nothing.
+    """
+    departure = wrapped_payload(activity, "afp:Departure") or {}
+    label = departure.get("id", "<no id>")
+    decision_digest = departure.get("afp:decision")
+    _decision_activity, decision = _decision_by_digest(decision_digest, all_activities)
+    resolves = decision is not None
+    report.record(
+        f"departure: {label} names a producible DecisionRecord",
+        resolves,
+        "" if resolves else
+        f"afp:decision {decision_digest!r} resolves to no present afp:DecisionRecord activity "
+        f"in the pool (ADR-0018)",
+    )
+    if not resolves:
+        return
+
+    round_id = decision.get("afp:round")
+    proposal = find_proposal_for_round(round_id, all_activities)
+    pinned_voters = set((proposal or {}).get("afp:voters", []) or {})
+    actor = activity.get("actor")
+    is_pinned = actor in pinned_voters
+    report.record(
+        f"departure: {label} is by a pinned voter of that round",
+        is_pinned,
+        "" if is_pinned else
+        f"{actor!r} departs afp:round {round_id!r} without being one of its pinned afp:voters "
+        f"(ADR-0018)",
+    )
+
+    is_binding = (proposal or {}).get("afp:binding") == "joint"
+    report.record(
+        f"departure: {label} departs a binding decision",
+        is_binding,
+        "" if is_binding else
+        f"afp:round {round_id!r}'s proposal does not declare afp:binding: \"joint\" (ADR-0018)",
+    )
+
+
+def check_decision_settlement(
+    report,
+    activity: dict,
+    all_activities: list[dict],
+    pool: list[dict],
+    seen_rounds: dict[str, str],
+) -> None:
+    """ADR-0018 W5 — V10-V14, the decision-subject `afp:Settlement` checks.
+
+    Mutually exclusive with the allocation settlement's `afp:task` (W1): this
+    is the variant that closes a round rather than a task. V13 is the one
+    worth reading twice — *dissent* is "voted something other than what the
+    record decided", *vindicated* is "voted what the world turned out to
+    be", and both are recomputed here from `afp:countedVotes`, never trusted
+    from the settlement's own `afp:dissentVindicated` list, so a hub can
+    neither hand standing to a majority voter nor withhold it from an actual
+    dissenter without the check catching the mismatch.
+
+    `seen_rounds` is shared across every decision-settlement in one replay
+    (round id -> the first settlement id that claimed it), so V14 catches a
+    second settlement naming a round the first one already settled.
+    """
+    settlement = settlement_payload(activity) or {}
+    label = settlement.get("id", "<no id>")
+    has_task = "afp:task" in settlement
+    decision_digest = settlement.get("afp:decision")
+    has_decision = decision_digest is not None
+    one_subject = has_task != has_decision
+    report.record(
+        f"settlement: {label} names one subject",
+        one_subject,
+        "" if one_subject else
+        "an afp:Settlement must carry exactly one of afp:task / afp:decision — this one "
+        f"carries {'both' if has_task and has_decision else 'neither'} (ADR-0018)",
+    )
+    if not has_decision:
+        return
+
+    _decision_activity, decision = _decision_by_digest(decision_digest, all_activities)
+    round_id = settlement.get("afp:round")
+    resolves = decision is not None and decision.get("afp:round") == round_id
+    report.record(
+        f"settlement: {label} names a producible DecisionRecord",
+        resolves,
+        "" if resolves else
+        (f"afp:decision {decision_digest!r} resolves to no present afp:DecisionRecord (ADR-0018)"
+         if decision is None else
+         f"afp:decision resolves to a DecisionRecord for afp:round {decision.get('afp:round')!r}, "
+         f"not this settlement's declared afp:round {round_id!r} (ADR-0018)"),
+    )
+    if not resolves:
+        return
+
+    proposal = find_proposal_for_round(round_id, all_activities)
+    options = (proposal or {}).get("afp:options") or []
+    observed = settlement.get("afp:observedOutcome")
+    outcome_ok = observed in options
+    report.record(
+        f"settlement: {label} observed outcome is an option of the round",
+        outcome_ok,
+        "" if outcome_ok else
+        f"afp:observedOutcome {observed!r} is not among afp:round {round_id!r}'s afp:options "
+        f"{options!r} (ADR-0018)",
+    )
+
+    # V13 — recomputed from afp:countedVotes, never from the settlement's own
+    # afp:dissentVindicated list.
+    by_digest = {digest_of(a): a for a in pool}
+    decided_outcome = decision.get("afp:outcome")
+    voted: dict[str, object] = {}
+    for vote_hash in decision.get("afp:countedVotes", []):
+        vote_activity = by_digest.get(vote_hash)
+        vote_obj = afp_object(vote_activity, "afp:Vote") if isinstance(vote_activity, dict) else None
+        if vote_obj is None:
+            continue
+        voter = vote_activity.get("actor")
+        if isinstance(voter, str):
+            voted[voter] = vote_obj.get("value")
+
+    bad: list[str] = []
+    for candidate in settlement.get("afp:dissentVindicated") or []:
+        value = voted.get(candidate)
+        if candidate not in voted:
+            bad.append(f"{candidate} (no counted vote in afp:round {round_id!r})")
+        elif value != observed:
+            bad.append(f"{candidate} (voted {value!r}, not the observed outcome {observed!r})")
+        elif value == decided_outcome:
+            bad.append(f"{candidate} (voted the decided outcome {decided_outcome!r} — not a dissenter)")
+    report.record(
+        f"settlement: {label} vindicated dissenters voted the observed outcome",
+        not bad,
+        "" if not bad else "; ".join(bad) + " (ADR-0018)",
+    )
+
+    # V14 — one settlement per round in this bundle.
+    prior = seen_rounds.get(round_id)
+    duplicate = prior is not None and prior != label
+    report.record(
+        f"settlement: {label} settles its round once",
+        not duplicate,
+        "" if not duplicate else
+        f"afp:round {round_id!r} is already settled by {prior!r} (ADR-0018)",
+    )
+    seen_rounds.setdefault(round_id, label)
 
 
 def check_archive_state(report, activity: dict) -> None:

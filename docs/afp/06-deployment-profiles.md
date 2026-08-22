@@ -160,3 +160,47 @@ P4; it does not revisit P1–P3.
 One optional exception, in the additive direction: dual-publish shadow Notes (nominally P4)
 need no agreement and may be switched on at any phase, since they are the cheapest external
 anchor for outbox chain heads — see above.
+
+## Designing for per-subject disclosure
+
+Some deployments owe a trace to a *person* rather than to a counterparty: the EU AI Act
+duty that motivates [scenario 09](scenarios/09-the-screening-sidecar.md), a subject access
+request, a regulator asking what was decided about one applicant. The export machinery does
+not have that axis. ADR-0009's scope grammar cuts an export on **thread, visibility, or
+agreement**, and none of those three is a data subject — so whether a subject-scoped export
+is even possible is decided by how a deployment laid out its threads, long before anyone
+asks for one. Two rules follow, and both are design-time or never (finding 32).
+
+**Where disclosure is per-subject, the thread SHOULD be the subject-scoped unit.** One
+case, one `context`. Then the existing grammar already produces the export the duty
+demands, with no new mechanism and no per-request judgement: thread-scoped export, other
+threads become digest-only stubs (ADR-0009), the chain stays linkable, and the pins the
+answer was judged under travel with it (ADR-0010 Decision 5). A deployment that instead
+runs one long thread per *caseworker*, per shift, or per batch has made subject-scoped
+disclosure structurally impossible — redaction operates on activities, an activity belongs
+to exactly one thread, and there is no cut that separates two subjects sharing one.
+
+**Cross-thread carriers SHOULD carry no subject content.** Application-defined CRDT stores
+(02), the settlement trail and the reputation registers it feeds (ADR-0004) are keyed by
+task, agent or asset — never by thread — so there is no cut to make in them at all. Keep
+them to references: ids, digests, counts, scores. The moment one holds a subject's name, a
+case summary, or a free-text note, that content is outside every scope the export grammar
+can express, and the honest answer to "produce this subject's record, and only this
+subject's" becomes *no*.
+
+That second rule is sharper than it looks, because two later decisions pull in opposite
+directions. ADR-0012 Decision 4 keeps CRDT state **out** of the bundle and makes the
+omission checkable by declaring the bundle's content inventory. ADR-0015 Decision 3 then
+lets `afp:Archive` carry the hub's converged state **into** the record, once, at the moment
+it stops changing — because at P5 that state *is* the coordinated timeline a regulator
+asks about. Both are right. Together they mean a store's contents are excluded right up
+until the hub closes, and then published wholesale: a store that accumulated subject
+content quietly for the life of an engagement discloses it all at archive time, to everyone
+holding the case file. Deciding what may go in a hub-scoped store is therefore a disclosure
+decision taken at design time, not a storage decision taken per write.
+
+Neither rule is machinery, and neither is enforced — a protocol cannot inspect what a
+deployment means by a thread. What the protocol does guarantee is that the choice is
+visible: the content inventory says what a bundle contains, and the thread structure is
+plain in the record. State the layout you chose, and why, next to your retention duty
+(ADR-0012) — a deployment that never wrote it down has usually not made the choice.

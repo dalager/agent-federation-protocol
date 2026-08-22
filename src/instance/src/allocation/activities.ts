@@ -346,3 +346,39 @@ export function settlement(envelope: Envelope, spec: SettlementSpec): { [key: st
   }
   return activity;
 }
+
+// --------------------------------------------------------- Decision settlement (ADR-0018 W1)
+
+/**
+ * A second, mutually exclusive `afp:Settlement` subject: settles an
+ * `afp:DecisionRecord` rather than an `afp:Task`. `settlement()` above is
+ * untouched to the byte — the allocation settlement does not change.
+ */
+export interface DecisionSettlementSpec {
+  settlementId: string;
+  hub: string;
+  /** Digest of the DecisionRecord *activity* this settles. */
+  decision: string;
+  round: string;
+  /** MUST be one of the proposal's `afp:options`. */
+  observedOutcome: string;
+  /** 07's artifact shape, hash-addressed. */
+  evidence?: readonly { [key: string]: JsonValue }[];
+  /** Accurate minority objections raise standing, never sink it (04, Decision 5). */
+  dissentVindicated?: readonly string[];
+}
+
+/** `afp:Settlement` on a decision — links the recorded outcome to what the world showed. */
+export function settleDecision(envelope: Envelope, spec: DecisionSettlementSpec): { [key: string]: JsonValue } {
+  const object: { [key: string]: JsonValue } = {
+    id: spec.settlementId,
+    type: "afp:Settlement",
+    "afp:hub": spec.hub,
+    "afp:decision": spec.decision,
+    "afp:round": spec.round,
+    "afp:observedOutcome": spec.observedOutcome,
+  };
+  if (spec.evidence?.length) object["afp:evidence"] = spec.evidence.map((e) => ({ ...e }));
+  if (spec.dissentVindicated?.length) object["afp:dissentVindicated"] = [...spec.dissentVindicated];
+  return { ...base(envelope, "afp:Settlement"), object };
+}

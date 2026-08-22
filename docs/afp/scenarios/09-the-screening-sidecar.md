@@ -12,6 +12,20 @@
 > raised the count to twelve — the corrections are folded into the beats they touch.
 > Verdict at the end.
 
+| **Support status** | **Supported — all findings closed** |
+|---|---|
+| Findings raised | 12 · finding 32's remainder closed last, 2026-08-22 ([06 — per-subject disclosure](../06-deployment-profiles.md#designing-for-per-subject-disclosure)) |
+| Resolved by | [ADR-0010](../adr/0010-pinning-without-an-auction.md), [ADR-0011](../adr/0011-supersession-meets-the-irreversible-world.md), [ADR-0012](../adr/0012-the-long-horizon.md), spec v3.22 and v3.28 |
+| See it run | no standalone demo — covered by the gate(s) below ([why](README.md#is-this-workload-supported)) |
+| Gated by | `adr0010.test.ts`, `adr0010-parity.test.ts`, `adr0011.test.ts`, `adr0012.test.ts` |
+
+**Read the walkthrough below as history.** It records what strained when this workload was
+first walked, and is deliberately left as written — that is what makes a scenario evidence
+rather than a brochure. Every strain it names is now built; the
+[support index](README.md#is-this-workload-supported) is the current-status view, and the
+ledger there names the decision that closed each finding.
+
+
 ## User story
 
 **As** the platform owner of a public agency's caseworker system — where citizen

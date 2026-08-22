@@ -6,6 +6,20 @@
 > scenario where the *deliverable is an estimate* — nothing at answer-time can verify it.
 > Verdict at the end.
 
+| **Support status** | **Supported — all findings closed** |
+|---|---|
+| Findings raised | 6 |
+| Resolved by | spec v3.5 — coalition allocation, `afp:Synthesis`, `afp:Settlement` ([03](../03-coordination.md), [04](../04-operations.md)) |
+| See it run | `npm run demo:p3` · `npm run demo:p3:llm` |
+| Gated by | `allocation.test.ts` |
+
+**Read the walkthrough below as history.** It records what strained when this workload was
+first walked, and is deliberately left as written — that is what makes a scenario evidence
+rather than a brochure. Every strain it names is now built; the
+[support index](README.md#is-this-workload-supported) is the current-status view, and the
+ledger there names the decision that closed each finding.
+
+
 ## User story
 
 **As** a partner who has just been asked by a client "what would this cost, given these

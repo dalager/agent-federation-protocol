@@ -7,6 +7,20 @@
 > every action is already hash-bound to its answer — which is exactly what makes the
 > question answerable. Verdict at the end.
 
+| **Support status** | **Supported — all findings closed** |
+|---|---|
+| Findings raised | 0 raised — it sharpened finding 24 |
+| Resolved by | [ADR-0007](../adr/0007-supersession.md) |
+| See it run | no standalone demo — covered by the gate(s) below ([why](README.md#is-this-workload-supported)) |
+| Gated by | `adr0007.test.ts` |
+
+**Read the walkthrough below as history.** It records what strained when this workload was
+first walked, and is deliberately left as written — that is what makes a scenario evidence
+rather than a brochure. Every strain it names is now built; the
+[support index](README.md#is-this-workload-supported) is the current-status view, and the
+ledger there names the decision that closed each finding.
+
+
 ## User story
 
 **As** the platform team of OurAwesomeProduct,

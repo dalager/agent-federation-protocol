@@ -11,6 +11,20 @@
 > [the same events as the people involved tell them](08-the-subcontract-story.md) —
 > carries the human side: how it was sold, what it cost, what was harder than expected.
 
+| **Support status** | **Supported — all findings closed** |
+|---|---|
+| Findings raised | 7 |
+| Resolved by | [ADR-0008](../adr/0008-p4-federation-stack.md), [ADR-0009](../adr/0009-federated-replay.md) |
+| See it run | `npm run demo:p4` |
+| Gated by | `adr0008.test.ts`, `adr0008b.test.ts`, `adr0009.test.ts` |
+
+**Read the walkthrough below as history.** It records what strained when this workload was
+first walked, and is deliberately left as written — that is what makes a scenario evidence
+rather than a brochure. Every strain it names is now built; the
+[support index](README.md#is-this-workload-supported) is the current-status view, and the
+ledger there names the decision that closed each finding.
+
+
 ## User story
 
 **As** the lead of the integration practice (scenario 05) — whose client engagement now

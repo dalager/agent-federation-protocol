@@ -63,7 +63,7 @@ export function synthesisOf(activity: Record<string, unknown>): Record<string, u
  */
 export const ACTION_PHRASES = [
   "answers within the pinned category set",
-  "acts on a producible Synthesis",
+  "acts on a producible justification",
   "traces to a pinned action policy",
   "is the action the answer permitted",
 ] as const;

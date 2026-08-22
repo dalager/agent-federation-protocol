@@ -132,12 +132,24 @@ def check_disclosed_answers_keep_their_pins(report, thread_pool: list[dict]) -> 
     activities are present and carry no pins is ADR-0006's opt-in reading and
     passes untouched. The distinction is presence of the carrier, never presence
     of the pins.
+
+    ADR-0019 W5 V6 widens the carrier set: a round has no task-bearing
+    activity anywhere in its thread — it opens with `Offer{afp:Proposal}`,
+    which is not one — so a thread carrying a proposal has its opening act
+    too. This is carrier presence only (note A): a proposal still does NOT
+    join `check_pins`'s thread-level pin agreement, which stays task-only.
     """
     with_tasks = set(task_activities_by_context(thread_pool))
+    with_proposals = {
+        context
+        for a in thread_pool
+        if isinstance(context := a.get("context"), str) and afp_object(a, "afp:Proposal") is not None
+    }
+    carriers = with_tasks | with_proposals
     answered: dict[str, str] = {}
     for activity in thread_pool:
         context = activity.get("context")
-        if not isinstance(context, str) or context in with_tasks or context in answered:
+        if not isinstance(context, str) or context in carriers or context in answered:
             continue
         if _synthesis_payload(activity) is not None:
             answered[context] = "a Synthesis"
@@ -264,6 +276,42 @@ def check_pins(report, thread_pool: list[dict]) -> None:
                     "selection rule's minConfidence, neither of which exists in the direct "
                     "flow (ADR-0010)",
                 )
+
+
+def check_proposal_action_policy(report, thread_pool: list[dict]) -> None:
+    """ADR-0019 W5 V5 — a proposal-pinned `afp:actionPolicy` must name an
+    admissible action for every option the round offers, and for the reserved
+    `afp:no-decision` key.
+
+    `validateProposalActionPolicy` already refuses this at pin time
+    (ADR-0019 W3), the same discipline `check_pins`'s `afp:no-verdict`
+    check enforces for a task's policy — this is replay's recomputation of
+    that refusal, so a mutated bundle fails the same way an unvalidated one
+    would have, and a round whose policy cannot answer one of its own
+    outcomes never leaves the actuator parked without a named failure.
+    """
+    for activity in thread_pool:
+        proposal = afp_object(activity, "afp:Proposal")
+        if proposal is None:
+            continue
+        policy = proposal.get("afp:actionPolicy")
+        if not isinstance(policy, dict):
+            continue
+        round_id = proposal.get("afp:round", "<no round>")
+        options = proposal.get("afp:options") or []
+        missing = [
+            outcome
+            for outcome in list(options) + ["afp:no-decision"]
+            if not isinstance(policy.get(outcome), str) or policy.get(outcome) == ""
+        ]
+        report.record(
+            f"pins: {round_id} proposal policy names an action for every outcome",
+            not missing,
+            "" if not missing else
+            f"afp:actionPolicy names no admissible action for {missing!r} — a round whose "
+            f"policy cannot answer one of its own outcomes leaves the actuator parked "
+            f"(ADR-0019)",
+        )
 
 
 def _synthesis_payload(activity: dict) -> dict | None:

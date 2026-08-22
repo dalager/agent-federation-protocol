@@ -37,8 +37,12 @@ Award reads its pinned answer-sufficiency as a count over
 from __future__ import annotations
 
 import pins
-from decision import afp_object
+from decision import afp_object, enrolled_roles, enrolled_roles_at, find_proposal_for_round, instant_millis
+
 from proof import digest_of
+#: ADR-0018 Decision 2 — the reserved outcome of a round that did not decide.
+#: Actionable, but only through the policy key of the same name (ADR-0019 W1).
+NO_DECISION_OUTCOME = "afp:no-decision"
 
 
 def _synthesis_of(activity: dict) -> dict | None:
@@ -49,6 +53,43 @@ def _synthesis_of(activity: dict) -> dict | None:
     if isinstance(obj, dict) and obj.get("type") == "afp:Synthesis":
         return obj
     return afp_object(activity, "afp:Synthesis")
+
+
+def _governance_decision(target: dict | None, all_activities: list[dict]) -> dict | None:
+    """The `afp:DecisionRecord` payload of a target that *decided a question* —
+    or None (ADR-0019 W1).
+
+    Two conditions, and the first is the load-bearing one:
+
+    1. **The round pinned an `afp:actionPolicy`.** That pin is the proposer's
+       deliberate statement that this question's outcomes have consequences,
+       and it is the only thing an action could be looked up in. A ratification
+       round pins none — its outcome names an answer, not a course of action —
+       so it keeps taking ADR-0010 Decision 3's Synthesis hop, and a
+       DecisionRecord whose outcome names *another* DecisionRecord still fails
+       exactly where it always failed. Deciding this on the pin rather than on
+       what the outcome string looks like matters: a ratification round's
+       options legitimately contain activity ids, so "the outcome is an option"
+       cannot tell the two flows apart on its own.
+    2. **The outcome is one the round offered** — an option, or ADR-0018's
+       reserved `afp:no-decision`. The outcome IS the category the policy is
+       keyed by (ADR-0019 W1), and an outcome outside that set is not a
+       category.
+    """
+    if not isinstance(target, dict):
+        return None
+    decision = afp_object(target, "afp:DecisionRecord")
+    if decision is None:
+        return None
+    outcome = decision.get("afp:outcome")
+    if not isinstance(outcome, str):
+        return None
+    proposal = find_proposal_for_round(decision.get("afp:round"), all_activities)
+    if not isinstance((proposal or {}).get("afp:actionPolicy"), dict):
+        return None
+    options = proposal.get("afp:options")
+    admissible = isinstance(options, list) and outcome in options
+    return decision if admissible or outcome == NO_DECISION_OUTCOME else None
 
 
 def _resolve_synthesis(target: dict | None, all_activities: list[dict]) -> tuple[dict | None, dict | None]:
@@ -152,7 +193,17 @@ def _governing_policy(activity: dict, all_activities: list[dict]) -> tuple[dict 
 
 
 def check_actions(report, all_activities: list[dict], thread_pool: list[dict]) -> None:
-    by_digest = {digest_of(a): a for a in all_activities}
+    # ADR-0015 N2, arriving at actuation: `afp:actsOn` resolves from the THREAD
+    # POOL — own activities plus received bytes — not from the own outbox
+    # alone. Until ADR-0019 an action and the Synthesis justifying it were
+    # always authored inside one trust domain, so the distinction never
+    # surfaced. A governance actuation breaks that: the `DecisionRecord` is
+    # written by a hub on one operator's server and acted on by an agent
+    # enrolled from another, so for the actor's own bundle the justification is
+    # received bytes or it is nowhere. The same grain `check_decision_record`
+    # already uses for counted votes, and phase two verifies those bytes
+    # against the sender's own bundle exactly as it does there.
+    by_digest = {digest_of(a): a for a in thread_pool}
 
     # 1 — a Synthesis under a policy-bearing task activity carries a category
     # from the closed set. Checked for every such Synthesis, acted on or not:
@@ -176,8 +227,8 @@ def check_actions(report, all_activities: list[dict], thread_pool: list[dict]) -
         )
 
     # 2/3 — every action resolves its justification (directly, or through the
-    # one DecisionRecord hop), and did what the policy said that justification
-    # permits.
+    # one DecisionRecord hop, or ADR-0019 W2's third root over a round's own
+    # proposal), and did what the policy said that justification permits.
     for activity in all_activities:
         acts_on = activity.get("afp:actsOn")
         if not isinstance(acts_on, str):
@@ -185,14 +236,34 @@ def check_actions(report, all_activities: list[dict], thread_pool: list[dict]) -
         label = activity.get("id", "<no id>")
         target = by_digest.get(acts_on)
         resolved_activity, synthesis = _resolve_synthesis(target, all_activities)
+        # ADR-0019 W2 — a DecisionRecord target with no Synthesis behind it
+        # (a governance round decided, ratifying nothing) is a producible
+        # justification too, resolved through its own round's proposal. Tried
+        # only when the Synthesis-and-hop resolution above found nothing, so
+        # a DecisionRecord that DOES ratify a Synthesis (ADR-0010 Decision 3)
+        # keeps taking the existing path unchanged.
+        # …and only a DecisionRecord that actually DECIDED something counts.
+        # `afp:outcome` must be one of that round's own pinned options, or the
+        # reserved afp:no-decision — because the outcome IS the category the
+        # policy is looked up by (ADR-0019 W1), and an outcome that is not an
+        # option is not a category. This is what keeps ADR-0010's "two hops
+        # never resolve" exactly as it was: a DecisionRecord whose outcome
+        # names another DecisionRecord decided nothing this policy can admit,
+        # so it falls through to the same failure it always produced.
+        decision = _governance_decision(target, thread_pool) if synthesis is None else None
+        found = synthesis is not None or decision is not None
         if not report.record(
-            f"action: {label} acts on a producible Synthesis",
-            synthesis is not None,
-            "" if synthesis is not None else
-            f"afp:actsOn names {acts_on[:24]}…, which resolves to no present afp:Synthesis, "
-            f"directly or through a DecisionRecord's afp:outcome — an action whose "
-            f"justification the record cannot produce (ADR-0006/ADR-0010)",
+            f"action: {label} acts on a producible justification",
+            found,
+            "" if found else
+            f"afp:actsOn names {acts_on[:24]}…, which resolves to no present afp:Synthesis or "
+            f"afp:DecisionRecord, directly or through a DecisionRecord's afp:outcome — an "
+            f"action whose justification the record cannot produce (ADR-0006/ADR-0010/ADR-0019)",
         ):
+            continue
+
+        if decision is not None:
+            _check_decision_actuation(report, activity, label, decision, all_activities, thread_pool)
             continue
 
         policy, detail = _governing_policy(resolved_activity, all_activities)
@@ -223,6 +294,98 @@ def check_actions(report, all_activities: list[dict], thread_pool: list[dict]) -
         )
 
     check_synthesis_pins(report, all_activities, thread_pool)
+    check_actuator_publishes_only_actuation(report, all_activities)
+
+
+def _check_decision_actuation(
+    report, activity: dict, label: str, decision: dict, all_activities: list[dict], thread_pool: list[dict]
+) -> None:
+    """ADR-0019 W2/W5 — V2 and V3, for an action whose `afp:actsOn` resolves to
+    a `DecisionRecord` with no Synthesis behind it (a governance round decided
+    something, and ratified nothing).
+
+    V1 (the shared "acts on a producible justification" check) and V4 (the
+    actuator's write restriction) are checked by the caller / by
+    `check_actuator_publishes_only_actuation`; this covers only the two
+    checks that need the resolved decision itself.
+    """
+    round_id = decision.get("afp:round")
+    proposal = find_proposal_for_round(round_id, thread_pool)
+    hub_actor = decision.get("afp:hub") or (proposal or {}).get("afp:hub")
+    outcome = decision.get("afp:outcome")
+
+    # V2 — the category IS the outcome (W1): afp:action must equal the
+    # round's own pinned policy at that outcome, checked only where the
+    # policy is actually pinned (a round that pinned none constrains
+    # nothing, same discipline as check_synthesis_pins's governing pins).
+    policy = (proposal or {}).get("afp:actionPolicy")
+    if isinstance(policy, dict) and isinstance(outcome, str):
+        admissible = policy.get(outcome)
+        claimed = activity.get("afp:action")
+        ok = admissible is not None and claimed == admissible
+        report.record(
+            f"action: {label} action is admissible under the round's pinned policy",
+            ok,
+            "" if ok else
+            f"afp:action is {claimed!r}, but the round's pinned afp:actionPolicy admits "
+            f"{admissible!r} for outcome {outcome!r} (ADR-0019)",
+        )
+
+    # V3 — the actor was enrolled as member or actuator in the deciding hub
+    # at the action's own published instant, replayed from the Enroll trail
+    # the verifier already reconstructs for snapshot and role checks.
+    if isinstance(hub_actor, str):
+        roles = enrolled_roles_at(hub_actor, thread_pool, instant_millis(activity.get("published")))
+        actor = activity.get("actor")
+        role = roles.get(actor)
+        ok = role in ("member", "actuator")
+        report.record(
+            f"action: {label} actor is enrolled in the deciding hub",
+            ok,
+            "" if ok else
+            f"actor {actor!r} holds role {role!r} in hub {hub_actor!r} at this action's "
+            f"published instant — only a member or an actuator may act on a decision "
+            f"(ADR-0019)",
+        )
+
+
+def check_actuator_publishes_only_actuation(report, all_activities: list[dict]) -> None:
+    """ADR-0019 W4/W5 V4 — an `actuator`-role agent's only admissible write is
+    the actuation record itself.
+
+    The role is otherwise purely declarative (W4): every existing
+    enforcement point already tests `=== "member"`, so an actuator is
+    excluded from all of them for free. This is the one restriction with no
+    existing analogue, checked here as a replay fact rather than enforced on
+    the writer — enforcement a writer alone provides leaves no trace
+    (ADR-0003 Decision 6).
+    """
+    hub_actors = sorted(
+        {
+            a.get("target")
+            for a in all_activities
+            if a.get("type") in ("afp:Enroll", "afp:Unenroll") and isinstance(a.get("target"), str)
+        }
+    )
+    for hub_actor in hub_actors:
+        roles = enrolled_roles(hub_actor, all_activities)
+        for agent in sorted(agent for agent, role in roles.items() if role == "actuator"):
+            violations = sorted(
+                a.get("id", "<no id>")
+                for a in all_activities
+                if a.get("actor") == agent
+                and a.get("afp:visibility") == "hub"
+                and not isinstance(a.get("afp:actsOn"), str)
+            )
+            report.record(
+                f"roles: {agent} actuator publishes only actuation activities",
+                not violations,
+                "" if not violations else
+                f"authored hub-visibility activity(ies) carrying no afp:actsOn: "
+                + ", ".join(violations)
+                + " — an actuator's only admissible write is the actuation record itself "
+                "(ADR-0019)",
+            )
 
 
 def check_synthesis_pins(report, all_activities: list[dict], thread_pool: list[dict]) -> None:

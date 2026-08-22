@@ -19,7 +19,7 @@ import type { ActionPolicy } from "../ap/pins.ts";
 // The pin vocabulary moved down to the P1 layer when ADR-0010 gave the direct
 // flow the same pins (see `ap/pins.ts` for why); re-exported here so ADR-0006's
 // readers find it where it was.
-export { NO_VERDICT_CATEGORY, buildPinSet, validateActionPolicy } from "../ap/pins.ts";
+export { NO_VERDICT_CATEGORY, buildPinSet, validateActionPolicy, NO_DECISION_CATEGORY, validateProposalActionPolicy } from "../ap/pins.ts";
 export type { ActionPolicy, TaskPins } from "../ap/pins.ts";
 
 /**
@@ -53,6 +53,25 @@ export function actionStamp(
     );
   }
   return { "afp:action": action, "afp:actsOn": synthesisDigest };
+}
+
+/**
+ * The two fields binding a consequence to a decision (ADR-0019 W1/W3). `outcome`
+ * is the category — the DecisionRecord's own `afp:outcome` — so a writer cannot
+ * claim an action its own round never admitted. Otherwise the shape of
+ * `actionStamp`, over a `DecisionRecord` digest instead of a Synthesis one.
+ */
+export function decisionActionStamp(
+  action: string,
+  decisionDigest: string,
+  policyCheck?: { policy: ActionPolicy; outcome: string },
+): { [key: string]: JsonValue } {
+  if (policyCheck && admissibleAction(policyCheck.policy, policyCheck.outcome) !== action) {
+    throw new Error(
+      `action ${action} is not admissible for outcome ${policyCheck.outcome} — the pinned policy says ${admissibleAction(policyCheck.policy, policyCheck.outcome)}`,
+    );
+  }
+  return { "afp:action": action, "afp:actsOn": decisionDigest };
 }
 
 /**

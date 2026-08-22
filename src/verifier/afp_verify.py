@@ -35,7 +35,16 @@ from pathlib import Path
 from allocation import check_announce_role, check_award
 from asset import check_assets
 from action import check_actions, check_supersession
-from decision import afp_object, check_archive_state, check_decision_record, check_enroll_authority, instant_millis
+from decision import (
+    afp_object,
+    check_archive_state,
+    check_decision_record,
+    check_decision_settlement,
+    check_departure,
+    check_enroll_authority,
+    instant_millis,
+    settlement_payload,
+)
 from federation import check_federation, check_joint
 from keys import (
     check_key_intervals,
@@ -43,7 +52,12 @@ from keys import (
     history_keys,
     parse_key_history,
 )
-from pins import check_disclosed_answers_keep_their_pins, check_pins, check_prior_thread
+from pins import (
+    check_disclosed_answers_keep_their_pins,
+    check_pins,
+    check_prior_thread,
+    check_proposal_action_policy,
+)
 from proof import CRYPTOSUITE, decode_multikey, digest_of, verify_proof
 
 
@@ -702,6 +716,10 @@ def verify_export(export: Path, thread: str | None, report: Report) -> dict:
     # delegated thread's opening Offer may be authored by the counterparty.
     check_pins(report, thread_pool)
     check_disclosed_answers_keep_their_pins(report, thread_pool)
+    # ADR-0019 W5 V5: a proposal-pinned afp:actionPolicy names an action for
+    # every option and for afp:no-decision. Exports with no proposal-pinned
+    # policy (everything before this ADR) run none of this.
+    check_proposal_action_policy(report, thread_pool)
     # ADR-0011 Decision 4: afp:priorThread resolves to a closed, unretracted
     # thread when present; an absent one is a lawfully scoped omission.
     check_prior_thread(report, thread_pool)
@@ -723,6 +741,26 @@ def verify_export(export: Path, thread: str | None, report: Report) -> dict:
 
         if activity.get("type") == "afp:Archive":
             check_archive_state(report, activity)
+
+    # ADR-0018 W5 V7-V9 / W6: afp:Departure from a binding round. Exports
+    # with none (everything before this ADR, and any round without
+    # afp:binding: "joint") run none of this.
+    for activity in all_activities:
+        if afp_object(activity, "afp:Departure") is not None:
+            check_departure(report, activity, all_activities)
+
+    # ADR-0018 W5 V10-V14: the decision-subject afp:Settlement variant.
+    # seen_rounds is shared across the whole export so V14 catches a second
+    # settlement naming a round the first one already settled. Exports with
+    # no decision settlement (everything before this ADR, and every
+    # allocation-task Settlement) run none of this.
+    decision_settlement_seen_rounds: dict[str, str] = {}
+    for activity in all_activities:
+        settlement = settlement_payload(activity)
+        if settlement is not None and settlement.get("afp:decision") is not None:
+            check_decision_settlement(
+                report, activity, all_activities, thread_pool, decision_settlement_seen_rounds
+            )
 
     # ADR-0003 Decision 7 / 03 "Bidding & allocation". Exports with no Award
     # (all of P1/P2) run none of this — backward compatible by construction.

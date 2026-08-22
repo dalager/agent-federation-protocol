@@ -8,6 +8,20 @@
 > scenario where the swarm changes the outside world on the strength of a conclusion it
 > reached itself. Runs on the P1–P3 stack plus ADR-0004/0005. Verdict at the end.
 
+| **Support status** | **Supported — all findings closed** |
+|---|---|
+| Findings raised | 6 |
+| Resolved by | [ADR-0006](../adr/0006-checkable-actuation.md), [ADR-0007](../adr/0007-supersession.md), spec v3.13–v3.14 |
+| See it run | no standalone demo — covered by the gate(s) below ([why](README.md#is-this-workload-supported)) |
+| Gated by | `adr0006.test.ts`, `adr0007.test.ts` |
+
+**Read the walkthrough below as history.** It records what strained when this workload was
+first walked, and is deliberately left as written — that is what makes a scenario evidence
+rather than a brochure. Every strain it names is now built; the
+[support index](README.md#is-this-workload-supported) is the current-status view, and the
+ledger there names the decision that closed each finding.
+
+
 ## User story
 
 **As** the operator of OurAwesomeProduct's software lifecycle,

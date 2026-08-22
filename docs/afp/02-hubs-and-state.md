@@ -46,9 +46,15 @@ instance level mass-unenrolls everything that instance put into the hub.
 **Enrollment carries a role** (`afp:role`, default `member` — ADR-0004): not everyone on
 a hub is there to decide. A **`requester`** may announce tasks and publish Results on its
 own threads (an ask, and later the observed actuals that settle it) but never bids,
-votes, or appears in a quorum snapshot; an **`observer`** only reads at `hub` visibility.
+votes, or appears in a quorum snapshot; an **`observer`** only reads at `hub` visibility;
+an **`actuator`** (ADR-0019) reads everything at `hub` visibility and publishes exactly
+one kind of activity — one carrying `afp:actsOn` — so the party that *carries out* a
+decision can be recorded doing it without ever influencing it. That last seat exists
+because the alternative deployments reach for is worse: granting `member` to a party that
+must not vote corrupts the electorate in a way no replay would flag.
 The role is folded into the membership state and replayed from the Enroll trail, so "who
-could ask," "who could answer," and "who could decide" are distinguishable in the record
+could ask," "who could answer," "who could decide," and "who could act" are
+distinguishable in the record
 — enforcement at bid admission and snapshot-pinning, never in workflow code. Role state
 merges deterministically: per-agent last-writer-wins over the Enroll trail (latest
 `published`, compared as an *instant* rather than as a string; equal timestamps break by
@@ -204,8 +210,18 @@ the Byzantine bound, since two agents of one operator are not independent failur
   from recent connectivity/staleness observations
 - **Weight, not headcount** — and not agent-count either: each seated instance carries the
   same total, divided among its live pinned voters, so an operator's say does not grow by
-  running more agents. Quorum is a weight-sum threshold. Weight is liveness-gated only —
+  running more agents. Quorum is a weight-sum threshold, and where a round means to hold
+  its outcome to one, that threshold is **pinned in the proposal** and recomputed at
+  replay like the weights themselves (`afp:quorumRule`, ADR-0018 Decision 1) — a bar
+  stated only in prose is a bar no record can be held to. Weight is liveness-gated only —
   hub-scoped reputation is deliberately *not* a term in it (ADR-0005 Decision 4)
+- **A seat that does not vote spends its own operator's weight.** The corollary of the
+  rule above, stated because it surprises deployments: the per-operator total is conserved
+  and split across that operator's *pinned* voters, so seating a second agent that never
+  votes halves the weight of the one that does, and the unused half lands in `abstain`
+  where it still counts toward the bar. An agent that reads but does not decide should
+  therefore hold an `observer` seat, or a `member` seat left out of the round's explicit
+  voter list — not a pinned seat and a hope (ADR-0018 Decision 5)
 
 **Snapshot-pinning.** At round start the proposer hashes the merged membership CRDT and
 embeds it (`afp:quorumSnapshot`) plus the explicit voter list (`afp:voters`) — only
@@ -213,6 +229,11 @@ embeds it (`afp:quorumSnapshot`) plus the explicit voter list (`afp:voters`) —
 per-voter weights (`afp:voterWeights`) in the proposal — recorded explicitly so tally
 recomputation never depends on state a verifier can't see, and *recomputable* from the
 pinned voters and the roster, so a proposer cannot simply write the numbers it wants.
+The pinned voter list is a **declaration**, not a discovery: the proposer states the
+electorate and signs it, every seated member can see whether it was included, and a
+proposer that pins a convenient subset has signed exactly that. A hub policy MAY constrain
+which electorates are admissible; either way the record makes the choice attributable.
+
 Votes are validated against the pinned set: an agent enrolled *after* round start simply
 isn't in it. This closes late-join tally skew and the mid-round Sybil attack — in the
 multi-operator setting, it's what stops an operator from bulk-enrolling agents mid-vote to

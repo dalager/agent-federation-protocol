@@ -28,6 +28,7 @@ import type { Server } from "node:http";
 import { loadConfig } from "./config.ts";
 import { AfpInstance, type AgentRegistration } from "./instance.ts";
 import { CountingBrain } from "./brains/stub.ts";
+import type { Brain } from "./brains/port.ts";
 import { createHttpServer } from "./ap/server.ts";
 import type { Envelope } from "./ap/activities.ts";
 import { offerTask, vouch } from "./ap/activities.ts";
@@ -36,13 +37,30 @@ import { Federation, agreementObject, createAgreement, offerAgreement } from "./
 import { httpTransport } from "./federation/transport.ts";
 import { signRequest } from "./federation/httpSig.ts";
 import { loadOrCreateHubKeyPair } from "./crypto/keys.ts";
-import { castVote, enroll } from "./hub/activities.ts";
+import { castVote, departure, enroll } from "./hub/activities.ts";
+import { NO_DECISION_CATEGORY } from "./ap/pins.ts";
+import { decisionActionStamp } from "./allocation/actions.ts";
 import { Hub } from "./hub/hub.ts";
 import { exportBundle, type ExportSummary } from "./export.ts";
 import { jumpClock } from "./demoP3.ts";
 import type { JsonValue } from "./crypto/jcs.ts";
 
 const CAPABILITY = "afp:cap:assess";
+/** ADR-0018 Decision 2 — the outcome of a round that did not decide. */
+const NO_DECISION_OUTCOME = "afp:no-decision";
+
+/**
+ * The rulebook the round pins before anyone votes (ADR-0019 W1): one admissible
+ * action per way the question can go, including ADR-0018's reserved
+ * `afp:no-decision` — because a bridge that cannot agree by the deadline still
+ * has to tell the field something, and terminality always releases the actuator
+ * (ADR-0010 Decision 4).
+ */
+const ACTION_POLICY = {
+  yes: "declare-sev-1",
+  no: "hold-at-sev-2",
+  [NO_DECISION_CATEGORY]: "escalate-to-duty-directors",
+} as const;
 
 function freePort(): Promise<number> {
   return new Promise((resolvePort, reject) => {
@@ -71,12 +89,45 @@ export interface Operator {
   config: ReturnType<typeof loadConfig>;
 }
 
+/**
+ * What an agent concluded about the incident, and what produced the conclusion.
+ * In the default demo this is deterministic stub text; in the Lemonade
+ * experiment (`experimentP5.ts`) it is a real model reading real telemetry.
+ * Either way the vote that lands on the record is `verdict`, and nothing about
+ * the hub, the transport, or the DecisionRecord changes shape.
+ */
+export interface P5Assessment {
+  /** One of the round's options — the value the agent's `afp:Vote` carries. */
+  verdict: string;
+  /** One line a human can read next to the vote. Narration, not record. */
+  rationale: string;
+  /** Model id or `"stub"` — copied onto `afp:producedBy` where it is recorded. */
+  producedBy: string;
+  /** Full assessment text, if the producer wrote one. */
+  content?: string;
+}
+
+/** Injection points for content, so the mechanics stay one implementation. */
+export interface P5Content {
+  /** Called once per voting agent, before the round is voted. */
+  assess(operator: string, agent: string, role: "member" | "observer"): Promise<P5Assessment>;
+  /** A brain for `agent` on `operator`, replacing the deterministic stub. */
+  brainFor?(operator: string, agent: string): Brain | null;
+  /** The brief s-noc delegates to e-noc after the hub's host is killed. */
+  meshBrief?(assessments: Readonly<Record<string, P5Assessment>>): string;
+  /** The bulletin the actuator sends once the round closes (ADR-0019). */
+  notice?(outcome: string, action: string): string;
+}
+
+const STUB_ASSESSMENT: P5Assessment = { verdict: "yes", rationale: "", producedBy: "stub" };
+
 async function operator(
   name: string,
   agents: readonly string[],
   rootDir: string,
   exportRoot: string,
   clock: ReturnType<typeof jumpClock>,
+  content?: P5Content,
 ): Promise<Operator> {
   const port = await freePort();
   const origin = `http://127.0.0.1:${port}`;
@@ -90,7 +141,9 @@ async function operator(
   });
   const registrations: AgentRegistration[] = agents.map((agent) => ({
     spec: { name: agent, capabilities: [CAPABILITY], keyCustody: "instance", since: "2026-08-17T00:00:00Z" },
-    brain: new CountingBrain(agent, [CAPABILITY], () => ({ ok: true, content: `${name}: assessed, two risks noted` })),
+    brain:
+      content?.brainFor?.(name, agent) ??
+      new CountingBrain(agent, [CAPABILITY], () => ({ ok: true, content: `${name}: assessed, two risks noted` })),
   }));
   const instance = new AfpInstance(config, registrations, clock);
   const actorId = String(instance.instanceDocument().id);
@@ -150,6 +203,18 @@ export interface P5DemoResult {
   talliedVotes: number;
   /** The closing DecisionRecord's afp:uncounted, agent → status. */
   uncounted: Record<string, string>;
+  /** The closing DecisionRecord's outcome and the tally it was read from. */
+  outcome: string;
+  weightTally: Record<string, number>;
+  /** `expired` | `threshold-not-met` when the round reached no decision (ADR-0018). */
+  noDecisionReason?: string;
+  /** The bar the outcome had to clear, and the clock it had to beat. */
+  quorumBar: { rule: string; total: number };
+  deadline: string;
+  /** What the actuator did about it, and under which declared action (ADR-0019). */
+  actuation: { actor: string; action: string; notice: string };
+  /** Members that recorded a departure from a binding outcome (ADR-0018 Decision 3). */
+  departed: string[];
   /** Replica convergence: members before, after first pull, after second (idempotent) pull. */
   replicaSeats: { before: number; afterPull: number; afterSecondPull: number };
   syncStores: string[];
@@ -158,19 +223,26 @@ export interface P5DemoResult {
   deadHubWriteError: string;
   exports: { alpha: ExportSummary; bravo: ExportSummary; gamma: ExportSummary };
   incidentThread: string;
+  /** What each voting agent concluded, keyed by local agent name. */
+  assessments: Record<string, P5Assessment>;
+  /** The mesh Result that survived the hub's death, as it reads on the record. */
+  meshResult: { content: string; producedBy: string } | null;
   close(): Promise<void>;
 }
 
-export async function runP5Demo(options: { rootDir?: string; exportRoot?: string } = {}): Promise<P5DemoResult> {
+export async function runP5Demo(
+  options: { rootDir?: string; exportRoot?: string; content?: P5Content } = {},
+): Promise<P5DemoResult> {
   const rootDir = options.rootDir ?? "./data-p5";
   const exportRoot = options.exportRoot ?? "./export-p5";
   rmSync(rootDir, { recursive: true, force: true });
   rmSync(exportRoot, { recursive: true, force: true });
 
+  const content = options.content;
   const clock = jumpClock();
-  const alpha = await operator("alpha", ["n-noc", "n-telemetry"], rootDir, exportRoot, clock);
-  const bravo = await operator("bravo", ["s-noc"], rootDir, exportRoot, clock);
-  const gamma = await operator("gamma", ["e-noc", "e-watcher"], rootDir, exportRoot, clock);
+  const alpha = await operator("alpha", ["n-noc", "n-telemetry"], rootDir, exportRoot, clock, content);
+  const bravo = await operator("bravo", ["s-noc"], rootDir, exportRoot, clock, content);
+  const gamma = await operator("gamma", ["e-noc", "e-watcher", "e-notify"], rootDir, exportRoot, clock, content);
 
   const FED = `${alpha.origin}/threads/fed`;
 
@@ -237,6 +309,11 @@ export async function runP5Demo(options: { rootDir?: string; exportRoot?: string
     [bravo, "s-noc", "member"],
     [gamma, "e-noc", "member"],
     [gamma, "e-watcher", "observer"],
+    // ADR-0019 Decision 2: the seat that carries a decision out. Separate from
+    // the observer on purpose — an actuator's hub-visibility activities must
+    // ALL carry `afp:actsOn`, so a seat that also casts a (refused) vote could
+    // never hold this role. Two seats, two different things.
+    [gamma, "e-notify", "actuator"],
   ] as const) {
     for (const url of [op.actorId, op.instance.actorId(agent)]) await cacheDoc(url);
     const hubKey = loadOrCreateHubKeyPair(op.config.keyDir, agent, op.instance.actorId(agent), "bridge");
@@ -249,8 +326,36 @@ export async function runP5Demo(options: { rootDir?: string; exportRoot?: string
 
   // --- A round, voted across the boundary.
   const incident = `${alpha.origin}/threads/incident-9`;
-  const proposal = hub.proposeRound({ round: `${alpha.origin}/rounds/sev`, thread: incident, question: "declare sev-1?", options: ["yes", "no"] });
+  // The round declares its own terms before a single vote exists (ADR-0018
+  // Decision 1, ADR-0019 Decision 1): the bar the outcome must clear, the clock
+  // the world imposed rather than the hub, that the outcome binds all three
+  // operators jointly, and the one action admissible for each way it can go.
+  const deadline = new Date(clock.now().getTime() + 30 * 60_000).toISOString();
+  const proposal = hub.proposeRound({
+    round: `${alpha.origin}/rounds/sev`,
+    thread: incident,
+    question: "declare sev-1?",
+    options: ["yes", "no"],
+    quorumRule: { "afp:form": "majority-of-total" },
+    deadline,
+    binding: "joint",
+    pins: { actionPolicy: ACTION_POLICY, irrevocableActions: Object.values(ACTION_POLICY) },
+  });
   const snapshot = String((proposal.activity.object as Record<string, unknown>)["afp:quorumSnapshot"]);
+
+  // Each agent that will vote reads its own operator's evidence and reaches
+  // its own conclusion first. The hub never sees the reasoning — only the
+  // value — which is the whole reason the DecisionRecord is checkable.
+  const assessments: Record<string, P5Assessment> = {};
+  for (const [op, agent, role] of [
+    [alpha, "n-noc", "member"],
+    [bravo, "s-noc", "member"],
+    [gamma, "e-noc", "member"],
+    [gamma, "e-watcher", "observer"],
+  ] as const) {
+    assessments[agent] = content ? await content.assess(op.name, agent, role) : STUB_ASSESSMENT;
+  }
+
   const vote = (op: Operator, agent: string) =>
     op.instance.publish(agent, [hub.actorId], incident, "hub", (envelope) =>
       castVote(envelope, {
@@ -259,7 +364,7 @@ export async function runP5Demo(options: { rootDir?: string; exportRoot?: string
         hub: hub.actorId,
         proposalHash: proposal.digest,
         quorumSnapshot: snapshot,
-        value: "yes",
+        value: assessments[agent]?.verdict ?? "yes",
       }),
     ).activity;
 
@@ -289,6 +394,75 @@ export async function runP5Demo(options: { rootDir?: string; exportRoot?: string
     "afp:status": string;
   }[];
   const uncounted = Object.fromEntries(uncountedRaw.map((u) => [u.agent, u["afp:status"]]));
+  // The closing record is delivered to the voters before anyone acts on it —
+  // an operator that never received the decision cannot resolve the
+  // justification an action of its own would name (ADR-0015's per-domain
+  // replay: evidence that crossed a boundary is received bytes, or it is
+  // nowhere).
+  const hubTransportOut = httpTransport({
+    keyId: alpha.instance.transportKey("@instance").keyId,
+    privateKey: alpha.instance.transportKey("@instance").privateKey,
+    now: () => clock.now(),
+    isLocal: (target) => alpha.instance.nameOf(target) !== null || target === alpha.actorId,
+    local: alpha.instance.localTransport(),
+  });
+  await hub.run(hubTransportOut);
+  for (const op of [bravo, gamma]) await op.instance.run(op.transport);
+
+  const decisionObject = decision.activity.object as Record<string, unknown>;
+  const outcome = String(decisionObject["afp:outcome"]);
+  const weightTally = decisionObject["afp:weightTally"] as Record<string, number>;
+  const noDecisionReason = decisionObject["afp:noDecisionReason"] as string | undefined;
+
+  // --- The consequence (ADR-0019). The desk that sends the field bulletin has
+  // no vote and never had one; what it has is the one seat whose whole warrant
+  // is carrying a decision out, and an action the round itself declared
+  // admissible for exactly this outcome. Note the reserved key doing its job
+  // when the bridge failed to reach its bar: nobody is left waiting.
+  const action = ACTION_POLICY[outcome as keyof typeof ACTION_POLICY];
+  const notice = content?.notice?.(outcome, action) ?? `${action}: bridge outcome recorded, field notified`;
+  const actuation = gamma.instance.publish("e-notify", [hub.actorId], incident, "hub", (envelope: Envelope) =>
+    ({
+      "@context": ["https://www.w3.org/ns/activitystreams", "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"],
+      id: envelope.activityId,
+      type: "Create",
+      actor: envelope.actor,
+      to: [...envelope.to],
+      published: envelope.published,
+      context: envelope.thread,
+      "afp:visibility": envelope.visibility,
+      ...(envelope.prevActivity !== null ? { "afp:prevActivity": envelope.prevActivity } : {}),
+      object: { id: `${envelope.actor}/acts/sev`, type: "afp:Act", "afp:hub": hub.actorId, content: notice },
+      ...decisionActionStamp(action, decision.digest, { policy: ACTION_POLICY, outcome }),
+    }) as never,
+  );
+  await postToHubInbox(gamma, alpha.origin, actuation.activity, clock);
+
+  // --- And the counterpart to a binding outcome (ADR-0018 Decision 3): an
+  // operator that lost a vote it is bound by says so on its own chain, or the
+  // record shows nothing at all. Only where something actually bound it — a
+  // round that reached no decision bound nobody.
+  const dissenters = hub
+    .roundVotes(`${alpha.origin}/rounds/sev`)
+    .filter((v) => v.value !== outcome && outcome !== NO_DECISION_OUTCOME);
+  const departed: string[] = [];
+  for (const { actor } of dissenters.slice(0, 1)) {
+    const op = [alpha, bravo, gamma].find((o) => o.instance.nameOf(actor) !== null);
+    const name = op?.instance.nameOf(actor);
+    if (!op || !name) continue;
+    const leaving = op.instance.publish(name, [hub.actorId], incident, "hub", (envelope: Envelope) =>
+      departure(envelope, {
+        departureId: `${envelope.actor}/departures/sev`,
+        hub: hub.actorId,
+        round: `${alpha.origin}/rounds/sev`,
+        decision: decision.digest,
+        reason: "our own telemetry does not support this outcome; we are filtering locally regardless",
+      }),
+    );
+    if (op === alpha) await hub.receive(leaving.activity);
+    else await postToHubInbox(op, alpha.origin, leaving.activity, clock);
+    departed.push(actor);
+  }
 
   // --- An application-defined store, moved by its own signed activity (Decision 3).
   const backlog = bravo.instance.publish("s-noc", [hub.actorId], incident, "hub", (envelope) =>
@@ -337,7 +511,7 @@ export async function runP5Demo(options: { rootDir?: string; exportRoot?: string
   docCache.set(replica.actorId, replica.actorDocument());
 
   const seatsBefore = replica.members().length;
-  const alphaHubTransport = httpTransport({
+  const replicaPullTransport = httpTransport({
     keyId: alpha.instance.transportKey("@instance").keyId,
     privateKey: alpha.instance.transportKey("@instance").privateKey,
     now: () => clock.now(),
@@ -347,7 +521,7 @@ export async function runP5Demo(options: { rootDir?: string; exportRoot?: string
   const pull = async (): Promise<void> => {
     const offer = replica.offerSync(hub.actorId);
     await postToHubInbox(bravo, alpha.origin, offer.activity, clock);
-    await hub.run(alphaHubTransport); // the Accept{afp:StateDeltas} rides back to the replica's inbox
+    await hub.run(replicaPullTransport); // the Accept{afp:StateDeltas} rides back to the replica's inbox
   };
   await pull();
   const seatsAfterPull = replica.members().length;
@@ -356,8 +530,9 @@ export async function runP5Demo(options: { rootDir?: string; exportRoot?: string
 
   // --- Kill the hub mid-task (the roadmap's P5 kill criterion).
   const mesh = `${bravo.origin}/threads/mesh-9`;
+  const brief = content?.meshBrief?.(assessments) ?? "correlate our two views";
   bravo.instance.publish("s-noc", [gamma.instance.actorId("e-noc")], mesh, "parties", (envelope: Envelope) =>
-    offerTask(envelope, { taskId: `${envelope.actor}/tasks/m9`, capability: CAPABILITY, correlationId: "m9", content: "correlate our two views" }),
+    offerTask(envelope, { taskId: `${envelope.actor}/tasks/m9`, capability: CAPABILITY, correlationId: "m9", content: brief }),
   );
   await new Promise<void>((resolveClose) => alphaServer.close(() => resolveClose()));
 
@@ -365,10 +540,17 @@ export async function runP5Demo(options: { rootDir?: string; exportRoot?: string
   await bravo.instance.run(bravo.transport);
   await gamma.instance.run(gamma.transport);
   await bravo.instance.run(bravo.transport);
-  const meshCompleted = bravo.federation.receivedActivities().some((r) => {
-    const object = r.activity.object;
-    return !!object && typeof object === "object" && !Array.isArray(object) && (object as Record<string, JsonValue>).type === "afp:Result";
-  });
+  const meshObject = bravo.federation
+    .receivedActivities()
+    .map((r) => r.activity.object)
+    .find(
+      (object): object is Record<string, JsonValue> =>
+        !!object && typeof object === "object" && !Array.isArray(object) && (object as Record<string, JsonValue>).type === "afp:Result",
+    );
+  const meshCompleted = meshObject !== undefined;
+  const meshResult = meshObject
+    ? { content: String(meshObject.content ?? ""), producedBy: String(meshObject["afp:producedBy"] ?? "stub") }
+    : null;
 
   // A new write toward the dead hub fails to its caller — visible degradation
   // (ADR-0014 Decision 2), never a queue's silence.
@@ -409,12 +591,24 @@ export async function runP5Demo(options: { rootDir?: string; exportRoot?: string
     observerVoteStatus,
     talliedVotes,
     uncounted,
+    outcome,
+    weightTally,
+    noDecisionReason,
+    quorumBar: {
+      rule: "majority-of-total",
+      total: Object.values((proposal.activity.object as Record<string, unknown>)["afp:voterWeights"] as Record<string, number>).reduce((a, b) => a + b, 0),
+    },
+    deadline,
+    actuation: { actor: gamma.instance.actorId("e-notify"), action, notice },
+    departed,
     replicaSeats: { before: seatsBefore, afterPull: seatsAfterPull, afterSecondPull: seatsAfterSecondPull },
     syncStores: Object.keys(hub.syncVector()).sort(),
     meshCompleted,
     deadHubWriteError,
     exports,
     incidentThread: incident,
+    assessments,
+    meshResult,
     async close() {
       await Promise.all(
         [bravoServer, gamma.server].map((server) => new Promise<void>((resolveClose) => server.close(() => resolveClose()))),

@@ -24,6 +24,7 @@ npm run demo:p3       # P3: two auctions, coalition award, synthesis (-> ./expor
 npm run demo:p3:llm   # the same auction, answers written by a real local model
 npm run demo:p4       # P4: three instances over real HTTP, one boundary (-> ./export-p4)
 npm run demo:p5       # P5: a shared hub with a real inbox, replica sync (-> ./export-p5)
+npm run demo:p5:llm   # the same hub as a snow day: three schools decide together (real model)
 npm run gate          # the acceptance gate: P1's 11 checks + CRDT + hub + auction + boundary
 npm run serve         # the public HTTP surface + the federation inbox
 ```
@@ -253,6 +254,64 @@ each sender's own bundle (ADR-0016's T8 amendment):
 python3 ../verifier/afp_verify.py export-p5/alpha export-p5/bravo export-p5/gamma \
     --thread https://alpha.operator.local/threads/incident-9 --verbose
 # PASSED — 365 checks, no gaps
+```
+
+### Running it with a real model
+
+`npm run demo:p5:llm` runs the same bridge with the three voting agents backed
+by a local model instead of stubs (any OpenAI-compatible endpoint; see
+Configuration), on a scenario that needs no protocol vocabulary to follow. It is
+the running counterpart of
+[scenario 11](../../docs/afp/scenarios/11-the-snow-day.md), whose eight findings
+were read off runs of this command.
+
+It snowed overnight. Three schools — Hilltop, Riverside and Central — share one
+bus company, so the buses can only run one timetable: the three of them close
+together or none of them does. It is 05:30 and the message to parents goes out
+at 06:00. Each head teacher is given only their own school's morning — their
+car park, their roads, their staff — and none of the others'. That split is the
+point: it is why a shared place to decide has to exist at all.
+
+They disagree, and the disagreement is honest. Riverside's only road is blocked
+by a fallen tree and its building is at 12°C with four hours of oil left.
+Central is in town, the main road is clear, and it remembers closing on a
+forecast last February for snow that never came. The record closes over that
+dissent rather than over a manufactured consensus.
+
+Three things are then visible in the count that are hard to see in the abstract:
+
+- The hub is told each answer and none of the reasons, so anyone can recount
+  the vote afterwards without being able to see a single school's car park.
+- The parent-notification desk reads every school's traffic — it has to, it
+  writes the 06:00 message — and its vote is still thrown away in the handler.
+  Reading and deciding are separate permissions, and the count is where you can
+  see which one it holds.
+- Hilltop's caretaker holds a seat and is out gritting the yard. He is recorded
+  as `silent`, not as an abstention: the record does not claim to know what
+  someone who never answered would have said.
+
+Since ADR-0018 and ADR-0019 the round also declares its own terms before anyone
+votes: the bar the outcome must clear (`majority-of-total` over the pinned
+weights), the 06:00 deadline the world imposed rather than the hub, that the
+outcome binds all three schools jointly, and one admissible action per way the
+question can go. So the interesting morning is now the one where the schools
+*fail* to clear the bar: the record closes `afp:no-decision`, which is a signed
+fact rather than a silence, and the parent-notification desk — an `actuator`,
+which reads everything, votes on nothing, and may publish nothing but the
+consequence — still sends the message the round declared admissible for exactly
+that outcome. Nobody is left waiting on a decision that never came.
+
+Then the school hosting the noticeboard loses power. A vote sent to it after
+that bounces back to whoever sent it instead of disappearing quietly — and the
+question Riverside had already put to Central, a real model call, is answered
+anyway, because it went school to school and never through the noticeboard. The
+answer lands on the record with `afp:producedBy` naming what wrote it.
+
+```bash
+npm run demo:p5:llm
+python3 ../verifier/afp_verify.py export-p5-llm/alpha export-p5-llm/bravo export-p5-llm/gamma
+# PASSED — 418 checks, no gaps   (the exact count moves with how the schools voted:
+#                                  a departure is only recorded when someone was outvoted)
 ```
 
 ## Using a running instance

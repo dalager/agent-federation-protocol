@@ -6,6 +6,20 @@
 > billing substrate, equivocation rollup — and deliberately walks into the confidentiality
 > and hub-lifecycle gaps found in scenario 01. Verdict at the end.
 
+| **Support status** | **Supported — all findings closed** |
+|---|---|
+| Findings raised | 4 + 2 recurring |
+| Resolved by | spec v3.4, then [ADR-0005](../adr/0005-operators-are-equal.md) for per-operator weight |
+| See it run | `npm run demo:p2` |
+| Gated by | `hub.test.ts`, `adr0005.test.ts` |
+
+**Read the walkthrough below as history.** It records what strained when this workload was
+first walked, and is deliberately left as written — that is what makes a scenario evidence
+rather than a brochure. Every strain it names is now built; the
+[support index](README.md#is-this-workload-supported) is the current-status view, and the
+ledger there names the decision that closed each finding.
+
+
 ## User story
 
 **As** the managing partners of two consultancies (Alpha and Bravo) co-staffing project
