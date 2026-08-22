@@ -11,6 +11,7 @@
 
 import type { Db } from "../store/db.ts";
 import type { QuorumRule } from "./quorum.ts";
+import type { VotePhase } from "./equivocation.ts";
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS hub_rounds (
@@ -73,6 +74,18 @@ CREATE TABLE IF NOT EXISTS hub_departures (
   departure_digest TEXT NOT NULL,
   PRIMARY KEY (round_id, actor)
 );
+
+-- ADR-0020 W1/W4: one row per voter convicted in a round -- the zeroing
+-- table. A conviction zeroes that voter's weight for the round's own doom
+-- arithmetic (Decision 4) and blocks it from successor() (Decision 3); it
+-- never shrinks the pinned electorate itself (Decision 4's denominator
+-- ruling).
+CREATE TABLE IF NOT EXISTS hub_convictions (
+  round_id     TEXT NOT NULL,
+  actor        TEXT NOT NULL,
+  proof_digest TEXT NOT NULL,
+  PRIMARY KEY (round_id, actor)
+);
 `;
 
 export function ensureHubSchema(db: Db): void {
@@ -90,6 +103,18 @@ export function ensureHubSchema(db: Db): void {
     ["binding", "binding TEXT"],
   ] as const) {
     if (!existing.has(column)) db.exec(`ALTER TABLE hub_rounds ADD COLUMN ${ddl}`);
+  }
+  // ADR-0020 W1/W2: additive migration for tuple-grain vote dedupe -- nullable
+  // so pre-ADR-0020 (L0) rows are untouched; only an L1 round's votes ever
+  // populate them.
+  const existingVoteReceiptCols = new Set(
+    (db.prepare("PRAGMA table_info(hub_vote_receipts)").all() as { name: string }[]).map((col) => col.name),
+  );
+  for (const [column, ddl] of [
+    ["phase", "phase TEXT"],
+    ["seq_no", "seq_no INTEGER"],
+  ] as const) {
+    if (!existingVoteReceiptCols.has(column)) db.exec(`ALTER TABLE hub_vote_receipts ADD COLUMN ${ddl}`);
   }
 }
 
@@ -158,12 +183,25 @@ export function loadRound(db: Db, roundId: string): RoundRow | null {
   };
 }
 
-export function saveVoteReceipt(db: Db, roundId: string, actor: string, voteDigest: string, value: string): void {
+/**
+ * ADR-0020 W1/W2: `phase`/`seqNo` are the L1 ballot-identity tuple, absent
+ * for an L0 vote -- today's behaviour, byte-identical when omitted.
+ */
+export function saveVoteReceipt(
+  db: Db,
+  roundId: string,
+  actor: string,
+  voteDigest: string,
+  value: string,
+  phase?: VotePhase,
+  seqNo?: number,
+): void {
   db.prepare(
-    `INSERT INTO hub_vote_receipts (round_id, actor, vote_digest, value)
-       VALUES (?, ?, ?, ?)
-     ON CONFLICT (round_id, actor) DO UPDATE SET vote_digest = excluded.vote_digest, value = excluded.value`,
-  ).run(roundId, actor, voteDigest, value);
+    `INSERT INTO hub_vote_receipts (round_id, actor, vote_digest, value, phase, seq_no)
+       VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT (round_id, actor) DO UPDATE SET
+       vote_digest = excluded.vote_digest, value = excluded.value, phase = excluded.phase, seq_no = excluded.seq_no`,
+  ).run(roundId, actor, voteDigest, value, phase ?? null, seqNo ?? null);
 }
 
 export function voteReceiptsFor(db: Db, roundId: string): { actor: string; voteDigest: string; value: string }[] {
@@ -178,6 +216,26 @@ export function voteReceiptsFor(db: Db, roundId: string): { actor: string; voteD
     voteDigest: String(row.vote_digest),
     value: String(row.value),
   }));
+}
+
+/**
+ * ADR-0020 W2: the L1 tuple of the ballot currently counted for `(round,
+ * actor)` -- `null` for an L0 round, whose receipts carry no phase/seqNo.
+ * The counted ballot is one per voter (this table's own primary key), so a
+ * vote from an *earlier* phase must never displace a later one; `onVote`
+ * reads this to enforce that, while cross-phase tuple history lives in the
+ * per-phase `voteact:` registers.
+ */
+export function countedVoteTuple(
+  db: Db,
+  roundId: string,
+  actor: string,
+): { phase: VotePhase; seqNo: number } | null {
+  const row = db
+    .prepare("SELECT phase, seq_no FROM hub_vote_receipts WHERE round_id = ? AND actor = ?")
+    .get(roundId, actor) as { phase: string | null; seq_no: number | null } | undefined;
+  if (!row || (row.phase !== "prepare" && row.phase !== "commit") || typeof row.seq_no !== "number") return null;
+  return { phase: row.phase, seqNo: row.seq_no };
 }
 
 /** The open round a proposal belongs to — how a `Reject{proposal}` finds its round. */
@@ -273,4 +331,33 @@ export function seatByFollowActivity(db: Db, followActivityId: string): string |
     .prepare("SELECT instance_actor FROM hub_seats WHERE follow_activity = ? AND revoked_at IS NULL")
     .get(followActivityId) as { instance_actor: string } | undefined;
   return row ? String(row.instance_actor) : null;
+}
+
+// ------------------------------------------------------------------ convictions (ADR-0020 W1/W4)
+
+/** Record a round-scoped conviction (an on-record `afp:EquivocationProof`) against `actor`. */
+export function recordConviction(db: Db, roundId: string, actor: string, proofDigest: string): void {
+  db.prepare(
+    `INSERT INTO hub_convictions (round_id, actor, proof_digest)
+       VALUES (?, ?, ?)
+     ON CONFLICT (round_id, actor) DO NOTHING`,
+  ).run(roundId, actor, proofDigest);
+}
+
+/** Convictions on record for a round -- the doom arithmetic's and `successor`'s zeroing set. */
+export function convictionsFor(db: Db, roundId: string): { actor: string; proofDigest: string }[] {
+  return (
+    db.prepare("SELECT actor, proof_digest FROM hub_convictions WHERE round_id = ?").all(roundId) as {
+      actor: string;
+      proof_digest: string;
+    }[]
+  ).map((row) => ({ actor: String(row.actor), proofDigest: String(row.proof_digest) }));
+}
+
+/** Whether `actor` is convicted in `roundId`. */
+export function isConvicted(db: Db, roundId: string, actor: string): boolean {
+  const row = db
+    .prepare("SELECT 1 FROM hub_convictions WHERE round_id = ? AND actor = ?")
+    .get(roundId, actor) as unknown;
+  return row !== undefined;
 }

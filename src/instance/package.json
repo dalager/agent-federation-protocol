@@ -19,6 +19,8 @@
     "demo:p3:llm": "node --experimental-sqlite src/cli.ts p3:llm",
     "demo:p4": "node --experimental-sqlite src/cli.ts p4",
     "demo:p5": "node --experimental-sqlite src/cli.ts p5",
-    "demo:p5:llm": "node --experimental-sqlite src/cli.ts p5:llm"
+    "demo:p5:llm": "node --experimental-sqlite src/cli.ts p5:llm",
+    "demo:p6": "node --experimental-sqlite src/cli.ts p6",
+    "demo:p6:llm": "node --experimental-sqlite src/cli.ts p6:llm"
   }
 }

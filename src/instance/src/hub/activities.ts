@@ -111,6 +111,9 @@ export function updateAsset(envelope: Envelope, spec: AssetSpec): { [key: string
 
 // ------------------------------------------------------------------- L0 voting
 
+/** ADR-0020 W1: the closed registry of pinned succession forms; v1 defines one. */
+export type SuccessionRule = { "afp:form": "snapshot-order" };
+
 export interface ProposalSpec {
   proposalId: string;
   round: string;
@@ -137,6 +140,12 @@ export interface ProposalSpec {
    * this builder's). Absent means unpinned — today's behaviour, byte-identical.
    */
   pins?: TaskPins;
+  /** ADR-0020 Decision 1/W1: pins the round grammar. Absent means L0 — today's behaviour. */
+  level?: 1;
+  /** ADR-0020 Decision 3/W1: optional, recomputable succession rule. Absent means no sanctioned succession. */
+  successionRule?: SuccessionRule;
+  /** ADR-0020 Decision 3/W1: on a successor round only — digest of the stalled proposal ACTIVITY. */
+  supersedesRound?: string;
 }
 
 /** `Offer{afp:Proposal}` — opens an L0 round (03 § 8c). */
@@ -160,6 +169,11 @@ export function offerProposal(envelope: Envelope, spec: ProposalSpec): { [key: s
   // ADR-0019 Decision 1/W1: emitted only when supplied — an unchanged caller
   // must produce byte-identical output.
   if (spec.pins) Object.assign(object, buildPinSet(spec.pins));
+  // ADR-0020 W1: emitted only when supplied — an unchanged caller must
+  // produce byte-identical output.
+  if (spec.level) object["afp:level"] = spec.level;
+  if (spec.successionRule) object["afp:successionRule"] = { ...spec.successionRule };
+  if (spec.supersedesRound) object["afp:supersedesRound"] = spec.supersedesRound;
   return { ...base(envelope, "Offer"), object };
 }
 
@@ -177,22 +191,31 @@ export interface VoteSpec {
    * grant that names one.
    */
   hub?: string;
+  /** ADR-0020 W1: L1 field — "prepare" | "commit". Absent means L0. */
+  phase?: "prepare" | "commit";
+  /** ADR-0020 W1: L1 field — integer ≥ 1, per (voter, round, phase). Absent means L0. */
+  seqNo?: number;
+  /** ADR-0020 W1: L1 field — activity digests at the same grain as `afp:countedVotes`. */
+  observedVotes?: readonly string[];
 }
 
-/** `Create{afp:Vote}` — a point-to-point L0 vote (03 § 8c). */
+/** `Create{afp:Vote}` — a point-to-point vote, L0 or L1 (03 § 8c, ADR-0020 W1). */
 export function castVote(envelope: Envelope, spec: VoteSpec): { [key: string]: JsonValue } {
-  return {
-    ...base(envelope, "Create"),
-    object: {
-      id: spec.voteId,
-      type: "afp:Vote",
-      ...(spec.hub ? { "afp:hub": spec.hub } : {}),
-      "afp:round": spec.round,
-      "afp:proposalHash": spec.proposalHash,
-      "afp:quorumSnapshot": spec.quorumSnapshot,
-      value: spec.value,
-    },
+  const object: { [key: string]: JsonValue } = {
+    id: spec.voteId,
+    type: "afp:Vote",
+    ...(spec.hub ? { "afp:hub": spec.hub } : {}),
+    "afp:round": spec.round,
+    "afp:proposalHash": spec.proposalHash,
+    "afp:quorumSnapshot": spec.quorumSnapshot,
+    value: spec.value,
   };
+  // ADR-0020 W1: L1 fields, emitted only when supplied — an unchanged caller
+  // must produce byte-identical output.
+  if (spec.phase) object["afp:phase"] = spec.phase;
+  if (spec.seqNo !== undefined) object["afp:seqNo"] = spec.seqNo;
+  if (spec.observedVotes) object["afp:observedVotes"] = [...spec.observedVotes];
+  return { ...base(envelope, "Create"), object };
 }
 
 export interface DecisionRecordSpec {
@@ -223,7 +246,7 @@ export interface DecisionRecordSpec {
    * `"threshold-not-met"`. Emitted only when supplied, so a pre-ADR-0018
    * record is byte-identical.
    */
-  noDecisionReason?: "expired" | "threshold-not-met";
+  noDecisionReason?: "expired" | "threshold-not-met" | "quorum-impossible";
 }
 
 /** ADR-0018 W1: the reserved `afp:outcome` value a pinned quorum rule can produce. */
@@ -248,6 +271,30 @@ export function decisionRecord(envelope: Envelope, spec: DecisionRecordSpec): { 
   }
   if (spec.noDecisionReason) object["afp:noDecisionReason"] = spec.noDecisionReason;
   return { ...base(envelope, "Create"), object };
+}
+
+// ------------------------------------------------------------------- L1 equivocation (ADR-0020 W1)
+
+export interface EquivocationProofSpec {
+  proofId: string;
+  hub: string;
+  round: string;
+  /** The two full signed `afp:Vote` ACTIVITIES the proof convicts on, verbatim. */
+  votes: readonly [{ [key: string]: JsonValue }, { [key: string]: JsonValue }];
+}
+
+/** `Announce{afp:EquivocationProof}` — the case file's proof object (Decision 5, W1). */
+export function equivocationProof(envelope: Envelope, spec: EquivocationProofSpec): { [key: string]: JsonValue } {
+  return {
+    ...base(envelope, "Announce"),
+    object: {
+      id: spec.proofId,
+      type: "afp:EquivocationProof",
+      "afp:hub": spec.hub,
+      "afp:round": spec.round,
+      "afp:votes": spec.votes.map((vote) => ({ ...vote })),
+    },
+  };
 }
 
 // ------------------------------------------------------------------- Departure (ADR-0018 W1)

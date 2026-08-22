@@ -8,5 +8,5 @@ package-lock.json
 data/
 data-p*/
 export/
-# demo outputs: demo:p2, demo:p3, demo:p3:llm, demo:p4, demo:p5
+# demo outputs: demo:p2, demo:p3, demo:p3:llm, demo:p4, demo:p5, demo:p6
 export-*/

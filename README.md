@@ -86,14 +86,17 @@ npm run demo:p3        # P3: two sealed auctions, a coalition award, a ratified 
 npm run demo:p4        # P4: three instances over real HTTP — handshake, probe, delegation, joint export
 npm run demo:p5        # P5: a shared hub with a real inbox — the write door, replica sync, the kill criterion
 npm run demo:p5:llm    # the same hub, told as a snow day: three schools, one bus company, one decision
+npm run demo:p6        # P6: five reinsurers at L1 — an equivocator convicted, a backup-restore acquitted
+npm run demo:p6:llm    # the same pool, with the underwriters' verdicts written by a local model
 npm run gate           # the acceptance gate: P1's 11 checks, CRDT property tests, hub, auction, boundary
 
 cd ../verifier
-python3 afp_verify.py ../instance/export --thread urn:afp:thread:doc-1
-python3 afp_verify.py ../instance/export-p2 --thread urn:afp:thread:codebase-integrity
-python3 afp_verify.py ../instance/export-p3 --thread urn:afp:thread:q-88-migration-estimate
+python3 afp_verify.py ../instance/export --thread "https://alpha.operator.local/threads/doc-1"
+python3 afp_verify.py ../instance/export-p2 --thread "https://alpha.operator.local/threads/codebase-integrity"
+python3 afp_verify.py ../instance/export-p3 --thread "https://alpha.operator.local/threads/q-88-migration-estimate"
 python3 afp_verify.py ../instance/export-p4/alpha ../instance/export-p4/beta --verbose
 python3 afp_verify.py ../instance/export-p5/alpha ../instance/export-p5/bravo ../instance/export-p5/gamma --verbose
+python3 afp_verify.py ../instance/export-p6/{atlas,meridian,pelican,anchor,harbor} --verbose
 ```
 
 The verifier is a deliberately independent second implementation in another language — a

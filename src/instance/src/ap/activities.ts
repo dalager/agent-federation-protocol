@@ -231,6 +231,29 @@ export function disown(
 }
 
 /**
+ * `Create{afp:ControlTransfer}` — the instance declares who now operates it
+ * (ADR-0005 amendment: declared change of control).
+ *
+ * Published by the transferring instance actor on its own outbox chain, same
+ * class as `Vouch`/`Disown`: a change of control is a recorded, signed act,
+ * never an inference. `afp:operatedBy` names the *new* operator — another
+ * instance actor, for the declared-common-control case scenario 12's finding
+ * 63 describes — and takes effect from this activity's own `published`. No
+ * retroactivity: a snapshot pinned before this activity existed is untouched.
+ */
+export function controlTransfer(envelope: Envelope, operatedBy: string): { [key: string]: JsonValue } {
+  return {
+    ...base(envelope, "Create"),
+    object: {
+      id: `${envelope.activityId}#control-transfer`,
+      type: "afp:ControlTransfer",
+      "afp:operatedBy": operatedBy,
+      since: envelope.published,
+    },
+  };
+}
+
+/**
  * `Follow{actor, object: target}` (ADR-0017 Decision 4, R3) — the instance
  * actor's door-knock at a hub, published `public` as governance trail, same
  * class as Vouch/Disown.

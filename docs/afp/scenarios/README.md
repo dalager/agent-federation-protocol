@@ -23,15 +23,20 @@ protocol does; that review tested whether the build order still matched it.
 | [09](09-the-screening-sidecar.md) | The screening sidecar: an auditable agentic subsystem inside someone else's workflow | Solo profile behind a pre-existing actuation boundary, external initiator, fixed-panel fan-out, polyglot brains behind the port, dissent into the verdict, checkable actuation against an external API, subject-scoped audit export (EU AI Act) | 12 |
 | [10](10-the-incident-bridge.md) | The incident bridge: three operators, one hub, and the host is the one on fire | The P5 shakedown — a shared hub across three trust domains, hub reads across the boundary, CRDT convergence after the host partitions, a quorum round with a member unreachable, membership churn mid-decision, and the first three-export replay | 7 |
 | [11](11-the-snow-day.md) | The snow day: three parties, one decision, and a clock nobody controls | A hub that binds action rather than pooling information — an indivisible outcome, an externally imposed deadline, unverifiable local evidence held by the losing party, actuation by a party with no vote, and grading a decision the morning after. First scenario with a running counterpart (`npm run demo:p5:llm`) | 8 |
+| [12](12-the-parametric-trigger.md) | The parametric trigger: five reinsurers, one storm, and a signature that voted twice | The P6 shakedown — first workload at n≥4 (real Byzantine tolerance), a rational equivocator with pinned incentives, a captured-key claim, backup-restore as accidental equivocation, quorum arithmetic after weight-zeroing, view-change capture, a merger the snapshot cannot see, recusal, and proof portability | 8 |
 | [· tuesday](the-operators-tuesday.md) | The operator's Tuesday | The built stack's ordinary day, every noun pointing at a file — commands, tables, outputs and warts of the solo profile as it runs today; the hard-focus baseline the P4 build will be measured against | — |
 
 ## Is this workload supported?
 
 Every scenario above was written to *break* something, and each one did. This table is the
 answer to the question the walkthroughs deliberately do not answer: **what holds today, and
-how can you see it.** All fifty-seven findings raised across eight campaigns are closed —
-finding 32's remainder last (2026-08-22), when building this index caught that campaign 6
-had been recording it as resolved while its own prose said otherwise.
+how can you see it.** All fifty-seven findings raised across the first eight campaigns are
+closed — finding 32's remainder last (2026-08-22), when building this index caught that
+campaign 6 had been recording it as resolved while its own prose said otherwise. Campaign 9
+([scenario 12](12-the-parametric-trigger.md), the P6 shakedown) is **five-eighths closed**:
+findings 58, 60, 61 and 62 landed with [ADR-0020](../adr/0020-p6-hardened-round-stack.md)
+and finding 63 with the [ADR-0005 amendment](../adr/0005-operators-are-equal.md) — all
+built and gated the day the scenario was walked; 59, 64 and 65 stay open for ADR-0021.
 
 A scenario's own text is never rewritten when its findings land — a scenario records what
 was true when it was walked, which is what makes it evidence. So read a walkthrough as
@@ -51,6 +56,7 @@ demo shows the *resolved* world and the walkthrough shows what it cost to get th
 | [09](09-the-screening-sidecar.md) | 12 · closed | [ADR-0010](../adr/0010-pinning-without-an-auction.md), [ADR-0011](../adr/0011-supersession-meets-the-irreversible-world.md), [ADR-0012](../adr/0012-the-long-horizon.md) | — | `adr0010.test.ts`, `adr0010-parity.test.ts`, `adr0011.test.ts`, `adr0012.test.ts` |
 | [10](10-the-incident-bridge.md) | 7 · closed | [ADR-0014](../adr/0014-p5-shared-hub-stack.md), [ADR-0015](../adr/0015-the-case-file-at-n-parties.md) | `npm run demo:p5` | `adr0014.test.ts`, `adr0014-m6.test.ts`, `adr0015.test.ts`, `adr0016.test.ts` |
 | [11](11-the-snow-day.md) | 8 · closed | [ADR-0018](../adr/0018-the-round-as-a-commitment.md), [ADR-0019](../adr/0019-acting-on-a-decision.md) | `npm run demo:p5:llm` | `adr0018.test.ts`, `adr0019.test.ts` |
+| [12](12-the-parametric-trigger.md) | 8 · **5 closed, 3 open** | [ADR-0020](../adr/0020-p6-hardened-round-stack.md) built (58, 60, 61, 62) · [ADR-0005 amendment](../adr/0005-operators-are-equal.md) built (63); ADR-0021 (59, 64, 65) to write | `npm run demo:p6` · `demo:p6:llm` | `adr0020.test.ts`, `adr0005.test.ts` |
 
 **Where the "See it run" column is empty**, the scenario's shape is covered by its gate
 files rather than by a demo. Three of the four are workloads that live inside another
@@ -359,3 +365,86 @@ a round that fails to decide *does* release its actuator, through the policy's r
 | 55 | *(**closed** — ADR-0019 Decision 3, built)* Nothing constrains who may act — replay checks the binding, the category and the admissibility, never the actor | Require the actor to be enrolled in the hub whose round produced the outcome, checked from the Enroll trail replay already rebuilds |
 | 56 | *(**closed** — ADR-0018 Decision 4, built)* A `DecisionRecord` cannot be settled, so a correct dissenter cannot be credited — settlement binds to estimates or a Synthesis, follows an award, once per task; 04 states the stake itself ("a swarm that penalizes accurate minority objections will stop producing them") | Let a settlement take a `DecisionRecord` as its subject, keeping the award-follows precondition for the allocation case |
 | 57 | *(**closed** — ADR-0018 Decision 3, built)* An outcome that binds jointly has no expression, and defection has no record — harmless while outcomes were divisible, load-bearing once a decision is indivisible by construction | A declared joint-binding property on the proposal, plus a recorded act by which a member states it is not following an outcome it was pinned into — visible non-compliance beats unenforceable compliance |
+
+### Campaign 9 → open (scenario 12, the P6 shakedown)
+
+**Opened 2026-08-22.** Eight findings from [scenario 12](12-the-parametric-trigger.md),
+the first workload at n≥4 operators — where L1's `floor(2n/3)+1` is real tolerance
+rather than the n=2 accountability consolation — and the first with adversaries *inside*
+the agreement: a member for whom a failed round is profitable (its arbitration clause
+wakes on `afp:no-decision`, so campaign 8's honest non-answer terminal becomes a target),
+a key its operator later claims was captured, and an honest node whose restore-from-backup
+produces the exact record shape of an equivocator. Written before the P6 stack ADR on
+purpose, per the standing pattern.
+
+**The through-line: the proof is about a key; every consequence is about a party.**
+The cryptography held end to end — chained votes, anti-entropy, the standalone proof,
+automatic zeroing, the governance rollup — and every finding lives *after* the moment of
+cryptographic conviction, in territory L1 never specified. A second pattern repeats from
+campaigns 6 and 8: machinery gains power faster than the rules governing access to it —
+ADR-0018 made the proposal the protocol's most consequential object, and the view-change
+sentence that hands proposals out was never re-examined (finding 62, the scenario's own
+triage suggestion for first, since it is the only finding that makes an attack *cheaper*
+as specified).
+
+**Triaged into two proposed ADRs and one amendment** (2026-08-22), grouped by the
+decision each finding forces rather than by the subject it touches:
+
+- **[ADR-0020](../adr/0020-p6-hardened-round-stack.md) — the P6 hardened-round stack**
+  (62, 58, 60, 61) — **accepted and built** (2026-08-22, `test/adr0020.test.ts`, 10
+  cases, suite green at 192; findings 58, 60, 61 and 62 closed): everything that changes
+  how the **L1 round itself** behaves, following the P2/P3/P4/P5 stack-ADR convention.
+  The proposal pins its own succession — a deterministic successor rule over the pinned
+  snapshot, zeroed voters excluded, checked at replay (62 — first, inside its own ADR,
+  because it is the only finding that makes an attack *cheaper* as the spec stands, and
+  because it is ADR-0018's own pinning discipline applied to one more sentence); the
+  equivocation predicate ruled precisely — differing *values* convict, a same-value hash
+  mismatch becomes a defined state-loss event with a compliant re-vote path (58 — before
+  any demo exists, since a demo that cannot tell the backup-restore from the equivocator
+  would be gating the wrong thing); the provably-doomed round closes `afp:no-decision`
+  early, citing arithmetic replay recomputes (60 — ADR-0018 Decision 2's shape, arriving
+  before the deadline instead of at it); and the joint replay scans received votes
+  cross-domain for same-tuple conflicts, failing by name on any pair without an on-record
+  proof — which is what makes a MUST-announce duty on proof-holders enforceable rather
+  than aspirational (61 — ADR-0015's all-pairs join extended one check, the machinery the
+  scenario found already half-covering it).
+- **An amendment to [ADR-0005](../adr/0005-operators-are-equal.md)** for 63 — the
+  declared change of control — **built** (2026-08-22, gated in `adr0005.test.ts`;
+  finding 63 closed). Small on its own: an `afp:operatedBy` transfer act in the
+  existing Vouch/Disown grammar, which a snapshot MUST consult (seats under common
+  declared control merge to one operator-weight, per ADR-0005's own rule), plus the
+  honest sentence in 02 that *undeclared* common control is collusion-class —
+  consortium-terms territory, exactly as cross-instance bid collusion already is.
+  Triaged separately rather than folded into ADR-0021 because it amends ADR-0005's core
+  invariant, and because ADR-0021's recusal needs its recompute-over-a-remainder
+  machinery to already exist.
+- **ADR-0021 — after the proof: conviction to consequence** (59, 64, 65): the campaign's
+  through-line as one ADR — conviction is cryptographic, consequence is governance, and
+  the seam between them is unbuilt. A recorded compromise claim referencing the proof and
+  feeding the instance-level governance round that already exists, with restoration a
+  GovernanceDecision like any other membership act — zeroing stays automatic either way
+  (59); a declared recused set with recorded cause on the proposal, excluded from the
+  snapshot with per-operator totals recomputed over the remainder, checked at replay as
+  the estimator wall already is (64); and the proof given a destination — citable as
+  enrollment evidence, consumable by a named reputation-registry derivation, with
+  blacklist federation explicitly declined and the reasons recorded (65).
+
+Build order follows the dependencies rather than the numbering: **ADR-0020 first, with
+finding 62 first inside it** (the live attack surface, and the smallest fix), then 58
+before any P6 demo is written, then 60 and 61; **the ADR-0005 amendment second** (63 —
+it hands ADR-0021 the electorate-recompute machinery recusal needs); **ADR-0021 last**,
+because a contest, a recusal and a portable proof all presuppose a round that can no
+longer be captured or quietly stalled. The seam to watch: 60 and 64 both shrink an
+electorate mid-flight — one by arithmetic, one by declaration — and the two must resolve
+weight the same way or replay will need two rules where one should do.
+
+| # | Finding | Candidate |
+|---|---|---|
+| 58 | *(**closed** — ADR-0020, built)* Equivocation is "different value" in 03's prose and "different hash" in its diagram — a backup-restored honest re-vote convicts under one reading, and an observed-set-only equivocator escapes under the other | Rule it precisely: proof requires differing values; same-value hash mismatch becomes a defined state-loss event with a compliant re-vote path |
+| 59 | The proof punishes the key, not the culprit — no contest path, no compromised-vs-malicious distinction, no ADR-0012 interplay, no restoration mechanism | A recorded compromise claim feeding the existing instance-level governance round; zeroing stays automatic, restoration becomes a GovernanceDecision |
+| 60 | *(**closed** — ADR-0020, built)* A doomed round is indistinguishable from a pending one — zeroing can make the pinned quorum rule unsatisfiable with the deadline days away | A defined early close: `afp:no-decision` citing recomputable impossibility, checked at replay like the tally |
+| 61 | *(**closed** — ADR-0020, built)* Nothing obliges completing a proof, and concealment is invisible — though both halves of the pair already sit in the joint case file | The joint replay scans received votes cross-domain for same-tuple conflicts and fails by name on any pair lacking an on-record proof; then a MUST-announce duty has teeth |
+| 62 | *(**closed** — ADR-0020, built)* The view change is unpinned power — "highest-reputation live replica" is recomputable nowhere, excludes nobody (not even the zeroed equivocator), and now confers ADR-0018's full pin authority | The proposal pins its own succession: a deterministic successor rule over the pinned snapshot, zeroed voters excluded, checked at replay |
+| 63 | *(**closed** — ADR-0005 amendment, built)* A declared change of control has no mechanism — five seats, four owners, and the f=1 arithmetic silently assumes an independence the record cannot state | An `afp:operatedBy` transfer act in the Vouch/Disown grammar that snapshots MUST consult; undeclared control named honestly as collusion-class, consortium-terms territory |
+| 64 | The accused votes on its own expulsion — the governance path has no recusal, though the estimator wall solved the same shape at bid admission | A declared recused set with recorded cause on the proposal; snapshot excludes them with per-operator totals recomputed; replay checks it |
+| 65 | The proof does not travel — enrollment weighs vouches not history, reputation consumes settlements not proofs, so a convicted equivocator re-enrolls elsewhere clean | Enrollment MAY cite proofs as evidence; a named reputation-registry derivation MAY consume them; blacklist federation explicitly declined, with reasons |

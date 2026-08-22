@@ -716,7 +716,9 @@ Every L1 `Vote` embeds:
 - `afp:proposalHash` — hash of the thing being voted on
 - `afp:seqNo` — monotonic per (voter, round) sequence number (replay prevention)
 - `afp:observedVotes` — hashes of every signed vote this voter saw before casting its own
-- a detached signature over the whole vote object
+- signed exactly as every other activity is: one `eddsa-jcs-2022` object integrity proof
+  over the vote object — no detached envelope, no second signature suite
+  ([ADR-0020](adr/0020-p6-hardened-round-stack.md) Decision 1)
 
 Two peers each holding one of a Byzantine voter's conflicting signed votes can produce a
 self-contained `Announce{afp:EquivocationProof}` — same (voter, round, seqNo), different
@@ -768,9 +770,13 @@ hub governance.
 **What's achievable, honestly:** L1 keeps PBFT's **safety** — equivocation is provable, so
 two conflicting proposals can never both collect a valid quorum certificate — but
 downgrades **liveness** to best-effort: soft rounds under generous timeouts riding the
-outbox retry queue; a stalled round triggers a simplified view change (the
-highest-reputation live replica issues a fresh round referencing the stalled one). No
-formal termination bound, but no silent inconsistency either.
+outbox retry queue; succession is pinned in the proposal, not improvised at stall time —
+`afp:successionRule` (snapshot-order: deterministic rotation from the stalled proposal's
+own pinned voter list, starting after its own actor, skipping any voter convicted or
+recorded silent in that round) names the entitled successor, who opens a fresh round
+naming its predecessor via `afp:supersedesRound`; replay fails an unentitled successor
+by name ([ADR-0020](adr/0020-p6-hardened-round-stack.md) Decision 3). No formal
+termination bound, but no silent inconsistency either.
 
 **What L1 buys at small operator counts — read this before claiming "Byzantine
 tolerance":**
@@ -818,7 +824,7 @@ sequenceDiagram
     Note over B,C: D told B 'X' and C 'Y' for the same (round, seq=1) - equivocation
 
     B->>C: anti-entropy exchange of observedVotes sets
-    Note over B,C: cross-check finds two signed D-votes, same seqNo, different hash
+    Note over B,C: same seqNo, conflicting value - an equivocation pair (ADR-0020: values or proposalHash convict; a same-value duplicate is state loss, not proof material)
 
     B-->>D: Announce{afp:EquivocationProof}
     C-->>D: Announce{afp:EquivocationProof}
@@ -830,5 +836,5 @@ sequenceDiagram
     end
 
     Note over P,D: only 2 honest votes, 3 needed - round times out
-    Note over P,D: fallback: highest-reputation live replica issues a fresh round
+    Note over P,D: fallback: the pinned succession rule names the successor, who issues a fresh round naming this one (ADR-0020 Decision 3)
 ```

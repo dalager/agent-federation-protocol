@@ -225,6 +225,47 @@ week, and neither is visible from the phase table above.
   widens the redaction surface, which was the whole reason for triaging it as its own track
   rather than folding it into a P5 ADR.
 
+## Known blockers before P6 opens
+
+[Scenario 12](scenarios/12-the-parametric-trigger.md) walks P6 end to end before its stack
+ADR exists — the same move scenario 10 made for P5 — and reports eight findings
+(campaign 9, open). Its through-line is the seam L1's spec never crosses: **the proof is
+about a key; every consequence is about a party.** The cryptography held end to end; every
+finding lives after the moment of conviction. Triaged in the
+[campaign 9 ledger](scenarios/README.md#campaign-9--open-scenario-12-the-p6-shakedown)
+into [ADR-0020](adr/0020-p6-hardened-round-stack.md) (the hardened-round stack —
+**built and gated** (`adr0020.test.ts`, 10 cases): succession pinned in the proposal, the
+equivocation predicate ruled precisely, the provably-doomed round's early close, and
+replay-detected concealment — findings 58, 60, 61 and 62 closed), an ADR-0005 amendment
+(declared change of control — **built and gated**, `adr0005.test.ts`; finding 63 closed), and
+ADR-0021 (conviction to consequence: contest and restoration, recusal, proof
+portability). Two are worth naming here because a P6 build will hit them in its first
+week, and neither is visible from the phase table above:
+
+- ~~**Finding 62 is a live attack surface, not a gap.**~~ **Closed** — ADR-0020
+  Decision 3, built the same day: `afp:successionRule` pinned in the proposal,
+  rotation keyed on the stalled proposal's wire actor, an unentitled successor a named
+  replay failure. Kept below as written, per the standing rule that a blocker which
+  quietly disappears teaches a later reader nothing. The view-change rule
+  ("highest-reputation live replica issues a fresh round") is prose no proposal pins and
+  no replay checks — and since ADR-0018/0019 the proposal carries the deadline, quorum
+  rule, binding, electorate, action policy and irrevocability. Stalling rounds to farm
+  proposer-ship got *more* valuable with every campaign that made the proposal stronger.
+  It goes first inside ADR-0020.
+- ~~**Finding 58 gates the demo before the demo exists.**~~ **Closed** — ADR-0020
+  Decision 2, built: values or `proposalHash` convict, a same-value duplicate is state
+  loss with a lawful re-vote path, and gate case G2 is exactly the
+  scripted-restore-that-must-not-convict this bullet asked for. Prose and diagram
+  disagreed on
+  what equivocation *is* (different value vs. different hash), and the difference decides
+  whether an honest backup-restore is convicted. The demo that bullet asked for is
+  **built** — `npm run demo:p6`: five instances over real HTTP, one scripted
+  equivocator, one scripted restore, told apart by the joint replay, with
+  `demo:p6:llm` running the same pool on a local model. Running it at five operators
+  found a defect no unit gate could reach — V2 verified a proof's embedded votes
+  against the announcing bundle's keys alone, and a real conviction always crosses a
+  boundary (ADR-0020 W3, gate G14).
+
 ## Open questions
 
 - **Directory-of-hubs bootstrap.** Left as an out-of-band, consortium-published list at a

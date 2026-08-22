@@ -24,24 +24,31 @@ import {
   acceptStateDeltas,
   archiveHub,
   decisionRecord,
+  equivocationProof,
   freezeHub,
   offerDigest,
   offerProposal,
   NO_DECISION,
   type Envelope,
   type HubRole,
+  type SuccessionRule,
   type Visibility,
 } from "./activities.ts";
+import { convicts, voteTupleOf, type VotePhase } from "./equivocation.ts";
 import { validateIrrevocableActions, validateProposalActionPolicy, type TaskPins } from "../ap/pins.ts";
 import { LWWRegister, ORMap, ORMapLWW, ORSet } from "./crdtAdapter.ts";
 import { thresholdOf, type QuorumRule } from "./quorum.ts";
 import { voterWeights } from "./weights.ts";
 import { CRDTStore, type LWWState, type ORMapState, type ORSetState } from "../crdt/index.ts";
 import {
+  convictionsFor,
   ensureHubSchema,
+  countedVoteTuple,
   hasSeat,
+  isConvicted,
   liveSeats,
   loadRound,
+  recordConviction,
   roundByProposal,
   roundDeclinesFor,
   saveDeparture,
@@ -112,6 +119,36 @@ interface LivenessValue {
 }
 
 /**
+ * ADR-0020 W1: per-round L1 metadata, kept in the CRDT store rather than
+ * `hub_rounds` (`store.ts` is WP-1's file, not this WP's to extend) — one LWW
+ * register per round, restored in `hydrate()` like every other view. Absent
+ * (no entry in `Hub.roundMeta`) means an L0 round.
+ */
+interface RoundMeta {
+  level?: 1;
+  successionRule?: SuccessionRule;
+  /** Digest of the stalled proposal ACTIVITY this round supersedes, if any. */
+  supersedesRound?: string;
+  /**
+   * The `actor` of this round's own `Offer{afp:Proposal}` ACTIVITY, as
+   * recorded — "the stalled round's proposer" `successor()` rotates past.
+   * Integration ruling: this MUST be read from the record (the signed
+   * proposal's own `actor`), never from off-wire caller state, so a replay
+   * recomputes the identical rotation start. Today every proposal is signed
+   * by the hub itself (ADR-0014's sequencing authority), so this is
+   * `this.actorId` for every round; a member-signed proposal path would
+   * populate it from that activity's `actor` instead.
+   */
+  proposalActor: string;
+}
+
+/**
+ * ADR-0020 W1: the L1 phases in their protocol order — a counted ballot never
+ * moves backwards through them (`onVote`).
+ */
+const PHASE_ORDER: Record<VotePhase, number> = { prepare: 0, commit: 1 };
+
+/**
  * Is `at` past a round's `afp:deadline` (ADR-0018 W4)? False when no deadline
  * was pinned, and false for a deadline nobody can parse — a round whose clock
  * is unreadable has no clock, which is the pre-ADR-0018 behaviour rather than
@@ -171,6 +208,16 @@ export class Hub {
    */
   private readonly instances = new Map<string, LWWRegister<string>>();
   /**
+   * Declared changes of control (ADR-0005 amendment, 2026-08-22): instance
+   * actor id → the operator it currently declares itself operated by, folded
+   * from the latest `Create{afp:ControlTransfer}` on that instance's own
+   * chain. Absent means the instance is its own operator, exactly today's
+   * behaviour — the weighting in `weights.ts` groups by whichever key this
+   * map or the raw instance id resolves to, so an unused feature changes
+   * nothing.
+   */
+  private readonly controlTransfers = new Map<string, LWWRegister<string>>();
+  /**
    * The asset registry (ADR-0004 Decision 2): a hub-scoped OR-Map
    * `"assetId@version"` → asset record, fed by signed `Update{afp:Asset}`
    * activities. One (id, version) is immutable once registered — enforced
@@ -182,6 +229,21 @@ export class Hub {
   // style as the allocator's award sweep — so a restart mid-round needs no
   // rehydration step (ADR-0004, implementation parity note).
   private readonly seen = new Set<string>();
+  /** ADR-0020 W1: `RoundMeta` per round, CRDT-backed (`roundmeta:{round}`). */
+  private readonly roundMeta = new Map<string, LWWRegister<RoundMeta>>();
+  /**
+   * ADR-0020 W2: the last-seen full vote activity per (round, actor, phase)
+   * — needed to build a legitimate `afp:EquivocationProof` (both votes
+   * embedded verbatim, Decision 1), which `hub_vote_receipts` cannot supply
+   * since it stores only a digest. Keyed by phase because phase is part of
+   * the ballot-identity tuple Decision 2 convicts on: a per-voter key would
+   * evict the earlier phase's vote when the round advances, and take that
+   * phase's equivocation evidence with it. CRDT-backed
+   * (`voteact:{round}:{actor}:{phase}`), restored on hydrate like every
+   * other view. Populated only for a vote carrying L1 fields — an L0 vote is
+   * never proof material.
+   */
+  private readonly voteActivities = new Map<string, LWWRegister<{ [key: string]: JsonValue }>>();
 
   private status: "active" | "frozen" | "archived" = "active";
 
@@ -253,6 +315,18 @@ export class Hub {
         const register = new LWWRegister<string>();
         register.restore(state as LWWState<string>);
         this.instances.set(crdtId.slice("instance:".length), register);
+      } else if (crdtId.startsWith("controlTransfer:") && crdtType === "LWW_REGISTER") {
+        const register = new LWWRegister<string>();
+        register.restore(state as LWWState<string>);
+        this.controlTransfers.set(crdtId.slice("controlTransfer:".length), register);
+      } else if (crdtId.startsWith("roundmeta:") && crdtType === "LWW_REGISTER") {
+        const register = new LWWRegister<RoundMeta>();
+        register.restore(state as LWWState<RoundMeta>);
+        this.roundMeta.set(crdtId.slice("roundmeta:".length), register);
+      } else if (crdtId.startsWith("voteact:") && crdtType === "LWW_REGISTER") {
+        const register = new LWWRegister<{ [key: string]: JsonValue }>();
+        register.restore(state as LWWState<{ [key: string]: JsonValue }>);
+        this.voteActivities.set(crdtId.slice("voteact:".length), register);
       }
     }
 
@@ -469,6 +543,9 @@ export class Hub {
     if (type === "Undo") return this.onUndoFollow(activity);
     if (type === "afp:Enroll") return this.onEnroll(activity);
     if (type === "afp:Unenroll") return this.onUnenroll(activity);
+    // ADR-0005 amendment (2026-08-22): a declared change of control, on the
+    // transferring instance's own chain — same class as Enroll/Unenroll.
+    if (type === "Create" && objectType === "afp:ControlTransfer") return this.onControlTransfer(activity);
     if (type === "Create" && objectType === "afp:Vote") return this.onVote(activity);
     // ADR-0018 Decision 3: a departure from a binding decision, published on
     // the round's own thread by a pinned voter — shaped like afp:Settlement,
@@ -488,6 +565,10 @@ export class Hub {
     // re-fanned out by the hub, and the announcing actor becomes the
     // settlement's counterparty. An observer cannot announce.
     if (type === "Announce" && objectType === "afp:Task") return this.allocation.onAnnounce(activity);
+    // ADR-0020 Decision 5 (C): a member's own assembled proof, announced —
+    // the concealment duty's other half of the searchlight (V8 is the joint
+    // layer's; this is the hub's own receive-time check).
+    if (type === "Announce" && objectType === "afp:EquivocationProof") return this.onEquivocationProofAnnounce(activity);
     // A requester reporting observed actuals onto its own thread — the write
     // that settlement on requester-reported actuals depends on (scenario 05).
     if (type === "Create" && objectType === "afp:Result") return this.allocation.onActualsReport(activity);
@@ -621,6 +702,50 @@ export class Hub {
     return this.instances.get(agent)?.getState()?.value ?? null;
   }
 
+  /**
+   * A declared change of control (ADR-0005 amendment): `Create{afp:ControlTransfer}`
+   * on the transferring instance's own chain, folded the same way as an
+   * Enroll — by its own actor, into an LWW register keyed by that instance.
+   *
+   * No authority check beyond signature: the activity is self-referential (an
+   * instance declares its own new operator), so a valid signature from the
+   * transferring instance's own key is exactly the entitlement the record
+   * needs — the same standard a Vouch/Disown is held to.
+   */
+  private onControlTransfer(activity: { [key: string]: JsonValue }): void {
+    const instanceActor = String(activity.actor ?? "");
+    const object = activity.object;
+    const operatedBy =
+      object && typeof object === "object" && !Array.isArray(object)
+        ? String((object as Record<string, JsonValue>)["afp:operatedBy"] ?? "")
+        : "";
+    if (!instanceActor || !operatedBy) return;
+
+    const published = String(activity.published ?? this.now().toISOString());
+    const delta = { value: operatedBy, timestamp: published, nodeId: instanceActor };
+    const register = this.controlTransfers.get(instanceActor) ?? new LWWRegister<string>();
+    register.apply(delta);
+    this.controlTransfers.set(instanceActor, register);
+    this.crdt.apply(
+      { hub: this.hubId, crdtId: `controlTransfer:${instanceActor}`, crdtType: "LWW_REGISTER", delta },
+      instanceActor,
+      this.now(),
+      String(activity.id),
+    );
+  }
+
+  /**
+   * The operator instance `instanceActor` currently counts as, for weighting
+   * (ADR-0005 amendment): the latest declared `Create{afp:ControlTransfer}`
+   * on its own chain, else itself unchanged. Grouping voters by this instead
+   * of by raw instance id is what lets a declared merger fold two seats into
+   * one operator's weight — and, absent any transfer, is the identity
+   * function `voterWeights` has always seen.
+   */
+  effectiveOperatorOf(instanceActor: string): string {
+    return this.controlTransfers.get(instanceActor)?.getState()?.value ?? instanceActor;
+  }
+
   private onUnenroll(activity: { [key: string]: JsonValue }): void {
     if (this.status !== "active") return;
     const agent = String(activity.object ?? "");
@@ -707,8 +832,56 @@ export class Hub {
     // writer that ordered it differently would disagree with its own replay.
     if (pastDeadline(this.now(), row.deadline)) return;
 
+    // ADR-0020 W1/V1: a vote carrying every L1 field is a tuple, in any
+    // round; an `afp:level: 1` round REQUIRES one — a vote missing
+    // phase/seqNo there is malformed and dropped, same lane as every other
+    // rejection above (no receipt, no tally).
+    const meta = this.roundMetaOf(round);
+    const tuple = voteTupleOf(activity);
+    if (meta?.level === 1 && !tuple) return;
+
     const digest = digestOf(activity);
     const value = String(object.value ?? "");
+    // Keyed by phase, not just by voter: `(actor, round, phase, seqNo)` is the
+    // ballot identity ADR-0020 Decision 2 convicts on, so the prior vote a
+    // duplicate is judged against must be the prior vote *of that phase*. A
+    // per-voter key would let a phase change evict the only copy of the
+    // earlier phase's vote and take its equivocation with it.
+    const voteActKey = tuple ? `${round}:${actor}:${tuple.phase}` : `${round}:${actor}`;
+
+    if (tuple) {
+      // Tuple-grain dedupe (Decision 2, W2), beside the existing id-grain
+      // dedupe in `receive()`: an exact tuple already seen decides between a
+      // benign state-loss duplicate and a conviction.
+      const priorActivity = this.voteActivities.get(voteActKey)?.getState()?.value;
+      const priorTuple = priorActivity ? voteTupleOf(priorActivity) : null;
+      if (priorTuple && priorTuple.seqNo === tuple.seqNo) {
+        if (digestOf(priorActivity!) === digest) return; // identical redelivery
+        if (convicts(priorActivity!, activity)) {
+          this.publishEquivocationAndZero(row, round, actor, priorActivity!, activity);
+        }
+        // Otherwise a state-loss duplicate agreeing in value and
+        // afp:proposalHash — first-seen wins, dropped without a trace beyond
+        // what is already on record.
+        return;
+      }
+
+      // Supersede-by-higher-seqNo: a later seqNo from the same (actor, phase)
+      // replaces the counted ballot; a same-or-lower one is dropped.
+      if (priorTuple && tuple.seqNo < priorTuple.seqNo) return;
+
+      // One counted ballot per voter (`hub_vote_receipts`' own primary key),
+      // so a vote from an earlier phase must never displace a later one: a
+      // stale or replayed `prepare` arriving after a `commit` is dropped
+      // rather than overwriting the ballot that supersedes it. Its tuple
+      // still lands in the per-phase register above, so an equivocation on
+      // the earlier phase is still convictable.
+      const counted = countedVoteTuple(this.db, round, actor);
+      if (counted && PHASE_ORDER[tuple.phase] < PHASE_ORDER[counted.phase]) {
+        this.rememberVoteActivity(voteActKey, actor, activity);
+        return;
+      }
+    }
 
     this.crdt.apply(
       { hub: this.hubId, crdtId: `receipts:${round}`, crdtType: "G_SET", delta: { adds: [{ key: actor, value: digest }] } },
@@ -716,7 +889,203 @@ export class Hub {
       this.now(),
       String(activity.id),
     );
-    saveVoteReceipt(this.db, round, actor, digest, value);
+    saveVoteReceipt(this.db, round, actor, digest, value, tuple?.phase, tuple?.seqNo);
+
+    if (tuple) this.rememberVoteActivity(voteActKey, actor, activity);
+  }
+
+  /**
+   * ADR-0020 W2: keep the full signed vote activity for `(round, actor,
+   * phase)` — the proof material `hub_vote_receipts` cannot supply, since it
+   * stores only a digest. Applied to the register already held for the key
+   * rather than replacing it, so an out-of-order delivery resolves by LWW
+   * like every other register in this hub.
+   */
+  private rememberVoteActivity(
+    voteActKey: string,
+    actor: string,
+    activity: { [key: string]: JsonValue },
+  ): void {
+    const delta = { value: activity, timestamp: this.now().getTime(), nodeId: this.actorId };
+    const register = this.voteActivities.get(voteActKey) ?? new LWWRegister<{ [key: string]: JsonValue }>();
+    register.apply(delta);
+    this.voteActivities.set(voteActKey, register);
+    this.crdt.apply(
+      { hub: this.hubId, crdtId: `voteact:${voteActKey}`, crdtType: "LWW_REGISTER", delta },
+      actor,
+      this.now(),
+      String(activity.id),
+    );
+  }
+
+  /** `roundMeta.get(round)`'s current value, or `null` for an L0/unknown round. */
+  private roundMetaOf(round: string): RoundMeta | null {
+    return this.roundMeta.get(round)?.getState()?.value ?? null;
+  }
+
+  /**
+   * ADR-0020 Decision 1: the receiver-side half of zeroing — record a
+   * conviction against `actor` in `round` and stop here; the tally exclusion
+   * (`closeRound`/`doomed`) and `successor()` both read `isZeroedFor`
+   * forward from whatever round a conviction first lands in.
+   */
+  private convictActor(round: string, actor: string, proofDigest: string): void {
+    recordConviction(this.db, round, actor, proofDigest);
+  }
+
+  /**
+   * ADR-0020 Decision 5: this hub itself discovered a conviction pair (the
+   * vote-receive path, B) — assemble and publish the `afp:EquivocationProof`
+   * (both full signed votes verbatim, Decision 1) before recording it, since
+   * nobody else has announced this pair yet.
+   */
+  private publishEquivocationAndZero(
+    row: RoundRow,
+    round: string,
+    actor: string,
+    voteA: { [key: string]: JsonValue },
+    voteB: { [key: string]: JsonValue },
+  ): void {
+    if (isConvicted(this.db, round, actor)) return; // already on record
+    const proofId = `${this.actorId}/proofs/${round}/${actor}`;
+    const entry = this.emit(row.voters, row.thread, "hub", (envelope) =>
+      equivocationProof(envelope, { proofId, hub: this.actorId, round, votes: [voteA, voteB] }),
+    );
+    this.convictActor(round, actor, digestOf(entry.activity));
+  }
+
+  /**
+   * `Announce{afp:EquivocationProof}` (ADR-0020 Decision 5, deliverable C): a
+   * member may assemble and announce a proof itself. Both embedded votes are
+   * verified here exactly as any inbound activity would be — a proof is
+   * trusted for nothing on say-so alone — and `convicts()` is recomputed,
+   * never taken on faith. A proof failing any leg is rejected and logged; a
+   * valid one is recorded without a second announcement (this one already is
+   * the record).
+   */
+  private onEquivocationProofAnnounce(activity: { [key: string]: JsonValue }): void {
+    const object = activity.object as Record<string, JsonValue>;
+    const round = String(object["afp:round"] ?? "");
+    const votes = object["afp:votes"];
+    const reject = (reason: string) =>
+      logAdmission(this.db, this.now().toISOString(), round, String(activity.actor ?? ""), "rejected", reason);
+
+    if (!Array.isArray(votes) || votes.length !== 2) {
+      return reject("afp:EquivocationProof without exactly two afp:votes");
+    }
+    const [a, b] = votes as [{ [key: string]: JsonValue }, { [key: string]: JsonValue }];
+
+    const va = this.verifySignature(a);
+    if (!va.ok) return reject(`embedded vote fails signature verification: ${va.reason}`);
+    const vb = this.verifySignature(b);
+    if (!vb.ok) return reject(`embedded vote fails signature verification: ${vb.reason}`);
+
+    if (!convicts(a, b)) return reject("embedded votes do not convict (ADR-0020 W2)");
+
+    // The proof's own `afp:round` must be the round the pair was cast in: a
+    // genuine pair from one round, announced under another round's name,
+    // would otherwise record a conviction — and, being forward-scoped, a
+    // zeroing — in a round the voter never equivocated in.
+    const voteRound = String((a.object as Record<string, JsonValue>)["afp:round"] ?? "");
+    if (voteRound !== round) {
+      return reject(`afp:EquivocationProof names round ${round}, but its votes were cast in ${voteRound}`);
+    }
+
+    const actor = String(a.actor ?? "");
+    const row = loadRound(this.db, round);
+    if (!row || !row.voters.includes(actor)) {
+      return reject(`round ${round} unknown, or ${actor} is outside its pinned snapshot`);
+    }
+
+    if (isConvicted(this.db, round, actor)) return; // already on record — nothing new
+    this.convictActor(round, actor, digestOf(activity));
+  }
+
+  /**
+   * ADR-0020 Decision 1/4: has a conviction landed in `round` or any round
+   * created no later than it, in this hub? Zeroing is forward-scoped only —
+   * a closed round's DecisionRecord is signed history, never re-tallied — so
+   * this is ordered by `hub_rounds.created_at`, the only stable order two
+   * round ids carry relative to each other.
+   */
+  private isZeroedFor(round: string, actor: string): boolean {
+    const row = this.db
+      .prepare(
+        `SELECT 1 FROM hub_convictions c
+           JOIN hub_rounds cr ON cr.round_id = c.round_id
+           JOIN hub_rounds tr ON tr.round_id = ?
+          WHERE c.actor = ? AND cr.hub_id = tr.hub_id AND cr.created_at <= tr.created_at
+          LIMIT 1`,
+      )
+      .get(round, actor) as unknown;
+    return row !== undefined;
+  }
+
+  /**
+   * ADR-0020 Decision 4: `attainable(option) = tally[option] + Σ weight(v)`
+   * over pinned voters with no counted vote and no conviction; `doomed` holds
+   * when every option's attainable weight is under the bar. `false` when the
+   * round pins no `afp:quorumRule` — doom is meaningless without a bar.
+   */
+  private doomed(row: RoundRow, votes: readonly { actor: string; value: string; digest: string }[]): boolean {
+    if (!row.quorumRule || row.options.length === 0) return false;
+    const bar = thresholdOf(row.quorumRule, row.weights);
+    if (bar === null) return false;
+    const tally = this.tally(row, votes);
+    const heard = new Set(votes.map((vote) => vote.actor));
+    let reachable = 0;
+    for (const voter of row.voters) {
+      if (heard.has(voter)) continue;
+      if (this.isZeroedFor(row.roundId, voter)) continue;
+      reachable += row.weights[voter] ?? 0;
+    }
+    return row.options.every((option) => (tally[option] ?? 0) + reachable < bar);
+  }
+
+  /** Recompute `doomed` for an open round exactly as `demandClose` gates on it — WP-4's G5/G6 hook. */
+  isDoomed(round: string): boolean {
+    const row = loadRound(this.db, round);
+    if (!row || row.status !== "open") return false;
+    const votes = this.roundVotes(round).filter((vote) => !this.isZeroedFor(round, vote.actor));
+    return this.doomed(row, votes);
+  }
+
+  /**
+   * ADR-0020 Decision 3, W2: the pinned, recomputable successor — the first
+   * survivor of `stalled.voters`, rotated to start after the stalled round's
+   * proposer, skipping a voter convicted in that round or recorded silent in
+   * its DecisionRecord. `null` when no sanctioned succession remains.
+   */
+  private successor(stalledRoundId: string, stalledRow: RoundRow, stalledMeta: RoundMeta): string | null {
+    const order = stalledRow.voters;
+    if (order.length === 0) return null;
+    const proposerIdx = order.indexOf(stalledMeta.proposalActor);
+    const start = proposerIdx === -1 ? 0 : proposerIdx + 1;
+    const convicted = new Set(convictionsFor(this.db, stalledRoundId).map((c) => c.actor));
+    // "Recorded silent" is derived exactly as `finishClose` derives the
+    // DecisionRecord's `afp:uncounted` — heard minus declines over the pinned
+    // voters — which is what the verifier's `successor()` reads back off that
+    // record. The two must agree: a closed round takes no further votes
+    // (`onVote` gates on `status === "open"`), so this live view and the
+    // signed one are the same set.
+    const heard = new Set(this.roundVotes(stalledRoundId).map((vote) => vote.actor));
+    const declined = new Set(roundDeclinesFor(this.db, stalledRoundId));
+    for (let i = 0; i < order.length; i++) {
+      const candidate = order[(start + i) % order.length];
+      if (convicted.has(candidate)) continue;
+      const silent = !heard.has(candidate) && !declined.has(candidate);
+      if (silent) continue;
+      return candidate;
+    }
+    return null;
+  }
+
+  /** Public wrapper over `successor()` — the round-open validation, and WP-4's G7/G8 hook. */
+  successorOf(stalledRoundId: string): string | null {
+    const stalledRow = loadRound(this.db, stalledRoundId);
+    const meta = this.roundMetaOf(stalledRoundId);
+    if (!stalledRow || !meta?.successionRule) return null;
+    return this.successor(stalledRoundId, stalledRow, meta);
   }
 
   /**
@@ -936,6 +1305,19 @@ export class Hub {
      * and are refused below rather than emitted.
      */
     pins?: TaskPins;
+    /** ADR-0020 Decision 1/W1: pins the round grammar. Absent means L0 — today's behaviour, byte-identical. */
+    level?: 1;
+    /** ADR-0020 Decision 3/W1: optional, recomputable succession rule. Absent means no sanctioned succession. */
+    successionRule?: SuccessionRule;
+    /**
+     * ADR-0020 Decision 3: this round's own id, as a successor claiming a
+     * stalled predecessor — not the digest 03/W1 pins (`afp:supersedesRound`
+     * is derived here, from the stalled round's own `proposalHash`). The
+     * stalled round must be closed and must have pinned a `successionRule`,
+     * and the actor this round's `Offer` will be signed by must be its
+     * entitled `successor()`.
+     */
+    supersedesRoundId?: string;
   }): OutboxEntry {
     if (this.status !== "active") {
       throw new Error(`hub is ${this.status} — no new rounds (afp:${this.status === "frozen" ? "Freeze" : "Archive"})`);
@@ -969,14 +1351,53 @@ export class Hub {
     // One operator, one weight (ADR-0005 Decision 1): each seated instance
     // carries the same total, divided among its pinned voters. At a single
     // instance this reduces to the liveness-gated uniform weight of 1 that
-    // ADR-0002 Decision 3 pinned, so the solo profile is unchanged.
-    const weights = voterWeights(voters.map((agent) => ({ agent, instance: this.instanceOf(agent) ?? agent })));
+    // ADR-0002 Decision 3 pinned, so the solo profile is unchanged. The
+    // grouping key is the *effective* operator (ADR-0005 amendment): a
+    // declared change of control folds two instances' seats into one weight
+    // bucket at the moment a snapshot is pinned — never retroactively, since
+    // this is resolved fresh on every proposeRound call.
+    const weights = voterWeights(
+      voters.map((agent) => ({ agent, instance: this.effectiveOperatorOf(this.instanceOf(agent) ?? agent) })),
+    );
 
     // ADR-0018 W2: never sign a rule nobody can recompute — an unknown form
     // fails here, at propose time, rather than surfacing only when the round
     // closes or a verifier tries to recompute the bar it cannot resolve.
     if (options.quorumRule && thresholdOf(options.quorumRule, weights) === null) {
       throw new Error(`afp:quorumRule names an unknown form (ADR-0018): ${JSON.stringify(options.quorumRule)}`);
+    }
+
+    // ADR-0020 Decision 3: a successor round is validated before it is ever
+    // signed — `afp:supersedesRound` pins the stalled proposal's digest, and
+    // replay must be able to recompute the same successor from the stalled
+    // round's own record alone (successor() mirrors this exactly). "The
+    // proposing actor" is checked against the actor this round's own `Offer`
+    // is about to be signed by — today that is always `this.actorId` (the
+    // hub is ADR-0014's sequencing authority; no member-signed proposal path
+    // exists yet), which makes this trivially satisfiable in-process, but the
+    // comparison is kept so a future member-signed path is checked here
+    // rather than only by the verifier reading the wire.
+    let supersedesRound: string | undefined;
+    if (options.supersedesRoundId) {
+      const stalledRow = loadRound(this.db, options.supersedesRoundId);
+      if (!stalledRow || stalledRow.status !== "closed") {
+        throw new Error(
+          `afp:supersedesRound names round ${options.supersedesRoundId}, which is not closed/stalled (ADR-0020)`,
+        );
+      }
+      const stalledMeta = this.roundMetaOf(options.supersedesRoundId);
+      if (!stalledMeta?.successionRule) {
+        throw new Error(
+          `afp:supersedesRound requires the stalled round to have pinned afp:successionRule (ADR-0020 W1)`,
+        );
+      }
+      const entitled = this.successor(options.supersedesRoundId, stalledRow, stalledMeta);
+      if (!entitled || entitled !== this.actorId) {
+        throw new Error(
+          `afp:supersedesRound: ${this.actorId} is not the entitled successor of ${options.supersedesRoundId} (ADR-0020 W2)`,
+        );
+      }
+      supersedesRound = stalledRow.proposalHash;
     }
 
     const quorumSnapshot = digestOf([...voters].sort());
@@ -996,6 +1417,9 @@ export class Hub {
         quorumRule: options.quorumRule,
         binding: options.binding,
         pins: options.pins,
+        level: options.level,
+        successionRule: options.successionRule,
+        supersedesRound,
       }),
     );
 
@@ -1015,6 +1439,28 @@ export class Hub {
       binding: options.binding ?? null,
     };
     saveRound(this.db, row, this.now().toISOString());
+
+    // ADR-0020 W1: recorded only for an L1 round — an L0 caller supplies none
+    // of `level`/`successionRule`/`supersedesRoundId`, so nothing is written
+    // and `roundMetaOf` reads back `null`, exactly as before this decision.
+    if (options.level || options.successionRule || supersedesRound) {
+      const meta: RoundMeta = {
+        level: options.level,
+        successionRule: options.successionRule,
+        supersedesRound,
+        proposalActor: String(entry.activity.actor ?? this.actorId),
+      };
+      const delta = { value: meta, timestamp: this.now().getTime(), nodeId: this.actorId };
+      const register = new LWWRegister<RoundMeta>();
+      register.apply(delta);
+      this.roundMeta.set(options.round, register);
+      this.crdt.apply(
+        { hub: this.hubId, crdtId: `roundmeta:${options.round}`, crdtType: "LWW_REGISTER", delta },
+        this.actorId,
+        this.now(),
+        String(entry.activity.id),
+      );
+    }
 
     return entry;
   }
@@ -1037,11 +1483,41 @@ export class Hub {
    * one closing call rather than state the round needs to survive a restart.
    */
   closeRound(round: string, options?: { priorQuorumSnapshot?: string }): OutboxEntry {
+    return this.finishClose(round, { priorQuorumSnapshot: options?.priorQuorumSnapshot });
+  }
+
+  /**
+   * ADR-0020 Decision 4: an early close, right on demand — `no-decision`
+   * with reason `quorum-impossible`, granted only when `doomed()` holds at
+   * the moment of the call. The normal deadline close (`expired`) is
+   * untouched and remains valid even when `doomed` also held: early close is
+   * a right, never a duty, until this is called.
+   */
+  demandClose(round: string): OutboxEntry {
+    if (this.status === "archived") throw new Error("hub is archived — terminal, read-only (afp:Archive)");
+    const row = loadRound(this.db, round);
+    if (!row) throw new Error(`unknown round ${round}`);
+    if (row.status !== "open") throw new Error(`round ${round} is not open`);
+    const votes = this.roundVotes(round).filter((vote) => !this.isZeroedFor(round, vote.actor));
+    if (!this.doomed(row, votes)) {
+      throw new Error(`round ${round} is not provably doomed — demandClose refused (ADR-0020 Decision 4)`);
+    }
+    return this.finishClose(round, { forcedNoDecisionReason: "quorum-impossible" });
+  }
+
+  /** The shared close body behind `closeRound` and `demandClose`. */
+  private finishClose(
+    round: string,
+    options: { priorQuorumSnapshot?: string; forcedNoDecisionReason?: "quorum-impossible" },
+  ): OutboxEntry {
     if (this.status === "archived") throw new Error("hub is archived — terminal, read-only (afp:Archive)");
     const row = loadRound(this.db, round);
     if (!row) throw new Error(`unknown round ${round}`);
 
-    const votes = this.roundVotes(round);
+    // ADR-0020 W2/V3: a convicted voter's ballot never reaches the tally or
+    // `afp:countedVotes`, though its pinned weight still counts toward the
+    // bar's denominator (row.weights, untouched by zeroing — Decision 4).
+    const votes = this.roundVotes(round).filter((vote) => !this.isZeroedFor(round, vote.actor));
     const tally = this.tally(row, votes);
     // Options in declared order, then abstain; first wins ties — Array#sort is
     // stable, and `tally`'s own keys are built in that order (this.tally),
@@ -1049,12 +1525,18 @@ export class Hub {
     let outcome = Object.entries(tally).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "abstain";
     const countedVotes = votes.map((vote) => vote.digest);
 
-    // ADR-0018 W3: with a quorum rule pinned, the plain argmax is not yet the
-    // outcome — it must also clear the bar, and `abstain` can never win under
-    // a rule (it is a residual bucket, not an option). A round with no rule
-    // takes none of this branch, so its signed bytes are unchanged to the byte.
-    let noDecisionReason: "expired" | "threshold-not-met" | undefined;
-    if (row.quorumRule) {
+    let noDecisionReason: "expired" | "threshold-not-met" | "quorum-impossible" | undefined;
+    if (options.forcedNoDecisionReason) {
+      // ADR-0020 Decision 4: `demandClose` already recomputed `doomed` before
+      // calling this — trusted here, not re-derived, so the check lives in
+      // exactly one place.
+      outcome = NO_DECISION;
+      noDecisionReason = options.forcedNoDecisionReason;
+    } else if (row.quorumRule) {
+      // ADR-0018 W3: with a quorum rule pinned, the plain argmax is not yet the
+      // outcome — it must also clear the bar, and `abstain` can never win under
+      // a rule (it is a residual bucket, not an option). A round with no rule
+      // takes none of this branch, so its signed bytes are unchanged to the byte.
       const bar = thresholdOf(row.quorumRule, row.weights);
       if (bar === null) throw new Error(`round ${round} pins an unresolvable afp:quorumRule (ADR-0018)`);
       if (outcome === "abstain" || (tally[outcome] ?? 0) < bar) {
@@ -1086,7 +1568,7 @@ export class Hub {
         quorumSnapshot: row.quorumSnapshot,
         countedVotes,
         weightTally: tally,
-        priorQuorumSnapshot: options?.priorQuorumSnapshot,
+        priorQuorumSnapshot: options.priorQuorumSnapshot,
         uncounted,
         noDecisionReason,
       }),
@@ -1125,6 +1607,27 @@ export class Hub {
   /** Read-only view mirroring `roundVotes` — every recorded departure from this round's binding decision. */
   roundDepartures(round: string): { actor: string; digest: string }[] {
     return departuresFor(this.db, round);
+  }
+
+  /**
+   * Read-only view in the same family — every conviction on record for a
+   * round (ADR-0020 Decision 1's zeroing table), with the proof that carries
+   * it. What `closeRound` excludes from the tally and `successor()` skips.
+   */
+  convictionsIn(round: string): { actor: string; proofDigest: string }[] {
+    return convictionsFor(this.db, round);
+  }
+
+  /**
+   * Verify one published activity's own integrity proof the way any receiver
+   * does — exposed so a caller holding an `afp:EquivocationProof` can check
+   * its two embedded votes standalone, from the proof's contents alone,
+   * without being handed a verdict by the hub that assembled it (ADR-0020
+   * Decision 1: the proof's defining property is that it convinces someone
+   * holding nothing else).
+   */
+  verifyPublished(activity: { [key: string]: JsonValue }): { ok: true } | { ok: false; reason: string } {
+    return this.verifySignature(activity);
   }
 
   /** `afp:Freeze` — suspend new work; existing rounds may still close. */

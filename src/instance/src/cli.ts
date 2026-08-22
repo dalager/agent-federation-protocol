@@ -362,6 +362,226 @@ async function main(): Promise<void> {
       break;
     }
 
+    case "p6": {
+      const { runP6Demo } = await import("./demoP6.ts");
+      const demo = await runP6Demo();
+      const who = (url: string | null): string => (url ? (url.split("/").pop() ?? url) : "nobody");
+
+      console.log(`\natlas    ${demo.atlas.origin}  (atl-uw, atl-pay) — hosts windward`);
+      console.log(`meridian ${demo.meridian.origin}  (mer-uw) — profits if the round fails to close`);
+      console.log(`pelican  ${demo.pelican.origin}  (pel-uw)`);
+      console.log(`anchor   ${demo.anchor.origin}  (anc-uw)`);
+      console.log(`harbor   ${demo.harbor.origin}  (har-uw)\n`);
+
+      console.log("the round declares its terms before a vote exists (ADR-0018/0019/0020):");
+      console.log(`  level     1 — five operators live in this hub, so every ballot is a chained tuple`);
+      console.log(`  bar       ${demo.quorumBar.rule} ${demo.quorumBar.threshold} of a pinned total of ${demo.quorumBar.total}`);
+      console.log(`  deadline  ${demo.deadline}  (the contract's 72-hour determination window)`);
+      console.log(`  binding   joint — one determination, no per-member payout`);
+      console.log(`  policy    one admissible action per outcome, afp:no-decision included`);
+      console.log(`  succession ${demo.succession.rule} — who may inherit this round if it stalls\n`);
+
+      console.log("the prepare phase:");
+      for (const voter of demo.voters) {
+        const agent = who(voter);
+        const assessment = demo.assessments[agent];
+        console.log(`  ${agent.padEnd(8)} ${assessment ? assessment.verdict.padEnd(4) : "—   "} ${assessment?.rationale ?? ""}`);
+      }
+
+      console.log(`\none signature, two votes (ADR-0020 Decision 2):`);
+      console.log(`  ${who(demo.conviction.actor)} signed the same (round, phase, seqNo) twice:`);
+      for (const half of demo.conviction.halves) {
+        console.log(`    ${half.value.padEnd(4)} ${half.digest.slice(0, 22)}…  observedVotes: ${half.observed}`);
+      }
+      console.log("  the hub recomputed convicts() over the two signed objects, published an");
+      console.log("  Announce{afp:EquivocationProof} carrying both of them verbatim, and zeroed the seat");
+      console.log(`  the proof re-verified from its own two embedded votes: ${demo.conviction.verifiesStandalone}`);
+      console.log("    — which is what makes it usable by someone holding nothing else\n");
+
+      console.log("the same shape, and not a sanction (the finding-58 discriminator):");
+      console.log(`  ${who(demo.restore.actor)} restored from backup and re-signed its vote`);
+      console.log(`    same tuple: ${demo.restore.sameTupleAsFirst}   same value: yes   different bytes: ${demo.restore.duplicateDigest.slice(0, 22)}…`);
+      console.log(`    convicted: ${demo.restore.convicted}  — values convict, hashes do not`);
+      console.log(`  its lawful move was to re-vote at seqNo ${demo.restore.revoteSeqNo}, which superseded in place:`);
+      console.log(`    receipts for that seat: ${demo.restore.receiptsForActor} (counted once, not zero, not twice)\n`);
+
+      console.log("the arithmetic after the proof (ADR-0020 Decision 4):");
+      for (const [option, weight] of Object.entries(demo.doom.attainable)) {
+        console.log(`  attainable(${option.padEnd(3)}) = ${weight}  ${weight < demo.doom.bar ? "<" : ">="} bar ${demo.doom.bar}`);
+      }
+      console.log(`  doomed: ${demo.doom.doomed} — the zeroed seat stays in the denominator, it just cannot cast`);
+      if (demo.noDecisionReason === "quorum-impossible") {
+        console.log(`  ${who(demo.doom.demandedBy)} demanded the close: 71 hours of theatre became one activity\n`);
+      } else {
+        console.log("  not provably doomed on these votes — the round closed on its own terms\n");
+      }
+
+      console.log(`outcome:  ${demo.outcome}${demo.noDecisionReason ? ` (${demo.noDecisionReason})` : ""}`);
+      console.log(`counted:  ${demo.countedVotes} votes — the convicted seat's ballot is not among them`);
+      for (const [option, weight] of Object.entries(demo.weightTally).sort((a, b) => b[1] - a[1])) {
+        console.log(`  ${option.padEnd(10)} ${"█".repeat(Math.round(weight))} ${weight}`);
+      }
+      for (const [agent, status] of Object.entries(demo.uncounted)) {
+        console.log(`  ${who(agent).padEnd(10)} ${status}`);
+      }
+      console.log("  the convicted seat's weight is the abstain row: it still counts toward the");
+      console.log("  total the bar was computed over (Decision 4 — zeroing removes the ability to");
+      console.log("  cast, never the electorate the rule was pinned against)");
+
+      console.log(`\nthe stall recovery (ADR-0020 Decision 3):`);
+      console.log(`  entitled successor: ${who(demo.succession.entitled)}`);
+      if (demo.succession.skipped.length) {
+        console.log(`  skipped:            ${demo.succession.skipped.map(who).join(", ")} — convicted in this round`);
+      }
+      console.log(`  it opened ${who(demo.succession.freshRound)} naming the stalled round by digest`);
+      console.log("    reputation would have handed this to the equivocator: it has the pool's best");
+      console.log("    settlement record. Snapshot order is dumb on purpose.\n");
+
+      console.log(`the consequence (ADR-0019):`);
+      console.log(`  ${who(demo.actuation.actor)} published afp:action ${demo.actuation.action}`);
+      console.log(`  "${demo.actuation.notice}"\n`);
+
+      for (const [name, summary] of Object.entries(demo.exports)) {
+        console.log(`export:  ${name.padEnd(9)} ${String(summary.activities).padStart(3)} activities -> ${summary.dir}`);
+      }
+      console.log(
+        `\nverify it:  python3 ../verifier/afp_verify.py ${Object.keys(demo.exports).map((n) => `${demo.exportRoot}/${n}`).join(" ")} --verbose\n`,
+      );
+      await demo.close();
+      break;
+    }
+
+    case "p6:llm": {
+      const config = loadConfig();
+      const { runP6Experiment } = await import("./experimentP6.ts");
+      const shortId = (url: string | null): string => (url ? (url.split("/").pop() ?? url) : "nobody");
+      const wrap = (text: string, indent: string): string =>
+        text
+          .split(/\s+/)
+          .reduce<string[]>((lines, word) => {
+            const last = lines[lines.length - 1];
+            if (last !== undefined && `${last} ${word}`.length <= 76) lines[lines.length - 1] = `${last} ${word}`;
+            else lines.push(word);
+            return lines;
+          }, [])
+          .join(`\n${indent}`);
+
+      console.log(`brains: ${config.llmModel} @ ${config.llmBaseUrl}\n`);
+      console.log("Storm Dagmar has been and gone. Five reinsurers share one contract, and it is");
+      console.log("the kind that pays out on measurements rather than on loss adjusters: if the");
+      console.log("storm crossed two pinned thresholds, four thousand policyholders are paid");
+      console.log("today, automatically. The five of them have to agree that it did.\n");
+      console.log("They are not neutral, and everybody knows it — each member's exposure is");
+      console.log("written into the contract the round references. One of them does best of all");
+      console.log("if the pool simply fails to answer.\n");
+
+      const demo = await runP6Experiment({ endpoint: endpointOf(config) });
+      const who = (url: string | null): string => demo.labels[shortId(url)] ?? shortId(url);
+
+      console.log(demo.bulletin.split("\n").map((line) => `  ${line}`).join("\n"));
+      console.log(`\nthe question:  ${demo.question}\n`);
+
+      console.log("each underwriter read the same bulletin next to its own book, and answered:\n");
+      for (const voter of demo.voters) {
+        const agent = shortId(voter);
+        const assessment = demo.assessments[agent];
+        if (!assessment) continue;
+        console.log(`  ${who(voter)} — ${assessment.verdict.toUpperCase()}`);
+        console.log(`    "${wrap(assessment.rationale, "     ")}"`);
+        console.log(`    (written by ${assessment.producedBy})\n`);
+      }
+
+      console.log("then one of them signed its answer twice.\n");
+      console.log(`  ${who(demo.conviction.actor)} put its name to two ballots at the same round,`);
+      console.log("  the same phase and the same sequence number — one saying yes, one saying no,");
+      console.log("  each carrying the set of votes it claimed to have seen:\n");
+      for (const half of demo.conviction.halves) {
+        console.log(`    ${half.value.padEnd(4)} ${half.digest.slice(0, 30)}…   (claimed to have seen ${half.observed} votes)`);
+      }
+      console.log("\n  If two camps each believe a different count is forming, neither of them ever");
+      console.log("  assembles a majority, the determination dies of old age at the deadline, and");
+      console.log("  the dispute goes to an arbitration panel on terms this member's own lawyers");
+      console.log("  wrote. Failing to decide is not a neutral outcome; here it is worth money.\n");
+      console.log(`  It did not survive the two copies meeting. The hub recomputed the test itself`);
+      console.log(`  and published a proof carrying both signed ballots inside it. Anyone can check`);
+      console.log(`  that proof holding nothing else — including this program, which just did: ${demo.conviction.verifiesStandalone}.`);
+      console.log("  The seat's weight went to zero for this round and every later one. Nobody");
+      console.log("  voted on that, and nobody had to: it is arithmetic over two signatures.\n");
+
+      console.log("and then a disk failed, which looks exactly the same.\n");
+      console.log(`  ${who(demo.restore.actor)} came back from a backup taken before it voted. It had`);
+      console.log("  no memory of voting, so it honestly signed the same answer again — same round,");
+      console.log("  same sequence number, same value, but a later timestamp and a longer list of");
+      console.log("  votes it had seen by then. Different bytes. The same shape as the equivocator.\n");
+      console.log(`    convicted: ${demo.restore.convicted}`);
+      console.log("  What convicts is contradicting yourself, not being byte-different. So the");
+      console.log("  duplicate was dropped, and the lawful way back — re-vote at a higher sequence");
+      console.log(`  number — replaced the old ballot in place: ${demo.restore.receiptsForActor} ballot for that seat, counted once.`);
+      console.log("  If the record could not tell these two apart, every node that ever restores");
+      console.log("  from backup would be a cheat, which over five years is all of them.\n");
+
+      console.log(
+        demo.doom.doomed
+          ? "what was left could not reach the bar:\n"
+          : "and then the count, with one seat unable to cast:\n",
+      );
+      for (const [option, weight] of Object.entries(demo.doom.attainable)) {
+        console.log(`    even if every remaining seat voted ${option.padEnd(3)}: ${weight}  (the bar is ${demo.doom.bar})`);
+      }
+      if (demo.noDecisionReason === "quorum-impossible") {
+        console.log("\n  With one seat unable to cast and the rest split, no answer could get there —");
+        console.log("  and that was provable from the record the moment the proof landed, with the");
+        console.log(`  deadline (${demo.deadline}) still days away.`);
+        console.log(`  ${who(demo.doom.demandedBy)} asked for the round to be closed on the arithmetic,`);
+        console.log("  and it was: seventy-one hours of waiting for a foregone conclusion became one");
+        console.log("  activity. The reason is on the record and anyone can recompute it.\n");
+      } else {
+        console.log("\n  A bar was still reachable on these votes, so the round closed on its own");
+        console.log("  terms rather than early.\n");
+      }
+
+      console.log(`  outcome:  ${demo.outcome}${demo.noDecisionReason ? ` (${demo.noDecisionReason})` : ""}`);
+      for (const [option, weight] of Object.entries(demo.weightTally).sort((a, b) => b[1] - a[1])) {
+        console.log(`    ${option.padEnd(10)} ${"█".repeat(Math.round(weight))} ${weight}`);
+      }
+      console.log("    the convicted seat still counts toward the total the bar was computed over —");
+      console.log("    it lost the ability to vote, not its place in the electorate. A proof that");
+      console.log("    could shrink the denominator would be a way to make a contested round");
+      console.log("    easier to win with one stolen key.\n");
+
+      console.log("who gets to ask the question again:\n");
+      console.log(`  ${who(demo.succession.entitled)}`);
+      if (demo.succession.skipped.length) {
+        console.log(`  and not ${demo.succession.skipped.map(who).join(", ")}, which the rule skipped for being convicted.`);
+      }
+      console.log("  The old rule was 'whoever has the best reputation' — and in this pool that is");
+      console.log("  the member that just equivocated: a diligent underwriter for years, right up");
+      console.log("  until this morning. The round now pins the order before anyone votes, and the");
+      console.log("  order is dumb on purpose. Whoever opens the next round writes its deadline,");
+      console.log("  its bar, its electorate and what may be done about the answer, so it is not a");
+      console.log("  chore to hand out on popularity.\n");
+
+      console.log("what actually happened to the money:\n");
+      console.log(`  ${who(demo.actuation.actor)} carried it out, under the one action this round had`);
+      console.log(`  already declared admissible for this outcome (${demo.actuation.action}):\n`);
+      console.log(`    "${wrap(demo.actuation.notice, "     ")}"\n`);
+      console.log("  That desk has no vote and never had one. It could not have chosen a different");
+      console.log("  instruction: the round fixed the menu before the first ballot existed.\n");
+
+      for (const [name, summary] of Object.entries(demo.exports)) {
+        console.log(`export:  ${name.padEnd(9)} ${String(summary.activities).padStart(3)} activities -> ${summary.dir}`);
+      }
+      console.log("\nfive case files, five separate operators, one command to replay them together —");
+      console.log("and the replay scans every ballot in every bundle for a signature that voted");
+      console.log("twice, so concealing one is as detectable as telling two stories about anything");
+      console.log("else. Here there was nothing to conceal: the proof was published.\n");
+      console.log(
+        `verify it:  python3 ../verifier/afp_verify.py ${Object.keys(demo.exports).map((n) => `${demo.exportRoot}/${n}`).join(" ")} --verbose\n`,
+      );
+      await demo.close();
+      break;
+    }
+
     case "export": {
       const config = loadConfig();
       const instance = new AfpInstance(config, agentRegistrations(config));
@@ -415,7 +635,7 @@ async function main(): Promise<void> {
     }
 
     default:
-      console.error(`unknown command: ${command}\nusage: cli.ts [demo|p2|p3|p4|p5|p5:llm|export|serve]`);
+      console.error(`unknown command: ${command}\nusage: cli.ts [demo|p2|p3|p3:llm|p4|p5|p5:llm|p6|p6:llm|export|serve]`);
       process.exit(1);
   }
 }

@@ -42,9 +42,14 @@ from decision import (
     check_decision_settlement,
     check_departure,
     check_enroll_authority,
+    check_equivocation_proof,
+    check_succession,
+    check_vote_l1_fields,
     instant_millis,
     settlement_payload,
+    wrapped_payload,
 )
+from equivocation import convicts, equivocation_proof_votes, proof_round, vote_tuple_of
 from federation import check_federation, check_joint
 from keys import (
     check_key_intervals,
@@ -110,7 +115,11 @@ class Report:
         # absent from the line reads as nothing, a family printed at :0 reads
         # as a question. Unconditional families (signature, chain, …) appear
         # by their counts alone.
-        conditional = ("action", "archive", "decision", "joint", "keys", "pins", "retention", "supersession", "synthesis")
+        conditional = (
+            "action", "archive", "decision", "equivocation", "joint", "keys",
+            "pins", "proof", "retention", "round", "succession", "supersession",
+            "synthesis", "vote",
+        )
         print("census — checks run per domain (a zero you expected to be nonzero is a question):")
         for domain in sorted(domains):
             families = dict(domains[domain])
@@ -742,6 +751,16 @@ def verify_export(export: Path, thread: str | None, report: Report) -> dict:
         if activity.get("type") == "afp:Archive":
             check_archive_state(report, activity)
 
+    # ADR-0020 W3 V1/V6/V7: L1's vote and succession checks. Exports with no
+    # afp:level: 1 round and no afp:successionRule/afp:supersedesRound
+    # (everything before this ADR) run none of this. V2 is NOT here — a proof
+    # convicts a foreign actor whose key this bundle need not publish, so it
+    # runs in the replay-wide layer beside V8 (`check_equivocation_proofs`).
+    check_vote_l1_fields(report, all_activities)
+    for activity in all_activities:
+        if afp_object(activity, "afp:Proposal") is not None:
+            check_succession(report, activity, all_activities)
+
     # ADR-0018 W5 V7-V9 / W6: afp:Departure from a binding round. Exports
     # with none (everything before this ADR, and any round without
     # afp:binding: "joint") run none of this.
@@ -796,7 +815,153 @@ def verify_export(export: Path, thread: str | None, report: Report) -> dict:
     # resolution. Exports with no assets and no reuse claims run none of this.
     check_assets(report, all_activities)
 
-    return {"path": export, "instance_actor": authority.instance_actor, "activities": all_activities}
+    return {
+        "path": export,
+        "instance_actor": authority.instance_actor,
+        "activities": all_activities,
+        # The keys this bundle publishes (own actor documents plus its own key
+        # history). Carried out so the replay-wide layer can verify a proof
+        # whose convicted actor lives in a different domain — see
+        # `check_equivocation_proofs`.
+        "keys": keys,
+    }
+
+
+def check_equivocation_proofs(report: Report, bundles: list[dict | None]) -> None:
+    """ADR-0020 W3 V2, at replay scope rather than per domain.
+
+    An `afp:EquivocationProof` convicts an actor who, in any real
+    consortium, belongs to a *different* operator: Atlas publishes the proof,
+    Meridian signed the votes. The convicted actor's verification key is
+    published in Meridian's own actor document — that is, in Meridian's
+    bundle — so verifying the two embedded votes against only the announcing
+    bundle's key table fails every genuine cross-domain proof, which is every
+    proof that matters. The keys of the whole replay are the right table, and
+    they resolve exactly the way ADR-0009's received bytes do: against the
+    domain that owns them.
+
+    A single-bundle replay merges one bundle, which is the previous
+    behaviour: a proof over a local actor still verifies, and a forged one
+    still fails.
+
+    The finding is attributed to the domain whose bundle holds the proof, so
+    the `proof` family still appears in that domain's census line (finding
+    48's rule) rather than in the joint row.
+    """
+    present = [b for b in bundles if b is not None]
+    merged: dict[str, bytes] = {}
+    for bundle in present:
+        merged.update(bundle.get("keys") or {})
+    for bundle in present:
+        domain = bundle["path"].name or str(bundle["path"])
+        prefix = f"[{domain}] " if len(present) > 1 else ""
+        for activity in bundle["activities"]:
+            if wrapped_payload(activity, "afp:EquivocationProof") is not None:
+                check_equivocation_proof(report, activity, merged, prefix)
+
+
+def _bundle_votes_and_proofs(bundle: dict) -> tuple[list[tuple[str, dict]], list[dict]]:
+    """`([(domain, vote_activity), ...], [proof_activity, ...])` for one
+    bundle — its own outbox plus its `received.jsonld` record, the same pool
+    ADR-0009/0015 already read for the joint replay."""
+    domain = bundle["path"].name or str(bundle["path"])
+    votes: list[tuple[str, dict]] = []
+    proofs: list[dict] = []
+    for activity in bundle["activities"]:
+        if afp_object(activity, "afp:Vote") is not None:
+            votes.append((domain, activity))
+        if proof_round(activity) is not None:
+            proofs.append(activity)
+
+    received_path = bundle["path"] / "received.jsonld"
+    if received_path.exists():
+        for item in load_json(received_path).get("orderedItems", []):
+            act = item.get("afp:activity")
+            if not isinstance(act, dict):
+                continue
+            if afp_object(act, "afp:Vote") is not None:
+                votes.append((domain, act))
+            if proof_round(act) is not None:
+                proofs.append(act)
+    return votes, proofs
+
+
+def check_equivocation_scan(report: Report, bundles: list[dict | None]) -> None:
+    """ADR-0020 Decision 5 / W3 V8 — the searchlight: pool every `afp:Vote`
+    across every bundle (own outbox and received-bytes record alike), group
+    by `(actor, round, phase, seqNo)`, and test Decision 2's predicate on
+    each pair. A conviction pair with no on-record `afp:EquivocationProof` in
+    any bundle for that round fails the joint replay by name, attributed to
+    every domain whose bundle held one of the two votes — a concealed
+    equivocation is exactly as detectable as a two-story agreement.
+
+    A bundle carrying no `afp:Vote` at all (every export before this ADR)
+    contributes nothing, and no report is ever recorded for it — the family
+    still reads as `equivocation:0` in the census (finding 48's rule), via
+    `Report.census`'s conditional-family default, not via a passing record
+    here.
+    """
+    entries: list[tuple[str, dict]] = []
+    proofs: list[dict] = []
+    for bundle in bundles:
+        # A bundle that never got past `bundle: MANIFEST.json present` has
+        # already failed by name and carries no activities to scan — skipping
+        # it keeps that one clean finding from becoming two.
+        if bundle is None:
+            continue
+        bundle_votes, bundle_proofs = _bundle_votes_and_proofs(bundle)
+        entries.extend(bundle_votes)
+        proofs.extend(bundle_proofs)
+
+    # Keyed by the *convicted voter*, not just the round: one announced proof
+    # excuses that voter's pair, never every other pair in the same round — a
+    # hub that announced one conviction would otherwise buy blanket
+    # concealment for the rest of the round (Decision 5 fails a conviction
+    # pair, not a round).
+    announced: set[tuple[str, str]] = set()
+    for proof_activity in proofs:
+        announced_round = proof_round(proof_activity)
+        proof_votes = equivocation_proof_votes(proof_activity)
+        if announced_round is None or proof_votes is None:
+            continue
+        for vote in proof_votes:
+            if isinstance(vote.get("actor"), str):
+                announced.add((announced_round, vote["actor"]))
+
+    # group (actor, round, phase, seqNo) -> {digest: {domains holding it}}
+    groups: dict[tuple, dict[str, set[str]]] = {}
+    by_digest: dict[str, dict] = {}
+    for domain, activity in entries:
+        tup = vote_tuple_of(activity)
+        if tup is None:
+            continue
+        digest = digest_of(activity)
+        by_digest[digest] = activity
+        groups.setdefault(tup, {}).setdefault(digest, set()).add(domain)
+
+    reported: set[tuple[str, str]] = set()
+    for tup, digests_to_domains in groups.items():
+        actor, round_id = tup[0], tup[1]
+        if (round_id, actor) in announced or (round_id, actor) in reported:
+            continue
+        digests = list(digests_to_domains)
+        convicted = False
+        holders: set[str] = set()
+        for i in range(len(digests)):
+            for j in range(i + 1, len(digests)):
+                if convicts(by_digest[digests[i]], by_digest[digests[j]]):
+                    convicted = True
+                    holders |= digests_to_domains[digests[i]] | digests_to_domains[digests[j]]
+        if not convicted:
+            continue
+        reported.add((round_id, actor))
+        for domain in sorted(holders):
+            report.record(
+                f"[{domain}] equivocation: unannounced conviction pair in round {round_id}",
+                False,
+                f"votes at {tup!r} convict, but no afp:EquivocationProof convicting {actor} in "
+                f"this round is on record in any bundle (ADR-0020)",
+            )
 
 
 class PrefixedReport:
@@ -827,7 +992,12 @@ def main() -> int:
     report = Report()
     try:
         if len(args.exports) == 1:
-            verify_export(args.exports[0], args.thread, report)
+            bundle = verify_export(args.exports[0], args.thread, report)
+            # ADR-0020 Decision 5 / W3 V8: the searchlight runs over a single
+            # bundle's own+received pool too — concealment does not require a
+            # second export in the replay, only a second copy of a vote.
+            check_equivocation_scan(report, [bundle])
+            check_equivocation_proofs(report, [bundle])
         else:
             # ADR-0009 Decision 1: N single-export replays plus a cross-check —
             # never a forked verifier. Phase one runs today's replay per bundle,
@@ -838,6 +1008,11 @@ def main() -> int:
                 domain = export.name or str(export)
                 bundles.append(verify_export(export, args.thread, PrefixedReport(report, domain)))  # type: ignore[arg-type]
             check_joint(report, bundles)
+            check_equivocation_scan(report, bundles)
+            # V2 runs here, not per domain: a proof convicts a foreign actor
+            # whose key its own bundle never publishes (ADR-0020 Decision 1's
+            # "verifies standalone" needs the whole case file's key table).
+            check_equivocation_proofs(report, bundles)
     except Exception as exc:  # a malformed bundle is a failed audit, not a crash
         report.record("bundle: readable", False, f"{type(exc).__name__}: {exc}")
 

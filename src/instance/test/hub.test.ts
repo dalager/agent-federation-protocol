@@ -239,7 +239,7 @@ describe("P2 hub: enrollment and an L0 weighted-quorum round", () => {
     const clean = runVerifier(verifier, config.exportDir, `${config.origin}/threads/policy-1`, ["--verbose"]);
     assert.equal(clean.code, 0, clean.output);
     assert.match(clean.output, /decision: .* weightTally recomputes from countedVotes/);
-    assert.match(clean.output, /decision: .* voter weights recompute per instance/);
+    assert.match(clean.output, /weights: .* pinned weights honor declared control/);
     assert.match(clean.output, /enroll: .* enrolled by its own instance/);
     assert.match(clean.output, /PASSED/);
 
@@ -269,7 +269,7 @@ describe("P2 hub: enrollment and an L0 weighted-quorum round", () => {
       }
     });
     assert.notEqual(forgedWeights.code, 0);
-    assert.match(forgedWeights.output, /FAIL \] decision: .*voter weights recompute per instance/);
+    assert.match(forgedWeights.output, /FAIL \] weights: .*pinned weights honor declared control/);
 
     // An Enroll issued by someone other than the agent's own operator.
     const poachedEnroll = mutate("instance", (outbox) => {

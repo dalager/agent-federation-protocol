@@ -215,6 +215,12 @@ the Byzantine bound, since two agents of one operator are not independent failur
   replay like the weights themselves (`afp:quorumRule`, ADR-0018 Decision 1) — a bar
   stated only in prose is a bar no record can be held to. Weight is liveness-gated only —
   hub-scoped reputation is deliberately *not* a term in it (ADR-0005 Decision 4)
+- **A declared change of control is consulted at snapshot time.** An instance that
+  publishes `Create{afp:ControlTransfer}` naming its new operator is folded into that
+  operator's weight from its next pinned round onward (ADR-0005 amendment) — two seats
+  under one roof carry one operator's worth of say, not two. *Undeclared* common control
+  is as invisible to the protocol as cross-instance bid collusion (05), and is governed
+  the same way: a consortium-terms question, not a cryptographic one.
 - **A seat that does not vote spends its own operator's weight.** The corollary of the
   rule above, stated because it surprises deployments: the per-operator total is conserved
   and split across that operator's *pinned* voters, so seating a second agent that never

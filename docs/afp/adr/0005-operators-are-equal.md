@@ -1,6 +1,9 @@
 # ADR-0005 — Operators are equal against a hub
 
-- **Status:** Accepted, and **built** except the P4-gated seat check (see [Build status](#build-status))
+- **Status:** Accepted, and **built** except the P4-gated seat check (see [Build status](#build-status)) —
+  including the [Amendment (2026-08-22)](#amendment-2026-08-22-declared-change-of-control),
+  built and gated the same day, closing [scenario 12](../scenarios/12-the-parametric-trigger.md)
+  finding 63
 - **Date:** 2026-08-20
 - **Applies to:** L0 deliberation from P2 onward, and the federation handshake it precedes
   ([P4](../05-roadmap.md#p2p7))
@@ -212,6 +215,81 @@ The gate is `test/adr0005.test.ts`: two operators, deliberately lopsided, where 
 running a single agent must weigh exactly as much as the one running four — and both new
 verifier checks are exercised by a mutation that makes them fail, since a check that
 cannot fail is decoration.
+
+## Amendment (2026-08-22): declared change of control
+
+**Context.** [Scenario 12](../scenarios/12-the-parametric-trigger.md) finding 63: fourteen
+days into a live pool, Meridian announces it has acquired Anchor — both seated instances,
+each pinned as its own operator. Decision 1's arithmetic just silently broke: five pinned
+seats, four beneficial owners, and the "honest majority" `f = 1` tolerance assumes now rests
+on trusting that two seats under one roof vote independently. The Vouch/Disown trail can
+*carry* exactly this fact — `afp:operatedBy` is the predicate already in the record — but
+nothing requires the declaration, no snapshot machinery reacts to one, and no round
+distinguishes "five operators" from "five seats."
+
+**Decision.**
+
+**A. Wire.** A new activity, `Create{afp:ControlTransfer}`, published by the transferring
+instance actor on its own outbox chain — same publisher as its `Vouch`/`Disown` trail, same
+visibility class:
+
+```jsonc
+{
+  "type": "Create",
+  "actor": "https://anchor.example/actor",
+  "object": {
+    "id": "https://anchor.example/actor/control-transfer/2026-09-05T00:00:00Z#control-transfer",
+    "type": "afp:ControlTransfer",
+    "afp:operatedBy": "https://meridian.example/actor",
+    "since": "2026-09-05T00:00:00Z"
+  }
+}
+```
+
+Effective from the activity's own `published`. No retroactivity: it changes which snapshots
+group Anchor with Meridian going forward, never a snapshot already pinned.
+
+**B. Instance effect.** At snapshot-pin time (`proposeRound`), the *effective operator* of
+each voter's instance is the `afp:operatedBy` named by the latest `Create{afp:ControlTransfer}`
+on that instance's own chain at pin time, or the instance itself absent one. Voters whose
+instances share an effective operator are grouped as **one** operator for Decision 1's
+per-operator split — the same `L`/division machinery, unchanged, over a different grouping
+key. A round already pinned (open or closed) is untouched: its weights were computed against
+the grouping in force *when it was pinned*, and are never recomputed against a later
+declaration.
+
+**C. Verifier.** When a bundle carries `Create{afp:ControlTransfer}` activities, the verifier
+resolves each pinned snapshot's effective-operator grouping as of the governing proposal's own
+`published` instant and recomputes the per-operator split against it — the same check Decision
+1 already ran (`weights: {label} pinned weights honor declared control`), now folding
+declared control into what "an instance" means for the tally. A bundle with no
+`ControlTransfer` activity recomputes exactly as before Decision 1 ever generalized: the
+grouping key defaults to the instance itself, so every shipped export before this amendment
+verifies unchanged.
+
+**The honest boundary.** *Declared* control is the only kind this amendment can act on.
+**Undeclared** common control — a quiet merger nobody records, or two instances that were
+always the same party under different names — is as invisible to the protocol as
+cross-instance bid collusion ([05 § Open questions](../05-roadmap.md#open-questions)): who
+you agree to federate with, and whether you believe what they declare about themselves, is
+consortium-terms territory, not something a signature can force. This amendment makes the
+*declared* case checkable; it does not, and cannot, make concealment detectable.
+
+**The seam with ADR-0020.** [ADR-0020 Decision 4](0020-p6-hardened-round-stack.md#4-a-provably-doomed-round-is-closeable-now)
+ruled that a quorum bar's denominator moves only when the snapshot does — zeroing a voter
+never shrinks the bar retroactively. This amendment is the other half of that same seam:
+declared control changes how a **new** snapshot *groups* voters into operators, and never
+touches a **pinned** round's already-computed denominator or tally. Two different edges,
+one contract: the electorate a round answers to is exactly the one it pinned, on both counts.
+
+**Build status:** done. `Create{afp:ControlTransfer}` in `src/ap/activities.ts`; the
+effective-operator fold in `src/hub/hub.ts` (`onControlTransfer`, `effectiveOperatorOf`),
+consulted by `proposeRound` alongside `weights.ts`'s unmodified `voterWeights`; the verifier's
+`effective_operator` in `src/verifier/decision.py`, folded into the same recomputation
+Decision 1 already ran. Gated by `test/adr0005.test.ts`: a declared merger folding two
+instances' seats into one operator's weight, a round pinned before the declaration left
+untouched, and a mutation that rewrites the pinned weights back to the unfolded split, caught
+by name.
 
 ## References
 

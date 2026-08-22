@@ -223,6 +223,34 @@ def enrolled_instances(hub_actor: str, all_activities: list[dict]) -> dict[str, 
     return instances
 
 
+def effective_operator(
+    instance: str, at_published: str, all_activities: list[dict]
+) -> str:
+    """The operator `instance` had declared itself operated by, as of `at_published`
+    (ADR-0005 amendment: declared change of control).
+
+    The latest `Create{afp:ControlTransfer}` on `instance`'s own chain with a
+    `published` no later than the proposal being checked — never a later one,
+    so a snapshot already pinned never moves when a later merger is declared.
+    Absent any such activity, `instance` is its own operator: today's
+    behaviour, unchanged when the feature is unused.
+    """
+    transfers = [
+        a
+        for a in all_activities
+        if a.get("type") == "Create"
+        and a.get("actor") == instance
+        and isinstance(a.get("object"), dict)
+        and a["object"].get("type") == "afp:ControlTransfer"
+        and instant_millis(a.get("published")) <= instant_millis(at_published)
+    ]
+    if not transfers:
+        return instance
+    latest = max(transfers, key=lambda a: (instant_millis(a.get("published")), digest_of(a)))
+    operated_by = latest["object"].get("afp:operatedBy")
+    return operated_by if isinstance(operated_by, str) and operated_by else instance
+
+
 def voter_weights(voters: list[tuple[str, str]]) -> dict[str, int]:
     """`agent -> weight` for one round's pinned voters, per instance.
 
@@ -367,19 +395,29 @@ def check_decision_record(
     # this a hub simply writes the numbers it wants into its own proposal, and
     # the tally recomputation below would faithfully confirm them.
     instances = enrolled_instances(hub_actor, all_activities)
+    proposal_published = proposal.get("published") or decision_activity.get("published")
+    # ADR-0005 amendment (declared change of control) — an instance's weight
+    # bucket is its *effective* operator as of this proposal's own `published`,
+    # not necessarily itself; absent any Create{afp:ControlTransfer} this is
+    # the identity function, so a bundle with no such activity recomputes
+    # exactly as before.
     recomputed = voter_weights(
-        [(v, instances.get(v, v)) for v in sorted(proposal.get("afp:voters", []) or declared_weights)]
+        [
+            (v, effective_operator(instances.get(v, v), proposal_published, all_activities))
+            for v in sorted(proposal.get("afp:voters", []) or declared_weights)
+        ]
     )
     weights_match = all(
         recomputed.get(v, 0) == declared_weights.get(v, 0)
         for v in set(recomputed) | set(declared_weights)
     )
     report.record(
-        f"decision: {label} voter weights recompute per instance",
+        f"weights: {label} pinned weights honor declared control",
         weights_match,
         "" if weights_match else
         f"recomputed {recomputed!r} but afp:Proposal declares {declared_weights!r} — each "
-        f"seated instance carries the same total, divided among its pinned voters (ADR-0005)",
+        f"effective operator carries the same total, divided among its pinned voters, "
+        f"honoring any declared change of control (ADR-0005)",
     )
 
     non_member_pinned = sorted(v for v in pinned_voters if roles.get(v, "member") != "member")
@@ -398,6 +436,10 @@ def check_decision_record(
     tally: dict[str, float] = {}
     proposal_deadline = proposal.get("afp:deadline")
     late: list[tuple[str, str]] = []
+    # ADR-0020 W3 V3/V4 — every vote actually counted, kept alongside the
+    # tally so the L1 checks below can recompute over exactly what counted,
+    # without a second pass over afp:countedVotes.
+    counted_vote_records: list[tuple[str, dict, str]] = []
 
     for vote_hash in decision.get("afp:countedVotes", []):
         vote_activity = by_digest.get(vote_hash)
@@ -433,6 +475,7 @@ def check_decision_record(
         value = vote_obj.get("value")
         tally[value] = tally.get(value, 0) + declared_weights.get(voter, 0)
         counted_voters.add(voter)
+        counted_vote_records.append((vote_hash, vote_activity, voter))
 
         # ADR-0018 W4/V5 — a counted vote whose own `published` is after the
         # proposal's `afp:deadline` closes the "signed lie" half of the
@@ -583,13 +626,15 @@ def check_decision_record(
         # set; anything else is an outcome that reads as decided-nothing with
         # no recomputable account of why.
         reason = decision.get("afp:noDecisionReason")
-        reason_known = reason in ("expired", "threshold-not-met")
+        # ADR-0020 Decision 4 adds the third reason: a round closed early
+        # because the arithmetic already proved no option can reach the bar.
+        reason_known = reason in ("expired", "threshold-not-met", "quorum-impossible")
         report.record(
             f"decision: {label} no-decision carries a reason",
             reason_known,
             "" if reason_known else
             f"afp:outcome is afp:no-decision but afp:noDecisionReason is {reason!r}, not "
-            f"'expired' or 'threshold-not-met' (ADR-0018)",
+            f"'expired', 'threshold-not-met' or 'quorum-impossible' (ADR-0018/ADR-0020)",
         )
         # V4 — the reason is recomputable, not asserted: `threshold-not-met`
         # requires the actual winner to have missed the bar, `expired`
@@ -606,9 +651,14 @@ def check_decision_record(
             bar = threshold_of(quorum_rule, declared_weights) if isinstance(quorum_rule, dict) else None
             if reason == "threshold-not-met":
                 justified = bar is None or winner == "abstain" or (winner_weight or 0) < bar
-            else:  # "expired"
+            elif reason == "expired":
                 deadline = proposal.get("afp:deadline")
                 justified = isinstance(deadline, str) and instant_millis(decision_activity.get("published")) > instant_millis(deadline)
+            else:  # "quorum-impossible" — ADR-0020 W3 V5
+                from equivocation import convicted_actors_in_round, doomed
+
+                convicted = convicted_actors_in_round(round_id, all_activities)
+                justified = doomed(proposal, tally, counted_voters, convicted)
             report.record(
                 f"decision: {label} no-decision reason is justified",
                 justified,
@@ -617,7 +667,10 @@ def check_decision_record(
                  f"{winner_weight!r}, at or above the bar {bar} (ADR-0018)"
                  if reason == "threshold-not-met" else
                  f"reason is 'expired' but the record's published {decision.get('published')!r} is "
-                 f"at or before afp:deadline {proposal.get('afp:deadline')!r} (ADR-0018)"),
+                 f"at or before afp:deadline {proposal.get('afp:deadline')!r} (ADR-0018)"
+                 if reason == "expired" else
+                 f"reason is 'quorum-impossible' but the recomputed doomed predicate does not "
+                 f"hold — some option remains attainable (ADR-0020)"),
             )
 
     if isinstance(proposal_deadline, str):
@@ -640,6 +693,40 @@ def check_decision_record(
             not reserved_listed,
             "" if not reserved_listed else
             "afp:options lists the reserved value afp:no-decision (ADR-0018)",
+        )
+
+    # ADR-0020 W3 V3/V4 — conditional on this round actually running at L1;
+    # a pre-ADR-0020 round (afp:level absent) triggers neither.
+    if proposal.get("afp:level") == 1:
+        from equivocation import convicted_actors_in_round, vote_tuple_of
+
+        convicted = convicted_actors_in_round(round_id, all_activities)
+        convicted_counted = sorted({voter for _, _, voter in counted_vote_records if voter in convicted})
+        report.record(
+            f"decision: {label} tally counts no convicted ballot",
+            not convicted_counted,
+            "" if not convicted_counted else
+            "counted vote(s) from actor(s) with an on-record afp:EquivocationProof for this "
+            "round: " + ", ".join(convicted_counted) + " (ADR-0020)",
+        )
+
+        seen_tuples: dict[tuple, str] = {}
+        duplicate_tuples: list[tuple] = []
+        for vote_hash, vote_activity, _voter in counted_vote_records:
+            tup = vote_tuple_of(vote_activity)
+            if tup is None:
+                continue
+            prior = seen_tuples.get(tup)
+            if prior is not None and prior != vote_hash:
+                duplicate_tuples.append(tup)
+            else:
+                seen_tuples[tup] = vote_hash
+        report.record(
+            f"decision: {label} tally counts each tuple once",
+            not duplicate_tuples,
+            "" if not duplicate_tuples else
+            "two counted votes share (actor, phase, seqNo): "
+            + ", ".join(str(t) for t in duplicate_tuples) + " (ADR-0020)",
         )
 
 
@@ -825,4 +912,148 @@ def check_archive_state(report, activity: dict) -> None:
         f"archive: {label} state matches its canonical hashes",
         not wrong,
         "" if not wrong else "; ".join(wrong) + " (ADR-0015)",
+    )
+
+
+def check_vote_l1_fields(report, all_activities: list[dict]) -> None:
+    """ADR-0020 W3 V1 — an `afp:level: 1` round's votes carry well-formed
+    `afp:phase`/`afp:seqNo`/`afp:proposalHash`, with `afp:seqNo` a positive
+    integer. Conditional on the vote's own round actually being pinned L1 —
+    an L0 vote (every pre-ADR-0020 bundle) triggers nothing here.
+    """
+    from equivocation import vote_tuple_of
+
+    l1_rounds = {
+        obj["afp:round"]
+        for a in all_activities
+        if (obj := afp_object(a, "afp:Proposal")) is not None
+        and obj.get("afp:level") == 1
+        and isinstance(obj.get("afp:round"), str)
+    }
+    if not l1_rounds:
+        return
+    for activity in all_activities:
+        vote = afp_object(activity, "afp:Vote")
+        if vote is None or vote.get("afp:round") not in l1_rounds:
+            continue
+        label = vote.get("id", activity.get("id", "<no id>"))
+        ok = vote_tuple_of(activity) is not None
+        report.record(
+            f"vote: {label} L1 fields are well-formed",
+            ok,
+            "" if ok else
+            "missing afp:phase, afp:seqNo or afp:proposalHash, or afp:seqNo < 1 (ADR-0020)",
+        )
+
+
+def check_equivocation_proof(
+    report, activity: dict, keys: dict[str, bytes], prefix: str = ""
+) -> None:
+    """ADR-0020 W3 V2 — every leg of `convicts`: the embedded pair resolves,
+    both proofs verify against the actor's published key (the same
+    `verify_proof`/`keys` machinery every other signature uses), and the two
+    votes actually convict (matching tuple, differing value/proposalHash).
+    A proof failing any leg is itself a replay failure.
+    """
+    from equivocation import convicts, equivocation_proof_votes
+
+    proof = wrapped_payload(activity, "afp:EquivocationProof") or {}
+    label = proof.get("id", activity.get("id", "<no id>"))
+    votes = equivocation_proof_votes(activity)
+    if votes is None:
+        report.record(
+            f"{prefix}proof: {label} convicts",
+            False,
+            "afp:votes does not carry exactly two embedded afp:Vote activities (ADR-0020)",
+        )
+        return
+
+    vote_a, vote_b = votes
+    reason_a = verify_proof(vote_a, keys)
+    reason_b = verify_proof(vote_b, keys)
+    # The proof's own afp:round must be the round the pair was cast in — a
+    # genuine pair announced under another round's name would otherwise
+    # convict (and, forward-scoped, zero) a voter in a round it never
+    # equivocated in.
+    vote_round = (afp_object(vote_a, "afp:Vote") or {}).get("afp:round")
+    round_matches = vote_round == proof.get("afp:round")
+    ok = reason_a is None and reason_b is None and round_matches and convicts(vote_a, vote_b)
+    if ok:
+        detail = ""
+    elif reason_a is not None:
+        detail = f"first embedded vote fails signature verification: {reason_a} (ADR-0020)"
+    elif reason_b is not None:
+        detail = f"second embedded vote fails signature verification: {reason_b} (ADR-0020)"
+    elif not round_matches:
+        detail = (
+            f"the proof names round {proof.get('afp:round')!r} but its votes were cast in "
+            f"{vote_round!r} (ADR-0020)"
+        )
+    else:
+        detail = "the two embedded votes do not convict — same tuple with no differing " \
+                 "value or afp:proposalHash (ADR-0020)"
+    report.record(f"{prefix}proof: {label} convicts", ok, detail)
+
+
+def check_succession(report, activity: dict, all_activities: list[dict]) -> None:
+    """ADR-0020 W3 V6/V7 — a successor round's proposer must be the round's
+    entitled successor, and a declared succession rule must be a known form.
+    Both conditional on the property being present: a proposal with neither
+    `afp:successionRule` nor `afp:supersedesRound` (every pre-ADR-0020
+    proposal) triggers nothing.
+    """
+    from equivocation import successor as compute_successor
+
+    proposal = afp_object(activity, "afp:Proposal")
+    if proposal is None:
+        return
+    label = proposal.get("id", "<no id>")
+
+    rule = proposal.get("afp:successionRule")
+    if rule is not None:
+        known = isinstance(rule, dict) and rule.get("afp:form") == "snapshot-order"
+        report.record(
+            f"succession: {label} rule is a known form",
+            known,
+            "" if known else
+            f"afp:successionRule names an unrecognised form {rule!r} (ADR-0020)",
+        )
+
+    supersedes = proposal.get("afp:supersedesRound")
+    if supersedes is None:
+        return
+
+    stalled_activity = next(
+        (
+            a for a in all_activities
+            if afp_object(a, "afp:Proposal") is not None and digest_of(a) == supersedes
+        ),
+        None,
+    )
+    if stalled_activity is None:
+        report.record(
+            f"round: {label} successor is entitled",
+            False,
+            f"afp:supersedesRound {supersedes!r} resolves to no present afp:Proposal activity (ADR-0020)",
+        )
+        return
+
+    stalled_proposal = afp_object(stalled_activity, "afp:Proposal") or {}
+    if stalled_proposal.get("afp:successionRule") is None:
+        report.record(
+            f"round: {label} successor is entitled",
+            False,
+            "the stalled proposal pinned no afp:successionRule — no sanctioned succession "
+            "exists to inherit (ADR-0020)",
+        )
+        return
+
+    entitled = compute_successor(stalled_activity, all_activities)
+    ok = entitled is not None and activity.get("actor") == entitled
+    report.record(
+        f"round: {label} successor is entitled",
+        ok,
+        "" if ok else
+        f"proposer {activity.get('actor')!r} is not the entitled successor "
+        f"({entitled!r}) of the stalled round (ADR-0020)",
     )
