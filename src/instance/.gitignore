@@ -1,7 +1,12 @@
 node_modules/
 package-lock.json
+
+# Demo runtime state: SQLite stores and generated keypairs, per phase.
+# `data-p5/` was tracked by accident until the ADR-0017 transport keys made
+# the omission obvious — a demo's keys are regenerated on every run and have
+# no business in the record. The glob covers every phase, present and future.
 data/
-data-p4/
+data-p*/
 export/
-# demo outputs: demo:p2, demo:p3, demo:p3:llm
+# demo outputs: demo:p2, demo:p3, demo:p3:llm, demo:p4, demo:p5
 export-*/
