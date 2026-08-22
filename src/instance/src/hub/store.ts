@@ -48,6 +48,18 @@ CREATE TABLE IF NOT EXISTS hub_round_declines (
   reject_digest  TEXT NOT NULL,
   PRIMARY KEY (round_id, actor)
 );
+
+-- ADR-0017 Decision 4: a live seat is an instance's active Follow of this hub
+-- -- the gate seatPolicy "follow-required" checks before admitting an Enroll.
+-- revoked_at NULL means live; re-Following after Undo revives the same row
+-- rather than inserting a second one, so a seat's history is one row with
+-- two timestamps, not a trail to replay.
+CREATE TABLE IF NOT EXISTS hub_seats (
+  instance_actor TEXT PRIMARY KEY,
+  follow_activity TEXT NOT NULL,
+  followed_at     TEXT NOT NULL,
+  revoked_at      TEXT
+);
 `;
 
 export function ensureHubSchema(db: Db): void {
@@ -151,4 +163,54 @@ export function roundDeclinesFor(db: Db, roundId: string): string[] {
   return (db.prepare("SELECT actor FROM hub_round_declines WHERE round_id = ?").all(roundId) as { actor: string }[]).map(
     (row) => String(row.actor),
   );
+}
+
+// ------------------------------------------------------------------ hub seats (ADR-0017 D4)
+
+/** Record a live seat for `actor` (its own Follow's activity id). Revives a revoked row on re-Follow. */
+export function saveSeat(db: Db, actor: string, followActivityId: string, at: string): void {
+  db.prepare(
+    `INSERT INTO hub_seats (instance_actor, follow_activity, followed_at, revoked_at)
+       VALUES (?, ?, ?, NULL)
+     ON CONFLICT (instance_actor) DO UPDATE SET
+       follow_activity = excluded.follow_activity,
+       followed_at = excluded.followed_at,
+       revoked_at = NULL`,
+  ).run(actor, followActivityId, at);
+}
+
+/** Mark `actor`'s seat revoked (Undo{Follow}). No-op if it holds no seat. */
+export function revokeSeat(db: Db, actor: string, at: string): void {
+  db.prepare("UPDATE hub_seats SET revoked_at = ? WHERE instance_actor = ?").run(at, actor);
+}
+
+/** Instance actor ids with a live (unrevoked) seat. */
+export function liveSeats(db: Db): string[] {
+  return (
+    db.prepare("SELECT instance_actor FROM hub_seats WHERE revoked_at IS NULL").all() as { instance_actor: string }[]
+  ).map((row) => String(row.instance_actor));
+}
+
+/** Whether `actor` currently holds a live seat. */
+export function hasSeat(db: Db, actor: string): boolean {
+  const row = db.prepare("SELECT revoked_at FROM hub_seats WHERE instance_actor = ?").get(actor) as
+    | { revoked_at: string | null }
+    | undefined;
+  return !!row && row.revoked_at === null;
+}
+
+/** The Follow activity id backing `actor`'s seat row (live or revoked), or null. */
+export function seatFollowActivity(db: Db, actor: string): string | null {
+  const row = db.prepare("SELECT follow_activity FROM hub_seats WHERE instance_actor = ?").get(actor) as
+    | { follow_activity: string }
+    | undefined;
+  return row ? String(row.follow_activity) : null;
+}
+
+/** The instance actor whose live seat's Follow carries this activity id, or null. */
+export function seatByFollowActivity(db: Db, followActivityId: string): string | null {
+  const row = db
+    .prepare("SELECT instance_actor FROM hub_seats WHERE follow_activity = ? AND revoked_at IS NULL")
+    .get(followActivityId) as { instance_actor: string } | undefined;
+  return row ? String(row.instance_actor) : null;
 }

@@ -93,6 +93,16 @@ Mitigation: exercise `generate-vocab` in week one, on `afp:Task` / `afp:Result` 
 three ride *inside* standard `Offer` and `Create` activities — so if generate-vocab proves
 unworkable, we find out while the sunk cost is still one week.
 
+**Amended by [ADR-0017](0017-standards-conformance.md) (2026-08-22):** Fedify is
+re-scoped from adopted dependency to **reference implementation to test against**. The
+instance stayed zero-dependency through P5 on its own hand-rolled AS2/HTTP-Signature/
+WebFinger layer, and earned the harder claim that follows: the conformance surfaces
+ADR-0017 built — WebFinger, RFC 9421 native signatures with the cavage double-knock,
+dereferenced delivery that fetches and validates every advertised URL — name Fedify as
+the interop oracle those surfaces are checked against, not as code this project runs.
+The mitigation above (`generate-vocab` in week one) accordingly never fired; there was no
+Fedify vocabulary to extend.
+
 ### 4. State: SQLite, and no infrastructure at all
 
 Outbox, seen-ids, pending-task table and roster in a single file, so "export the outbox" is

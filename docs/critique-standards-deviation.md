@@ -114,25 +114,56 @@ Only bare `application/activity+json` is produced/accepted (`ap/server.ts:26`, `
 
 ## 2. Misrepresentations — promised standard machinery that doesn't exist
 
-### 2.1 WebFinger claimed, entirely unimplemented — `status: open`
+### 2.1 WebFinger claimed, entirely unimplemented — `status: fixed-code`
+
+**Resolution (2026-08-22, ADR-0017 Decision 4):** `/.well-known/webfinger` is served
+(`ap/webfinger.ts`) with RFC 7033 semantics — `acct:` and URL resource forms for
+instance (`acct:instance@host`), agents, and hubs; JRD with the `rel="self"` /
+`application/activity+json` link; 400 malformed, 404 unknown, CORS `*`,
+`application/jrd+json`. Actors publish `preferredUsername`. The trust-model analogy at
+01:93 was corrected by the same change set. Original finding follows.
 
 Claimed at `01-foundations.md:13`, `01:269-270`, `README.md:179` (architecture diagram), `README.md:212` ("v1 baseline"), `05-roadmap.md:34`. No `/.well-known/webfinger` route, no `acct:` URI (RFC 7565) anywhere in docs or code, no JRD, no `rel="self"` link. Also `01:93`'s "same trust model as WebFinger" is backwards: WebFinger is unauthenticated DNS+TLS trust; AFP's roster is a signed collection — a stronger, different model.
 
 If implemented, honor RFC 7033: HTTPS only, CORS `*`, 400 for malformed `resource`, 404 (not empty JRD) for unknown, JRD with `rel=self` + `application/activity+json` link.
 
-### 2.2 `Follow`/`Accept` enrollment documented, not implemented — `status: open`
+### 2.2 `Follow`/`Accept` enrollment documented, not implemented — `status: fixed-code` + `fixed-spec`
+
+**Resolution (2026-08-22, ADR-0017 Decision 4, R2/R3):** the hub now handles
+`Follow` (records a seat in the new `hub_seats` table, answers `Accept` whose object is
+the Follow activity id) and `Undo{Follow}` (revokes the seat, mass-unenrolls that
+instance's agents). Under `seatPolicy: "follow-required"` an `afp:Enroll` without a live
+seat is refused by name; the default stays `enroll-implies-seat` for the transition,
+with the migration note in 02. Hubs serve `followers`, the instance serves
+`/actor/following`. Original finding follows.
 
 The documented two-level enrollment (instance `Follow` → hub `Accept`, then per-agent `afp:Enroll`; `02-hubs-and-state.md:10-33`) collapses to one level in code: hub seats are derived from the `afp:Enroll` trail alone (`hub/hub.ts:539-542`). `Undo{Follow}` mass-unenrollment (`02:33`, `02:180-186`) does not exist. No actor has `followers`/`following` collections, so "any Mastodon user can `Follow` an AFP agent directly" (`04-operations.md:506-507`) is aspirational. AP §7.5 also expects a `Follow` recipient to respond with `Accept`/`Reject` delivered back to the follower.
 
-### 2.3 ADR-0001 adopts Fedify; the code has zero dependencies — `status: open`
+### 2.3 ADR-0001 adopts Fedify; the code has zero dependencies — `status: fixed-spec`
+
+**Resolution (2026-08-22, ADR-0017 Decision 7):** ADR-0001 Decision 3 carries a dated
+amendment re-scoping Fedify from adopted dependency to the reference implementation to
+test against — the interop oracle for the conformance surfaces ADR-0017 built. Original
+finding follows.
 
 ADR-0001 Decision 3 (`adr/0001-p1-stack.md:75-92`) adopts Fedify specifically to inherit WebFinger, the inbox pipeline, double-knocking, and Mastodon quirks. `src/instance/package.json` declares no dependencies; everything is hand-rolled on Node builtins. The ADR is unamended.
 
-### 2.4 `publicKeyPem` promised at P4, never shipped — `status: open`
+### 2.4 `publicKeyPem` promised at P4, never shipped — `status: fixed-code` + `fixed-spec`
+
+**Resolution (2026-08-22, ADR-0017 Decision 4, R1 / FEP-521a):** every actor now
+publishes a second Ed25519 Multikey `#transport-key` under `authentication`; HTTP
+signatures sign with it and resolve authentication-first (assertionMethod remains a
+compatibility fallback). Proof keys and transport keys are distinct. `publicKeyPem`
+is re-scoped in 01 to what it really is: the RSA key the Mastodon-facing cavage shim
+would need, appearing only if that shim is provisioned. Original finding follows.
 
 `01-foundations.md:48-54` says an instance adds `publicKey`/`publicKeyPem` at P4. The code (P4/P5 built per ADR-0008/0014/0016) instead resolves HTTP-Signature `keyId` against `assertionMethod` Multikey entries (`federation/inbox.ts:86-103`, `federation/readGate.ts:93-112`). Consequence: **one key serves both object proofs and transport auth**, contradicting the spec's own "two key formats, two jobs" framing — cross-protocol key reuse is a real, if modest, cryptographic hygiene concern. FEP-521a (multiple keys via Multikey/`assertionMethod`) is the clean fix.
 
-### 2.5 Roster example's proof cannot verify — `status: open`
+### 2.5 Roster example's proof cannot verify — `status: fixed-spec`
+
+**Resolution (2026-08-22):** the example's `verificationMethod` now names
+`#ed25519-key`, matching the actor document it verifies against. Original finding
+follows.
 
 The roster proof references `verificationMethod: …#main-key` (`01:85`) while the actor publishes `…#ed25519-key` (`01:38`).
 

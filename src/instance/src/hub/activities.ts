@@ -263,6 +263,13 @@ export function acceptStateDeltas(envelope: Envelope, spec: StateDeltasSpec): { 
   };
 }
 
+// ------------------------------------------------------------------- Seats (ADR-0017 D4)
+
+/** `Accept{Follow}` — the hub's reply to a Follow, `object` names the Follow activity itself. */
+export function acceptFollow(envelope: Envelope, followActivityId: string, follower: string): { [key: string]: JsonValue } {
+  return { ...base(envelope, "Accept"), object: followActivityId, to: [follower] };
+}
+
 // ------------------------------------------------------------------- Lifecycle
 
 /** `afp:Freeze` — suspends new work on the hub (03/07). */

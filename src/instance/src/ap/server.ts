@@ -54,6 +54,8 @@ export interface ServerOptions {
     receive?(activity: { [key: string]: JsonValue }): Promise<unknown>;
     /** ADR-0016 Decision 2: the write door — admission by the hub's own enrollment record. */
     writeAdmitted?(actor: string, activity: { [key: string]: JsonValue }): boolean;
+    /** ADR-0017 Decision 4 (R5): instance actor ids with a live seat — GET /hubs/:id/followers. */
+    followers?(): string[];
   }[];
 }
 
@@ -67,7 +69,7 @@ export interface ServerOptions {
 const PAGE_SIZE = 50;
 function collectionDocument(
   collectionId: string,
-  items: { [key: string]: unknown }[],
+  items: unknown[],
   totalItems: number,
   pageParam: string | null,
 ): { [key: string]: unknown } {
@@ -243,6 +245,21 @@ export function createHttpServer(instance: AfpInstance, options: ServerOptions =
           return send(200, hub.actorDocument());
         }
         if (path === "/roster") return send(200, instance.rosterDocument());
+
+        // ADR-0017 Decision 4 (R5): derived, public collections — the seat
+        // and Follow/Undo trail is the governance record, same publicity
+        // rationale as the roster.
+        if (path === "/actor/following") {
+          const ids = instance.followingIds();
+          return send(200, collectionDocument(`${instance.instanceDocument().id}/following`, ids, ids.length, url.searchParams.get("page")));
+        }
+        const followersMatch = path.match(/^\/hubs\/([\w-]+)\/followers$/);
+        if (followersMatch) {
+          const hub = options.hubs?.find((h) => h.hubId === followersMatch[1] && h.followers);
+          if (!hub) return notFound();
+          const ids = hub.followers!();
+          return send(200, collectionDocument(`${hub.actorDocument().id}/followers`, ids, ids.length, url.searchParams.get("page")));
+        }
 
         const agentMatch = path.match(/^\/agents\/([\w-]+)$/);
         if (agentMatch) {

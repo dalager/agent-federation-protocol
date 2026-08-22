@@ -6,9 +6,15 @@
   Decision 3 **built** (dereferenced inbox delivery, every advertised URL served,
   paged collections with `@context`, ld+json profile negotiation, and the
   `inbox_log` that gives inbox GET something true to serve);
+  Decision 4 **built** (WebFinger per RFC 7033; Follow/Accept seats with
+  `seatPolicy` and `Undo{Follow}` mass-unenrollment; FEP-521a-style transport keys
+  under `authentication`, resolved authentication-first — per the execution plan in
+  [0017-d4-execution-plan.md](0017-d4-execution-plan.md)),
   Decision 6 **partially built** (the `Offer{afp:Task}` envelope shape and its AS2
-  `target`, closing finding 1.6; the deviations section and verb audit remain);
-  Decisions 4, 5, 7, 8 open. Drafted from
+  `target`, closing finding 1.6; the deviations section and verb audit remain),
+  Decision 7 **partially built** (ADR-0001's Fedify amendment landed; remaining prose
+  reconciliation tracks the critique's statuses);
+  Decisions 5, 8 open. Drafted from
   [docs/critique-standards-deviation.md](../../critique-standards-deviation.md), the
    2026-08-21 four-source audit of the spec and instance against ActivityPub, AS2,
   JSON-LD, WebFinger, and current fediverse signature practice

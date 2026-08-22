@@ -31,27 +31,41 @@ agreement with.
   "id": "https://alpha.operator.example/actor",
   "type": ["Application", "afp:Instance"],
   "name": "Alpha Operator Instance",
+  "preferredUsername": "instance",
   "afp:operator": "Alpha Robotics Collective",
-  "inbox": "https://alpha.operator.example/inbox",
-  "outbox": "https://alpha.operator.example/outbox",
+  "inbox": "https://alpha.operator.example/actor/inbox",
+  "outbox": "https://alpha.operator.example/actor/outbox",
+  "following": "https://alpha.operator.example/actor/following",
   "assertionMethod": [{
     "id": "https://alpha.operator.example/actor#ed25519-key",
     "type": "Multikey",
     "controller": "https://alpha.operator.example/actor",
     "publicKeyMultibase": "z6Mkf...ffbq"
   }],
+  "authentication": [{
+    "id": "https://alpha.operator.example/actor#transport-key",
+    "type": "Multikey",
+    "controller": "https://alpha.operator.example/actor",
+    "publicKeyMultibase": "z6Mkg...ttq2"
+  }],
   "afp:roster": "https://alpha.operator.example/roster",
   "afp:policy": "https://alpha.operator.example/.well-known/afp-policy"
 }
 ```
 
-**Two key formats, two jobs.** `assertionMethod` publishes a **Multikey**, which is what
-`eddsa-jcs-2022` object integrity proofs verify against — required from P1, because proofs
-are what survive an export. HTTP Signatures instead read a `publicKey`/`publicKeyPem`
-entry; an instance adds one at **P4**, when it first has a hop to authenticate and needs to
-interoperate with Mastodon. Publishing both is normal and they may share a key. Publishing
-only `publicKeyPem` — as earlier revisions of this example did — leaves every object proof
-unverifiable.
+**Two key formats, two jobs** (ADR-0017 Decision 4). `assertionMethod` publishes a
+**Multikey**, which is what `eddsa-jcs-2022` object integrity proofs verify against —
+required from P1, because proofs are what survive an export. HTTP Signatures verify
+against a second Multikey, `#transport-key`, published under `authentication` — the same
+shape as the assertion key, a distinct key. Resolution is **authentication-first, with an
+assertionMethod fallback** kept open as a compatibility window for actor documents that
+have not yet published a dedicated transport key. Publishing only `assertionMethod` — as
+earlier revisions of this example did — still verifies today through that fallback, but
+leaves object-integrity and transport-authentication uses sharing one key indefinitely,
+which the second key exists to end. A `publicKey`/`publicKeyPem` entry is a different
+thing again: the RSA key the Mastodon-facing draft-cavage shim would need, since Mastodon's
+HTTP Signature implementation expects RSA rather than Ed25519. That shim is not built; the
+entry appears only if and when it is provisioned.
 
 **Agent → instance link.** Every agent actor document carries `afp:operatedBy`:
 
@@ -82,7 +96,7 @@ membership is verifiable from a cached copy without a live roundtrip:
       "status": "active", "afp:keyCustody": "instance", "since": "2026-07-15T00:00:00Z" }
   ],
   "proof": { "type": "DataIntegrityProof", "cryptosuite": "eddsa-jcs-2022", "created": "2026-08-16T09:00:00Z",
-    "verificationMethod": "https://alpha.operator.example/actor#main-key", "proofPurpose": "assertionMethod", "proofValue": "z3Fh9..." }
+    "verificationMethod": "https://alpha.operator.example/actor#ed25519-key", "proofPurpose": "assertionMethod", "proofValue": "z3Fh9..." }
 }
 ```
 
@@ -267,7 +281,10 @@ v3, to the instance standing behind it via `afp:operatedBy`.
 
 - **Direct URL** — already-known actor URLs are simply fetched.
 - **WebFinger** — resolve `@billing-agent@alpha.operator.example` via
-  `/.well-known/webfinger`.
+  `/.well-known/webfinger` (ADR-0017 Decision 4), served for both `acct:` and URL resource
+  queries per RFC 7033: 400 on a malformed resource, 404 on an unknown one, `Access-Control-
+  Allow-Origin: *`, `application/jrd+json`. The instance actor itself resolves under the
+  literal username `instance` (`@instance@alpha.operator.example`).
 - **Within a hub** — the hub's own roster and capability registry *are* the discovery
   mechanism; a per-hub directory actor is redundant and dropped.
 - **Discovering hubs themselves** — a thin, out-of-band consortium-published list at a

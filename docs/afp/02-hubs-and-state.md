@@ -15,6 +15,16 @@ different hubs.
 2. **Agent level** — the instance issues a signed `afp:Enroll` per agent, carrying that
    agent's hub-scoped capability declarations:
 
+> **Migration (ADR-0017 Decision 4).** The hub's `Accept` answers the Follow with the
+> *Follow activity's id* as its `object` — the same convention every other Accept in
+> this spec follows. During the transition a hub MAY run `enroll-implies-seat`, deriving
+> the instance seat from the `afp:Enroll` trail as earlier revisions of the reference
+> implementation did; `follow-required` — an `afp:Enroll` from an instance holding no
+> live seat is refused by name — is the conformant target, and the reference instance
+> flips its default in the next phase. `Undo{Follow}` revokes the seat and mass-unenrolls
+> that instance's agents; a later re-Follow revives the seat empty, enrollment starting
+> over per agent.
+
 ```json
 {
   "@context": ["https://www.w3.org/ns/activitystreams", "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"],

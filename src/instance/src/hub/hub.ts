@@ -34,9 +34,22 @@ import {
 import { LWWRegister, ORMap, ORMapLWW, ORSet } from "./crdtAdapter.ts";
 import { voterWeights } from "./weights.ts";
 import { CRDTStore, type LWWState, type ORMapState, type ORSetState } from "../crdt/index.ts";
-import { ensureHubSchema, loadRound, roundByProposal, roundDeclinesFor, saveRound, saveRoundDecline, saveVoteReceipt, voteReceiptsFor, type RoundRow } from "./store.ts";
+import {
+  ensureHubSchema,
+  hasSeat,
+  liveSeats,
+  loadRound,
+  roundByProposal,
+  roundDeclinesFor,
+  saveRound,
+  saveRoundDecline,
+  saveVoteReceipt,
+  voteReceiptsFor,
+  type RoundRow,
+} from "./store.ts";
 import { Allocator } from "../allocation/allocator.ts";
 import { logAdmission } from "../allocation/store.ts";
+import { onFollow, onUndoFollow, type SeatDeps } from "./seats.ts";
 
 export { hubTransport } from "./transport.ts";
 
@@ -79,6 +92,13 @@ export interface HubDeps {
    * ADR-0014's open revisit trigger, deliberately untouched.
    */
   replicaOf?: string;
+  /**
+   * ADR-0017 Decision 4 (R2): `"follow-required"` gates `afp:Enroll` on a live
+   * seat (this instance must have Followed this hub first); the default,
+   * `"enroll-implies-seat"`, keeps every existing hub test's behavior
+   * byte-identical — Enroll alone still fills `this.instances`.
+   */
+  seatPolicy?: "follow-required" | "enroll-implies-seat";
 }
 
 interface LivenessValue {
@@ -105,6 +125,7 @@ export class Hub {
   private readonly now: () => Date;
   /** The hub actor sync traffic names: `replicaOf` when set, else self. */
   private readonly hubIdentity: string;
+  private readonly seatPolicy: "follow-required" | "enroll-implies-seat";
 
   /**
    * The persisted CRDT store (ADR-0002 Decision 5): every delta the hub folds
@@ -157,6 +178,7 @@ export class Hub {
     this.now = deps.now ?? (() => new Date());
     this.actorId = hubActorId(deps.origin, deps.hubId);
     this.hubIdentity = deps.replicaOf ?? this.actorId;
+    this.seatPolicy = deps.seatPolicy ?? "enroll-implies-seat";
 
     ensureHubSchema(this.db);
     this.crdt = new CRDTStore(this.db);
@@ -334,6 +356,10 @@ export class Hub {
   writeAdmitted(actor: string, activity: { [key: string]: JsonValue }): boolean {
     const type = String(activity.type ?? "");
     if (type === "afp:Enroll" || type === "afp:Unenroll") return true;
+    // ADR-0017 Decision 4 (R3): Follow/Undo join the door-knock class — a
+    // seat is what admits future Enrolls, so establishing or revoking one
+    // cannot itself require a seat.
+    if (type === "Follow" || type === "Undo") return true;
     const object = activity.object;
     const objectType =
       object && typeof object === "object" && !Array.isArray(object)
@@ -420,6 +446,10 @@ export class Hub {
         ? String((object as Record<string, JsonValue>).type ?? "")
         : "";
 
+    // ADR-0017 Decision 4 (R3): Follow/Undo, dispatched before the allocator's
+    // own Accept fallthrough — the same class as Enroll/Unenroll above.
+    if (type === "Follow") return this.onFollow(activity);
+    if (type === "Undo") return this.onUndoFollow(activity);
     if (type === "afp:Enroll") return this.onEnroll(activity);
     if (type === "afp:Unenroll") return this.onUnenroll(activity);
     if (type === "Create" && objectType === "afp:Vote") return this.onVote(activity);
@@ -485,6 +515,21 @@ export class Hub {
         operatedBy
           ? `enroll issued by ${origin}, but ${agent} is operated by ${operatedBy} (ADR-0005)`
           : `enroll for ${agent}, whose actor document names no afp:operatedBy`,
+      );
+      return;
+    }
+
+    // ADR-0017 Decision 4 (R2): under `follow-required`, an Enroll from an
+    // instance holding no live seat is refused — the seat, not the Enroll
+    // alone, is what admits new membership.
+    if (this.seatPolicy === "follow-required" && !hasSeat(this.db, origin)) {
+      logAdmission(
+        this.db,
+        this.now().toISOString(),
+        agent,
+        origin,
+        "rejected",
+        `no seat: instance ${origin} has not Followed this hub (ADR-0017 D4)`,
       );
       return;
     }
@@ -559,6 +604,11 @@ export class Hub {
     if (this.status !== "active") return;
     const agent = String(activity.object ?? "");
     if (!agent) return;
+    this.removeAgent(agent, String(activity.actor ?? ""), String(activity.id));
+  }
+
+  /** The shared body of `onUnenroll` and the seat revocation's mass-unenroll (ADR-0017 D4). */
+  private removeAgent(agent: string, byActor: string, activityId: string): void {
     const tags = this.membership.tagsFor(agent);
     for (const tag of tags) this.membership.apply({ op: "remove", value: agent, tag });
     this.crdt.apply(
@@ -568,12 +618,36 @@ export class Hub {
         crdtType: "OR_SET",
         delta: { adds: [], removes: [{ element: agent, tombstoneTags: tags }] },
       },
-      String(activity.actor ?? ""),
+      byActor,
       this.now(),
-      String(activity.id),
+      activityId,
     );
     this.liveness.delete(agent);
     this.roles.delete(agent);
+  }
+
+  /** ADR-0017 Decision 4 (R3): the slice of `Hub` `hub/seats.ts`'s handlers need. */
+  private seatDeps(): SeatDeps {
+    return {
+      db: this.db,
+      actorId: this.actorId,
+      fetchActor: this.fetchActor,
+      now: this.now,
+      emit: (to, thread, visibility, build) => this.emit(to, thread, visibility, build),
+      members: () => this.members(),
+      instanceOf: (agent) => this.instanceOf(agent),
+      removeAgent: (agent, byActor, activityId) => this.removeAgent(agent, byActor, activityId),
+    };
+  }
+
+  /** `Follow{object: this hub}` (ADR-0017 Decision 4, R3) — see `hub/seats.ts`. */
+  private onFollow(activity: { [key: string]: JsonValue }): void {
+    onFollow(this.seatDeps(), activity);
+  }
+
+  /** `Undo{Follow}` (ADR-0017 Decision 4, R3) — see `hub/seats.ts`. */
+  private onUndoFollow(activity: { [key: string]: JsonValue }): void {
+    onUndoFollow(this.seatDeps(), activity);
   }
 
   /**
@@ -948,6 +1022,11 @@ export class Hub {
     return this.emit([], "urn:afp:thread:hub-lifecycle", "hub", (envelope) =>
       archiveHub(envelope, { hub: this.actorId, reason, stateHashes, state }),
     );
+  }
+
+  /** Instance actors with a live seat (ADR-0017 Decision 4, R5) — this hub's public `followers`. */
+  followers(): string[] {
+    return liveSeats(this.db);
   }
 
   async run(transport: Transport): Promise<void> {

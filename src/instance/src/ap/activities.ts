@@ -230,6 +230,24 @@ export function disown(
   };
 }
 
+/**
+ * `Follow{actor, object: target}` (ADR-0017 Decision 4, R3) — the instance
+ * actor's door-knock at a hub, published `public` as governance trail, same
+ * class as Vouch/Disown.
+ */
+export function follow(envelope: Envelope, target: string): { [key: string]: JsonValue } {
+  return { ...base(envelope, "Follow"), object: target };
+}
+
+/**
+ * `Undo{Follow}` — revokes a prior Follow. `object` names the Follow
+ * activity id being undone; `target` names the hub, for cheap resolution
+ * without dereferencing the object.
+ */
+export function undoFollow(envelope: Envelope, followActivityId: string, target: string): { [key: string]: JsonValue } {
+  return { ...base(envelope, "Undo"), object: followActivityId, target };
+}
+
 /** Read `afp:correlationId` from an activity or its object. */
 export function correlationIdOf(activity: { [key: string]: JsonValue }): string | null {
   const direct = activity["afp:correlationId"];

@@ -40,6 +40,7 @@ import {
 import { validateActionPolicy, validateIrrevocableActions, type TaskPins } from "./ap/pins.ts";
 import type { Brain } from "./brains/port.ts";
 import { Inbox } from "./inbox.ts";
+import { followHub as followHubImpl, followingIds as followingIdsImpl, unfollowHub as unfollowHubImpl } from "./instance/following.ts";
 
 export interface AgentRegistration {
   spec: AgentSpec;
@@ -135,13 +136,7 @@ export class AfpInstance {
   }
 
   instanceDocument(): { [key: string]: JsonValue } {
-    return instanceActor(
-      this.config.origin,
-      this.config.operator,
-      this.config.instanceName,
-      this.key("@instance"),
-      this.transportKey("@instance"),
-    );
+    return instanceActor(this.config.origin, this.config.operator, this.config.instanceName, this.key("@instance"), this.transportKey("@instance"));
   }
 
   agentDocument(name: string): { [key: string]: JsonValue } {
@@ -402,6 +397,22 @@ export class AfpInstance {
     return entry;
   }
 
+  // -------------------------------------------------------------------- seats
+  // ADR-0017 Decision 4: Follow/Undo/replay, in `instance/following.ts` to
+  // stay under this file's line ceiling.
+
+  followHub(hubActorId: string): OutboxEntry {
+    return followHubImpl(this, hubActorId);
+  }
+
+  unfollowHub(hubActorId: string): OutboxEntry {
+    return unfollowHubImpl(this, hubActorId);
+  }
+
+  followingIds(): string[] {
+    return followingIdsImpl(this);
+  }
+
   // ------------------------------------------------------------------ running
 
   /** In-process transport. P4 swaps this for signed HTTP without touching brains. */
@@ -482,10 +493,4 @@ export class AfpInstance {
   static digest(activity: { [key: string]: JsonValue }): string {
     return digestOf(activity);
   }
-}
-
-function firstRecipient(activity: { [key: string]: JsonValue }): string | null {
-  const to = activity.to;
-  if (Array.isArray(to) && to.length > 0 && typeof to[0] === "string") return to[0];
-  return typeof to === "string" ? to : null;
 }
