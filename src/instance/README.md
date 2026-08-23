@@ -25,6 +25,10 @@ npm run demo:p3:llm   # the same auction, answers written by a real local model
 npm run demo:p4       # P4: three instances over real HTTP, one boundary (-> ./export-p4)
 npm run demo:p5       # P5: a shared hub with a real inbox, replica sync (-> ./export-p5)
 npm run demo:p5:llm   # the same hub as a snow day: three schools decide together (real model)
+npm run demo:p6       # P6: five reinsurers at L1 — an equivocator convicted, a restore acquitted (-> ./export-p6)
+npm run demo:p6:llm   # the same pool, with the underwriters' verdicts written by a real local model
+npm run demo:p7       # P7: four support desks split one retainer over a quarter (-> ./export-p7)
+npm run demo:p7:llm   # the same quarter, with the work, the split and the ratification vote from a real model
 npm run gate          # the acceptance gate: P1's 11 checks + CRDT + hub + auction + boundary
 npm run serve         # the public HTTP surface + the federation inbox
 ```
@@ -314,6 +318,76 @@ python3 ../verifier/afp_verify.py export-p5-llm/alpha export-p5-llm/bravo export
 #                                  a departure is only recorded when someone was outvoted)
 ```
 
+## The P6 demo
+
+Five reinsurers, one hub, and a determination wired to money: did a named storm cross the
+contract's pinned thresholds? The round runs at **L1** — five operators live in it, which
+is P6's own activation trigger — so every ballot is a chained tuple and the round pins its
+own succession before anyone votes.
+
+```
+one signature, two votes:  Meridian signs the same (round, phase, seqNo) twice
+the same shape, no sanction: Anchor restores from backup and re-signs — not convicted
+the arithmetic after:      attainable(yes) 3 < bar 4, attainable(no) 1 < bar 4 → doomed
+outcome:                   afp:no-decision (quorum-impossible), closed on demand
+```
+
+The point is the part *after* the proof. A conviction is arithmetic over two signatures and
+needs nobody's permission; what it *means* is governance. So the demo keeps going: the
+convicted operator publishes an `afp:KeyCompromiseClaim` that changes nothing (a claim is
+not evidence), the pool opens a governance round that recuses its own subject by the proof
+convicting it, a member — never the hub — publishes the expulsion, and the next round
+simply pins four seats.
+
+```bash
+npm run demo:p6
+python3 ../verifier/afp_verify.py export-p6/atlas export-p6/meridian export-p6/pelican export-p6/anchor export-p6/harbor
+# PASSED — 559 checks, no gaps
+```
+
+`npm run demo:p6:llm` runs the same pool with the underwriters' determinations written by a
+real local model reading its own operator's exposure and the met office bulletin.
+
+## The P7 demo
+
+Four small support desks cover one vendor's customers overnight out of one shared queue,
+and at the end of the quarter one retainer is split by who did the work. **Nobody in it
+misbehaves** — and that is what makes it the P7 demo rather than another P6. Two honest
+desks add up the same quarter and get two different numbers, because one of them may not
+read a ticket carrying a customer's own tax filing (07's classes and ADR-0013's gate, both
+correct), and before ADR-0022 the record had no way to say so.
+
+```
+the quarter:      a half-open interval of two digests on the hub's own chain
+                  (one ticket settled before it opens, and no clock can move it in)
+the escalation:   credited 1:3 in integer shares — a fraction cannot be canonicalised
+a seat ends:      expelled mid-quarter; the work it was credited before that stands
+two numbers:      dayshift 1 / 1 / 0.75 / 0.25 + one ticket it may not read
+                  northwind recomputes the same period with the wider scope: 2 / 1 / 0.75 / 0.25
+the terminal:     dispute with evidence → correction supersedes → a round ratifies it
+```
+
+```bash
+npm run demo:p7
+python3 ../verifier/afp_verify.py export-p7/northwind export-p7/dayshift export-p7/kestrel export-p7/lantern
+# PASSED — 977 checks, no gaps
+```
+
+### Running it with a real model
+
+`npm run demo:p7:llm` gives a local model the three judgements the record genuinely cannot
+derive — what each desk did, how a shared ticket divides between the desk that triaged it
+and the desk that fixed it, and whether the quarter's summary is the right account of it.
+It is given **none** of the arithmetic, deliberately: the numbers are recomputed from
+signed evidence by two implementations, and a summary anybody has to take on trust is the
+thing this phase exists to abolish.
+
+On the run that built it, the model divided the escalation **3:1 toward the desk that
+triaged** — the inverse of the scripted split — reasoning that "three hours of initial
+research enabled the forty-minute fix". The quarter's numbers moved; every check still
+passed. That is the property worth watching: a disagreement about a judgement stays a
+disagreement about a judgement, instead of becoming two irreconcilable numbers.
+
 ## Using a running instance
 
 `npm run serve` starts the real HTTP surface — the same one the P4 demo runs
@@ -558,9 +632,10 @@ own identifier there.
 
 ## What this instance deliberately does not do yet
 
-Gossip anti-entropy, cross-operator hubs and bidding, Mastodon visibility.
-Those are P5–P7. Federation agreements, real HTTP transport, and HTTP
-Signatures landed with P4. What P1 *does* carry is the whole integrity floor —
+Gossip anti-entropy and Mastodon visibility. Cross-operator hubs landed with P5,
+Byzantine rounds and the governed consequence of a conviction with P6, and
+contribution accounting with P7; federation agreements, real HTTP transport and
+HTTP Signatures landed with P4. What P1 *does* carry is the whole integrity floor —
 signing, hash-chained outboxes, visibility classes and hash-addressed evidence —
 because those four are nearly free at two agents and cannot be backfilled later.
 

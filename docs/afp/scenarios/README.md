@@ -58,7 +58,7 @@ demo shows the *resolved* world and the walkthrough shows what it cost to get th
 | [10](10-the-incident-bridge.md) | 7 · closed | [ADR-0014](../adr/0014-p5-shared-hub-stack.md), [ADR-0015](../adr/0015-the-case-file-at-n-parties.md) | `npm run demo:p5` | `adr0014.test.ts`, `adr0014-m6.test.ts`, `adr0015.test.ts`, `adr0016.test.ts` |
 | [11](11-the-snow-day.md) | 8 · closed | [ADR-0018](../adr/0018-the-round-as-a-commitment.md), [ADR-0019](../adr/0019-acting-on-a-decision.md) | `npm run demo:p5:llm` | `adr0018.test.ts`, `adr0019.test.ts` |
 | [12](12-the-parametric-trigger.md) | 8 · closed | [ADR-0020](../adr/0020-p6-hardened-round-stack.md) (58, 60, 61, 62) · [ADR-0005 amendment](../adr/0005-operators-are-equal.md) (63) · [ADR-0021](../adr/0021-conviction-to-consequence.md) (59, 64, 65) | `npm run demo:p6` · `demo:p6:llm` | `adr0020.test.ts`, `adr0005.test.ts`, `adr0021.test.ts` |
-| [13](13-the-quarterly-split.md) | 9 · closed | [ADR-0022](../adr/0022-the-summary-declares-its-frame.md) (66-73) + its [ADR-0017](../adr/0017-standards-conformance.md) amendment (74) | — (no P7 demo yet) | `adr0022.test.ts` |
+| [13](13-the-quarterly-split.md) | 9 · closed | [ADR-0022](../adr/0022-the-summary-declares-its-frame.md) (66-73) + its [ADR-0017](../adr/0017-standards-conformance.md) amendment (74) | `npm run demo:p7` · `demo:p7:llm` | `adr0022.test.ts` |
 
 **Where the "See it run" column is empty**, the scenario's shape is covered by its gate
 files rather than by a demo. Three of the four are workloads that live inside another
@@ -491,8 +491,14 @@ make checkable.
 **Triaged into one stack ADR** (2026-08-23), following the P2/P3/P4/P5/P6 convention:
 [ADR-0022](../adr/0022-the-summary-declares-its-frame.md) — the summary declares its frame
 (66-73), with 74 amended into [ADR-0017](../adr/0017-standards-conformance.md) where the
-standards-conformance rules live. **All five decisions and the amendment are built** (`adr0022.test.ts`, 24 cases, suite
-green at 245).
+standards-conformance rules live. **All five decisions, the dispute flow and the amendment are built** (`adr0022.test.ts`,
+29 cases, suite green at 250), and demonstrated end to end by `npm run demo:p7` — four
+desks over real sockets, four bundles replaying jointly at 977 checks. Building the demo
+found three further defects, all in mechanisms P7 is the first workload to exercise: a
+federated auction could not recompute its award (the bid pool was one domain's own
+outbox), a closed award became unrecomputable when a bidder later left the hub, and a
+hub that broadcasts its queue made every member's bundle look incomplete. See
+[ADR-0022 § The demo](../adr/0022-the-summary-declares-its-frame.md#the-demo-and-the-three-defects-it-found).
 
 Build order followed the campaign's own logic — the defect that makes an honest party
 invisible first. `afp:contributionSplit` went first because it needs no summary object to

@@ -693,6 +693,206 @@ async function main(): Promise<void> {
       break;
     }
 
+    case "p7": {
+      const { runP7Demo } = await import("./demoP7.ts");
+      const demo = await runP7Demo();
+      // Origins are 127.0.0.1:<random port> in this demo, so every url reads
+      // alike until it is mapped back to the desk that owns it.
+      const nameOfOrigin = new Map(Object.entries(demo.desks).map(([name, d]) => [d.origin, name]));
+      const op = (url: string): string => {
+        const origin = url.split("/").slice(0, 3).join("/");
+        return nameOfOrigin.get(origin) ?? origin;
+      };
+      const who = (url: string): string => `${op(url)}'s ${url.split("/").pop()}`;
+
+      console.log("\nfour support desks share one out-of-hours queue for one software vendor, and");
+      console.log("one quarterly retainer, split by who actually did the work:\n");
+      for (const [name, d] of Object.entries(demo.desks)) {
+        console.log(`  ${name.padEnd(10)} ${d.origin}  (${d.agents.join(", ")})${name === "northwind" ? " — hosts nightdesk" : ""}`);
+      }
+      console.log("\nnobody in this demo misbehaves. They still cannot agree on the number.\n");
+
+      console.log("the quarter, as the hub's own chain (ADR-0022 Decision 1):");
+      console.log(`  opens after  ${demo.period.from.slice(0, 26)}…  (${demo.period.opensAfter})`);
+      console.log(`  closes at    ${demo.period.to.slice(0, 26)}…  (${demo.period.closesAt})`);
+      console.log("  a half-open interval of digests — not a window over self-asserted `published`");
+      console.log("  values, which cannot carry a cross-operator ordering claim at all\n");
+
+      console.log("the tickets:");
+      for (const ticket of demo.tickets) {
+        const mark = ticket.inPeriod ? " " : "×";
+        const authors = ticket.authors.length > 1 ? `${ticket.authors.length} authors` : "1 author";
+        console.log(`  ${mark} ${ticket.slug.padEnd(30)} ${ticket.visibility.padEnd(8)} ${authors}`);
+      }
+      console.log("  × settled before the period opened — its timestamp is minutes from the edge,");
+      console.log("    and no honest desk can be talked into counting it\n");
+
+      console.log("a seat ends inside the quarter (ADR-0021, reused unchanged):");
+      console.log(`  ${who(demo.expulsion.agent)} — round outcome '${demo.expulsion.outcome}', member-role seats ${demo.expulsion.membersBefore} -> ${demo.expulsion.membersAfter}`);
+      console.log("  it had already worked, and been settled for, a ticket earlier in the quarter");
+      console.log("  the work it was credited before that keeps its credit: accounting is");
+      console.log("  forward-scoped, exactly as conviction is\n");
+
+      console.log(`the first summary — computed by ${op(demo.draft.computedBy)}, over what it is entitled to read:`);
+      console.log(`  scope        ${demo.draft.scope.join(", ")}`);
+      console.log(`  denominator  ${demo.draft.denominator}`);
+      for (const [operator, credited] of Object.entries(demo.draft.credited).sort()) {
+        console.log(`    ${op(operator).padEnd(11)} ${"█".repeat(Math.round((credited / demo.draft.denominator) * 4))} ${credited / demo.draft.denominator} ${credited === demo.draft.denominator ? "ticket " : "tickets"}`);
+      }
+      for (const [operator, count] of Object.entries(demo.draft.unreadable).sort()) {
+        console.log(`    ${op(operator).padEnd(11)} + ${count} settled task(s) it may not read — counted, never dropped`);
+      }
+      console.log("  this is an honest number computed by an honest desk. It is also wrong, and");
+      console.log("  the record can say why rather than leaving two members to argue\n");
+
+      console.log("the dispute (04 § Disputes, with evidence):");
+      console.log(`  ${op(demo.dispute.by)} disputes it on ground '${demo.dispute.ground}'`);
+      console.log(`  evidence: ${demo.dispute.evidence[0].slice(0, 30)}…`);
+      console.log("  a dispute citing nothing checkable is a claim — refused at the port, and");
+      console.log("  failed at replay. The arithmetic adjudicates; the dispute only points\n");
+
+      console.log(`the correction — computed by ${op(demo.ratified.computedBy)}, which is a party to that ticket:`);
+      console.log(`  scope        ${demo.ratified.scope.join(", ")}`);
+      console.log(`  denominator  ${demo.ratified.denominator}`);
+      for (const [operator, credited] of Object.entries(demo.ratified.credited).sort()) {
+        console.log(`    ${op(operator).padEnd(11)} ${"█".repeat(Math.round((credited / demo.ratified.denominator) * 4))} ${credited / demo.ratified.denominator} ${credited === demo.ratified.denominator ? "ticket " : "tickets"}`);
+      }
+      console.log(`  unreadable   ${Object.keys(demo.ratified.unreadable).length === 0 ? "none — it could read the whole period" : JSON.stringify(demo.ratified.unreadable)}`);
+      console.log(`  membership   ${demo.ratified.membership.map((m) => `${who(m.agent)} — ${m.act}`).join(", ") || "no change"}`);
+      console.log(`  supersedes   ${demo.ratified.supersedes.split("/").pop()}`);
+      console.log("  the escalation is credited 1:3 between the desk that triaged it and the desk");
+      console.log("  that fixed it — integer shares, because a fraction cannot be canonicalised\n");
+
+      console.log("and the dispute ends:");
+      console.log(`  ratified by ${demo.ratified.round.split("/").pop()} — an ordinary round whose outcome names the summary,`);
+      console.log("  which is 04's own ratification idiom and not a second consensus path.");
+      console.log("  Exactly one summary now stands for this period; a second would fail replay\n");
+
+      for (const [name, summary] of Object.entries(demo.exports)) {
+        console.log(`export:  ${name.padEnd(10)} ${String(summary.activities).padStart(3)} activities -> ${summary.dir}`);
+      }
+      console.log(
+        `\nverify it:  python3 ../verifier/afp_verify.py ${Object.keys(demo.exports).map((n) => `${demo.exportRoot}/${n}`).join(" ")} --verbose\n`,
+      );
+      await demo.close();
+      break;
+    }
+
+    case "p7:llm": {
+      const config = loadConfig();
+      const { runP7Experiment } = await import("./experimentP7.ts");
+      const wrapAt = (text: string, indent: string): string =>
+        text
+          .split(/\s+/)
+          .reduce<string[]>((lines, word) => {
+            const last = lines[lines.length - 1];
+            if (last !== undefined && `${last} ${word}`.length <= 76) lines[lines.length - 1] = `${last} ${word}`;
+            else lines.push(word);
+            return lines;
+          }, [])
+          .join(`\n${indent}`);
+
+      console.log(`brains: ${config.llmModel} @ ${config.llmBaseUrl}\n`);
+      console.log("Four small support companies cover one software vendor's customers overnight,");
+      console.log("between them, out of one shared queue. At the end of the quarter the vendor pays");
+      console.log("one retainer, and it is split by who actually did the work.\n");
+      console.log("Nobody in what follows misbehaves. They still do not agree, and the interesting");
+      console.log("part is exactly which things they can disagree about and which they cannot.\n");
+
+      const demo = await runP7Experiment({ endpoint: endpointOf(config) });
+      const label = (name: string): string => demo.labels[name] ?? name;
+      const opOf = (url: string): string => {
+        const origin = url.split("/").slice(0, 3).join("/");
+        const found = Object.entries(demo.desks).find(([, d]) => d.origin === origin);
+        return found ? label(found[0]) : origin;
+      };
+
+      console.log("the quarter's tickets, worked over real sockets by four separate operators:\n");
+      for (const ticket of demo.tickets) {
+        const judged = demo.judgements.resolved[ticket.slug];
+        console.log(`  ${ticket.inPeriod ? " " : "×"} ${ticket.slug}${ticket.visibility === "parties" ? "  (customer data)" : ""}`);
+        if (judged?.content) console.log(`      "${wrapAt(judged.content, "       ")}"`);
+      }
+      console.log("\n  × was settled before the quarter opened. The boundary is two digests on the");
+      console.log("    hub's own chain, so no desk can move a ticket across it by dating it\n");
+
+      if (demo.judgements.split) {
+        console.log("one ticket was worked by two desks, and that is the one thing here the record");
+        console.log("cannot derive for itself:\n");
+        console.log(`  ${label("kestrel")} fixed what ${label("dayshift")} had narrowed, and had to state the`);
+        console.log(`  division on the shared record: ${demo.judgements.split.content}`);
+        console.log(`    "${wrapAt(demo.judgements.split.rationale, "     ")}"`);
+        console.log(`    (written by ${demo.judgements.split.producedBy.split(" @ ")[0]})\n`);
+        console.log("  Whole numbers, because a fraction cannot be canonicalised in a signed");
+        console.log("  document at all. The protocol does not settle this claim — it makes it");
+        console.log("  explicit, signed, and checkable against exactly the authors it names.\n");
+      }
+
+      console.log("a seat ended halfway through:\n");
+      console.log(`  ${opOf(demo.expulsion.agent)} was expelled by a vote of the other desks, and the work it`);
+      console.log("  had already done keeps its credit. Accounting is forward-scoped for the same");
+      console.log("  reason conviction is: what was accepted was accepted, and a later act does not");
+      console.log("  reach back and un-do the night somebody worked.\n");
+
+      console.log(`then ${opOf(demo.draft.computedBy)} added the quarter up — over what it is entitled to read:\n`);
+      for (const [operator, credited] of Object.entries(demo.draft.credited).sort((a, b) => b[1] - a[1])) {
+        console.log(`    ${opOf(operator).padEnd(30)} ${credited / demo.draft.denominator}`);
+      }
+      for (const [operator, count] of Object.entries(demo.draft.unreadable).sort()) {
+        console.log(`    ${opOf(operator).padEnd(30)} + ${count} settled ticket(s) it may not read`);
+      }
+      console.log("\n  That last line is the whole of P7. One ticket carried a customer's own tax");
+      console.log("  filing, so it is served to nobody unentitled — correctly, and including three");
+      console.log("  competitor desks in the same pool. The summary could have said nothing and");
+      console.log("  simply come out lower. Instead it counts what it could not read, and an honest");
+      console.log("  difference stops being indistinguishable from a fraud.\n");
+
+      console.log(`  ${opOf(demo.dispute.by)} — which holds that ticket — disputed it, with evidence:`);
+      console.log(`    ground '${demo.dispute.ground}', citing ${demo.dispute.evidence[0].slice(0, 24)}…`);
+      console.log("    A dispute that cites nothing checkable is a claim, and this object exists so");
+      console.log("    that a challenge resolves against the record instead.\n");
+
+      console.log(`  and recomputed it over the wider scope:\n`);
+      for (const [operator, credited] of Object.entries(demo.ratified.credited).sort((a, b) => b[1] - a[1])) {
+        console.log(`    ${opOf(operator).padEnd(30)} ${credited / demo.ratified.denominator}`);
+      }
+      console.log("\n  Both numbers were honest. Neither desk did anything wrong. What changed is");
+      console.log("  that the record can now say *why* they differ.\n");
+
+      console.log("the desks voted on whether that is the quarter's record:\n");
+      for (const [seat, judged] of Object.entries(demo.judgements.ratify)) {
+        const [deskName, seatName] = seat.split("/");
+        console.log(`  ${`${label(deskName)} · ${seatName}`.padEnd(34)} ${judged.stand ? "STAND" : "REJECT"}`);
+        console.log(`    "${wrapAt(judged.rationale, "     ")}"`);
+        console.log(`    (written by ${judged.producedBy.split(" @ ")[0]})\n`);
+      }
+      console.log(`  outcome:  ${demo.terminal.ratified ? "ratified" : `not ratified (${demo.terminal.outcome})`}`);
+      for (const [option, weight] of Object.entries(demo.terminal.tally).sort((a, b) => b[1] - a[1])) {
+        const shown = option.startsWith("http") ? "the corrected summary" : option;
+        console.log(`    ${shown.padEnd(24)} ${"█".repeat(Math.round(weight))} ${weight}`);
+      }
+      console.log(
+        demo.terminal.ratified
+          ? "\n  One summary now stands for this quarter. A second ratified one would fail the\n  replay by name, which is what it means for a dispute to end.\n"
+          : "\n  The pool did not ratify it, so nothing stands for this quarter yet — a lawful\n  state, and one the record says out loud rather than leaving to be assumed.\n",
+      );
+
+      console.log("  Note what the models were never asked. Not one of them computed a number:");
+      console.log("  the arithmetic is recomputed from signed evidence by two implementations, and");
+      console.log("  a summary anybody had to take on trust is the thing this phase abolishes. They");
+      console.log("  were asked the three questions the record genuinely cannot answer — what they");
+      console.log("  did, how a shared ticket divides, and whether the frame is the right one.\n");
+
+      for (const [name, summary] of Object.entries(demo.exports)) {
+        console.log(`export:  ${name.padEnd(10)} ${String(summary.activities).padStart(3)} activities -> ${summary.dir}`);
+      }
+      console.log(
+        `\nverify it:  python3 ../verifier/afp_verify.py ${Object.keys(demo.exports).map((n) => `${demo.exportRoot}/${n}`).join(" ")} --verbose\n`,
+      );
+      await demo.close();
+      break;
+    }
+
     case "export": {
       const config = loadConfig();
       const instance = new AfpInstance(config, agentRegistrations(config));
@@ -746,7 +946,7 @@ async function main(): Promise<void> {
     }
 
     default:
-      console.error(`unknown command: ${command}\nusage: cli.ts [demo|p2|p3|p3:llm|p4|p5|p5:llm|p6|p6:llm|export|serve]`);
+      console.error(`unknown command: ${command}\nusage: cli.ts [demo|p2|p3|p3:llm|p4|p5|p5:llm|p6|p6:llm|p7|p7:llm|export|serve]`);
       process.exit(1);
   }
 }

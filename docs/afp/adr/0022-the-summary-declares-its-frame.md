@@ -1,8 +1,8 @@
 # ADR-0022 — The P7 accounting stack: a summary declares its frame, or it is a number in a signed envelope
 
-- **Status:** Accepted, and **built** (2026-08-23) — all five decisions, gated by
-  `test/adr0022.test.ts` (24 cases, suite green at 245), every shipped bundle replaying
-  with unchanged pass status and unmoved check counts
+- **Status:** Accepted, and **built** (2026-08-23) — all five decisions plus the dispute
+  flow, gated by `test/adr0022.test.ts` (29 cases, suite green at 250) and demonstrated by
+  `npm run demo:p7` / `demo:p7:llm`, whose four bundles replay jointly at 977 checks
 - **Date:** 2026-08-23
 - **Applies to:** P7, and — for Decision 2 — **every phase from P1 onward**, because a
   co-authored `afp:Result` is producible the moment two agents share a thread and the
@@ -427,6 +427,48 @@ a seat, it does not retroactively change who did the work. Resolving as of *now*
 an agent that leaves after a quarter re-bucket its own past credit, which is the defect
 ADR-0021 Decision 1 closed for weights, arriving one layer up in accounting. Both
 implementations now fold the same rule from the same evidence.
+
+## The demo, and the three defects it found
+
+`npm run demo:p7` runs scenario 13 over real sockets: four desks, one quarter of a shared
+queue, a ticket settled before the period opens and excluded by the hub's own chain, an
+escalation credited in integer shares, a seat expelled mid-quarter whose earlier work keeps
+its credit, and two honest computers reaching two different numbers because one of them may
+not read a ticket carrying customer data — settled by a dispute with evidence, a
+correction, and a round that ratifies it. `demo:p7:llm` puts the three judgements the
+record cannot derive to a local model: what the desk did, how a shared ticket divides, and
+whether the frame is right. **No model touches the arithmetic**, which is the point: a
+summary anybody has to take on trust is what this phase abolishes.
+
+Building it found three defects, none of them in this ADR's own machinery and all three in
+mechanisms P7 is the first workload to exercise:
+
+1. **A federated auction could never recompute its award.** `check_award` resolved bids
+   from the verifying bundle's own outbox, and a federated auction's bidders are in other
+   domains by construction — their commits and reveals arrive as received bytes. So every
+   cross-boundary award failed: no producible winning bid, no recomputed performer. It
+   reads the thread pool now, the same pool `check_decision_record` already read for
+   counted votes. This is the **fourth** appearance of the shape ADR-0021 W3 named after
+   the third ("a check whose evidence is owned by a different party belongs where the pool
+   is"), and the reason it survived until now is that no demo had ever run an auction
+   across a boundary — P3 is single-instance, and P4/P5/P6 move delegations and votes.
+2. **A closed award became unrecomputable when a bidder later left.** The member filter
+   folded the Enroll trail as of *now*, so expelling a desk that had already won a ticket
+   retroactively voided the award that gave it the work. Read as of the award's own
+   `published` now — ADR-0021 Decision 1's cutoff, arriving in allocation, and the exact
+   defect this ADR's Decision 4 rules against one layer up.
+3. **A broadcast queue made every member's bundle look incomplete.** A hub fans its queue
+   out to all members, so a desk holds `Announce{afp:Task}` for tickets it never touched
+   and can never show their terminals — and where the answer carries customer data it never
+   will, because ADR-0013's gate is doing its job. `check_thread` now holds a domain to the
+   threads it *acted on*; a participant that drops its terminal still fails.
+
+Two seams the demo hit and left on the record rather than designing around: **a recused
+subject never receives its own governance round**, so it cannot be handed the actuation
+alone without its case file disclosing an act whose pins it cannot resolve; and **a summary
+computed over a narrower *holding* than the case file will not survive joint replay**,
+because the frame declares visibility classes rather than what a member happened to be
+sent. Neither blocks P7; both are honest limits of what was built.
 
 ## References
 

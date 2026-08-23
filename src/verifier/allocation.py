@@ -33,7 +33,7 @@ from __future__ import annotations
 import hashlib
 from datetime import datetime
 
-from decision import afp_object, enrolled_roles, instant_millis
+from decision import afp_object, enrolled_roles, enrolled_roles_at, instant_millis
 from proof import digest_of
 from reputation import REPUTATION_RULES
 
@@ -310,7 +310,16 @@ def check_award(report, award_activity: dict, all_activities: list[dict]) -> Non
     by_digest = {digest_of(a): a for a in all_activities}
     # ADR-0004 Decision 1: pool reconstruction excludes non-member-role reveals
     # — a requester or observer can never be an admitted bidder.
-    roles = enrolled_roles(hub_actor, all_activities)
+    # ADR-0004 Decision 1's member filter, read **as of the award's own
+    # instant** rather than as of now. A bidder that was a member when it bid
+    # and left the hub afterwards — resigned, or expelled by a ratified round
+    # (ADR-0021) — must not make a closed award unrecomputable: the auction's
+    # arithmetic is signed history, and nothing that happens later reaches back
+    # into it. Same class as ADR-0021 Decision 1's second corollary, which put
+    # the weight recompute on the proposal's instant for the identical reason;
+    # found here by the P7 demo, whose quarter expels a desk that had already
+    # won a ticket.
+    roles = enrolled_roles_at(hub_actor, all_activities, instant_millis(award_activity.get("published")))
     members = {agent for agent, role in roles.items() if role == "member"}
 
     commits = [a for a in all_activities if is_bid_commit(a) and a.get("object") == task_id]

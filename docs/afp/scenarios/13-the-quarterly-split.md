@@ -23,7 +23,7 @@
 |---|---|
 | Resolved by | [ADR-0022](../adr/0022-the-summary-declares-its-frame.md) — all five decisions **built** (66-73) · its [ADR-0017](../adr/0017-standards-conformance.md) amendment **built** (74) — [triage](README.md#campaign-10--built-scenario-13-the-p7-shakedown) |
 | Gated by | `test/adr0022.test.ts` (24 cases — G6 is the fraction that cannot be canonicalised, G15 the partial view that claims to have read everything) |
-| See it run | — (P7 is unbuilt; `npm run demo:p3` and `demo:p6` show the evidence this scenario would sum) |
+| See it run | `npm run demo:p7` — four desks over real HTTP through a quarter of the shared queue: a ticket settled before the period opens and excluded by the hub's own chain, an escalation credited 1:3 between the desk that triaged it and the desk that fixed it, a seat expelled mid-quarter whose earlier work keeps its credit, and two honest computers reaching two different numbers because one of them may not read a ticket carrying customer data — settled by a dispute with evidence, a correction, and a round that ratifies it. `npm run demo:p7:llm` runs the same quarter with the three judgements the record cannot derive — what each desk did, how the shared ticket divides, whether the frame is right — written by a local model |
 
 ## User story
 
@@ -360,8 +360,15 @@ recompute the same way twice, is worse than no number — because it looks like 
 
 ## Running it
 
-There is nothing to run: P7 is unbuilt, and this scenario was written before its stack
-ADR on purpose — the third time (after [scenario 10](10-the-incident-bridge.md) for P5
+`npm run demo:p7` runs this scenario end to end — four desks, real sockets, one quarter,
+and the four case files replay together clean at 977 checks. `demo:p7:llm` runs it with a
+local model making the three calls the record genuinely cannot derive, and on the run that
+built it the model divided the escalation **3:1 toward the desk that triaged** — the
+inverse of the scripted split, moving the quarter's numbers while every check still passed.
+That is the property worth seeing: the desks argue about a judgement, and the arithmetic
+does not move. What follows is what was true when the
+scenario was *walked*, which is the record this directory keeps: P7 was unbuilt, and this
+scenario was written before its stack ADR on purpose — the third time (after [scenario 10](10-the-incident-bridge.md) for P5
 and [scenario 12](12-the-parametric-trigger.md) for P6), and for the reason the roadmap
 now states as a standing pattern. Both earlier walks produced defects that reading the
 spec alone had not, and both were cheaper to fix before the phase existed than after.

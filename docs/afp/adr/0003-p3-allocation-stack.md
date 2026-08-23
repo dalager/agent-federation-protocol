@@ -175,6 +175,25 @@ Set-membership, digests, and one pure function per rule — still no new cryptog
 | A rule the registry can't express | Decision 3 — extend the registry (twice), or accept a hub-local rule marked non-recomputable in the record |
 | P5 cross-operator bidding | Decision 1 — the announce fan-out crosses instance boundaries; transport hardening arrives with P4's machinery |
 
+
+## Amended 2026-08-23 (ADR-0022's P7 demo): the award recomputes across a boundary
+
+Two corrections to `check_award`, both found by the first workload to run an auction
+between operators rather than inside one:
+
+- **The bid pool is the thread pool.** Reveals and commitments from a foreign bidder
+  arrive as received bytes, so resolving them from the verifying bundle's own outbox made
+  every cross-boundary award unrecomputable — no producible winning bid, no recomputed
+  performer, no match. It reads the same pool `check_decision_record` already reads for
+  counted votes (ADR-0015 N2's grain).
+- **The member filter reads the trail as of the award.** Folding it as of *now* meant a
+  bidder that won a ticket and later left the hub — resigned, or expelled by a ratified
+  round (ADR-0021) — retroactively voided the award that gave it the work. An auction's
+  arithmetic is signed history, and the cutoff is ADR-0021 Decision 1's, applied here.
+
+Neither changes what an award *means*; both close the gap between what this ADR specified
+and what it checked once the parties stopped sharing a process.
+
 ## References
 
 - [03 — Bidding & allocation, selection rules, declining, estimator separation](../03-coordination.md#bidding--allocation)

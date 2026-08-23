@@ -88,6 +88,8 @@ npm run demo:p5        # P5: a shared hub with a real inbox — the write door, 
 npm run demo:p5:llm    # the same hub, told as a snow day: three schools, one bus company, one decision
 npm run demo:p6        # P6: five reinsurers at L1 — an equivocator convicted, a backup-restore acquitted
 npm run demo:p6:llm    # the same pool, with the underwriters' verdicts written by a local model
+npm run demo:p7        # P7: four support desks split one retainer — two honest numbers, one dispute, one summary
+npm run demo:p7:llm    # the same quarter, with the work, the split and the ratification vote from a local model
 npm run gate           # the acceptance gate: P1's 11 checks, CRDT property tests, hub, auction, boundary
 
 cd ../verifier

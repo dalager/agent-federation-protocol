@@ -543,7 +543,7 @@ def check_attachments(report: Report, export: Path, activity: dict) -> None:
         )
 
 
-def check_thread(report: Report, activities: list[dict], thread: str) -> None:
+def check_thread(report: Report, activities: list[dict], thread: str, own_actors: set[str] | None = None) -> None:
     """A replay selects by `context` and must reach a terminal outcome."""
     in_thread = [a for a in activities if a.get("context") == thread]
     report.record(
@@ -560,7 +560,29 @@ def check_thread(report: Report, activities: list[dict], thread: str) -> None:
     # there is none.
     tasks = [a for a in in_thread if outcome_type(a) == "afp:Task"]
     outcomes = [a for a in in_thread if outcome_type(a) in ("afp:Result", "afp:Error")]
-    if tasks:
+
+    # A bundle answers for the threads it *acted on*. A hub broadcasts its queue
+    # to every member, so a desk that never bid on a ticket holds the announce
+    # and nothing else — and where the answer carries customer data it will
+    # never hold more than that, because ADR-0013's gate is doing its job. An
+    # absent terminal is that domain's gap only if that domain was in the
+    # thread; otherwise the record is reporting somebody else's completeness as
+    # this bundle's hole, which is exactly the confusion ADR-0009 separated when
+    # it ruled that a per-actor chain cannot show a missing participant.
+    #
+    # Nothing is loosened for a participant: a domain that published in a thread
+    # and dropped its terminal still fails here. Found by the P7 demo, the first
+    # workload whose hub broadcasts work most of its members never touch.
+    participated = own_actors is None or any(a.get("actor") in own_actors for a in in_thread)
+    if tasks and not participated:
+        report.record(
+            f"thread: {thread} reaches a terminal outcome",
+            True,
+            "received-only: this domain published nothing in this thread, so an absent terminal is "
+            "not its gap — the hub broadcast the task and the answer is somebody else's to hold "
+            "(ADR-0009's participant/completeness split)",
+        )
+    elif tasks:
         report.record(
             f"thread: {thread} reaches a terminal outcome",
             bool(outcomes),
@@ -740,7 +762,7 @@ def verify_export(export: Path, thread: str | None, report: Report) -> dict:
         {a["context"] for a in thread_pool if isinstance(a.get("context"), str)}
     )
     for name in threads:
-        check_thread(report, thread_pool, name)
+        check_thread(report, thread_pool, name, own_actors=set(seen_actors))
 
     # ADR-0010 Decision 1: pin-equality and pins-precede-answers over the
     # thread pool — the same pool `check_thread` runs over, because a
@@ -845,7 +867,21 @@ def verify_export(export: Path, thread: str | None, report: Report) -> dict:
     # (all of P1/P2) run none of this — backward compatible by construction.
     for activity in all_activities:
         if afp_object(activity, "afp:Award") is not None:
-            check_award(report, activity, all_activities)
+            # ADR-0003's award recomputation, over the **thread pool** rather
+            # than this domain's own outbox. A federated auction's bidders are
+            # in other domains by construction, so their commits and reveals
+            # arrive as received bytes (ADR-0015 N2's grain, the same pool
+            # `check_decision_record` reads for counted votes) — and reading
+            # only the host's own activities made every cross-boundary award
+            # unrecomputable: no producible winning bid, no recomputed
+            # performer, no match. Found by the P7 demo, which is the first
+            # workload to run an auction across a boundary at all.
+            #
+            # The fourth time this shape has appeared (ADR-0020's foreign
+            # signing key, ADR-0021's foreign Enroll trail and cited proofs),
+            # and ADR-0021 W3 wrote the rule after the third: a check whose
+            # evidence is owned by a different party must read the pool.
+            check_award(report, activity, thread_pool)
 
     # ADR-0004 Decision 1: an Announce{afp:Task} from an observer (or from an
     # actor the Enroll trail never admitted) is a role violation on the record.
