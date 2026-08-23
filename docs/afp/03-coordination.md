@@ -108,8 +108,19 @@ still has one committer.
 
 Where a Result truly has no single author, AS2's `attributedTo` accepts an array. If used,
 the emitting instances MUST also state a contribution split (`afp:contributionSplit`, a
-map of actor → fraction summing to 1) so ContributionSummary stays computable; absent it,
-verifiers count such a Result for no one rather than double-counting.
+map of actor → **positive integer share**, the denominator being their sum) so
+ContributionSummary stays computable. Shares, not fractions, for the reason
+[ADR-0005](adr/0005-operators-are-equal.md) already established for `afp:voterWeights`:
+the AFP JCS numeric profile forbids non-integer numbers in a signed document, so a
+fraction is not merely awkward here — a document carrying one cannot be canonicalised,
+and therefore cannot be signed or read. The split's keys MUST equal the `attributedTo`
+set exactly.
+
+A co-authored Result without a split is refused by the emitting instance and is a named
+replay failure ([ADR-0022](adr/0022-the-summary-declares-its-frame.md) Decision 2). The
+older rule — that verifiers count such a Result for no one rather than double-counting —
+is retained for exactly one job: it is what an accounting pass does with a record written
+before that decision.
 
 ### External systems: keep the firehose behind the port
 
@@ -204,7 +215,7 @@ finding 41).
 | `afp:DecisionRecord` | Object (in `Create`) | First-class outcome record closing every voting round: outcome, snapshot hash, counted-vote hashes, weight tally |
 | `afp:prevActivity` | Property (any activity) | Optional per-actor outbox hash chain — makes logs append-only-verifiable |
 | `context` (standard AS2) | Property (any activity) | Thread id grouping all activities of one incident/case/item — distinct from `correlationId` |
-| `afp:contributionSplit` | Property (Result) | Actor → fraction map, required when `attributedTo` names several actors |
+| `afp:contributionSplit` | Property (Result) | Actor → **positive integer share** map (denominator = their sum), required when `attributedTo` names several actors and forbidden otherwise; keys equal the `attributedTo` set (ADR-0022 Decision 2) |
 | `afp:visibility` | Property (any activity) | `public` \| `hub` \| `parties` \| `internal` — read-side access class (07) |
 | `afp:AuditGrant` | Credential | Signed, expiring, scoped read grant naming an auditor actor (07) |
 | `afp:digest`, `afp:size` | Properties (Link) | Hash-addressing for artifacts; `afp:digest` is mandatory on attachments (07) |

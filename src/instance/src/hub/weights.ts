@@ -30,6 +30,30 @@ function gcd(a: bigint, b: bigint): bigint {
 }
 
 /**
+ * Least common multiple over a list of positive integers, exact in
+ * arbitrary precision and converted only at the end.
+ *
+ * Exported because ADR-0022 needs the identical move one layer up — a
+ * contribution summary scales per-Result shares to a common denominator
+ * exactly as a proposal scales per-instance seats — and W0.1 forbids forking
+ * the arithmetic. This is the shared primitive; the *rules* built on it
+ * (`voterWeights` here, `creditOf` in `summary.ts`) stay separate, because
+ * they answer different questions.
+ */
+export function lcmOf(values: readonly number[]): number {
+  let lcm = 1n;
+  for (const value of [...values].sort((a, b) => a - b)) {
+    const n = BigInt(value);
+    if (n <= 0n) throw new Error(`least common multiple is undefined for ${value}`);
+    lcm = (lcm / gcd(lcm, n)) * n;
+  }
+  if (lcm > BigInt(Number.MAX_SAFE_INTEGER)) {
+    throw new Error(`common denominator ${lcm} exceeds the safe integer range`);
+  }
+  return Number(lcm);
+}
+
+/**
  * `agent → weight` for one round's pinned voters.
  *
  * Computed in arbitrary-precision integers so the least common multiple is

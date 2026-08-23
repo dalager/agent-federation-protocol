@@ -168,6 +168,26 @@ Decision 6's job.
   existing answer instead of a bespoke one.
 - `afp:bidCommit` is renamed `afp:BidCommit`.
 
+**Amended 2026-08-23 (ADR-0022, finding 74) — a rename keeps a read-side alias.** The
+rename above shipped with no compatibility path, so every bundle written before it
+replayed as though its bid commitments did not exist — and failed by
+"reveal with no matching commitment", which names the wrong thing entirely. Measured on a
+2026-08-19 export: ten failures, one rename. The rule, generalized so the next rename does
+not repeat it:
+
+> A retired type spelling MUST keep a **read-side alias** — the writer emits the current
+> spelling and nothing else, exactly as draft-cavage became a read shim when RFC 9421 went
+> native (Decision 2 above) — and a bundle carrying a retired spelling MUST fail or pass by
+> a check that *names the retired spelling*, never by a downstream check that happens to
+> notice the absence first.
+
+Built: `RETIRED_TYPE_SPELLINGS` in `src/verifier/allocation.py`, read by `is_bid_commit`,
+with `vocabulary: {id} uses the retired spelling {type}` recording the fact without
+failing the replay. Why it is ADR-0022 that noticed: for every other object a vocabulary
+change is a migration nuisance, but `afp:ContributionSummary`'s inputs are **historical by
+definition**, so a look-back spanning a rename silently sums a different set — an
+accounting error with a signature on it.
+
 ### 6. Deliberate deviations become normative text
 
 A new spec section — **"Deviations from ActivityPub"** — states, as rules rather than

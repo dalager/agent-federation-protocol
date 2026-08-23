@@ -32,7 +32,7 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from allocation import check_announce_role, check_award
+from allocation import check_announce_role, check_award, check_retired_spellings
 from asset import check_assets
 from action import check_actions, check_supersession
 from decision import (
@@ -41,6 +41,7 @@ from decision import (
     check_decision_record,
     check_decision_settlement,
     check_departure,
+    check_contribution_split,
     check_enroll_authority,
     check_equivocation_proof,
     check_key_compromise_claim,
@@ -73,6 +74,7 @@ from pins import (
     check_proposal_action_policy,
 )
 from proof import CRYPTOSUITE, decode_multikey, digest_of, verify_proof
+from summary import check_summary_arithmetic, check_summary_frame
 
 
 # --------------------------------------------------------------------- report
@@ -134,6 +136,11 @@ class Report:
             # every one of them is a zero an auditor must be able to SEE
             # rather than an absence they never think to ask about.
             "recusal", "claim", "evidence", "membership",
+            # ADR-0022 Decision 2 and its ADR-0017 amendment: a co-authored
+            # Result's split, and a bundle whose vocabulary predates a rename.
+            # `contribution:0` on a bundle full of single-author Results is the
+            # honest reading; `vocabulary:0` says nothing here was retired.
+            "contribution", "vocabulary",
         )
         print("census — checks run per domain (a zero you expected to be nonzero is a question):")
         for domain in sorted(domains):
@@ -790,6 +797,22 @@ def verify_export(export: Path, thread: str | None, report: Report) -> dict:
     # convicts a foreign actor whose key this bundle need not publish, so it
     # runs in the replay-wide layer beside V8 (`check_equivocation_proofs`).
     check_vote_l1_fields(report, all_activities)
+    # ADR-0022 Decision 2 / V1: co-authored Results state their split. Over the
+    # thread pool, because a co-authored Result routinely arrives as received
+    # bytes — co-work is what crosses a boundary. Exports with no multi-author
+    # attributedTo (every bundle this repository has shipped, which is finding
+    # 66 restated as a measurement) run none of this.
+    for activity in thread_pool:
+        check_contribution_split(report, activity)
+    # ADR-0022 / finding 74: a bundle written under a retired type spelling
+    # replays, and says so by name.
+    check_retired_spellings(report, all_activities)
+    # ADR-0022 Decision 1 / V2: the frame is a shape claim about the summary's
+    # own bytes, so it answers per domain. V3/V4 need the pool and run in the
+    # replay-wide layer. Exports with no afp:ContributionSummary — every bundle
+    # written before this ADR — run none of this.
+    for activity in all_activities:
+        check_summary_frame(report, activity)
     for activity in all_activities:
         if afp_object(activity, "afp:Proposal") is not None:
             check_succession(report, activity, all_activities)
@@ -1409,6 +1432,7 @@ def main() -> int:
             check_equivocation_scan(report, [bundle])
             check_equivocation_proofs(report, [bundle])
             check_electorate(report, [bundle])
+            check_summary_arithmetic(report, [bundle])
             check_recusal_causes(report, [bundle])
             check_enroll_evidence(report, [bundle])
             check_revocation_not_erasing(report, [bundle])
@@ -1428,6 +1452,7 @@ def main() -> int:
             # "verifies standalone" needs the whole case file's key table).
             check_equivocation_proofs(report, bundles)
             check_electorate(report, bundles)
+            check_summary_arithmetic(report, bundles)
             # ADR-0021 Decisions 3-5, all here for one reason: every fact they
             # rest on — the hub's proofs, the accused's signing key, the key
             # history of the party a proof is about — is owned by a domain

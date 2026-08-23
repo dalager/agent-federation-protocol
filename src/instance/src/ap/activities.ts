@@ -134,16 +134,70 @@ export interface ResultSpec {
    * the delivered adaptation's own digest — closing the reuse loop.
    */
   reused?: { asset: string; version: string; digest: string };
+  /**
+   * ADR-0022 Decision 2 / 03 § Co-work: the authors, where a Result truly has
+   * no single one. Absent, `attributedTo` is the emitting actor alone and
+   * nothing changes — which is every Result this repository has ever written.
+   */
+  attributedTo?: readonly string[];
+  /**
+   * ADR-0022 Decision 2a: actor → **positive integer share**; the denominator
+   * is their sum. 03 specified this as "a map of actor → fraction summing to
+   * 1", which the AFP JCS numeric profile cannot express — the identical wall
+   * ADR-0005 hit for vote weights and solved with integer shares over an LCM
+   * denominator. Shares scale to a common denominator the same way; no second
+   * arithmetic is introduced, and an implementer writing a rounding rule has
+   * taken a wrong turn.
+   */
+  contributionSplit?: Readonly<Record<string, number>>;
 }
 
 export function createResult(envelope: Envelope, result: ResultSpec): { [key: string]: JsonValue } {
+  const authors = result.attributedTo ? [...result.attributedTo] : null;
   const object: { [key: string]: JsonValue } = {
     id: result.resultId,
     type: "afp:Result",
     "afp:correlationId": result.correlationId,
     content: result.content,
-    attributedTo: envelope.actor,
+    attributedTo: authors && authors.length > 1 ? authors : (authors?.[0] ?? envelope.actor),
   };
+  // ADR-0022 Decision 2b: the MUST binds the writer. 03 states a requirement
+  // ("the emitting instances MUST also state a contribution split") and a
+  // fallback in the same breath ("absent it, verifiers count such a Result for
+  // no one") — and a rule with a defined fallback is a rule nobody keeps. It
+  // has been normative since v3.4 and implemented never, which is exactly how
+  // the most collaborative operator became the least visible one in the
+  // ledger. Refused here, before anything is signed, rather than left for a
+  // verifier to notice about a record that already exists.
+  if (authors && authors.length > 1) {
+    const split = result.contributionSplit;
+    if (!split) {
+      throw new Error(
+        `a Result attributed to ${authors.length} actors must state afp:contributionSplit (03, ADR-0022): ${authors.join(", ")}`,
+      );
+    }
+    const keys = Object.keys(split);
+    const missing = authors.filter((actor) => !(actor in split));
+    const strangers = keys.filter((actor) => !authors.includes(actor));
+    if (missing.length || strangers.length) {
+      throw new Error(
+        `afp:contributionSplit must name exactly the attributedTo set (ADR-0022)` +
+          (missing.length ? `; missing ${missing.join(", ")}` : "") +
+          (strangers.length ? `; not an author: ${strangers.join(", ")}` : ""),
+      );
+    }
+    for (const [actor, share] of Object.entries(split)) {
+      if (!Number.isInteger(share) || share < 1) {
+        throw new Error(
+          `afp:contributionSplit share for ${actor} must be a positive integer, got ${share} — ` +
+            `the JCS numeric profile forbids fractions in a signed document (ADR-0005, ADR-0022)`,
+        );
+      }
+    }
+    object["afp:contributionSplit"] = { ...split };
+  } else if (result.contributionSplit) {
+    throw new Error("afp:contributionSplit on a single-author Result divides nothing (ADR-0022)");
+  }
   if (result.summary) object.summary = result.summary;
   // Provenance stops at the agent-instance port unless the workflow externalizes
   // it (04 § Rationale externalization). Naming the producer is the cheapest

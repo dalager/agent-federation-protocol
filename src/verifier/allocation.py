@@ -41,6 +41,54 @@ from reputation import REPUTATION_RULES
 # ------------------------------------------------------------------ helpers
 
 
+#: ADR-0017 Decision 5 renamed `afp:bidCommit` to `afp:BidCommit`, and shipped
+#: with no read-side compatibility — so every bundle written before 2026-08-22
+#: replayed as though its bid commitments did not exist, failing by
+#: "reveal with no matching commitment" rather than by anything naming the real
+#: cause. Measured on a 2026-08-19 export: ten failures, one rename.
+#:
+#: Kept as a **read-side alias only** (ADR-0022's amendment to ADR-0017,
+#: finding 74): the writer emits the current spelling and nothing else, exactly
+#: as draft-cavage became a read shim when RFC 9421 went native (ADR-0017
+#: Decision 2). A record is supposed to outlive the vocabulary it was written
+#: in; for `afp:ContributionSummary`, whose inputs are historical by
+#: definition, a rename without an alias is an accounting error with a
+#: signature on it.
+RETIRED_TYPE_SPELLINGS = {"afp:bidCommit": "afp:BidCommit"}
+
+
+def is_bid_commit(activity: dict) -> bool:
+    """An `afp:BidCommit` under its current spelling or a retired one."""
+    declared = activity.get("type")
+    return declared == "afp:BidCommit" or RETIRED_TYPE_SPELLINGS.get(str(declared)) == "afp:BidCommit"
+
+
+def check_retired_spellings(report, all_activities: list[dict]) -> None:
+    """ADR-0022 / finding 74 — a bundle written under a retired type spelling
+    still replays, and *says so by name*.
+
+    The alias is what keeps the record readable; this check is what keeps the
+    fact visible. Without it a pre-rename bundle passes silently and a reader
+    has no way to know the vocabulary moved under it — which for an accounting
+    roll-up over a historical period is the difference between a number and a
+    number computed over a different set.
+
+    Never a failure: the record is intact, and it was written in good faith
+    under the spelling of its day.
+    """
+    for activity in all_activities:
+        declared = str(activity.get("type"))
+        current = RETIRED_TYPE_SPELLINGS.get(declared)
+        if current is None:
+            continue
+        report.record(
+            f"vocabulary: {activity.get('id', '<no id>')} uses the retired spelling {declared}",
+            True,
+            f"read as {current} (ADR-0017 Decision 5 renamed it; the alias is read-side only, "
+            f"ADR-0022 finding 74) — the record is intact and its vocabulary is older than this verifier",
+        )
+
+
 def _parse_time(value: str | None) -> datetime | None:
     if not isinstance(value, str):
         return None
@@ -265,7 +313,7 @@ def check_award(report, award_activity: dict, all_activities: list[dict]) -> Non
     roles = enrolled_roles(hub_actor, all_activities)
     members = {agent for agent, role in roles.items() if role == "member"}
 
-    commits = [a for a in all_activities if a.get("type") == "afp:BidCommit" and a.get("object") == task_id]
+    commits = [a for a in all_activities if is_bid_commit(a) and a.get("object") == task_id]
     reveals = [
         a
         for a in all_activities

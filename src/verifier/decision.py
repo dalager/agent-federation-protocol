@@ -1094,6 +1094,76 @@ def check_proposal_electorate(report, activity: dict) -> None:
     )
 
 
+def check_contribution_split(report, activity: dict) -> None:
+    """ADR-0022 Decision 2 / W3 V1 — a co-authored `afp:Result` states who did
+    how much of it, in integers.
+
+    03 has required this since v3.4 (campaign 1's finding 7) and nothing has
+    ever read it, so the one case where credit is genuinely ambiguous — two
+    agents from two operators on one Result, which is the normal shape of an
+    escalation — has been dropped from every recomputation in silence. The
+    operator that does the most co-work is the one the ledger sees least of.
+
+    Two rulings from the ADR are visible in the shape of this check. **Integers,
+    not fractions**: 03 said "a map of actor → fraction summing to 1", which the
+    AFP JCS numeric profile cannot express in a signed document — the identical
+    wall ADR-0005 hit for `afp:voterWeights` and solved with integer shares over
+    an LCM denominator, an answer that post-dates 03's sentence and was never
+    carried back. And **the MUST binds**: 03 pairs its requirement with a
+    fallback ("absent it, verifiers count such a Result for no one"), which is a
+    rule nobody keeps; the fallback is retained only as what an accounting pass
+    does with a pre-ADR record, and the requirement is enforced here.
+
+    Conditional on the material: a single-author Result — every Result this
+    repository has ever written — triggers nothing.
+    """
+    result = afp_object(activity, "afp:Result")
+    if result is None:
+        return
+    attributed = result.get("attributedTo")
+    authors = [a for a in attributed if isinstance(a, str)] if isinstance(attributed, list) else []
+    split = result.get("afp:contributionSplit")
+    label = result.get("id", activity.get("id", "<no id>"))
+    name = f"contribution: {label} co-authored result declares a well-formed split"
+
+    if len(authors) <= 1:
+        # Nothing to divide. A split here would credit a division that does not
+        # exist, which is as unreadable as one that is missing.
+        if split is not None:
+            report.record(
+                name,
+                False,
+                "a single-author afp:Result carries afp:contributionSplit, which divides "
+                "nothing (ADR-0022 Decision 2)",
+            )
+        return
+
+    if not isinstance(split, dict):
+        report.record(
+            name,
+            False,
+            f"attributedTo names {len(authors)} actors and no afp:contributionSplit is "
+            f"present — 03 requires one, and without it this Result credits nobody (ADR-0022)",
+        )
+        return
+
+    wrong: list[str] = []
+    missing = sorted(a for a in authors if a not in split)
+    strangers = sorted(k for k in split if k not in authors)
+    if missing:
+        wrong.append("author(s) with no share: " + ", ".join(missing))
+    if strangers:
+        wrong.append("share(s) for non-author(s): " + ", ".join(strangers))
+    for actor, share in sorted(split.items()):
+        if isinstance(share, bool) or not isinstance(share, int) or share < 1:
+            wrong.append(f"{actor}: share {share!r} is not a positive integer")
+    report.record(
+        name,
+        not wrong,
+        "" if not wrong else "; ".join(wrong) + " (ADR-0022 Decision 2)",
+    )
+
+
 def check_vote_l1_fields(report, all_activities: list[dict]) -> None:
     """ADR-0020 W3 V1 — an `afp:level: 1` round's votes carry well-formed
     `afp:phase`/`afp:seqNo`/`afp:proposalHash`, with `afp:seqNo` a positive

@@ -309,6 +309,41 @@ built code when it was found:
   no new wire property. Worth landing ahead of everything else in that ADR, because
   every electorate rule above it reads the trail this defect lets anyone edit.
 
+## Known blockers before P7 opens
+
+[Scenario 13](scenarios/13-the-quarterly-split.md) walks P7 end to end before its stack
+ADR exists — the same move scenarios 10 and 12 made for P5 and P6 — and reports nine
+findings ([campaign 10](scenarios/README.md#campaign-10--open-scenario-13-the-p7-shakedown),
+open). It is the first shakedown in which **nobody misbehaves**: four honest support desks
+split one retainer, and they still cannot agree on the number.
+
+Its through-line is the one thing P7 asks for that no earlier phase needed: **a sum is
+only as recomputable as its input set is agreed, and the protocol does not name sets.**
+Every mechanism P1–P6 built answers a question about an event you can point at;
+`afp:ContributionSummary` is the first object whose subject is a *boundary* — which
+events, over which window, seen by whom, credited at what weight, still valid under which
+vocabulary — and each finding is a different edge of that boundary left undrawn.
+
+Two are worth naming here, because a P7 build hits them in its first hour and neither is
+visible from the phase table above:
+
+- **`afp:contributionSplit` is normative and implemented nowhere.** 03 requires it
+  whenever a Result's `attributedTo` names several actors, and rules that a Result
+  lacking it counts *for no one*. It has been in the spec since v3.4 (campaign 1's
+  finding 7) and appears in no builder and no check. So the collaborative case — the one
+  where credit is genuinely ambiguous, and the whole reason a split field exists — is
+  silently dropped from the arithmetic P7 is built to make checkable. Worse when someone
+  implements it as written: a map of fractions summing to 1 is unrepresentable under the
+  JCS numeric profile, which is the wall ADR-0005 already hit for vote weights and solved
+  with integer shares over an LCM denominator.
+- **"Any member can recompute it" is not true today, and the record cannot say so.** 04
+  calls the inputs "fully derived from public signed data"; 07 and ADR-0013 guarantee
+  that non-`public` work is served to nobody unentitled — 404, by design. Two members
+  therefore recompute the same period honestly and disagree, with no way to tell an
+  entitlement gap from an error or a fraud. The fix's shape already exists one layer
+  down: ADR-0015's census made "a check that could not be evaluated" visible instead of
+  silent, and a summary computed over a partial view is exactly that in accounting form.
+
 ## Open questions
 
 - **Directory-of-hubs bootstrap.** Left as an out-of-band, consortium-published list at a
