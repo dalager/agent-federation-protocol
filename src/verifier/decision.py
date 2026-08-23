@@ -182,8 +182,29 @@ def enrolled_roles_at(hub_actor: str, all_activities: list[dict], at_millis: int
     the fold. `enrolled_roles` is this function at `at_millis = _MAX_MILLIS`,
     i.e. "as of now" — so there is one fold, not two, and no existing check
     shifts behaviour.
+    ADR-0021 Decision 4b: the trail is Enroll/Unenroll **and ratified
+    membership actuations**. 03's `afp:MemberExpel`/`afp:MemberAdmit` have
+    been the membership decisions since v1 and this fold never consumed them,
+    so a lawful expulsion left the seat in the electorate forever and every
+    round the hub pinned afterwards failed V4 by name. Only *ratified* acts
+    enter — `ratified_membership_acts` documents what that costs and why it
+    may not be relaxed — and they are cut at the same `at_millis` as
+    everything else, so an expulsion at T moves no round pinned before T and a
+    `MemberAdmit` restores forward only (Decision 4c). Signed history does not
+    move in either direction.
+
+    The hub cannot reach the same end with an `afp:Unenroll`: Decision 1 binds
+    that to the agent's own operating instance, and the hub is not the
+    expelled agent's operator. Decision 1 and Decision 4b interlock here.
     """
+    from electorate import membership_actuation, ratified_membership_acts
+
     roles: dict[str, str] = {}
+    # An expelled seat's last declared role, so a later MemberAdmit restores
+    # what the agent actually held rather than inventing one. An agent
+    # readmitted with no Enroll anywhere in the trail reads as `member`, which
+    # is the role a governance round is about.
+    held: dict[str, str] = {}
     trail = [
         a
         for a in all_activities
@@ -191,13 +212,20 @@ def enrolled_roles_at(hub_actor: str, all_activities: list[dict], at_millis: int
         and a.get("target") == hub_actor
         and instant_millis(a.get("published")) <= at_millis
     ]
+    trail += [
+        a
+        for a in ratified_membership_acts(hub_actor, all_activities)
+        if instant_millis(a.get("published")) <= at_millis
+    ]
     for activity in sorted(trail, key=lambda a: (instant_millis(a.get("published")), digest_of(a))):
         agent = activity.get("object")
         if not isinstance(agent, str):
             continue
         if activity.get("type") == "afp:Enroll":
-            roles[agent] = activity.get("afp:role", "member")
-        else:
+            held[agent] = roles[agent] = activity.get("afp:role", "member")
+        elif membership_actuation(activity) == "afp:MemberAdmit":
+            roles[agent] = held.get(agent, "member")
+        else:  # afp:Unenroll, afp:MemberExpel
             roles.pop(agent, None)
     return roles
 
@@ -233,14 +261,32 @@ def enrolled_instances(
     which is the same defect ADR-0020's forward-scoping rule exists to
     prevent. Defaulting to `_MAX_MILLIS` keeps every caller that means "as of
     now" behaving exactly as before.
+    ADR-0021 Decision 4b: ratified membership actuations fold here too, for
+    the same reason they fold into `enrolled_roles_at` — an expelled seat must
+    leave its operator's bucket, or one operator keeps carrying weight for a
+    seat the members voted away.
+
+    A `MemberAdmit` restores the agent to **the instance that enrolled it**,
+    never to the actuator that carried the decision out. The actuator is
+    whichever member published the act; attributing the readmitted seat to it
+    would hand that member a seat belonging to somebody else's operator, and
+    quietly re-divide every per-operator weight in the next round.
     """
+    from electorate import membership_actuation, ratified_membership_acts
+
     instances: dict[str, str] = {}
+    enrolled_by: dict[str, str] = {}
     trail = [
         a
         for a in all_activities
         if a.get("type") in ("afp:Enroll", "afp:Unenroll")
         and a.get("target") == hub_actor
         and instant_millis(a.get("published")) <= at_millis
+    ]
+    trail += [
+        a
+        for a in ratified_membership_acts(hub_actor, all_activities)
+        if instant_millis(a.get("published")) <= at_millis
     ]
     for activity in sorted(trail, key=lambda a: (instant_millis(a.get("published")), digest_of(a))):
         agent = activity.get("object")
@@ -249,8 +295,11 @@ def enrolled_instances(
         if activity.get("type") == "afp:Enroll":
             actor = activity.get("actor")
             if isinstance(actor, str):
-                instances[agent] = actor
-        else:
+                enrolled_by[agent] = instances[agent] = actor
+        elif membership_actuation(activity) == "afp:MemberAdmit":
+            if agent in enrolled_by:
+                instances[agent] = enrolled_by[agent]
+        else:  # afp:Unenroll, afp:MemberExpel
             instances.pop(agent, None)
     return instances
 
@@ -427,11 +476,7 @@ def check_decision_record(
     # against the sender's own bundle; nothing here is trusted more.
     by_digest = {digest_of(a): a for a in (pool if pool is not None else all_activities)}
 
-    # ADR-0004 Decision 1 — only member-role agents may ever be pinned into a
-    # quorum snapshot; a requester or observer in afp:voters is a failure the
-    # Enroll trail proves.
     hub_actor = decision.get("afp:hub") or proposal.get("afp:hub") or decision_activity.get("actor")
-    roles = enrolled_roles(hub_actor, all_activities)
     # ADR-0005 Decision 1 — the pinned weights are recomputed, not trusted.
     # Recorded-so-a-verifier-can-see is not the same as checkable: without
     # this a hub simply writes the numbers it wants into its own proposal, and
@@ -454,7 +499,18 @@ def check_decision_record(
         or proposal.get("published")
         or decision_activity.get("published")
     )
-    instances = enrolled_instances(hub_actor, all_activities, instant_millis(proposal_published))
+    at_proposal = instant_millis(proposal_published)
+    instances = enrolled_instances(hub_actor, all_activities, at_proposal)
+    # ADR-0004 Decision 1 — only member-role agents may ever be pinned into a
+    # quorum snapshot; a requester or observer in afp:voters is a failure the
+    # Enroll trail proves. Read as of the SAME instant as the weights beside
+    # it, never as of "now": this was the one recompute in this function left
+    # on the untimed fold, and once that fold began consuming ADR-0021
+    # Decision 4b's ratified expulsions, a MemberExpel landing after a round
+    # closed retroactively changed that closed round's role view — the same
+    # class of defect as Decision 1's second corollary, one call site further
+    # on.
+    roles = enrolled_roles_at(hub_actor, all_activities, at_proposal)
     # ADR-0005 amendment (declared change of control) — an instance's weight
     # bucket is its *effective* operator as of this proposal's own `published`,
     # not necessarily itself; absent any Create{afp:ControlTransfer} this is
@@ -479,6 +535,25 @@ def check_decision_record(
         f"honoring any declared change of control (ADR-0005)",
     )
 
+    # The `"member"` default is deliberate and must not be tightened into a
+    # failure. An `afp:Enroll` is issued by the enrolling agent's own instance
+    # (ADR-0005 Decision 2) and therefore lives on that agent's own chain, so
+    # a hub host's bundle carries only its own Enroll and every foreign pinned
+    # voter is simply *absent* from this domain's fold. Measured, not
+    # reasoned: making absence a failure fails every hub host in the
+    # repository — p5 alpha and p6 atlas both go red, naming the four or five
+    # members whose Enrolls live in their own bundles. This is the same
+    # one-directional asymmetry that makes ADR-0021's V4 three-valued, and it
+    # is correct here for the identical reason.
+    #
+    # The limit that leaves, recorded rather than papered over: **nothing
+    # verifies that a pinned voter WAS an enrolled member at the proposal's
+    # instant.** V4 checks `enrolled ⊆ voters ∪ excluded` and never the
+    # converse, and this check defaults absentees to `member` — so a hub may
+    # still pin a stranger, or a seat it expelled last week, and replay clean.
+    # Closing it needs a completeness signal no bundle carries today and a
+    # replay-wide, three-valued check in V4's shape; it is an ADR-sized
+    # question, not a line to change here.
     non_member_pinned = sorted(v for v in pinned_voters if roles.get(v, "member") != "member")
     report.record(
         f"decision: {label} pinned voters are member-role agents",
@@ -1160,4 +1235,189 @@ def check_succession(report, activity: dict, all_activities: list[dict]) -> None
         "" if ok else
         f"proposer {activity.get('actor')!r} is not the entitled successor "
         f"({entitled!r}) of the stalled round (ADR-0020)",
+    )
+
+
+def check_key_compromise_claim(report, activity: dict, all_activities: list[dict], authority) -> None:
+    """ADR-0021 Decision 4a / W3 V8 — an `afp:KeyCompromiseClaim` is published
+    by the convicted agent's own instance, and answers a proof that is really
+    on the record and really convicts its own subject.
+
+    The claim is the record's way of telling a sanction from an incident, and
+    the entitlement it needs is exactly the one `afp:Vouch`, `afp:Disown` and
+    `afp:ControlTransfer` need: a valid signature from the instance that
+    operates the agent. Anybody else saying "my key was captured" about
+    somebody else's key is not a contested conviction, it is a third party
+    narrating — and a record that cannot tell those apart has gained nothing
+    over the one state it had before.
+
+    What it emphatically does **not** do is act (W0.3). Zeroing stays
+    automatic; this check moves no weight, delays no round and reverses
+    nothing. Per domain, because a claim rides on the claiming instance's own
+    chain and that bundle publishes the actor documents this resolves against
+    — but resolved against the thread pool, since the proof it answers is
+    announced by the HUB and reaches the claimant as received bytes.
+    """
+    from equivocation import convicts, equivocation_proof_votes
+
+    claim = afp_object(activity, "afp:KeyCompromiseClaim")
+    if claim is None:
+        return
+    label = claim.get("id", activity.get("id", "<no id>"))
+    name = f"claim: {label} is published by the agent's own instance"
+
+    digest = claim.get("afp:proof")
+    proof_activity = (
+        next((a for a in all_activities if digest_of(a) == digest), None)
+        if isinstance(digest, str)
+        else None
+    )
+    if proof_activity is None:
+        report.record(
+            name,
+            False,
+            f"afp:proof {digest!r} resolves to no present activity — a claim answers a proof "
+            f"on the record or it answers nothing (ADR-0021)",
+        )
+        return
+
+    votes = equivocation_proof_votes(proof_activity)
+    if votes is None or not convicts(*votes):
+        report.record(
+            name,
+            False,
+            "the named afp:proof does not convict — its embedded pair is absent, malformed, "
+            "or does not equivocate (ADR-0021)",
+        )
+        return
+
+    subject = votes[0].get("actor")
+    operator = authority.operated_by.get(subject)
+    actor = activity.get("actor")
+    if operator is None or actor != operator:
+        report.record(
+            name,
+            False,
+            f"published by {actor!r}, but the convicted agent {subject} is operated by "
+            f"{operator!r} — a compromise claim is self-referential or it is somebody else's "
+            f"narration (ADR-0021)"
+            if operator is not None else
+            f"published by {actor!r}, but {subject} publishes no afp:operatedBy, so no actor "
+            f"is entitled to claim capture of its key (ADR-0021)",
+        )
+        return
+
+    # W1 makes both of these required, and W0.8 forbids a field no check
+    # reads: `afp:verificationMethod` is "the key it says was captured", so it
+    # must be a key that actually signed one of the convicting votes —
+    # otherwise the claim answers a proof while naming an unrelated key — and
+    # `afp:since` must be a readable instant, because "the moment the capture
+    # began" is the whole content of the assertion.
+    signed_by = {
+        (v.get("proof") or {}).get("verificationMethod")
+        for v in votes
+        if isinstance(v.get("proof"), dict)
+    }
+    method = claim.get("afp:verificationMethod")
+    since = claim.get("afp:since")
+    wrong = []
+    if method not in signed_by:
+        wrong.append(
+            f"afp:verificationMethod {method!r} signed neither convicting vote "
+            f"({', '.join(sorted(str(s) for s in signed_by))})"
+        )
+    if not isinstance(since, str) or instant_millis(since) == 0:
+        wrong.append(f"afp:since {since!r} is not a readable RFC 3339 instant")
+    report.record(name, not wrong, "" if not wrong else "; ".join(wrong) + " (ADR-0021)")
+
+
+def check_membership_actuation(report, activity: dict, all_activities: list[dict]) -> None:
+    """ADR-0021 Decision 4b / W3 V9 and V10 — a `MemberExpel` / `MemberAdmit`
+    is the ADR-0019 actuation of a governance round, and names that round's
+    own subject.
+
+    A governance round is an ordinary ADR-0018 round with a subject; there is
+    no second consensus path and no second quorum. So the actuation is held to
+    the ordinary actuation contract — `afp:actsOn` resolves to a real
+    `DecisionRecord`, `afp:action` is the action that round's own pinned
+    `afp:actionPolicy` names for that outcome — plus the two things that make
+    it a *membership* act: the round must have pinned an
+    `afp:governanceSubject`, and the agent removed or admitted must be that
+    subject (V10). A governance round that expels somebody it never named is
+    not a decision the record can be said to have taken.
+
+    And the clause 02 has carried since before this ADR, now with teeth: a
+    `MemberExpel` or `MemberAdmit` signed by the **hub's own actor** is
+    invalid. ADR-0014 made the hub the sequencing authority that signs
+    proposals, and that habit collides with member-entitled acts exactly here.
+    Membership is decided by a weighted quorum among the members — never by a
+    signature from the hub's own key.
+
+    These are the same legs `ratified_membership_acts` requires before an act
+    may edit the membership trail, and that is deliberate: an actuation the
+    record does not ratify neither moves the electorate nor passes here.
+    """
+    from electorate import membership_actuation
+
+    kind = membership_actuation(activity)
+    if kind is None:
+        return
+    label = activity.get("id", "<no id>")
+    v9 = f"membership: {label} actuates its round's declared action"
+
+    hub_actor = activity.get("afp:hub")
+    if isinstance(hub_actor, str) and activity.get("actor") == hub_actor:
+        report.record(
+            v9,
+            False,
+            f"signed by the hub actor {hub_actor} itself — a membership act requires a "
+            f"weighted quorum among the members, never a signature from the hub's own key "
+            f"(02, ADR-0021 Decision 4b)",
+        )
+        return
+
+    acts_on = activity.get("afp:actsOn")
+    decision_activity, decision = _decision_by_digest(acts_on, all_activities)
+    if decision is None:
+        report.record(
+            v9,
+            False,
+            f"afp:actsOn {str(acts_on)[:24]}… resolves to no present afp:DecisionRecord "
+            f"(ADR-0021)",
+        )
+        return
+
+    round_id = decision.get("afp:round")
+    proposal = find_proposal_for_round(round_id, all_activities) or {}
+    subject = proposal.get("afp:governanceSubject")
+    if not isinstance(subject, str):
+        report.record(
+            v9,
+            False,
+            f"round {round_id!r} pins no afp:governanceSubject, so it decided no membership "
+            f"question and this actuation has nothing to act on (ADR-0021)",
+        )
+        return
+
+    outcome = decision.get("afp:outcome")
+    policy = proposal.get("afp:actionPolicy")
+    admissible = policy.get(outcome) if isinstance(policy, dict) else None
+    claimed = activity.get("afp:action")
+    ok = admissible is not None and claimed == admissible
+    report.record(
+        v9,
+        ok,
+        "" if ok else
+        f"afp:action is {claimed!r}, but the round's pinned afp:actionPolicy admits "
+        f"{admissible!r} for outcome {outcome!r} (ADR-0019, ADR-0021)",
+    )
+
+    named = activity.get("object")
+    ok = named == subject
+    report.record(
+        f"membership: {label} names the subject its round decided",
+        ok,
+        "" if ok else
+        f"{kind} names {named!r}, but round {round_id!r} decided about {subject!r} — a "
+        f"membership act may only reach the agent its round was about (ADR-0021)",
     )

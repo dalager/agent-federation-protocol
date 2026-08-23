@@ -30,18 +30,22 @@ import {
   offerProposal,
   NO_DECISION,
   type Envelope,
+  type ExcludedEntry,
   type ExclusionStatus,
   type HubRole,
+  type RecusalCause,
   type SuccessionRule,
   type Visibility,
 } from "./activities.ts";
 import { convicts, voteTupleOf, type VotePhase } from "./equivocation.ts";
+import { causeResolves } from "./electorate.ts";
 import { validateIrrevocableActions, validateProposalActionPolicy, type TaskPins } from "../ap/pins.ts";
 import { LWWRegister, ORMap, ORMapLWW, ORSet } from "./crdtAdapter.ts";
 import { thresholdOf, type QuorumRule } from "./quorum.ts";
 import { voterWeights } from "./weights.ts";
 import { CRDTStore, type LWWState, type ORMapState, type ORSetState } from "../crdt/index.ts";
 import {
+  convictionByProof,
   convictionsFor,
   ensureHubSchema,
   countedVoteTuple,
@@ -50,6 +54,7 @@ import {
   liveSeats,
   loadRound,
   recordConviction,
+  recordRestoration,
   roundByProposal,
   roundDeclinesFor,
   saveDeparture,
@@ -554,6 +559,22 @@ export class Hub {
     // ADR-0005 amendment (2026-08-22): a declared change of control, on the
     // transferring instance's own chain — same class as Enroll/Unenroll.
     if (type === "Create" && objectType === "afp:ControlTransfer") return this.onControlTransfer(activity);
+    // ADR-0021 Decision 4a: a compromise claim is a record state, never an
+    // exculpation. It is admitted, checked for issuer entitlement, and logged
+    // — and then it changes nothing at all. Zeroing stays automatic and stays
+    // where ADR-0020 put it; the seam a claim opens is a governance round's,
+    // not a handler's.
+    if (type === "Create" && objectType === "afp:KeyCompromiseClaim") return this.onKeyCompromiseClaim(activity);
+    // ADR-0021 Decision 4b: membership actuation, dual-typed (03's vocabulary
+    // since v1, built here for the first time). `activity.type` is an ARRAY
+    // for these two, so they are matched before the string comparisons below
+    // — `String(["Remove","afp:MemberExpel"])` is "Remove,afp:MemberExpel" and
+    // would silently match nothing.
+    if (Array.isArray(activity.type)) {
+      const types = activity.type.map(String);
+      if (types.includes("afp:MemberExpel")) return this.onMembershipActuation(activity, "expel");
+      if (types.includes("afp:MemberAdmit")) return this.onMembershipActuation(activity, "admit");
+    }
     if (type === "Create" && objectType === "afp:Vote") return this.onVote(activity);
     // ADR-0018 Decision 3: a departure from a binding decision, published on
     // the round's own thread by a pinned voter — shaped like afp:Settlement,
@@ -809,6 +830,123 @@ export class Hub {
     this.roles.delete(agent);
   }
 
+  /**
+   * ADR-0021 Decision 4a — the claim path, which exists to record and to
+   * refuse, never to relieve.
+   *
+   * Entitlement is the same self-referential standard `Vouch`, `Disown` and
+   * `ControlTransfer` are held to: the instance that operates the agent whose
+   * key is named may say this about itself, and nobody else may say it for
+   * them. A claim from a third party is refused and logged — not because it
+   * would have changed anything (it would not; W0.3), but because a record
+   * that accepts statements from parties with no standing to make them is a
+   * record whose later readers cannot tell which is which.
+   */
+  private onKeyCompromiseClaim(activity: { [key: string]: JsonValue }): void {
+    const object = activity.object as Record<string, JsonValue>;
+    const vm = String(object["afp:verificationMethod"] ?? "");
+    const subject = vm.split("#")[0];
+    const origin = String(activity.actor ?? "");
+    const reject = (reason: string) =>
+      logAdmission(this.db, this.now().toISOString(), subject, origin, "rejected", reason);
+
+    if (!vm) return reject("afp:KeyCompromiseClaim names no afp:verificationMethod (ADR-0021 W1)");
+    if (!String(object["afp:proof"] ?? "")) {
+      return reject("afp:KeyCompromiseClaim names no afp:proof — a claim answers a conviction or it answers nothing");
+    }
+    const operatedBy = String(this.fetchActor(subject)?.["afp:operatedBy"] ?? "") || subject;
+    if (origin !== operatedBy) {
+      return reject(
+        `key-compromise claim for ${subject} issued by ${origin}, which does not operate it (ADR-0021 Decision 4a)`,
+      );
+    }
+    // Admitted, and deliberately inert: the weight stays zero. What the record
+    // gains is that `zeroed` and `zeroed-contested` are now distinguishable.
+    logAdmission(this.db, this.now().toISOString(), subject, origin, "admitted", `key-compromise claim for ${vm}`);
+  }
+
+  /**
+   * ADR-0021 Decision 4b/4c — a membership consequence is carried out by a
+   * *member*, binding to the round that decided it, or it is not carried out
+   * at all.
+   *
+   * Three refusals, and each one is a rule 02 or ADR-0019 already stated that
+   * nothing enforced until now:
+   *
+   * - **Never the hub's own key.** 02: hub governance "requires a weighted
+   *   quorum vote among current instance members … *never* a signature from
+   *   the hub's own key." ADR-0014 made the hub the sequencing authority that
+   *   signs proposals, and that habit walks straight into this.
+   * - **It must bind to a decision.** `afp:actsOn` resolves to a
+   *   `DecisionRecord` this hub closed (ADR-0006's edge, unchanged).
+   * - **It must name that round's subject.** A round about Dagmar cannot
+   *   expel Meridian, however ratified it was.
+   *
+   * An admitted `expel` removes the seat; an admitted `admit` records a
+   * restoration, which is forward-scoped by `isZeroedFor` — it never re-tallies
+   * a closed round.
+   */
+  private onMembershipActuation(activity: { [key: string]: JsonValue }, act: "expel" | "admit"): void {
+    const agent = String(activity.object ?? "");
+    const origin = String(activity.actor ?? "");
+    const actsOn = String(activity["afp:actsOn"] ?? "");
+    const reject = (reason: string) =>
+      logAdmission(this.db, this.now().toISOString(), agent, origin, "rejected", reason);
+
+    if (!agent) return reject(`afp:Member${act === "expel" ? "Expel" : "Admit"} names no agent`);
+    if (origin === this.actorId) {
+      return reject(
+        "a membership consequence signed by the hub's own key is not a ratified act (02, ADR-0021 Decision 4b)",
+      );
+    }
+    if (this.roleOf(origin) === null) {
+      return reject(`${origin} holds no seat in this hub and cannot actuate its decisions (ADR-0019)`);
+    }
+    if (!actsOn) return reject("membership actuation carries no afp:actsOn — it binds to no decision (ADR-0006)");
+
+    const decision = this.decisionByDigest(actsOn);
+    if (!decision) return reject(`afp:actsOn ${actsOn} resolves to no DecisionRecord in this hub's record`);
+    const subject = this.governanceSubjectOf(decision.round);
+    if (!subject) return reject(`round ${decision.round} pins no afp:governanceSubject — it decided nothing about a member`);
+    if (subject !== agent) {
+      return reject(`round ${decision.round} decided about ${subject}, not ${agent} (ADR-0021 V10)`);
+    }
+
+    if (act === "expel") {
+      this.removeAgent(agent, origin, String(activity.id));
+    } else {
+      recordRestoration(this.db, agent, actsOn, this.now().toISOString());
+    }
+    logAdmission(this.db, this.now().toISOString(), agent, origin, "admitted", `member-${act} on ${decision.round}`);
+  }
+
+  /** The `afp:DecisionRecord` this hub signed with digest `digest`, and the round it closed. */
+  private decisionByDigest(digest: string): { round: string } | null {
+    for (const entry of this.outbox.byActor(this.actorId)) {
+      if (entry.digest !== digest) continue;
+      const object = entry.activity.object;
+      if (typeof object !== "object" || object === null || Array.isArray(object)) return null;
+      const record = object as Record<string, JsonValue>;
+      if (record.type !== "afp:DecisionRecord") return null;
+      const round = String(record["afp:round"] ?? "");
+      return round ? { round } : null;
+    }
+    return null;
+  }
+
+  /** The `afp:governanceSubject` the round's own proposal pinned, or `null`. */
+  private governanceSubjectOf(round: string): string | null {
+    for (const entry of this.outbox.byActor(this.actorId)) {
+      const object = entry.activity.object;
+      if (typeof object !== "object" || object === null || Array.isArray(object)) continue;
+      const proposal = object as Record<string, JsonValue>;
+      if (proposal.type !== "afp:Proposal" || proposal["afp:round"] !== round) continue;
+      const subject = proposal["afp:governanceSubject"];
+      return typeof subject === "string" ? subject : null;
+    }
+    return null;
+  }
+
   /** ADR-0017 Decision 4 (R3): the slice of `Hub` `hub/seats.ts`'s handlers need. */
   private seatDeps(): SeatDeps {
     return {
@@ -1052,10 +1190,47 @@ export class Hub {
            JOIN hub_rounds cr ON cr.round_id = c.round_id
            JOIN hub_rounds tr ON tr.round_id = ?
           WHERE c.actor = ? AND cr.hub_id = tr.hub_id AND cr.created_at <= tr.created_at
+            AND NOT EXISTS (
+              SELECT 1 FROM hub_restorations r
+               WHERE r.actor = c.actor
+                 AND r.created_at >= cr.created_at
+                 AND r.created_at < tr.created_at
+            )
           LIMIT 1`,
       )
       .get(round, actor) as unknown;
     return row !== undefined;
+  }
+
+  /**
+   * ADR-0021 Decision 3: does a declared recusal resolve? The
+   * `equivocation-proof` form is answered from the hub's own conviction table
+   * — proofs it has already verified end to end — and the
+   * `governance-subject` form from the round the caller is about to open.
+   * `causeResolves` (the verifier's parity twin) is consulted as well, over
+   * the hub's own outbox, so a proof this hub published but never had to
+   * convict on still resolves.
+   *
+   * Nothing here consults the caller's word for anything. A cause that does
+   * not resolve makes `proposeRound` throw rather than emit a claim the
+   * verifier will reject — the same discipline ADR-0018 applied to an
+   * unrecomputable quorum rule.
+   */
+  private recusalResolves(
+    entry: { agent: string; cause: RecusalCause },
+    governanceSubject: string | undefined,
+  ): boolean {
+    if (entry.cause?.["afp:form"] === "equivocation-proof") {
+      const digest = (entry.cause as { "afp:proof": string })["afp:proof"];
+      if (convictionByProof(this.db, entry.agent, digest)) return true;
+    }
+    const pool = this.outbox.actors().flatMap((actor) => this.outbox.byActor(actor).map((e) => e.activity));
+    return causeResolves(
+      entry.cause,
+      entry.agent,
+      governanceSubject ? { "afp:governanceSubject": governanceSubject } : {},
+      pool,
+    );
   }
 
   /**
@@ -1355,6 +1530,19 @@ export class Hub {
      * entitled `successor()`.
      */
     supersedesRoundId?: string;
+    /**
+     * ADR-0021 Decision 3: seats excluded from this round's electorate by
+     * declared cause. Each cause is recomputed against the hub's own verified
+     * record before anything is signed — a proposer may recuse the convicted
+     * and the accused, and nobody else.
+     */
+    recused?: readonly { agent: string; cause: RecusalCause }[];
+    /**
+     * ADR-0021 Decision 4b: the agent this round is about. A governance round
+     * is an ordinary round with a subject — no second quorum path — and the
+     * subject is what `MemberExpel`/`MemberAdmit` actuation is checked against.
+     */
+    governanceSubject?: string;
   }): OutboxEntry {
     if (this.status !== "active") {
       throw new Error(`hub is ${this.status} — no new rounds (afp:${this.status === "frozen" ? "Freeze" : "Archive"})`);
@@ -1382,8 +1570,25 @@ export class Hub {
     // Snapshot-pinning (ADR-0004 Decision 1): only member-role agents are ever
     // pinned into afp:voters — a requester or observer can never appear in a
     // quorum snapshot, and a verifier can prove it from the Enroll trail.
+    // ADR-0021 Decision 3: a recusal is validated before it is ever signed.
+    // The hub records a conviction only after recomputing `convicts` and
+    // verifying both embedded signatures, so its own conviction table is a
+    // stronger answer than a scan of whatever activities happen to be at hand
+    // — and `causeResolves` is the shape the verifier will recompute from the
+    // record, kept as the parity twin rather than a second rule.
+    const recused = new Map<string, RecusalCause>();
+    for (const entry of options.recused ?? []) {
+      if (!this.recusalResolves(entry, options.governanceSubject)) {
+        throw new Error(
+          `afp:cause for ${entry.agent} does not resolve against this hub's record (ADR-0021 Decision 3): ` +
+            JSON.stringify(entry.cause),
+        );
+      }
+      recused.set(entry.agent, entry.cause);
+    }
+
     const voters = [...(options.voters ?? this.members())].filter(
-      (agent) => this.isLive(agent) && this.roleOf(agent) === "member",
+      (agent) => this.isLive(agent) && this.roleOf(agent) === "member" && !recused.has(agent),
     );
 
     // ADR-0021 Decision 2: account for every member-role seat this round did
@@ -1398,14 +1603,26 @@ export class Hub {
     // exclusion was invisible: nothing compared `afp:voters` against the
     // Enroll trail, so a disenfranchised member and an unreachable one read
     // identically at replay. Now the hub must sign a statement about which.
+    //
+    // The third status, `recused` (ADR-0021 Decision 3), is the one the record
+    // *can* falsify — and it is the one that shrinks the denominator, because
+    // the seat was never in the pinned total to begin with. ADR-0020's ruling
+    // that "a proof must not be able to lower a bar" is untouched: zeroing
+    // still leaves the total alone. Only a snapshot that never contained a
+    // seat has a smaller one, and it was computed in the open, before anyone
+    // voted.
     const pinned = new Set(voters);
-    const excluded = this.members()
+    const excluded: ExcludedEntry[] = this.members()
       .filter((agent) => !pinned.has(agent) && this.roleOf(agent) === "member")
       .sort()
-      .map((agent) => ({
-        agent,
-        "afp:status": (this.isLive(agent) ? "not-pinned" : "not-live") as ExclusionStatus,
-      }));
+      .map((agent) => {
+        const cause = recused.get(agent);
+        if (cause) return { agent, "afp:status": "recused" as ExclusionStatus, "afp:cause": cause };
+        return {
+          agent,
+          "afp:status": (this.isLive(agent) ? "not-pinned" : "not-live") as ExclusionStatus,
+        };
+      });
     // One operator, one weight (ADR-0005 Decision 1): each seated instance
     // carries the same total, divided among its pinned voters. At a single
     // instance this reduces to the liveness-gated uniform weight of 1 that
@@ -1479,6 +1696,7 @@ export class Hub {
         successionRule: options.successionRule,
         supersedesRound,
         excluded,
+        governanceSubject: options.governanceSubject,
       }),
     );
 

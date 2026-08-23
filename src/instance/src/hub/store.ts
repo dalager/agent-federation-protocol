@@ -86,6 +86,20 @@ CREATE TABLE IF NOT EXISTS hub_convictions (
   proof_digest TEXT NOT NULL,
   PRIMARY KEY (round_id, actor)
 );
+
+-- ADR-0021 Decision 4c: a restoration is a membership act like any other, and
+-- it is forward-scoped. A ratified governance round whose outcome actuates
+-- an afp:MemberAdmit restores the named agent's weight for rounds pinned AFTER
+-- the decision landed — never retroactively, and never by re-tallying a closed
+-- round, whose DecisionRecord is signed history. ADR-0020's forward-scoping
+-- rule run in the other direction: neither conviction nor forgiveness reaches
+-- backwards into a signed record.
+CREATE TABLE IF NOT EXISTS hub_restorations (
+  actor          TEXT NOT NULL,
+  decision_digest TEXT NOT NULL,
+  created_at     TEXT NOT NULL,
+  PRIMARY KEY (actor, decision_digest)
+);
 `;
 
 export function ensureHubSchema(db: Db): void {
@@ -352,6 +366,35 @@ export function convictionsFor(db: Db, roundId: string): { actor: string; proofD
       proof_digest: string;
     }[]
   ).map((row) => ({ actor: String(row.actor), proofDigest: String(row.proof_digest) }));
+}
+
+/**
+ * ADR-0021 Decision 4c: record a ratified restoration for `actor`. `now` is
+ * the instant it lands, and it is compared against `hub_rounds.created_at` —
+ * the same ordering `isZeroedFor` already uses, which is the only stable order
+ * two round ids carry relative to each other.
+ */
+export function recordRestoration(db: Db, actor: string, decisionDigest: string, now: string): void {
+  db.prepare(
+    `INSERT INTO hub_restorations (actor, decision_digest, created_at)
+       VALUES (?, ?, ?)
+     ON CONFLICT (actor, decision_digest) DO NOTHING`,
+  ).run(actor, decisionDigest, now);
+}
+
+/**
+ * ADR-0021 Decision 3: does the hub hold a verified conviction of `actor`
+ * carried by exactly this proof digest? The hub records a conviction only
+ * after recomputing `convicts` and verifying both embedded signatures, so this
+ * is a stronger question than "is a matching activity somewhere in the pool" —
+ * and it is the one a proposer's declared recusal must answer before the hub
+ * will sign it.
+ */
+export function convictionByProof(db: Db, actor: string, proofDigest: string): boolean {
+  const row = db
+    .prepare("SELECT 1 FROM hub_convictions WHERE actor = ? AND proof_digest = ? LIMIT 1")
+    .get(actor, proofDigest) as unknown;
+  return row !== undefined;
 }
 
 /** Whether `actor` is convicted in `roundId`. */

@@ -367,9 +367,9 @@ a round that fails to decide *does* release its actuator, through the policy's r
 | 56 | *(**closed** — ADR-0018 Decision 4, built)* A `DecisionRecord` cannot be settled, so a correct dissenter cannot be credited — settlement binds to estimates or a Synthesis, follows an award, once per task; 04 states the stake itself ("a swarm that penalizes accurate minority objections will stop producing them") | Let a settlement take a `DecisionRecord` as its subject, keeping the award-follows precondition for the allocation case |
 | 57 | *(**closed** — ADR-0018 Decision 3, built)* An outcome that binds jointly has no expression, and defection has no record — harmless while outcomes were divisible, load-bearing once a decision is indivisible by construction | A declared joint-binding property on the proposal, plus a recorded act by which a member states it is not following an outcome it was pinned into — visible non-compliance beats unenforceable compliance |
 
-### Campaign 9 → open (scenario 12, the P6 shakedown)
+### Campaign 9 → built (scenario 12, the P6 shakedown)
 
-**Opened 2026-08-22.** Eight findings from [scenario 12](12-the-parametric-trigger.md),
+**Opened 2026-08-22, closed 2026-08-23.** Eight findings from [scenario 12](12-the-parametric-trigger.md),
 the first workload at n≥4 operators — where L1's `floor(2n/3)+1` is real tolerance
 rather than the n=2 accountability consolation — and the first with adversaries *inside*
 the agreement: a member for whom a failed round is profitable (its arbitration clause
@@ -420,7 +420,9 @@ decision each finding forces rather than by the subject it touches:
   invariant, and because ADR-0021's recusal needs its recompute-over-a-remainder
   machinery to already exist.
 - **[ADR-0021](../adr/0021-conviction-to-consequence.md) — after the proof: conviction to
-  consequence** (59, 64, 65) — **written 2026-08-22, not built.** Decomposing it turned up a
+  consequence** (59, 64, 65) — **accepted and built** (Decisions 1 and 2 on 2026-08-22,
+  Decisions 3-5 on 2026-08-23; `test/adr0021.test.ts`, 24 cases, suite green at 221 —
+  findings 59, 64 and 65 closed). Decomposing it turned up
   **two** defects older than the campaign and promoted both ahead of the findings that
   exposed them. The first: `afp:Unenroll` has no authority check in either
   implementation, so anyone with a verifying key can remove any agent from any hub —
@@ -451,10 +453,10 @@ weight the same way or replay will need two rules where one should do.
 | # | Finding | Candidate |
 |---|---|---|
 | 58 | *(**closed** — ADR-0020, built)* Equivocation is "different value" in 03's prose and "different hash" in its diagram — a backup-restored honest re-vote convicts under one reading, and an observed-set-only equivocator escapes under the other | Rule it precisely: proof requires differing values; same-value hash mismatch becomes a defined state-loss event with a compliant re-vote path |
-| 59 | The proof punishes the key, not the culprit — no contest path, no compromised-vs-malicious distinction, no ADR-0012 interplay, no restoration mechanism | A recorded compromise claim feeding the existing instance-level governance round; zeroing stays automatic, restoration becomes a GovernanceDecision |
+| 59 | *(**closed** — ADR-0021 Decision 4, built)* The proof punishes the key, not the culprit — no contest path, no compromised-vs-malicious distinction, no ADR-0012 interplay, no restoration mechanism | A recorded compromise claim feeding the existing instance-level governance round; zeroing stays automatic, restoration becomes a GovernanceDecision |
 | 60 | *(**closed** — ADR-0020, built)* A doomed round is indistinguishable from a pending one — zeroing can make the pinned quorum rule unsatisfiable with the deadline days away | A defined early close: `afp:no-decision` citing recomputable impossibility, checked at replay like the tally |
 | 61 | *(**closed** — ADR-0020, built)* Nothing obliges completing a proof, and concealment is invisible — though both halves of the pair already sit in the joint case file | The joint replay scans received votes cross-domain for same-tuple conflicts and fails by name on any pair lacking an on-record proof; then a MUST-announce duty has teeth |
 | 62 | *(**closed** — ADR-0020, built)* The view change is unpinned power — "highest-reputation live replica" is recomputable nowhere, excludes nobody (not even the zeroed equivocator), and now confers ADR-0018's full pin authority | The proposal pins its own succession: a deterministic successor rule over the pinned snapshot, zeroed voters excluded, checked at replay |
 | 63 | *(**closed** — ADR-0005 amendment, built)* A declared change of control has no mechanism — five seats, four owners, and the f=1 arithmetic silently assumes an independence the record cannot state | An `afp:operatedBy` transfer act in the Vouch/Disown grammar that snapshots MUST consult; undeclared control named honestly as collusion-class, consortium-terms territory |
-| 64 | The accused votes on its own expulsion — the governance path has no recusal, though the estimator wall solved the same shape at bid admission | A declared recused set with recorded cause on the proposal; snapshot excludes them with per-operator totals recomputed; replay checks it |
-| 65 | The proof does not travel — enrollment weighs vouches not history, reputation consumes settlements not proofs, so a convicted equivocator re-enrolls elsewhere clean | Enrollment MAY cite proofs as evidence; a named reputation-registry derivation MAY consume them; blacklist federation explicitly declined, with reasons |
+| 64 | *(**closed** — ADR-0021 Decisions 2 and 3, built)* The accused votes on its own expulsion — the governance path has no recusal, though the estimator wall solved the same shape at bid admission | A declared recused set with recorded cause on the proposal; snapshot excludes them with per-operator totals recomputed; replay checks it |
+| 65 | *(**closed** — ADR-0021 Decision 5, built)* The proof does not travel — enrollment weighs vouches not history, reputation consumes settlements not proofs, so a convicted equivocator re-enrolls elsewhere clean | Enrollment MAY cite proofs as evidence; a named reputation-registry derivation MAY consume them; blacklist federation explicitly declined, with reasons |

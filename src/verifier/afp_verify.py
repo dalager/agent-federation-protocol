@@ -43,6 +43,8 @@ from decision import (
     check_departure,
     check_enroll_authority,
     check_equivocation_proof,
+    check_key_compromise_claim,
+    check_membership_actuation,
     check_proposal_electorate,
     check_succession,
     check_vote_l1_fields,
@@ -50,7 +52,12 @@ from decision import (
     settlement_payload,
     wrapped_payload,
 )
-from electorate import partition as electorate_partition
+from electorate import (
+    cause_resolves,
+    excluded_entries,
+    partition as electorate_partition,
+    proofs_convicting,
+)
 from equivocation import convicts, equivocation_proof_votes, proof_round, vote_tuple_of
 from federation import check_federation, check_joint
 from keys import (
@@ -121,6 +128,12 @@ class Report:
             "action", "archive", "decision", "equivocation", "joint", "keys",
             "pins", "proof", "retention", "round", "succession", "supersession",
             "electorate", "synthesis", "unenroll", "vote",
+            # ADR-0021 Decisions 3-5. Every one of these fires only on
+            # material no shipped bundle carries — a recusal cause, a
+            # compromise claim, a membership actuation, a cited proof — so
+            # every one of them is a zero an auditor must be able to SEE
+            # rather than an absence they never think to ask about.
+            "recusal", "claim", "evidence", "membership",
         )
         print("census — checks run per domain (a zero you expected to be nonzero is a question):")
         for domain in sorted(domains):
@@ -753,6 +766,24 @@ def verify_export(export: Path, thread: str | None, report: Report) -> dict:
         if activity.get("type") == "afp:Archive":
             check_archive_state(report, activity)
 
+        # ADR-0021 Decision 4 V8/V9/V10. Both are per domain: a compromise
+        # claim rides on the claiming instance's own chain (so that bundle
+        # publishes the actor document V8 resolves the operator against), and
+        # a membership actuation is checked against the round it names, the
+        # same way every other actuation has been since ADR-0006. A bundle
+        # carrying neither — every export that has ever shipped — runs
+        # neither.
+        # Both resolve against `thread_pool`, not `all_activities`: the proof
+        # a claim answers is announced by the HUB, and the DecisionRecord and
+        # governance proposal an actuation names are signed by the hub too, so
+        # in every real consortium they reach the claiming or actuating party
+        # as received bytes rather than through its own outbox. Resolving them
+        # against the domain's own chain alone would fail exactly the honest
+        # cases. `_check_decision_actuation` already reads the same pool for
+        # the same reason.
+        check_key_compromise_claim(report, activity, thread_pool, authority)
+        check_membership_actuation(report, activity, thread_pool)
+
     # ADR-0020 W3 V1/V6/V7: L1's vote and succession checks. Exports with no
     # afp:level: 1 round and no afp:successionRule/afp:supersedesRound
     # (everything before this ADR) run none of this. V2 is NOT here — a proof
@@ -830,6 +861,10 @@ def verify_export(export: Path, thread: str | None, report: Report) -> dict:
         # whose convicted actor lives in a different domain — see
         # `check_equivocation_proofs`.
         "keys": keys,
+        # This bundle's own `afp:keyHistory` (None before ADR-0012). Carried
+        # out for the same reason `keys` is: V14 compares a revocation cut
+        # against a proof that routinely sits in somebody else's bundle.
+        "history": history,
     }
 
 
@@ -887,6 +922,318 @@ def check_electorate(report: Report, bundles: list[dict | None]) -> None:
                 f"{prefix}electorate: {label} accounts for every enrolled member",
                 ok,
                 "" if ok else detail + " (ADR-0021)",
+            )
+
+
+def _merged_pool(bundles: list[dict | None]) -> tuple[list[dict], list[dict]]:
+    """`(present_bundles, every activity in them)` — the one merged pool every
+    replay-wide check in this layer folds over.
+
+    Factored out rather than repeated because the reason it exists is a rule,
+    not a convenience: a check whose evidence is owned by a different party
+    belongs at replay scope. A hub's Enroll trail, a foreign actor's signing
+    key, a proof announced by the party that caught the equivocation — none of
+    them is in the bundle that needs them, and every one of them is in the
+    case file.
+    """
+    present = [b for b in bundles if b is not None]
+    pool: list[dict] = []
+    for bundle in present:
+        pool.extend(bundle["activities"])
+    return present, pool
+
+
+def _received_activities(bundle: dict) -> list[dict]:
+    """The activities a bundle holds as received bytes (ADR-0009), or `[]`.
+
+    The same `received.jsonld` read `_bundle_votes_and_proofs` and
+    `verify_export`'s `thread_pool` already do — factored out because a third
+    caller wanted it and a fourth will.
+    """
+    received_path = bundle["path"] / "received.jsonld"
+    if not received_path.exists():
+        return []
+    return [
+        item["afp:activity"]
+        for item in load_json(received_path).get("orderedItems", [])
+        if isinstance(item, dict) and isinstance(item.get("afp:activity"), dict)
+    ]
+
+
+def check_recusal_causes(report: Report, bundles: list[dict | None]) -> None:
+    """ADR-0021 Decision 3 / V6 — every `recused` exclusion's declared cause
+    resolves on the record, against the agent it excludes.
+
+    This is the security property of the whole decision, and it is the
+    estimator wall's: the excluded set is recomputed from prior signed
+    evidence rather than trusted, so a proposer can recuse the convicted and
+    the accused and nobody else. A cause naming a proof that convicts a
+    different agent, or a `governance-subject` form on a round that pins no
+    subject, is a recusal by assertion — which is exactly the free, undeclared
+    exclusion this ADR exists to end, wearing a declaration.
+
+    Replay-wide and three-valued, for V4's reason and with V4's own condition
+    for the third value: the evidence a cause resolves against — the hub's
+    announced proofs, the hub's Enroll trail — lives on the hub's chain, and a
+    member's bundle carries the proposal it received and nothing else. When
+    the replay holds no trail for the hub at all it cannot distinguish a
+    forged cause from a bundle that was never given the hub's half, so it says
+    `unresolvable` and says it out loud (W0.5). When the trail *is* present, an
+    absent proof digest fails by name: Decision 3's ruling, intact.
+    """
+    present, pool = _merged_pool(bundles)
+
+    for bundle in present:
+        domain = bundle["path"].name or str(bundle["path"])
+        prefix = f"[{domain}] " if len(present) > 1 else ""
+        for activity in bundle["activities"]:
+            proposal = afp_object(activity, "afp:Proposal")
+            if proposal is None:
+                continue
+            label = proposal.get("id", activity.get("id", "<no id>"))
+            _missing, _overlapping, enrolled = electorate_partition(activity, pool)
+            for entry in excluded_entries(proposal):
+                if entry.get("afp:status") != "recused":
+                    continue
+                agent = entry.get("agent")
+                if not isinstance(agent, str):
+                    continue  # V5 (per domain, pure shape) already names this
+                name = (
+                    f"{prefix}recusal: {agent.split('/')[-1]} in {label} has a resolvable cause"
+                )
+                if not enrolled:
+                    report.record(
+                        name,
+                        True,
+                        "unresolvable: this replay carries no trail for the hub, so a declared "
+                        "cause cannot be resolved against the record it cites (ADR-0021)",
+                    )
+                    continue
+                cause = entry.get("afp:cause")
+                ok = cause_resolves(cause, agent, proposal, pool)
+                report.record(
+                    name,
+                    ok,
+                    "" if ok else
+                    f"afp:cause {cause!r} does not resolve: the cited proof is absent or "
+                    f"convicts somebody else, or the round pins no afp:governanceSubject "
+                    f"naming {agent} (ADR-0021)",
+                )
+
+
+def check_enroll_evidence(report: Report, bundles: list[dict | None]) -> None:
+    """ADR-0021 Decision 5 / V11, V12 and V13 — what a citation is worth.
+
+    03 has called the `afp:EquivocationProof` portable since v1 without giving
+    it anywhere to go. An `afp:Enroll` may now carry one inline (the only
+    available path: the bundle's `artifacts/` channel needs an
+    `object.attachment[]` to bind to, and an Enroll's object is a bare agent
+    URL). What the verifier does with it is recompute it, never trust it:
+
+    - **V11** — the cited proof must satisfy every leg of `convicts`, and must
+      convict the agent being enrolled. A citation against somebody else is
+      not evidence about this enrollment.
+    - **V12** — never fails, and that is the point. An enrollment at a new hub
+      is precisely the case where the accused's own bundle is absent, so the
+      convicting signature has no key to verify against. That outcome is
+      recorded as `unresolvable` in the detail rather than passing silently
+      (W0.5) — a reader who sees it knows to ask for the other bundle.
+    - **V13** — `afp:priorProofs` is worth exactly one thing, and it is the
+      enforceable one: nobody is obliged to volunteer their history, but a
+      signed denial contradicted by a proof in the same case file is a
+      finding. The empty list is a meaningful value, not an absence.
+
+    Replay-wide for the reason ADR-0020 learned the hard way: a cited proof
+    convicts a foreign actor whose key lives in a different bundle.
+
+    And **own outbox plus received bytes**, for the reason Decision 5b is
+    written about: the motivating case is an agent enrolling at a *new* hub
+    while carrying a proof against itself, so the citation the hub host must
+    weigh arrives in its `received.jsonld` and never appears in its own
+    outbox. An Enroll is issued by the enrolling agent's own instance
+    (ADR-0005 Decision 2), so a scan of own-outbox Enrolls only ever meets
+    citations whose signing key that same bundle publishes — which would make
+    V12's `unresolvable` a branch no honest bundle could reach, and a value
+    nothing can take is not a third value (W0.8). The key table stays merged
+    and is deliberately not widened: that is precisely what leaves a foreign
+    signer unresolvable rather than absent-and-passing.
+    """
+    present, pool = _merged_pool(bundles)
+    merged_keys: dict[str, bytes] = {}
+    for bundle in present:
+        merged_keys.update(bundle.get("keys") or {})
+    for bundle in present:
+        pool.extend(_received_activities(bundle))
+
+    for bundle in present:
+        domain = bundle["path"].name or str(bundle["path"])
+        prefix = f"[{domain}] " if len(present) > 1 else ""
+        seen: set[str] = set()
+        for activity in bundle["activities"] + _received_activities(bundle):
+            if activity.get("type") != "afp:Enroll":
+                continue
+            agent = activity.get("object")
+            if not isinstance(agent, str):
+                continue
+            # One Enroll can sit in a bundle twice — its issuer's outbox and
+            # the host's received record are the same bytes — and one finding
+            # about it is a finding, two is noise.
+            digest = digest_of(activity)
+            if digest in seen:
+                continue
+            seen.add(digest)
+            label = activity.get("id", "<no id>")
+
+            evidence = activity.get("afp:evidence")
+            entries = [e for e in evidence if isinstance(e, dict)] if isinstance(evidence, list) else []
+            if entries:
+                wrong: list[str] = []
+                unresolvable: list[str] = []
+                for entry in entries:
+                    declared = entry.get("afp:digest")
+                    carried = entry.get("afp:object")
+                    if not isinstance(carried, dict):
+                        wrong.append(f"{str(declared)[:24]}…: carries no inline afp:object")
+                        continue
+                    recomputed = digest_of(carried)
+                    if recomputed != declared:
+                        wrong.append(
+                            f"{str(declared)[:24]}…: the inline proof hashes to "
+                            f"{recomputed[:24]}…"
+                        )
+                        continue
+                    votes = equivocation_proof_votes(carried)
+                    if votes is None or not convicts(*votes):
+                        wrong.append(f"{recomputed[:24]}…: does not convict")
+                        continue
+                    if votes[0].get("actor") != agent:
+                        wrong.append(
+                            f"{recomputed[:24]}…: convicts {votes[0].get('actor')!r}, not the "
+                            f"enrolling agent"
+                        )
+                        continue
+                    for vote in votes:
+                        method = (vote.get("proof") or {}).get("verificationMethod")
+                        if method not in merged_keys:
+                            unresolvable.append(str(method))
+                report.record(
+                    f"{prefix}evidence: {label} cited proof convicts the enrolling agent",
+                    not wrong,
+                    "" if not wrong else "; ".join(wrong) + " (ADR-0021)",
+                )
+                # V12 never fails — it exists so the unresolvable case is
+                # visible rather than swallowed into a passing check.
+                report.record(
+                    f"{prefix}evidence: {label} cited proof resolves to a key",
+                    True,
+                    "" if not unresolvable else
+                    "unresolvable: this replay publishes no key for "
+                    + ", ".join(sorted(set(unresolvable)))
+                    + " — the convicting signature cannot be verified here, so ask for the "
+                      "accused's own bundle (ADR-0021)",
+                )
+
+            prior = activity.get("afp:priorProofs")
+            if isinstance(prior, list):
+                declared_digests = {p for p in prior if isinstance(p, str)}
+                contradicting = sorted(
+                    digest_of(p)
+                    for p in proofs_convicting(agent, pool)
+                    if digest_of(p) not in declared_digests
+                )
+                report.record(
+                    f"{prefix}evidence: {label} prior-proof declaration is not contradicted",
+                    not contradicting,
+                    "" if not contradicting else
+                    f"{agent} declared afp:priorProofs omitting "
+                    + ", ".join(d[:24] + "…" for d in contradicting)
+                    + ", which this case file carries and which convict it (ADR-0021)",
+                )
+
+
+def check_revocation_not_erasing(report: Report, bundles: list[dict | None]) -> None:
+    """ADR-0021 Decision 4d / V14 — a revocation cut may not predate a vote
+    embedded in a proof against that key's actor.
+
+    The seam ADR-0012 left open, running the other way from the one it named.
+    Revocation *cuts*: `check_key_intervals` fails anything the key signed
+    after the cut. So the convicted party publishes a key history revoking the
+    method that signed its equivocating votes, dates the cut an hour earlier,
+    and the two embedded votes now sit past it — ADR-0020's V2 requires both to
+    verify, so the proof that convicted it fails replay. The sanctioned party
+    rewrites the key history and the evidence against it evaporates.
+
+    Nothing here stops a genuine revocation, and nothing stops anyone claiming
+    the capture predated the equivocation: that claim is exactly what
+    `afp:KeyCompromiseClaim` is for and what a governance round then weighs.
+    What it stops is the claim being self-executing against somebody else's
+    evidence. Say it in a claim, argue it in a round; do not write it into the
+    key history and call the evidence invalid.
+
+    Replay-wide, because the proof and the key history routinely sit in
+    different bundles — which is the whole attack: the erasing history is
+    published by the very party the proof is about. The pool includes received
+    bytes for the same reason `check_enroll_evidence`'s does: the proof is
+    announced by the hub that caught the equivocation, so at the convicted
+    party — the one bundle certain to hold the erasing history — it arrives as
+    received bytes and never through its own outbox.
+
+    **Matched on the key, never on the actor**, and this is the whole
+    correctness of the check. `afp:keyCustody: "instance"` is the default in
+    this repository and what every shipped bundle uses: an agent's activities
+    are signed by its *operating instance's* key, so the history entry's
+    `afp:actor` is the instance while the embedded vote's `actor` is the
+    agent, and the two never compare equal. An actor-equality match is
+    therefore silent on precisely the custody every real bundle has — measured
+    against the gate, not reasoned about. The rule ADR-0012's own interval
+    resolution follows applies here too: interval questions are keyed on
+    `verificationMethod` alone. So the relation this check needs is *this key
+    signed that vote*, which is custody-correct in both directions — under
+    self-custody the method is the agent's own key and nothing changes.
+    """
+    present, pool = _merged_pool(bundles)
+    for bundle in present:
+        pool.extend(_received_activities(bundle))
+
+    # Every on-record proof's embedded votes, indexed by the key that actually
+    # signed each one. `convicts` is recomputed rather than trusted: a bare
+    # announcement typed afp:EquivocationProof must not be able to freeze an
+    # honest party's revocation, so only a genuinely convicting pair protects
+    # itself from erasure.
+    votes_by_method: dict[str, set[str]] = {}
+    for activity in pool:
+        if proof_round(activity) is None:
+            continue
+        votes = equivocation_proof_votes(activity)
+        if votes is None or not convicts(*votes):
+            continue
+        for vote in votes:
+            method = (vote.get("proof") or {}).get("verificationMethod")
+            if isinstance(method, str) and isinstance(vote.get("published"), str):
+                votes_by_method.setdefault(method, set()).add(vote["published"])
+
+    for bundle in present:
+        domain = bundle["path"].name or str(bundle["path"])
+        prefix = f"[{domain}] " if len(present) > 1 else ""
+        for record in bundle.get("history") or []:
+            if record.retired_by != "revocation" or record.valid_until is None:
+                continue
+            if not isinstance(record.key_id, str):
+                continue
+            early = sorted(
+                published
+                for published in votes_by_method.get(record.key_id, ())
+                if instant_millis(published) > record.valid_until
+            )
+            report.record(
+                f"{prefix}claim: {record.key_id} revocation does not predate a proof against it",
+                not early,
+                "" if not early else
+                f"the revocation cut at epoch-ms {record.valid_until} precedes vote(s) published "
+                + ", ".join(early)
+                + f" that this key signed and that an on-record afp:EquivocationProof embeds "
+                f"against {record.actor} — a revocation is not an eraser "
+                f"(ADR-0021 Decision 4d)",
             )
 
 
@@ -1062,6 +1409,9 @@ def main() -> int:
             check_equivocation_scan(report, [bundle])
             check_equivocation_proofs(report, [bundle])
             check_electorate(report, [bundle])
+            check_recusal_causes(report, [bundle])
+            check_enroll_evidence(report, [bundle])
+            check_revocation_not_erasing(report, [bundle])
         else:
             # ADR-0009 Decision 1: N single-export replays plus a cross-check —
             # never a forked verifier. Phase one runs today's replay per bundle,
@@ -1078,6 +1428,13 @@ def main() -> int:
             # "verifies standalone" needs the whole case file's key table).
             check_equivocation_proofs(report, bundles)
             check_electorate(report, bundles)
+            # ADR-0021 Decisions 3-5, all here for one reason: every fact they
+            # rest on — the hub's proofs, the accused's signing key, the key
+            # history of the party a proof is about — is owned by a domain
+            # other than the one holding the activity being checked.
+            check_recusal_causes(report, bundles)
+            check_enroll_evidence(report, bundles)
+            check_revocation_not_erasing(report, bundles)
     except Exception as exc:  # a malformed bundle is a failed audit, not a crash
         report.record("bundle: readable", False, f"{type(exc).__name__}: {exc}")
 

@@ -254,6 +254,38 @@ export function controlTransfer(envelope: Envelope, operatedBy: string): { [key:
 }
 
 /**
+ * `Create{afp:KeyCompromiseClaim}` — ADR-0021 Decision 4a.
+ *
+ * Published by the convicted agent's **own instance** on its own chain: the
+ * same self-referential class as `Vouch`, `Disown` and `ControlTransfer`, held
+ * to the same standard, because a valid signature from the instance that
+ * operates the agent is exactly the entitlement the record needs for a party
+ * to say something about itself.
+ *
+ * It changes **nothing** automatically, and an implementer must resist the
+ * obvious wrong turn: a claim is not evidence and must never gate, delay or
+ * reverse zeroing, which stays automatic and stays where ADR-0020 put it.
+ * What the claim buys is that the record can tell `zeroed` from
+ * `zeroed-contested` — the difference between a sanction and an incident,
+ * which was previously unsayable. Argue it in a governance round; the record
+ * carries the argument, not the verdict.
+ */
+export function keyCompromiseClaim(
+  envelope: Envelope,
+  spec: { proof: string; verificationMethod: string; since: string; content?: string },
+): { [key: string]: JsonValue } {
+  const object: { [key: string]: JsonValue } = {
+    id: `${envelope.activityId}#key-compromise-claim`,
+    type: "afp:KeyCompromiseClaim",
+    "afp:proof": spec.proof,
+    "afp:verificationMethod": spec.verificationMethod,
+    "afp:since": spec.since,
+  };
+  if (spec.content) object.content = spec.content;
+  return { ...base(envelope, "Create"), object };
+}
+
+/**
  * `Follow{actor, object: target}` (ADR-0017 Decision 4, R3) — the instance
  * actor's door-knock at a hub, published `public` as governance trail, same
  * class as Vouch/Disown.

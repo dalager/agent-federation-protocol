@@ -1,9 +1,10 @@
 /**
  * ADR-0021 gate — after the proof: conviction to consequence.
  *
- * Slice one only: **Decision 1**, the membership-authority binding. Decisions
- * 2-5 are written but unbuilt, and this file grows a section per slice rather
- * than pretending to cover what does not exist yet.
+ * Two sections at first, then a third: **Decision 1** (the membership-authority
+ * binding) and **Decision 2** (the recomputable electorate) landed as W4's two
+ * named slices, and **Decisions 3-5** follow here — recusal by declared cause,
+ * conviction to governed consequence, and a proof with somewhere to go.
  *
  * What Decision 1 closes, and why it is first: `Hub.onUnenroll` checked
  * nothing at all until 2026-08-22 — no issuer binding, no seat, no membership
@@ -21,11 +22,20 @@
 import assert from "node:assert/strict";
 import { after, describe, it } from "node:test";
 
-import { mkdtempSync } from "node:fs";
+import { cpSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
-import { enroll, offerProposal, unenroll } from "../src/hub/activities.ts";
+import {
+  castVote,
+  enroll,
+  equivocationProof,
+  memberAdmit,
+  memberExpel,
+  offerProposal,
+  unenroll,
+} from "../src/hub/activities.ts";
+import { keyCompromiseClaim } from "../src/ap/activities.ts";
 import { digestOf } from "../src/crypto/proof.ts";
 import { exportBundle } from "../src/export.ts";
 import { vouch } from "../src/ap/activities.ts";
@@ -289,5 +299,620 @@ describe("ADR-0021 Decision 1 — a membership change is authorized", () => {
     assert.equal(clean.code, 0, `a post-close Unenroll must not disturb the closed round:\n${clean.output}`);
     assert.match(clean.output, /ok\s*\] weights: .* pinned weights honor declared control/);
     t.instance.close();
+  });
+});
+
+// ---------------------------------------------------------------- Decisions 3-5
+
+/**
+ * The far side of the moment of conviction. ADR-0020 stopped exactly there:
+ * it rules what convicts, who inherits a stalled round, when a doomed round
+ * may close and how silence fails. What a conviction *means*, whom it
+ * punishes, whether it can be undone, who judges the judged, and where the
+ * proof goes afterwards were all left for here.
+ *
+ * The through-line every row below is testing: **the proof is about a key;
+ * every consequence is about a party.**
+ */
+
+const GOV_POLICY = { yes: "expel-member", no: "retain-member", "afp:no-decision": "retain-member" } as const;
+
+/** The one lawful `afp:EquivocationProof` these rows are built on: a real pair, really convicted. */
+async function convictThird(t: Bridge): Promise<{ proofDigest: string; convicted: string }> {
+  const convicted = t.instance.actorId("third");
+  const round = `${t.config.origin}/rounds/l1`;
+  const proposal = t.hub.proposeRound({
+    round,
+    thread: t.thread,
+    question: "ship it?",
+    options: ["yes", "no"],
+    level: 1,
+  });
+  const snapshot = String((proposal.activity.object as Record<string, unknown>)["afp:quorumSnapshot"]);
+  const ballot = (value: string) =>
+    t.instance.publish("third", [t.hub.actorId], t.thread, "hub", (envelope) =>
+      castVote(envelope, {
+        voteId: `${envelope.actor}/votes/l1/${value}`,
+        round,
+        hub: t.hub.actorId,
+        proposalHash: proposal.digest,
+        quorumSnapshot: snapshot,
+        value,
+        phase: "prepare",
+        seqNo: 1,
+      }),
+    ).activity;
+
+  // Two ballots, same (actor, round, phase, seqNo), different values: the hub
+  // assembles and publishes the proof itself on seeing the second.
+  await t.hub.receive(ballot("yes"));
+  await t.hub.receive(ballot("no"));
+  t.hub.closeRound(round);
+
+  const proof = t.hub.outbox
+    .byActor(t.hub.actorId)
+    .find((entry) => (entry.activity.object as Record<string, unknown>)?.type === "afp:EquivocationProof");
+  assert.ok(proof, "the hub publishes the proof it recomputed — ADR-0020 Decision 5, path B");
+  return { proofDigest: proof.digest, convicted };
+}
+
+/** A member-signed proposal with a hand-built electorate — the shape a mutation row needs. */
+function memberProposal(
+  t: Bridge,
+  name: string,
+  voters: readonly string[],
+  excluded: readonly Record<string, unknown>[],
+  extra: Record<string, unknown> = {},
+) {
+  return t.instance.publish("victim", [t.hub.actorId], t.thread, "hub", (envelope) => {
+    const activity = offerProposal(envelope, {
+      proposalId: `${envelope.actor}/proposals/${name}`,
+      round: `${t.config.origin}/rounds/${name}`,
+      hub: t.hub.actorId,
+      question: "ship it?",
+      options: ["yes", "no"],
+      quorumSnapshot: digestOf([...voters].sort()),
+      voters: [...voters],
+      weights: Object.fromEntries(voters.map((v) => [v, 1])),
+    });
+    const object = activity.object as Record<string, unknown>;
+    object["afp:excluded"] = excluded.map((entry) => ({ ...entry }));
+    Object.assign(object, extra);
+    return activity;
+  }).activity;
+}
+
+describe("ADR-0021 Decision 3 — recusal is declared, caused, and recomputable", () => {
+  it("G5 — an equivocator recused with its own proof as cause replays clean", async () => {
+    const t = bridge();
+    const { proofDigest, convicted } = await convictThird(t);
+
+    const round = `${t.config.origin}/rounds/after-conviction`;
+    const proposal = t.hub.proposeRound({
+      round,
+      thread: t.thread,
+      question: "ship it?",
+      options: ["yes", "no"],
+      recused: [{ agent: convicted, cause: { "afp:form": "equivocation-proof", "afp:proof": proofDigest } }],
+    });
+    t.hub.closeRound(round);
+
+    const object = proposal.activity.object as Record<string, JsonValue>;
+    const excluded = object["afp:excluded"] as { agent: string; "afp:status": string; "afp:cause": unknown }[];
+    assert.deepEqual(
+      excluded.find((e) => e.agent === convicted),
+      { agent: convicted, "afp:status": "recused", "afp:cause": { "afp:form": "equivocation-proof", "afp:proof": proofDigest } },
+      "the exclusion says who, and why, in a form the record resolves",
+    );
+    assert.ok(!(object["afp:voters"] as string[]).includes(convicted), "the recused seat is not in the electorate");
+
+    // The denominator moved because the SNAPSHOT moved (Decision 3's table),
+    // not because a proof lowered a bar — ADR-0020's ruling is untouched.
+    const weights = object["afp:voterWeights"] as Record<string, number>;
+    assert.equal(Object.keys(weights).length, 2, "the bar is computed over the remainder, in the open, before any vote");
+
+    exportOf(t);
+    const clean = runVerifier(VERIFIER, t.config.exportDir, t.thread, ["--verbose"]);
+    assert.equal(clean.code, 0, `a caused recusal must replay clean:\n${clean.output}`);
+    assert.match(clean.output, /ok\s*\] recusal: .* has a resolvable cause/);
+    t.instance.close();
+  });
+
+  it("G5b — the hub refuses to sign a recusal whose cause it cannot resolve", async () => {
+    const t = bridge();
+    // The estimator wall, transplanted: a proposer may recuse the convicted
+    // and the accused, and nobody else. Refusing here rather than emitting a
+    // claim the verifier will reject is ADR-0018's discipline for an
+    // unrecomputable quorum rule, applied to an unrecomputable exclusion.
+    assert.throws(
+      () =>
+        t.hub.proposeRound({
+          round: `${t.config.origin}/rounds/wishful`,
+          thread: t.thread,
+          question: "ship it?",
+          options: ["yes", "no"],
+          recused: [
+            {
+              agent: t.instance.actorId("third"),
+              cause: { "afp:form": "equivocation-proof", "afp:proof": "sha256:not-on-any-record" },
+            },
+          ],
+        }),
+      /does not resolve/,
+    );
+    t.instance.close();
+  });
+
+  it("G6 — a recusal citing a proof that convicts somebody else fails the cause check", async () => {
+    const t = bridge();
+    const { proofDigest } = await convictThird(t);
+    const victim = t.instance.actorId("victim");
+    const bystander = t.instance.actorId("bystander");
+    const third = t.instance.actorId("third");
+
+    // The partition still holds — every member is accounted for — so this row
+    // can only fail for the reason it names: the cited proof convicts `third`,
+    // and the entry recuses `bystander`.
+    memberProposal(t, "borrowed-proof", [victim, third], [
+      { agent: bystander, "afp:status": "recused", "afp:cause": { "afp:form": "equivocation-proof", "afp:proof": proofDigest } },
+    ]);
+
+    exportOf(t);
+    const out = runVerifier(VERIFIER, t.config.exportDir, t.thread, ["--verbose"]);
+    assert.notEqual(out.code, 0, "recusing an opponent on somebody else's conviction must not replay clean");
+    assert.match(out.output, /FAIL \] recusal: .* has a resolvable cause/);
+    t.instance.close();
+  });
+
+  it("G7 — a governance-subject cause on a round pinning no subject fails the cause check", async () => {
+    const t = bridge();
+    const victim = t.instance.actorId("victim");
+    const bystander = t.instance.actorId("bystander");
+    const third = t.instance.actorId("third");
+
+    memberProposal(t, "no-subject", [victim, bystander], [
+      { agent: third, "afp:status": "recused", "afp:cause": { "afp:form": "governance-subject" } },
+    ]);
+
+    exportOf(t);
+    const out = runVerifier(VERIFIER, t.config.exportDir, t.thread, ["--verbose"]);
+    assert.notEqual(out.code, 0, "a cause with nothing to resolve against must not replay clean");
+    assert.match(out.output, /FAIL \] recusal: .* has a resolvable cause/);
+    t.instance.close();
+  });
+
+  it("G8 — an operator with two seats, one recused, carries its whole weight on the seat that remains", async () => {
+    const t = bridge();
+    const { proofDigest, convicted } = await convictThird(t);
+
+    // Three seats, one operator: the pinned weights are 1/1/1 (lcm 3 ÷ 3).
+    // Recuse one and the SAME `voterWeights` recomputes over the remainder —
+    // 1/1 (lcm 2 ÷ 2). No second weight function exists, and an implementer
+    // who finds themselves writing one has taken a wrong turn (W0.1).
+    const round = `${t.config.origin}/rounds/remainder`;
+    const proposal = t.hub.proposeRound({
+      round,
+      thread: t.thread,
+      question: "ship it?",
+      options: ["yes", "no"],
+      recused: [{ agent: convicted, cause: { "afp:form": "equivocation-proof", "afp:proof": proofDigest } }],
+    });
+    const object = proposal.activity.object as Record<string, JsonValue>;
+    const weights = object["afp:voterWeights"] as Record<string, number>;
+    assert.deepEqual(
+      Object.values(weights).sort(),
+      [1, 1],
+      "the remainder is weighed by the one arithmetic ADR-0005 pinned, not by a recusal-specific rule",
+    );
+    assert.equal(weights[convicted], undefined, "a recused seat has no weight, because it is not in the electorate");
+    t.hub.closeRound(round);
+    t.instance.close();
+  });
+});
+
+describe("ADR-0021 Decision 4 — conviction is cryptographic, consequence is governed", () => {
+  /** A governance round about `subject`, carried to a ratified decision. */
+  function governanceRound(t: Bridge, name: string, subject: string, cause: Record<string, unknown>) {
+    const round = `${t.config.origin}/rounds/${name}`;
+    const proposal = t.hub.proposeRound({
+      round,
+      thread: t.thread,
+      question: `Expel ${subject}?`,
+      options: ["yes", "no"],
+      pins: { actionPolicy: { ...GOV_POLICY } },
+      governanceSubject: subject,
+      recused: [{ agent: subject, cause: cause as never }],
+    });
+    const snapshot = String((proposal.activity.object as Record<string, unknown>)["afp:quorumSnapshot"]);
+    for (const name_ of ["victim", "bystander"]) {
+      if (t.instance.actorId(name_) === subject) continue;
+      t.hub.receive(
+        t.instance.publish(name_, [t.hub.actorId], t.thread, "hub", (envelope) =>
+          castVote(envelope, {
+            voteId: `${envelope.actor}/votes/${name}`,
+            round,
+            hub: t.hub.actorId,
+            proposalHash: proposal.digest,
+            quorumSnapshot: snapshot,
+            value: "yes",
+          }),
+        ).activity,
+      );
+    }
+    const decision = t.hub.closeRound(round);
+    assert.equal((decision.activity.object as Record<string, JsonValue>)["afp:outcome"], "yes");
+    return { round, decision, proposal };
+  }
+
+  it("G9 — a governance round expels its subject, with the subject recused from its own sanction", async () => {
+    const t = bridge();
+    const { proofDigest, convicted } = await convictThird(t);
+    const { decision, proposal } = governanceRound(t, "expel-third", convicted, {
+      "afp:form": "equivocation-proof",
+      "afp:proof": proofDigest,
+    });
+
+    // The accused is out of its own electorate — and out of the denominator —
+    // by a rule anyone can recompute, which is what makes the round honest.
+    const object = proposal.activity.object as Record<string, JsonValue>;
+    assert.equal(object["afp:governanceSubject"], convicted);
+    assert.ok(!(object["afp:voters"] as string[]).includes(convicted), "the accused does not vote on its own expulsion");
+
+    // The consequence is a *member's* act, bound to the decision by afp:actsOn.
+    await t.hub.receive(
+      t.instance.publish("victim", [t.hub.actorId], t.thread, "hub", (envelope) =>
+        memberExpel(envelope, {
+          agent: convicted,
+          hub: t.hub.actorId,
+          decisionDigest: decision.digest,
+          action: "expel-member",
+        }),
+      ).activity,
+    );
+    assert.ok(!t.hub.members().includes(convicted), "the seat is gone, by ratified decision rather than by fiat");
+
+    exportOf(t);
+    const clean = runVerifier(VERIFIER, t.config.exportDir, t.thread, ["--verbose"]);
+    assert.equal(clean.code, 0, `a ratified expulsion must replay clean:\n${clean.output}`);
+    assert.match(clean.output, /ok\s*\] membership: .* actuates its round's declared action/);
+    t.instance.close();
+  });
+
+  it("G10 — an expulsion naming an agent its round never decided about fails by name", async () => {
+    const t = bridge();
+    const { proofDigest, convicted } = await convictThird(t);
+    const { decision } = governanceRound(t, "expel-wrong", convicted, {
+      "afp:form": "equivocation-proof",
+      "afp:proof": proofDigest,
+    });
+
+    // A round about `third` cannot expel `bystander`, however ratified it was.
+    const stray = t.instance.publish("victim", [t.hub.actorId], t.thread, "hub", (envelope) =>
+      memberExpel(envelope, {
+        agent: t.instance.actorId("bystander"),
+        hub: t.hub.actorId,
+        decisionDigest: decision.digest,
+        action: "expel-member",
+      }),
+    ).activity;
+    await t.hub.receive(stray);
+    assert.ok(t.hub.members().includes(t.instance.actorId("bystander")), "the hub refuses it at the door too");
+
+    exportOf(t);
+    const out = runVerifier(VERIFIER, t.config.exportDir, t.thread, ["--verbose"]);
+    assert.notEqual(out.code, 0, "an expulsion of somebody the round never named must not replay clean");
+    assert.match(out.output, /FAIL \] membership: .* names the subject its round decided/);
+    t.instance.close();
+  });
+
+  it("G10b — an expulsion signed by the hub's own key is not a ratified act", async () => {
+    const t = bridge();
+    const { proofDigest, convicted } = await convictThird(t);
+    const { decision } = governanceRound(t, "expel-by-hub", convicted, {
+      "afp:form": "equivocation-proof",
+      "afp:proof": proofDigest,
+    });
+
+    // 02, verbatim and load-bearing: hub governance "requires a weighted
+    // quorum vote among current instance members … never a signature from the
+    // hub's own key." ADR-0014 made the hub the sequencing authority that
+    // signs proposals, and that habit walks straight into this.
+    const byHub = t.hub.emit([t.instance.actorId("victim")], t.thread, "hub", (envelope) =>
+      memberExpel(envelope, {
+        agent: convicted,
+        hub: t.hub.actorId,
+        decisionDigest: decision.digest,
+        action: "expel-member",
+      }),
+    );
+    assert.ok(byHub, "the hub can physically sign one — which is exactly why the rule must be checked");
+
+    exportOf(t);
+    const out = runVerifier(VERIFIER, t.config.exportDir, t.thread, ["--verbose"]);
+    assert.notEqual(out.code, 0, "a self-signed expulsion must not replay clean");
+    assert.match(out.output, /FAIL \] membership: .* actuates its round's declared action/);
+    t.instance.close();
+  });
+
+  it("G11 — a compromise claim by the agent's own instance is recorded, and changes nothing", async () => {
+    const t = bridge();
+    const { proofDigest, convicted } = await convictThird(t);
+
+    await t.hub.receive(
+      t.instance.publishAsInstance([t.hub.actorId], t.thread, "hub", (envelope) =>
+        keyCompromiseClaim(envelope, {
+          proof: proofDigest,
+          // The method that ACTUALLY signed the convicting votes: under
+          // instance custody an agent's activities are signed by its operating
+          // instance's key, so a claim naming the agent's own key would be
+          // answering about a key the proof never used — which the verifier
+          // refuses, and rightly.
+          verificationMethod: `${t.instance.instanceDocument().id}#ed25519-key`,
+          since: "2026-08-16T00:00:00.000Z",
+          content: "the key was captured before the round opened",
+        }),
+      ).activity,
+    );
+
+    // W0.3, the invariant an implementer is most tempted to break: a claim is
+    // not evidence. The weight stays zero, and the round that follows the
+    // claim still refuses the convicted seat's ballot.
+    const round = `${t.config.origin}/rounds/after-claim`;
+    const proposal = t.hub.proposeRound({ round, thread: t.thread, question: "ship it?", options: ["yes", "no"] });
+    const voters = (proposal.activity.object as Record<string, JsonValue>)["afp:voters"] as string[];
+    assert.ok(voters.includes(convicted), "the seat is still enrolled — a claim is not an expulsion either");
+    t.hub.closeRound(round);
+
+    exportOf(t);
+    const clean = runVerifier(VERIFIER, t.config.exportDir, t.thread, ["--verbose"]);
+    assert.equal(clean.code, 0, `a claim from the right party must replay clean:\n${clean.output}`);
+    assert.match(clean.output, /ok\s*\] claim: .* is published by the agent's own instance/);
+    t.instance.close();
+  });
+
+  it("G12 — a compromise claim published by anyone else fails by name", async () => {
+    const t = bridge();
+    const { proofDigest, convicted } = await convictThird(t);
+
+    // Signed by an *agent* rather than by the instance that operates the
+    // convicted seat: the same standing question Vouch and Disown answer.
+    t.instance.publish("bystander", [t.hub.actorId], t.thread, "hub", (envelope) =>
+      keyCompromiseClaim(envelope, {
+        proof: proofDigest,
+        verificationMethod: `${t.instance.instanceDocument().id}#ed25519-key`,
+        since: "2026-08-16T00:00:00.000Z",
+      }),
+    );
+
+    exportOf(t);
+    const out = runVerifier(VERIFIER, t.config.exportDir, t.thread, ["--verbose"]);
+    assert.notEqual(out.code, 0, "a claim by a party with no standing must not replay clean");
+    assert.match(out.output, /FAIL \] claim: .* is published by the agent's own instance/);
+    t.instance.close();
+  });
+
+  it("G13 — restoration is forward-scoped: the restored seat votes in the next round, never the last one", async () => {
+    const t = bridge();
+    const { proofDigest, convicted } = await convictThird(t);
+    const { decision } = governanceRound(t, "restore-third", convicted, {
+      "afp:form": "equivocation-proof",
+      "afp:proof": proofDigest,
+    });
+
+    // A round pinned BEFORE the restoration lands. Its arithmetic is signed
+    // history the moment it closes, and nothing may move it afterwards (W0.4).
+    const before = `${t.config.origin}/rounds/before-restore`;
+    const beforeProposal = t.hub.proposeRound({
+      round: before,
+      thread: t.thread,
+      question: "ship it?",
+      options: ["yes", "no"],
+    });
+
+    await t.hub.receive(
+      t.instance.publish("victim", [t.hub.actorId], t.thread, "hub", (envelope) =>
+        memberAdmit(envelope, {
+          agent: convicted,
+          hub: t.hub.actorId,
+          decisionDigest: decision.digest,
+          action: "expel-member",
+        }),
+      ).activity,
+    );
+
+    const after = `${t.config.origin}/rounds/after-restore`;
+    const afterProposal = t.hub.proposeRound({
+      round: after,
+      thread: t.thread,
+      question: "ship it?",
+      options: ["yes", "no"],
+    });
+
+    // The same seat votes in both rounds. Observed through the record rather
+    // than through the hub's internals: the earlier round, pinned while the
+    // conviction stood, counts nothing from it; the later one counts it.
+    for (const [round, proposal] of [[before, beforeProposal], [after, afterProposal]] as const) {
+      const snapshot = String((proposal.activity.object as Record<string, unknown>)["afp:quorumSnapshot"]);
+      await t.hub.receive(
+        t.instance.publish("third", [t.hub.actorId], t.thread, "hub", (envelope) =>
+          castVote(envelope, {
+            voteId: `${envelope.actor}/votes/${round.split("/").pop()}`,
+            round,
+            hub: t.hub.actorId,
+            proposalHash: proposal.digest,
+            quorumSnapshot: snapshot,
+            value: "yes",
+          }),
+        ).activity,
+      );
+    }
+
+    const beforeCounted = (t.hub.closeRound(before).activity.object as Record<string, JsonValue>)["afp:countedVotes"];
+    const afterCounted = (t.hub.closeRound(after).activity.object as Record<string, JsonValue>)["afp:countedVotes"];
+    assert.equal((beforeCounted as string[]).length, 0, "a round pinned while the conviction stood keeps its arithmetic");
+    assert.equal((afterCounted as string[]).length, 1, "restoration takes effect forward, from the decision that granted it");
+
+    exportOf(t);
+    const clean = runVerifier(VERIFIER, t.config.exportDir, t.thread, ["--verbose"]);
+    assert.equal(clean.code, 0, `a ratified restoration must replay clean:\n${clean.output}`);
+    t.instance.close();
+  });
+});
+
+describe("ADR-0021 Decision 5 — the proof gets a destination", () => {
+  it("G14 — an Enroll citing a genuine proof against the enrolling agent replays clean", async () => {
+    const t = bridge();
+    const { proofDigest, convicted } = await convictThird(t);
+    const proofActivity = t.hub.outbox.byActor(t.hub.actorId).find((e) => e.digest === proofDigest)!.activity;
+
+    // Inline, verbatim, and not by digest alone: the bundle's artifacts/
+    // channel needs an object to hang an attachment on, and an afp:Enroll's
+    // object is a bare agent URL. The proof is self-contained by construction
+    // (ADR-0020 Decision 1 embeds both signed votes), so a bundle that cites
+    // one can carry one.
+    t.instance.publishAsInstance([t.hub.actorId], t.thread, "hub", (envelope) =>
+      enroll(envelope, {
+        agent: convicted,
+        hub: t.hub.actorId,
+        capabilities: [CAPABILITY],
+        hubKey: `${convicted}#${HUB_ID}`,
+        evidence: [{ "afp:digest": proofDigest, "afp:object": proofActivity }],
+        priorProofs: [proofDigest],
+      }),
+    );
+
+    exportOf(t);
+    const clean = runVerifier(VERIFIER, t.config.exportDir, t.thread, ["--verbose"]);
+    assert.equal(clean.code, 0, `a cited, honest conviction must replay clean:\n${clean.output}`);
+    assert.match(clean.output, /ok\s*\] evidence: .* cited proof convicts the enrolling agent/);
+    t.instance.close();
+  });
+
+  it("G16 — an empty prior-proof declaration contradicted by the record is falsified by name", async () => {
+    const t = bridge();
+    const { convicted } = await convictThird(t);
+
+    // Nobody is obliged to volunteer their history. A signed denial the same
+    // case file contradicts is a finding — ADR-0020 Decision 5's searchlight
+    // shape, applied to a self-declaration.
+    t.instance.publishAsInstance([t.hub.actorId], t.thread, "hub", (envelope) =>
+      enroll(envelope, {
+        agent: convicted,
+        hub: t.hub.actorId,
+        capabilities: [CAPABILITY],
+        hubKey: `${convicted}#${HUB_ID}`,
+        priorProofs: [],
+      }),
+    );
+
+    exportOf(t);
+    const out = runVerifier(VERIFIER, t.config.exportDir, t.thread, ["--verbose"]);
+    assert.notEqual(out.code, 0, "a denial the record contradicts must not replay clean");
+    assert.match(out.output, /FAIL \] evidence: .* prior-proof declaration is not contradicted/);
+    t.instance.close();
+  });
+});
+
+describe("ADR-0021 Decision 4d — a revocation is not an eraser", () => {
+  it("G16b — a cut backdated before the convicting votes fails, and the proof stands", async () => {
+    const t = bridge();
+    const { convicted } = await convictThird(t);
+    exportOf(t);
+
+    // The attack ADR-0012 never named, running the other way from the hazard
+    // it did: revocation *cuts*, and `check_key_intervals` fails anything the
+    // key signed after the cut. So the sanctioned party republishes its own
+    // key history with the cut dated before its equivocating votes — the two
+    // embedded votes now sit past it, ADR-0020's V2 requires both to verify,
+    // and the proof that convicted it evaporates. Nobody's signature is
+    // forged; the evidence is simply declared to have been signed by a key
+    // that was already dead.
+    const dir = mkdtempSync(join(tmpdir(), "afp-21-revoke-"));
+    cpSync(t.config.exportDir, dir, { recursive: true });
+    const manifestPath = join(dir, "MANIFEST.json");
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+    const instanceActor = String(t.instance.instanceDocument().id);
+    for (const entry of manifest["afp:keyHistory"] as Record<string, unknown>[]) {
+      if (entry["afp:actor"] !== instanceActor) continue;
+      entry["afp:validUntil"] = "2026-08-01T00:00:00.000Z"; // long before any vote was cast
+      entry["afp:retiredBy"] = "revocation";
+    }
+    writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+
+    const out = runVerifier(VERIFIER, dir, t.thread, ["--verbose"]);
+    assert.notEqual(out.code, 0, "a backdated revocation must not quietly retire the evidence");
+    assert.match(out.output, /FAIL \] claim: .* revocation does not predate a proof against it/);
+    assert.ok(convicted, "the conviction is what the cut was aimed at");
+    t.instance.close();
+  });
+});
+
+describe("ADR-0021 Decision 5b — a citation that cannot be resolved is not a citation that passed", () => {
+  it("G15 — a foreign Enroll citing a proof whose signer this replay does not publish records unresolvable", async () => {
+    // The case the P6 demo taught us to expect, and the one an implementer
+    // gets wrong first: an enrollment at a NEW hub is exactly the situation
+    // where the accused's own bundle is absent by definition. The hub host
+    // must weigh a citation whose signing key it has never seen.
+    const host = bridge();
+    const foreign = testInstance(["stranger"], CAPABILITY, "https://stranger.example");
+    const strangerId = foreign.instance.actorId("stranger");
+    const foreignThread = `${foreign.config.origin}/threads/enroll`;
+
+    // The foreign operator's own conviction, assembled on its own chain: two
+    // ballots at one (actor, round, phase, seqNo), differing in value.
+    const foreignRound = `${foreign.config.origin}/rounds/elsewhere`;
+    const ballot = (value: string) =>
+      foreign.instance.publish("stranger", [], foreignThread, "hub", (envelope) =>
+        castVote(envelope, {
+          voteId: `${envelope.actor}/votes/${value}`,
+          round: foreignRound,
+          proposalHash: "sha256:elsewhere",
+          quorumSnapshot: "sha256:elsewhere",
+          value,
+          phase: "prepare",
+          seqNo: 1,
+        }),
+      ).activity;
+    const proof = foreign.instance.publishAsInstance([], foreignThread, "hub", (envelope) =>
+      equivocationProof(envelope, {
+        proofId: `${foreign.config.origin}/proofs/stranger`,
+        hub: `${foreign.config.origin}/hubs/elsewhere`,
+        round: foreignRound,
+        votes: [ballot("yes"), ballot("no")],
+      }),
+    ).activity;
+
+    // The stranger's instance enrolls it at OUR hub, declaring the conviction
+    // rather than hiding it — the honest move Decision 5a exists to reward.
+    const enrollment = foreign.instance.publishAsInstance([host.hub.actorId], foreignThread, "hub", (envelope) =>
+      enroll(envelope, {
+        agent: strangerId,
+        hub: host.hub.actorId,
+        capabilities: [CAPABILITY],
+        hubKey: `${strangerId}#${HUB_ID}`,
+        evidence: [{ "afp:digest": digestOf(proof), "afp:object": proof }],
+      }),
+    ).activity;
+
+    host.instance.publishAsInstance([], `${host.config.origin}/threads/roster`, "public", (envelope) =>
+      vouch(envelope, { agent: host.hub.actorId, capabilities: ["afp:cap:hub"], keyCustody: "self" }),
+    );
+    exportBundle(host.instance, host.config.exportDir, [host.hub], undefined, {
+      receivedActivities: () => [
+        { digest: digestOf(enrollment), fromInstance: String(foreign.instance.instanceDocument().id), activity: enrollment },
+      ],
+    });
+
+    const out = runVerifier(VERIFIER, host.config.exportDir, host.thread, ["--verbose"]);
+    // Three-valued, and the third value is recorded rather than swallowed: the
+    // pair genuinely convicts (recomputable without any key at all), but the
+    // signer's key lives in a bundle nobody handed us. A reader sees
+    // `unresolvable` and knows to ask for the other bundle — which is the
+    // whole point, and the opposite of a check that passed vacuously.
+    assert.equal(out.code, 0, `an unresolvable citation must not fail the replay:\n${out.output}`);
+    assert.match(out.output, /ok\s*\] evidence: .* cited proof convicts the enrolling agent/);
+    assert.match(out.output, /unresolvable: this replay publishes no key for/);
+    host.instance.close();
+    foreign.instance.close();
   });
 });

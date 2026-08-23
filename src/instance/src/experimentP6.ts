@@ -20,11 +20,14 @@
  *
  * What is scripted, and honestly labelled as such:
  *
- *  - **Meridian's equivocation.** A model cannot be asked to defect; the demo
- *    signs the second, contradicting vote itself, at the same
- *    `(actor, round, phase, seqNo)`. What is *not* scripted is anything that
- *    happens afterwards — the hub recomputes `convicts()` on the two signed
- *    objects and reaches its own conclusion.
+ *  - **Meridian's equivocation.** A model cannot be asked to defect, so the
+ *    demo signs the *contradicting* half itself, at the same
+ *    `(actor, round, phase, seqNo)`. Meridian's own determination is not
+ *    scripted: the first half carries whatever its model actually concluded,
+ *    and the scripted half is that answer's negation — so the verdict printed
+ *    beside its name is one the record really carries. What happens
+ *    afterwards is not scripted either: the hub recomputes `convicts()` on
+ *    the two signed objects and reaches its own conclusion.
  *  - **Anchor's disk failure.** Also scripted, for the same reason, and it is
  *    the whole point of the row: on the wire it is the identical shape, and
  *    the record has to tell them apart without being told which is which.
@@ -37,14 +40,24 @@
  * scripted content would be reporting on nothing.
  */
 
+import { NO_DECISION_CATEGORY } from "./ap/pins.ts";
 import type { LlmEndpoint } from "./brains/openai.ts";
 import { checkEndpoint, makeLlmBrain } from "./brains/openai.ts";
-import { runP6Demo, type P6Assessment, type P6DemoResult } from "./demoP6.ts";
+import {
+  ACTION_POLICY,
+  GOVERNANCE_OPTIONS,
+  QUESTION,
+  runP6Demo,
+  type P6Assessment,
+  type P6DemoResult,
+} from "./demoP6.ts";
 
 const CAPABILITY = "afp:cap:assess";
 
-/** The question the trigger round asks, worded once and reused everywhere. */
-export const QUESTION = "Did Storm Dagmar cross the contract's pinned parametric thresholds?";
+// The question and the action names come from the demo that signs them. They
+// were restated here once, which is one edit away from a narration describing
+// a round the record never opened.
+export { QUESTION } from "./demoP6.ts";
 
 /**
  * The met office bulletin, identical for everyone — this is the shared fact
@@ -228,12 +241,49 @@ const DESKS: readonly Desk[] = [
  * paragraph: a small local model follows a two-line template it can see the
  * shape of, and stops following one that has been flattened into prose.
  */
+/** The seat question's own two-line template — `yes` expels, and it says so. */
+const REPLY_FORMAT_SEAT = [
+  "Reply with exactly two lines and nothing else:",
+  "VERDICT: expel",
+  "BECAUSE: <one sentence, under 25 words, giving the reason a fellow member would have to answer>",
+  "Write 'keep' instead of 'expel' to let the member keep its seat.",
+].join("\n");
+
 const REPLY_FORMAT = [
   "Reply with exactly two lines and nothing else:",
   "VERDICT: yes",
   "BECAUSE: <one sentence, under 25 words, naming the one measurement that decided it>",
   "Write 'no' instead of 'yes' on the VERDICT line if the pinned thresholds were not both crossed.",
 ].join("\n");
+
+/**
+ * The governance question (ADR-0021 Decision 4b). A different question from the
+ * determination, asked of the same desks: not "what do the measurements say"
+ * but "what do we do about a member we have just proved equivocated, who says
+ * its key was captured".
+ *
+ * Deliberately not loaded either way. A model told the claim is worthless
+ * votes to expel every time and the round stops testing anything; a model told
+ * to be merciful never expels. It is given the proof, the claim, and its own
+ * book, and asked what it can justify — which is the same standard the
+ * determination itself was asked to meet.
+ */
+function judgePrompt(desk: Desk): string {
+  return (
+    [
+      `You are ${desk.persona}.`,
+      "The pool has proved — cryptographically, and anyone can recompute it — that one member",
+      "signed two contradicting ballots in the determination that just failed. That member's",
+      "weight is already zero; nobody voted on that and nobody had to. What you are voting on",
+      "now is whether it keeps its seat in the pool at all.",
+      "Its operator says the signing key was captured. That statement is on the record and it",
+      "is not evidence: nothing about it can be checked. It is also not nothing.",
+      "You are being asked what you can justify to the other members, not what your book would",
+      "prefer. Your vote is signed with your name on it and the accused is recused from this",
+      "round, so it cannot vote on its own seat.",
+    ].join(" ") + `\n\n${REPLY_FORMAT_SEAT}`
+  );
+}
 
 function deskPrompt(desk: Desk): string {
   return (
@@ -256,16 +306,19 @@ function deskPrompt(desk: Desk): string {
 
 const encoder = new TextEncoder();
 
-async function ask(endpoint: LlmEndpoint, desk: Desk): Promise<{ text: string; producedBy: string }> {
-  const brain = makeLlmBrain(desk.agent, [CAPABILITY], deskPrompt(desk), endpoint);
+async function ask(
+  endpoint: LlmEndpoint,
+  desk: Desk,
+  question: { system: string; content: string; attachments: readonly string[] },
+): Promise<{ text: string; producedBy: string }> {
+  const brain = makeLlmBrain(desk.agent, [CAPABILITY], question.system, endpoint);
   const outcome = await brain.handle({
     capability: CAPABILITY,
-    content: `${QUESTION}\n\nThe bulletin, and your own book:`,
-    attachments: [
-      { mediaType: "text/markdown", bytes: encoder.encode(BULLETIN) },
-      { mediaType: "text/markdown", bytes: encoder.encode(desk.exposure) },
-      { mediaType: "text/markdown", bytes: encoder.encode(desk.privateRecord) },
-    ],
+    content: question.content,
+    attachments: question.attachments.map((text) => ({
+      mediaType: "text/markdown",
+      bytes: encoder.encode(text),
+    })),
     thread: "",
   });
   if (!outcome.ok) throw new Error(`model call for ${desk.agent} failed: ${outcome.reason}`);
@@ -277,9 +330,13 @@ async function ask(endpoint: LlmEndpoint, desk: Desk): Promise<{ text: string; p
  * silent default: guessing here would put an unearned value in a count that is
  * wired to a payment.
  */
-function parseVerdict(text: string, agent: string): { verdict: string; rationale: string } {
+function parseVerdict(
+  text: string,
+  agent: string,
+  options: readonly string[] = ["yes", "no"],
+): { verdict: string; rationale: string } {
   const verdictLine = text.split("\n").find((line) => /^\s*\**VERDICT/i.test(line));
-  const match = verdictLine ? /\b(yes|no)\b/i.exec(verdictLine) : null;
+  const match = verdictLine ? new RegExp(`\\b(${options.join("|")})\\b`, "i").exec(verdictLine) : null;
   if (!match) throw new Error(`${agent} returned no readable VERDICT line:\n${text.slice(0, 300)}`);
 
   const becauseLine = text.split("\n").find((line) => /^\s*\**BECAUSE/i.test(line)) ?? "";
@@ -321,8 +378,27 @@ export async function runP6Experiment(
     content: {
       async assess(_operator, agent): Promise<P6Assessment> {
         const desk = desks.get(agent)!;
-        const { text, producedBy } = await ask(options.endpoint, desk);
+        const { text, producedBy } = await ask(options.endpoint, desk, {
+          system: deskPrompt(desk),
+          content: `${QUESTION}\n\nThe bulletin, and your own book:`,
+          attachments: [BULLETIN, desk.exposure, desk.privateRecord],
+        });
         return { ...parseVerdict(text, agent), producedBy, content: text };
+      },
+      /**
+       * The seat question (ADR-0021 Decision 4b). The same desks, weighing the
+       * proof against the accused operator's statement about it — and the
+       * accused is not among them, because the round recused it by a cause the
+       * record resolves.
+       */
+      async judge(_operator, agent, dossier): Promise<P6Assessment> {
+        const desk = desks.get(agent)!;
+        const { text, producedBy } = await ask(options.endpoint, desk, {
+          system: judgePrompt(desk),
+          content: "Does this member keep its seat in the pool?\n\nThe case, and your own book:",
+          attachments: [dossier, desk.exposure],
+        });
+        return { ...parseVerdict(text, agent, GOVERNANCE_OPTIONS), producedBy, content: text };
       },
       /**
        * The payment instruction itself (ADR-0019). The desk that carries it
@@ -330,15 +406,19 @@ export async function runP6Experiment(
        * the round before anyone voted, and all it supplies is the wording.
        */
       notice(outcome, action): string {
-        const wording: Record<string, string> = {
-          "pay-parametric-trigger":
+        // Keyed off the round's own pinned policy rather than off restated
+        // string literals: if the demo ever renames an action, this map fails
+        // to compile instead of silently falling through to the `${action}`
+        // default and printing a placeholder where the money instruction goes.
+        const wording: Record<(typeof ACTION_POLICY)[keyof typeof ACTION_POLICY], string> = {
+          [ACTION_POLICY.yes]:
             "Trigger determined. Releasing the parametric payment to all 4,000 covered policyholders today.",
-          "close-file-no-payout":
+          [ACTION_POLICY.no]:
             "Thresholds not crossed. The file is closed with no payment; policyholders are notified of the measurements.",
-          "refer-to-arbitration-panel":
+          [ACTION_POLICY[NO_DECISION_CATEGORY]]:
             "The pool could not reach a determination. The file goes to the arbitration panel; no payment is released today.",
         };
-        return wording[action] ?? `${action} (outcome ${outcome})`;
+        return wording[action as keyof typeof wording] ?? `${action} (outcome ${outcome})`;
       },
     },
   });

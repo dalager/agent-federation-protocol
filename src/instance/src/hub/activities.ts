@@ -45,11 +45,42 @@ export interface EnrollSpec {
   hubKey: string;
   /** `afp:role` — member | requester | observer (ADR-0004 Decision 1). */
   role?: HubRole;
+  /**
+   * ADR-0021 Decision 5a/W1: prior convictions cited as enrollment evidence,
+   * carried **verbatim** rather than by digest alone.
+   *
+   * Inline is not a preference, it is the only path: the bundle's third-party
+   * evidence channel is `artifacts/`, and the verifier fails any artifact not
+   * referenced by some activity's `object.attachment[].afp:digest` — but an
+   * `afp:Enroll`'s `object` is a bare agent URL with nothing to hang an
+   * attachment array on. The proof is self-contained by construction
+   * (ADR-0020 Decision 1 embeds both signed votes), so a bundle that cites one
+   * can carry one.
+   */
+  evidence?: readonly EnrollEvidence[];
+  /**
+   * ADR-0021 Decision 5c/W1: the falsifiable self-declaration. `[]` is a
+   * meaningful value — a signed denial — so this is emitted whenever it is
+   * supplied, empty or not, which is the one place this file departs from the
+   * emit-when-non-empty idiom and does so deliberately.
+   *
+   * Worth exactly one thing, and it is the enforceable one: a proof
+   * convicting the declaring agent that surfaces in the same case file
+   * falsifies the declaration by name (V13). Nobody is obliged to volunteer
+   * history; a signed denial the record contradicts is a finding.
+   */
+  priorProofs?: readonly string[];
+}
+
+/** One cited conviction: its digest, and the full `Announce{afp:EquivocationProof}` it names. */
+export interface EnrollEvidence {
+  "afp:digest": string;
+  "afp:object": { [key: string]: JsonValue };
 }
 
 /** `afp:Enroll` — instance-issued, agent-level (02 § Enrollment is two-level). */
 export function enroll(envelope: Envelope, spec: EnrollSpec): { [key: string]: JsonValue } {
-  return {
+  const activity: { [key: string]: JsonValue } = {
     ...base(envelope, "afp:Enroll"),
     object: spec.agent,
     target: spec.hub,
@@ -58,6 +89,14 @@ export function enroll(envelope: Envelope, spec: EnrollSpec): { [key: string]: J
     "afp:hubKey": spec.hubKey,
     "afp:role": spec.role ?? "member",
   };
+  // ADR-0021 W0.6: emitted only when supplied — an unchanged caller must
+  // produce byte-identical output. `afp:priorProofs` tests for `undefined`
+  // rather than for emptiness, because `[]` is the declaration.
+  if (spec.evidence && spec.evidence.length > 0) {
+    activity["afp:evidence"] = spec.evidence.map((entry) => ({ ...entry }));
+  }
+  if (spec.priorProofs !== undefined) activity["afp:priorProofs"] = [...spec.priorProofs];
+  return activity;
 }
 
 export interface UnenrollSpec {
@@ -74,6 +113,66 @@ export function unenroll(envelope: Envelope, spec: UnenrollSpec): { [key: string
     target: spec.hub,
     "afp:hub": spec.hub,
     summary: spec.reason,
+  };
+}
+
+// -------------------------------------------------- Membership actuation (ADR-0021 D4b)
+
+/**
+ * ADR-0021 Decision 4b: 03's membership vocabulary, built for the first time,
+ * and built as an **ADR-0019 actuation** rather than as a hub command.
+ *
+ * A governance round is an ordinary round with a subject. 02 has always said
+ * hub governance "requires a weighted quorum vote among current instance
+ * members, reusing the L1 machinery — *never* a signature from the hub's own
+ * key", and that last clause has teeth here: ADR-0014 made the hub the
+ * sequencing authority that signs proposals, so the habit of letting the hub
+ * sign everything collides with a member-entitled act. An expulsion signed by
+ * the hub actor is invalid, and the verifier says so by name (V9).
+ *
+ * The binding to the round is `afp:actsOn` over the `DecisionRecord` digest —
+ * the same edge every consequence has carried since ADR-0006, with no new
+ * machinery and no second quorum path.
+ */
+export interface MembershipActuationSpec {
+  agent: string;
+  hub: string;
+  /** Digest of the signed `Create{afp:DecisionRecord}` this act carries out. */
+  decisionDigest: string;
+  /** The pinned policy's action name for that round's outcome. */
+  action: string;
+}
+
+/** `["Remove", "afp:MemberExpel"]` — the consequence of a ratified expulsion round. */
+export function memberExpel(envelope: Envelope, spec: MembershipActuationSpec): { [key: string]: JsonValue } {
+  return membershipActuation(envelope, ["Remove", "afp:MemberExpel"], spec);
+}
+
+/**
+ * `["Add", "afp:MemberAdmit"]` — restoration, and forward-scoped by
+ * construction (Decision 4c): it restores weight for rounds whose snapshot is
+ * pinned *after* this decision, never retroactively, and it never re-tallies a
+ * closed round. ADR-0020's forward-scoping rule, applied in the other
+ * direction — neither conviction nor forgiveness reaches backwards into a
+ * signed record.
+ */
+export function memberAdmit(envelope: Envelope, spec: MembershipActuationSpec): { [key: string]: JsonValue } {
+  return membershipActuation(envelope, ["Add", "afp:MemberAdmit"], spec);
+}
+
+function membershipActuation(
+  envelope: Envelope,
+  type: readonly [string, string],
+  spec: MembershipActuationSpec,
+): { [key: string]: JsonValue } {
+  return {
+    ...base(envelope, type[0]),
+    type: [...type],
+    object: spec.agent,
+    target: `${spec.hub}/members`,
+    "afp:hub": spec.hub,
+    "afp:action": spec.action,
+    "afp:actsOn": spec.decisionDigest,
   };
 }
 
@@ -122,11 +221,29 @@ export function updateAsset(envelope: Envelope, spec: AssetSpec): { [key: string
  * an undeclared absence is a named replay failure, where before it was
  * invisible.
  */
-export type ExclusionStatus = "not-live" | "not-pinned";
+export type ExclusionStatus = "not-live" | "not-pinned" | "recused";
+
+/**
+ * ADR-0021 Decision 3/W1: why a seat is *recused*, in a closed registry of
+ * forms that both resolve from the record alone. This is the estimator wall
+ * transplanted (ADR-0004): the excluded set is recomputed from prior signed
+ * evidence rather than trusted, so a proposer cannot recuse its opponents by
+ * declaring them recused — it can only recuse the convicted and the accused.
+ *
+ * A cause that does not resolve — a proof digest absent from the record, a
+ * proof convicting somebody else, a `governance-subject` form on a round that
+ * pins no subject — is a named replay failure. That is the whole security
+ * property.
+ */
+export type RecusalCause =
+  | { "afp:form": "equivocation-proof"; "afp:proof": string }
+  | { "afp:form": "governance-subject" };
 
 export interface ExcludedEntry {
   agent: string;
   "afp:status": ExclusionStatus;
+  /** Required when the status is `recused`, forbidden otherwise (W1). */
+  "afp:cause"?: RecusalCause;
 }
 
 /** ADR-0020 W1: the closed registry of pinned succession forms; v1 defines one. */
@@ -170,6 +287,14 @@ export interface ProposalSpec {
    * the hub's member-role electorate at the proposal's own instant.
    */
   excluded?: readonly ExcludedEntry[];
+  /**
+   * ADR-0021 Decision 4b/W1: the agent this round is *about*, present iff it
+   * is a governance round. It is what makes `MemberExpel`/`MemberAdmit`
+   * actuation checkable (V9/V10) and what the `governance-subject` recusal
+   * form resolves against — the accused is out of its own electorate, and out
+   * of the denominator, by a rule anyone can recompute.
+   */
+  governanceSubject?: string;
 }
 
 /** `Offer{afp:Proposal}` — opens an L0 round (03 § 8c). */
@@ -204,6 +329,7 @@ export function offerProposal(envelope: Envelope, spec: ProposalSpec): { [key: s
   if (spec.excluded && spec.excluded.length > 0) {
     object["afp:excluded"] = spec.excluded.map((entry) => ({ ...entry }));
   }
+  if (spec.governanceSubject) object["afp:governanceSubject"] = spec.governanceSubject;
   return { ...base(envelope, "Offer"), object };
 }
 

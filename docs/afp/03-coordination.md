@@ -190,7 +190,9 @@ finding 41).
 | `afp:Enroll` / `afp:Unenroll` | Activity | Adds/removes one agent to/from a hub's membership CRDT |
 | `afp:hub` | Property | Scopes a CRDTDelta, Task, Bid, etc. to one hub's namespace |
 | `afp:GovernanceDecision` | Activity | Signed, quorum-voted hub-level decision (admission, expulsion, disputes) |
-| `afp:MemberAdmit` / `afp:MemberExpel` | Activity, dual-typed `["Add", "afp:MemberAdmit"]` / `["Remove", "afp:MemberExpel"]`, `target` = the hub's members collection | Specific governance decisions on hub membership |
+| `afp:MemberAdmit` / `afp:MemberExpel` | Activity, dual-typed `["Add", "afp:MemberAdmit"]` / `["Remove", "afp:MemberExpel"]`, `target` = the hub's members collection | Specific governance decisions on hub membership — published by a **member**, carrying `afp:actsOn` to the DecisionRecord that authorized it and naming that round's `afp:governanceSubject` (02 § Governance concentration; never the hub's own key) |
+| `afp:KeyCompromiseClaim` | `Create`-carried object, on the claiming instance's own chain | The convicted agent's own instance saying its key was captured: names the proof it answers, the verification method, and the instant from which it claims the capture ran. Changes nothing automatically — zeroing stays automatic — and exists so the record can tell `zeroed` from `zeroed-contested` (ADR-0021 Decision 4a) |
+| `afp:governanceSubject` / `afp:excluded` | Properties on `afp:Proposal` | The agent a governance round is about; and every member-role seat the round did not pin, each with a status (`not-live` \| `not-pinned` \| `recused`) and, for a recusal, a cause the record resolves (ADR-0021 Decisions 2-3) |
 | `afp:Bid` | Activity (reserved in v1, now live) | Signed offer to perform an announced Task, with estimates |
 | `afp:Award` | Activity | Signed, independently-verifiable selection of a winning bid |
 | `afp:Reauction` | Activity | Restarts allocation after award timeout/failure |
@@ -784,11 +786,42 @@ tolerance":**
 | Operators in hub | Guarantee |
 |---|---|
 | 1 (solo profile) | Nothing L1 adds — equivocation defense would defend against yourself. Stay at L0 |
-| 2 | **Accountability, not tolerance.** No honest majority exists to outvote a dishonest party, but misbehavior yields portable cryptographic proof (EquivocationProof) usable commercially and in governance. Deadlock resolves off-protocol |
+| 2 | **Accountability, not tolerance.** No honest majority exists to outvote a dishonest party, but misbehavior yields a cryptographic proof that travels (EquivocationProof — see *What "portable" means*, below). Deadlock resolves off-protocol |
 | ≥4 (f=1) | Actual Byzantine fault *tolerance*: `floor(2n/3)+1` can proceed correctly despite f malicious voters |
 
 Both properties are worth having; conflating them is not. At n=2 the value is a
 non-repudiable record, not automatic recovery.
+
+**What "portable" means, and what it does not** (ADR-0021 Decision 5). This spec used to
+call the proof portable and commercially usable without saying where it could go, which
+made the claim larger than the mechanism. The true, smaller claim: an `afp:Enroll` MAY cite
+proofs as `afp:evidence`, carried **verbatim** — the proof embeds both signed votes for
+exactly this reason, so a bundle that cites one can carry one — and a cited proof is
+*recomputed* rather than trusted: it must convict, and it must convict the agent being
+enrolled. Where the convicted actor's signing key is absent from the replay (an enrollment
+at a new hub is precisely that case), the citation is recorded **unresolvable** and counted
+in the census; it never reads as a check that passed. A hub's terms MAY additionally require
+an enrolling agent to declare `afp:priorProofs`, which is worth one enforceable thing:
+nobody must volunteer their history, but a signed denial the same case file contradicts is
+a finding.
+
+**Blacklist federation is declined, and the reason is recorded.** A shared registry of
+convicted agents would import every governance question this protocol has answered
+round-by-round — who may write to it, who corrects it, what a contested entry means, how a
+restoration propagates, what a captured key does to a permanent public record — at
+consortium scale and with no round to ratify any of it. Proofs travel the way documents
+travel: someone carries one to someone with a reason to read it, and the reading is
+checkable.
+
+**A revocation is not an eraser** (ADR-0021 Decision 4d). Revocation cuts a key's interval,
+and every signature after the cut fails — so a convicted party that revokes the key which
+signed its equivocating votes, with the cut backdated, would invalidate the evidence
+against it. A revocation cut MUST NOT precede the `published` of any vote embedded in an
+on-record proof against that key; a key history that does so is a named replay failure.
+Nothing here prevents revoking a genuinely compromised key, or claiming the capture
+predated the equivocation — that claim is what `afp:KeyCompromiseClaim` is for, and what a
+governance round then weighs. Say it in a claim, argue it in a round; do not write it into
+the key history and call the evidence invalid.
 
 Raft was rejected: its leader must detect its own unreachability via missed acks in bounded
 time, and this transport has no delivery acks at all.

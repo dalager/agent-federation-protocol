@@ -18,7 +18,7 @@
   Decision 5 extends one check), [ADR-0018](0018-the-round-as-a-commitment.md) (the
   pinning discipline Decisions 3 and 4 apply to two more facts, and the
   `afp:no-decision` terminal Decision 4 gives a third reason)
-- **Driven by:** [scenario 12 / campaign 9](../scenarios/README.md#campaign-9--open-scenario-12-the-p6-shakedown),
+- **Driven by:** [scenario 12 / campaign 9](../scenarios/README.md#campaign-9--built-scenario-12-the-p6-shakedown),
   findings 58, 60, 61, 62 — the half of the campaign that changes how the round itself
   behaves; findings 59, 63, 64, 65 are triaged to the ADR-0005 amendment and ADR-0021
   and are **not** decided here

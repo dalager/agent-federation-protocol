@@ -1,9 +1,8 @@
 # ADR-0021 — After the proof: a recomputable electorate, a caused recusal, a governed consequence, and a proof with somewhere to go
 
-- **Status:** Accepted. **Decisions 1 and 2 are built** (2026-08-22), gated by
-  `test/adr0021.test.ts` (9 cases), full suite green at 206, every shipped bundle
-  replaying with unchanged pass status and higher check counts. **Decisions 3, 4 and 5
-  are written and not built** — W4's work packages are sized for them
+- **Status:** Accepted, and **built** (Decisions 1 and 2 on 2026-08-22; Decisions 3, 4
+  and 5 on 2026-08-23), gated by `test/adr0021.test.ts`, full suite green, every shipped
+  bundle replaying with unchanged pass status and higher check counts
 - **Date:** 2026-08-22
 - **Applies to:** every hub running L1 (ADR-0020's trigger: ≥2 operators live in it), and
   — for Decisions 1 and 2 — **every hub at any level**, because the defect it closes is
@@ -17,7 +16,7 @@
   (the pinning discipline), [ADR-0019](0019-acting-on-a-decision.md) (the action policy
   and actuator Decision 4 reuses wholesale), [ADR-0020](0020-p6-hardened-round-stack.md)
   (the conviction this ADR is about, and the denominator contract it must honour)
-- **Driven by:** [scenario 12 / campaign 9](../scenarios/README.md#campaign-9--open-scenario-12-the-p6-shakedown),
+- **Driven by:** [scenario 12 / campaign 9](../scenarios/README.md#campaign-9--built-scenario-12-the-p6-shakedown),
   findings **59, 64, 65** — and **two defects found while decomposing them**, both older
   than the campaign and both promoted ahead of the findings that exposed them, which is
   why this ADR has five decisions instead of three
@@ -821,14 +820,20 @@ a hurried implementer should decide alone.
    from the conviction side, but an implementer may reasonably conclude the check should
    live beside the other interval checks. Either location is defensible; pick one and
    record it.
-5. **Can a restored agent be re-convicted on the same proof?** The proof is still on
-   record and forward-scoped zeroing reads it. Restoration must therefore mask proofs
-   dated before it — that is implied by W2's `zeroState` ordering but is not stated as a
-   rule, and it should be.
-6. **Does an expelled member's weight leave the denominator of rounds pinned after the
-   expulsion?** It should — expulsion removes it from the electorate, so subsequent
-   snapshots simply do not contain it — but confirm this against Decision 3's table
-   rather than assuming.
+5. ~~**Can a restored agent be re-convicted on the same proof?**~~ **Resolved in the
+   build, and now a stated rule:** a restoration masks every conviction recorded before
+   it, for rounds pinned after it. `isZeroedFor` reads the conviction only when no
+   restoration for that actor sits between the convicting round and the round being
+   weighed — so the old proof cannot re-zero a restored seat, and a *new* conviction
+   after the restoration zeroes normally. Forgiveness is forward-scoped in exactly the
+   direction conviction is, which is what keeps one rule where two would otherwise grow.
+6. ~~**Does an expelled member's weight leave the denominator of rounds pinned after the
+   expulsion?**~~ **Confirmed against the built code, not assumed:** yes, and by the
+   mechanism the question guessed. An admitted `afp:MemberExpel` calls the same
+   `removeAgent` an `afp:Unenroll` does, so the seat is gone from the membership CRDT and
+   `proposeRound` — which pins only current member-role agents — never sees it again. No
+   expulsion-specific weight path exists, which is Decision 3's table holding: the
+   denominator moves because the snapshot moved.
 7. **Hub-scoped and transport keys are outside `afp:keyHistory` entirely.** Only the
    instance key and per-agent P1 keys are collected (`export.ts`), so a compromised
    hub-scoped or transport key can be neither recorded nor interval-checked — the
@@ -883,6 +888,91 @@ Two things surfaced that design had not:
 Check counts rose on every bundle carrying a proposal (p2 656→658, p3 452→454, the p6
 joint replay 441→445) with pass status unchanged everywhere, which is W6's measured
 prediction holding.
+
+**Decisions 3, 4 and 5 built** (2026-08-23), in one pass across WP-1/2/3 (TypeScript) and
+WP-4/5 (Python), the two halves written against this ADR rather than against each other.
+`test/adr0021.test.ts` now carries all of W5's matrix — 24 cases, full suite green at 221
+— and every mutation row was checked the way slice two established: revert its fix, and
+confirm that row, and only that row, goes red.
+
+What landed: `afp:excluded` gained the `recused` status and its `afp:cause` registry, with
+`Hub.proposeRound` taking a `recused` list it validates against its own conviction table
+*before signing* (G5b — the same refusal ADR-0018 gives an unrecomputable quorum rule);
+`afp:governanceSubject` on the proposal; `afp:KeyCompromiseClaim` on the instance's own
+chain, admitted, checked for standing, and then deliberately inert; `afp:MemberExpel` and
+`afp:MemberAdmit`, 03's vocabulary since v1, built for the first time as ADR-0019
+actuations rather than hub commands; a `hub_restorations` table that makes `isZeroedFor`
+forward-scope forgiveness exactly as it already forward-scoped conviction; and
+`afp:evidence`/`afp:priorProofs` on the Enroll. On the verifier side, V6, V8-V14 and the
+five new census families, with V6 replay-wide and three-valued beside V4 for the reason
+W3 already gave.
+
+Check counts on shipped bundles did **not** move (p2 658, p3 454, the p6 joint replay
+445), which is the correct result and worth stating: every check in these three decisions
+is conditional on material no bundle written before them carries.
+
+**Three things the build found that the design had not**, all three the same shape — a
+rule stated about a *party* where the mechanism is about a *key*, which is this campaign's
+own through-line arriving inside its own ADR:
+
+1. **V8 was stricter than its gate row, and the gate row was wrong.** The first G11
+   named the convicted agent's own key as `afp:verificationMethod`. Under
+   `keyCustody: "instance"` — the default here, and what every shipped bundle uses — an
+   agent's activities are signed by its *operating instance's* key, so the claim was
+   answering about a key the proof never used. The verifier refused it, correctly. A
+   claim names the method that actually signed the votes.
+2. **V12's third value was unreachable.** As first written, the evidence check scanned
+   own-outbox Enrolls only — and an Enroll is issued by the enrolling agent's own
+   instance, so the key that signed any cited proof is in that same bundle by
+   construction. `unresolvable` was a branch no honest bundle could take, which is a dead
+   field wearing a control-flow disguise (W0.8). Decision 5b's own motivating case is a
+   *foreign* Enroll arriving at a hub host, where it lands in `received.jsonld`; V11-V13
+   now scan received bytes too, and G15 builds exactly that bundle.
+3. **V14 did not fire on the attack it exists to stop.** It matched a key-history entry's
+   `afp:actor` against the embedded votes' `actor` — which never compare equal under
+   instance custody, so G16b's backdated revocation retired the evidence in silence while
+   the check stayed quiet. It matches on the embedded vote's own
+   `proof.verificationMethod` now: the rule is about the key that signed, and that is
+   custody-correct in both directions.
+
+**Wired into the P6 demo (2026-08-23), which found two more.** `npm run demo:p6` now
+runs the whole arc rather than stopping at conviction: the equivocator is convicted, its
+operator publishes an `afp:KeyCompromiseClaim` that changes nothing, the pool opens a
+governance round with the accused recused by the proof that convicted it, a member (never
+the hub) carries out the `afp:MemberExpel`, and the next round pins four seats with
+nothing to declare. `demo:p6:llm` runs the seat question through the same local models
+that made the determination. Both replay clean, five bundles jointly, at 559 checks.
+
+1. **A compromise claim has no lawful carrier across a boundary.** Decision 4a says where
+   a claim lives — the instance's own chain — and says nothing about how the pool that
+   must weigh it ever receives a copy. ADR-0008's grants admit task verbs
+   (`direct-delegation`) and anything carrying an `afp:hub` (`hub`); a
+   `Create{afp:KeyCompromiseClaim}` is neither, so the peers' own boundary gate refuses
+   it. Measured by trying, not predicted. The demo therefore addresses it to nobody and
+   says so: the other operators read the claim in the joint case file. Not fixed here —
+   fixing it means either a new grant type or an `afp:hub` on the claim, and both are
+   wire decisions that belong in whatever ADR next opens ADR-0008's grant registry.
+2. **A ratified expulsion was invisible to the electorate fold**, and this one was a
+   defect rather than a gap. The hub admits the `MemberExpel` and drops the seat from its
+   membership CRDT, but `enrolled_roles_at` reads only `afp:Enroll`/`afp:Unenroll` — so
+   the verifier still believed the expelled agent was a member-role seat, and **every
+   round pinned after a lawful expulsion failed V4 by name, forever.** An honest hub
+   carrying out a decision its own members ratified could no longer produce a passing
+   bundle. The fold now consumes ratified membership actuations as the membership acts 03
+   has always said they are, forward-scoped like everything else. Note why the obvious
+   alternative is unavailable: the hub cannot emit an `afp:Unenroll` on the expelled
+   agent's behalf, because Decision 1 binds an Unenroll to the agent's *own* operating
+   instance. Decisions 1 and 4b have to interlock, and this is where they meet.
+
+The pattern is the campaign's own, for the fourth time: a mechanism attached to the wrong
+thing, invisible until something was built on top of it. Both were found by building the
+demo, which is the argument for building one.
+
+**Open question 4 is resolved by placement:** V14 lives here, in `afp_verify.py`, not in
+ADR-0012's `keys.py`. It is replay-wide because the proof and the erasing key history sit
+in different bundles by construction — the party publishing the history is the party the
+proof is about — and `check_key_intervals` is a per-domain check. Either location was
+defensible; this one is picked and recorded.
 
 ## References
 

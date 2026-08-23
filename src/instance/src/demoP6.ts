@@ -63,17 +63,16 @@ import type { Server } from "node:http";
 import { loadConfig } from "./config.ts";
 import { AfpInstance, type AgentRegistration } from "./instance.ts";
 import { CountingBrain } from "./brains/stub.ts";
-import type { Brain } from "./brains/port.ts";
 import { createHttpServer } from "./ap/server.ts";
 import type { Envelope } from "./ap/activities.ts";
-import { vouch } from "./ap/activities.ts";
+import { keyCompromiseClaim, vouch } from "./ap/activities.ts";
 import { fetchActorDocument } from "./federation/inbox.ts";
 import { Federation, agreementObject, createAgreement, offerAgreement } from "./federation/federation.ts";
 import { httpTransport } from "./federation/transport.ts";
 import { signRequest } from "./federation/httpSig.ts";
 import { loadOrCreateHubKeyPair } from "./crypto/keys.ts";
-import { castVote, enroll, offerProposal } from "./hub/activities.ts";
-import { convicts } from "./hub/equivocation.ts";
+import { castVote, enroll, memberExpel, offerProposal } from "./hub/activities.ts";
+import { convicts, voteTupleOf } from "./hub/equivocation.ts";
 import { NO_DECISION_CATEGORY } from "./ap/pins.ts";
 import { decisionActionStamp } from "./allocation/actions.ts";
 import { digestOf } from "./crypto/proof.ts";
@@ -84,6 +83,13 @@ import type { JsonValue } from "./crypto/jcs.ts";
 
 const CAPABILITY = "afp:cap:assess";
 const HUB_ID = "windward";
+/**
+ * The determination, worded once. Both the trigger round and the successor
+ * round ask it, and the narration prints it — three places that must agree,
+ * because a successor round asking a subtly different question is not a
+ * successor round at all.
+ */
+export const QUESTION = "Did Storm Dagmar cross the contract's pinned parametric thresholds?";
 /** ADR-0018 Decision 2 — the outcome of a round that did not decide. */
 const NO_DECISION_OUTCOME = "afp:no-decision";
 
@@ -95,6 +101,42 @@ const NO_DECISION_OUTCOME = "afp:no-decision";
  */
 const QUORUM_THRESHOLD = 4;
 
+/** Anchor's lawful recovery: re-vote at a strictly higher seqNo than its lost one. */
+const ANCHOR_REVOTE_SEQ = 2;
+
+/**
+ * The governance round's rulebook (ADR-0021 Decision 4b). A governance round is
+ * an ordinary round with a subject — no second consensus path — so it pins an
+ * action policy like any other, and `afp:no-decision` gets one too: a pool that
+ * cannot agree to expel has not thereby agreed to expel.
+ */
+export const GOVERNANCE_POLICY = {
+  expel: "expel-member",
+  keep: "retain-member",
+  [NO_DECISION_CATEGORY]: "retain-member",
+} as const;
+
+/**
+ * The seat round's options, and the reason they are not `yes`/`no`: this
+ * question means the opposite of the determination's, so a shared yes/no
+ * vocabulary asks every reader — and every model — to hold an inversion in
+ * their head for one round only. Run against a real local model, that is
+ * exactly what went wrong: a desk returned `no` under a sentence arguing for
+ * expulsion, and the narration printed the contradiction faithfully. Options
+ * are arbitrary strings to the protocol, so the cheapest fix is to stop
+ * inverting anything and let the ballot say what it means.
+ */
+export const GOVERNANCE_OPTIONS = ["expel", "keep"] as const;
+
+/**
+ * Three of the four seats that remain once the accused is recused. The
+ * denominator is four rather than five, and it is smaller for a reason the
+ * record carries: the snapshot never contained the recused seat (ADR-0021
+ * Decision 3). Zeroing could not have done this — a proof must never be able
+ * to lower a bar.
+ */
+const GOVERNANCE_BAR = 3;
+
 /**
  * The rulebook the trigger round pins before anyone votes (ADR-0019 W1). Money
  * is the consequence, so `afp:no-decision` has an action too: a determination
@@ -103,7 +145,7 @@ const QUORUM_THRESHOLD = 4;
  * against — which is exactly what a stalled round is worth to Meridian, and
  * exactly why the equivocation happens.
  */
-const ACTION_POLICY = {
+export const ACTION_POLICY = {
   yes: "pay-parametric-trigger",
   no: "close-file-no-payout",
   [NO_DECISION_CATEGORY]: "refer-to-arbitration-panel",
@@ -157,12 +199,23 @@ export interface P6Assessment {
   content?: string;
 }
 
-/** Injection points for content, so the mechanics stay one implementation. */
+/**
+ * Injection points for content, so the mechanics stay one implementation.
+ *
+ * Deliberately narrower than `P5Content`, which also carries a `brainFor`:
+ * nothing in this demo delegates a task, so no agent brain is ever invoked and
+ * a brain injector here would be a field nobody reads. P5 has one because its
+ * mesh leg genuinely runs a delegated question through a model.
+ */
 export interface P6Content {
   /** Called once per voting member, before the round is voted. */
   assess(operator: string, agent: string): Promise<P6Assessment>;
-  /** A brain for `agent` on `operator`, replacing the deterministic stub. */
-  brainFor?(operator: string, agent: string): Brain | null;
+  /**
+   * Called once per *remaining* seat in the governance round (ADR-0021), with
+   * the dossier the pool is weighing: the conviction, and the accused
+   * operator's own statement about it. `yes` expels.
+   */
+  judge?(operator: string, agent: string, dossier: string): Promise<P6Assessment>;
   /** The instruction the actuator carries out once the round closes (ADR-0019). */
   notice?(outcome: string, action: string): string;
 }
@@ -178,7 +231,23 @@ const SCRIPTED: Record<string, P6Assessment> = {
   "pel-uw": { verdict: "no", rationale: "the reference station's 10-minute sustained wind never crossed the trigger", producedBy: "stub" },
   "anc-uw": { verdict: "yes", rationale: "landfall track is unambiguous; the pressure reading confirms it", producedBy: "stub" },
   "har-uw": { verdict: "yes", rationale: "both pinned parameters cleared, on the contract's own reference station", producedBy: "stub" },
-  "mer-uw": { verdict: "yes", rationale: "(the half of the pair delivered to the yes camp)", producedBy: "stub" },
+  // Meridian's honest determination — the half it tells the first camp. Only
+  // its *contradiction* is scripted (see beat 3); this value is its own.
+  "mer-uw": { verdict: "yes", rationale: "the corridor and the pressure reading both clear; the wind sits inside the error bar", producedBy: "stub" },
+};
+
+/**
+ * How the pool votes on expelling the equivocator, when no content injector is
+ * supplied. Anchor votes to keep it — the member that spent this same round
+ * looking exactly like a cheat is the one least willing to treat a signature
+ * as a whole story. A unanimous expulsion would prove nothing about the
+ * machinery; a 3-1 that still clears its pinned bar proves the arithmetic.
+ */
+const SCRIPTED_JUDGMENT: Record<string, P6Assessment> = {
+  "atl-uw": { verdict: "expel", rationale: "two contradicting ballots under one signature, recomputable by anyone", producedBy: "stub" },
+  "pel-uw": { verdict: "expel", rationale: "the claim explains the how; it does not explain away the two signatures", producedBy: "stub" },
+  "har-uw": { verdict: "expel", rationale: "the member profiting from a failed round is the member that broke it", producedBy: "stub" },
+  "anc-uw": { verdict: "keep", rationale: "we were nearly convicted by our own disk this morning; a capture claim deserves the hearing", producedBy: "stub" },
 };
 
 async function member(
@@ -201,9 +270,10 @@ async function member(
   });
   const registrations: AgentRegistration[] = agents.map(({ agent }) => ({
     spec: { name: agent, capabilities: [CAPABILITY], keyCustody: "instance", since: "2026-08-17T00:00:00Z" },
-    brain:
-      content?.brainFor?.(name, agent) ??
-      new CountingBrain(agent, [CAPABILITY], () => ({ ok: true, content: `${name}: determination assessed` })),
+    // Every seat keeps the deterministic stub: this demo delegates no task, so
+    // a brain is never called. What the underwriters "think" arrives through
+    // `content.assess`, which is the only place a model has anything to do.
+    brain: new CountingBrain(agent, [CAPABILITY], () => ({ ok: true, content: `${name}: determination assessed` })),
   }));
   const instance = new AfpInstance(config, registrations, clock);
   const actorId = String(instance.instanceDocument().id);
@@ -269,6 +339,8 @@ export interface P6DemoResult {
     actor: string;
     /** The re-signed duplicate: same tuple, same value, grown observed-set, different digest. */
     duplicateDigest: string;
+    /** The value it re-signed — its own assessment, whatever that turned out to be. */
+    value: string;
     sameTupleAsFirst: boolean;
     convicted: boolean;
     /** The lawful recovery move, and the receipt it superseded in place. */
@@ -288,6 +360,52 @@ export interface P6DemoResult {
   succession: { rule: string; entitled: string | null; skipped: string[]; freshRound: string; supersedes: string };
   /** What the actuator did about it, under the action the round declared (ADR-0019). */
   actuation: { actor: string; action: string; notice: string };
+  /**
+   * ADR-0021 Decision 4a — what the convicted operator put on the record, and
+   * what it changed (nothing, which is the point).
+   */
+  claim: {
+    id: string;
+    /** The operator that published it — the convicted agent's own instance. */
+    by: string;
+    /** That operator's short name, for narration that should not print "actor". */
+    byOperator: string;
+    verificationMethod: string;
+    since: string;
+    /** Measured after the claim landed, not asserted: the seat is still zeroed. */
+    weightStillZero: boolean;
+    /** Whether the pool's other operators hold a copy, or only the joint case file does. */
+    heldByPeers: boolean;
+  };
+  /**
+   * ADR-0021 Decisions 2-4 — the governance round about the convicted seat:
+   * an ordinary round with a subject, whose subject is out of its own
+   * electorate by a rule anyone can recompute.
+   */
+  governance: {
+    round: string;
+    subject: string;
+    /** The recusal as it reads on the wire: status, and the cause form that resolves it. */
+    recusal: { status: string; form: string; proof: string };
+    /** The remainder that votes, and the bar computed over it. */
+    electorate: string[];
+    bar: number;
+    total: number;
+    judgments: Record<string, P6Assessment>;
+    outcome: string;
+    weightTally: Record<string, number>;
+    action: string;
+    /** Who published the consequence — a member, never the hub's own key. */
+    expelledBy: string;
+    membersBefore: number;
+    membersAfter: number;
+  };
+  /**
+   * The next determination's electorate, pinned after the expulsion: four
+   * seats, nothing declared, because the snapshot simply no longer contains
+   * the fifth.
+   */
+  nextRound: { round: string; voters: number; excluded: number };
   exports: Record<string, ExportSummary>;
   triggerThread: string;
   exportRoot: string;
@@ -412,7 +530,7 @@ export async function runP6Demo(
   const proposal = hub.proposeRound({
     round: roundId,
     thread: trigger,
-    question: "Did Storm Dagmar cross the contract's pinned parametric thresholds?",
+    question: QUESTION,
     options: ["yes", "no"],
     voters,
     quorumRule: { "afp:form": "explicit", "afp:threshold": QUORUM_THRESHOLD },
@@ -482,10 +600,23 @@ export async function runP6Demo(
   // the arbitration clause wakes up. The two halves carry genuinely different
   // `afp:observedVotes` sets, because the two camps genuinely saw different
   // meshes; the hub sequences for every camp, so it is where they meet.
-  const yesHalf = ballot(meridian, "yes", { observed: [digestOf(atlasVote), digestOf(harborVote)], suffix: "-a" });
-  const noHalf = ballot(meridian, "no", { observed: [digestOf(pelicanVote)], suffix: "-b" });
-  await deliver(meridian, yesHalf);
-  await deliver(meridian, noHalf);
+  //
+  // The value it tells the first camp is **its own assessment** — the one it
+  // would have voted honestly, and the one the narration prints beside its
+  // name; the second half is that answer's contradiction. Scripting only the
+  // *contradiction* keeps one thing scripted and no more: a model cannot be
+  // asked to defect, but there is no reason for its actual determination to
+  // then be discarded, and a demo that prints a verdict the record never
+  // carried is narrating something that did not happen.
+  const meridianVerdict = assessments["mer-uw"].verdict;
+  const contradiction = meridianVerdict === "yes" ? "no" : "yes";
+  const firstHalf = ballot(meridian, meridianVerdict, {
+    observed: [digestOf(atlasVote), digestOf(harborVote)],
+    suffix: "-a",
+  });
+  const contradictingHalf = ballot(meridian, contradiction, { observed: [digestOf(pelicanVote)], suffix: "-b" });
+  await deliver(meridian, firstHalf);
+  await deliver(meridian, contradictingHalf);
 
   const meridianActor = meridian.instance.actorId("mer-uw");
   const proofEntry = hub.outbox
@@ -515,18 +646,32 @@ export async function runP6Demo(
   // event with a defined shape, and the difference is a disk failure not
   // becoming a sanction.
   const anchorDuplicate = ballot(anchor, assessments["anc-uw"].verdict, {
-    observed: [...observed, digestOf(yesHalf), digestOf(anchorFirst)],
+    observed: [...observed, digestOf(firstHalf), digestOf(anchorFirst)],
     suffix: "-restored",
   });
   await deliver(anchor, anchorDuplicate);
   const anchorActor = anchor.instance.actorId("anc-uw");
   const convictedAfterRestore = hub.convictionsIn(roundId).some((c) => c.actor === anchorActor);
+  // Recomputed, not asserted: the row's whole claim is that the duplicate is
+  // tuple-identical and byte-different, and a demo that prints `true` from a
+  // literal is reporting on nothing. This is the same rule the verifier holds
+  // itself to — never record a pass for something you did not check.
+  const firstTuple = voteTupleOf(anchorFirst);
+  const duplicateTuple = voteTupleOf(anchorDuplicate);
+  const sameTupleAsFirst =
+    firstTuple !== null &&
+    duplicateTuple !== null &&
+    firstTuple.actor === duplicateTuple.actor &&
+    firstTuple.round === duplicateTuple.round &&
+    firstTuple.phase === duplicateTuple.phase &&
+    firstTuple.seqNo === duplicateTuple.seqNo &&
+    digestOf(anchorFirst) !== digestOf(anchorDuplicate);
 
   // Its lawful recovery move: re-vote at a strictly higher seqNo. The later
   // ballot supersedes the earlier one in place — one receipt, counted once.
   const anchorRevote = ballot(anchor, assessments["anc-uw"].verdict, {
-    seqNo: 2,
-    observed: [...observed, digestOf(yesHalf), digestOf(anchorFirst)],
+    seqNo: ANCHOR_REVOTE_SEQ,
+    observed: [...observed, digestOf(firstHalf), digestOf(anchorFirst)],
   });
   await deliver(anchor, anchorRevote);
   const anchorReceipts = hub.roundVotes(roundId).filter((v) => v.actor === anchorActor);
@@ -592,7 +737,7 @@ export async function runP6Demo(
         proposalId: `${envelope.actor}/proposals/dagmar-ii`,
         round: freshRound,
         hub: hub.actorId,
-        question: "Did Storm Dagmar cross the contract's pinned parametric thresholds?",
+        question: QUESTION,
         options: ["yes", "no"],
         quorumSnapshot: snapshot,
         voters,
@@ -631,6 +776,179 @@ export async function runP6Demo(
   );
   await atlas.instance.run(hubTransportOut);
 
+  // --- Beat 8: the accused answers (ADR-0021 Decision 4a). Meridian's operator
+  // says the key that signed those two ballots was captured, and dates the
+  // capture before the round opened.
+  //
+  // It changes **nothing**. The weight stays zero, no round is delayed, no
+  // conviction is reversed — a claim is not evidence, and an implementer who
+  // wires it to any of those has built an exculpation primitive that any
+  // convicted party can fire at will. What the record gains is that `zeroed`
+  // and `zeroed-contested` are now different states, which is the difference
+  // between a sanction and an incident, and it was unsayable before.
+  //
+  // The claim rides on Meridian's own chain, which is where a party's
+  // statement about itself belongs — the same self-referential class as Vouch
+  // and Disown, and held to the same standard: the instance that operates the
+  // agent may say this, and nobody else may say it for them.
+  const convictingVm = String(
+    ((firstHalf.proof as Record<string, JsonValue> | undefined)?.verificationMethod ?? ""),
+  );
+  const capturedSince = new Date(clock.now().getTime() - 36 * 3600_000).toISOString();
+  //
+  // Addressed to nobody, and that is a finding rather than a choice. ADR-0008's
+  // grants admit task verbs (`direct-delegation`) and anything carrying an
+  // `afp:hub` (`hub`); a `Create{afp:KeyCompromiseClaim}` is neither, so the
+  // pool's own boundary gate refuses it — measured here, by trying. The claim
+  // therefore reaches the other four operators the only way it can: in
+  // Meridian's own case file, when the five bundles are replayed together.
+  // Decision 4a says where a claim lives and says nothing about how the pool
+  // that must weigh it ever receives a copy.
+  const claimEntry = meridian.instance.publishAsInstance(
+    [],
+    trigger,
+    "parties",
+    (envelope: Envelope) =>
+      keyCompromiseClaim(envelope, {
+        proof: proofEntry.digest,
+        verificationMethod: convictingVm,
+        since: capturedSince,
+        content:
+          "Our signing key was in the hands of a third party from the night of the 18th. " +
+          "We did not cast either of those ballots and we are not asking anyone to take that on trust.",
+      }),
+  );
+  const claimObject = claimEntry.activity.object as Record<string, JsonValue>;
+  // Measured, not asserted: a claim that quietly restored weight would be the
+  // single worst defect this ADR could ship.
+  const weightStillZero = hub.convictionsIn(roundId).some((c) => c.actor === meridianActor);
+  const heldByPeers = pool
+    .filter((op) => op !== meridian)
+    .some((op) => op.federation.receivedActivities().some((r) => String(r.activity.id) === String(claimEntry.activity.id)));
+
+  // --- Beat 9: the pool decides what the conviction means (ADR-0021 Decisions
+  // 2-4). Conviction was cryptographic and needed nobody's permission;
+  // consequence is governance and needs everybody's.
+  //
+  // The accused is recused from its own sanction round by a cause the record
+  // resolves — the proof convicting it — so nobody has to take the proposer's
+  // word for the exclusion, and the proposer could not have recused anyone
+  // else. The denominator is four rather than five because the snapshot never
+  // contained the fifth seat, which is the one lawful way a bar gets smaller.
+  const govRound = `${atlas.origin}/rounds/meridian-seat`;
+  const dossier = [
+    `The pool convicted ${meridianActor.split("/").pop()} of equivocation in the Dagmar round:`,
+    "two ballots, one signature, one (round, phase, seqNo), contradicting values.",
+    "The proof is on the record and anyone can recompute it.",
+    "",
+    "Its operator has published a key-compromise claim on its own chain:",
+    `  "${String(claimObject.content ?? "")}"`,
+    `  (claiming capture from ${capturedSince}, naming ${convictingVm})`,
+    "",
+    "The claim is a statement, not evidence. Nothing about it is checkable, and",
+    "the seat's weight is zero either way. The question is what the pool does",
+    "about the seat: expel it, or keep it.",
+    "",
+    "Note also that this member's retrocession contract pays it best when the",
+    "pool fails to reach a determination — which is what the equivocation",
+    "achieved this morning.",
+  ].join("\n");
+
+  const govProposal = hub.proposeRound({
+    round: govRound,
+    thread: trigger,
+    question: `Does ${meridianActor} keep its seat in the windward pool?`,
+    options: [...GOVERNANCE_OPTIONS],
+    governanceSubject: meridianActor,
+    recused: [
+      { agent: meridianActor, cause: { "afp:form": "equivocation-proof", "afp:proof": proofEntry.digest } },
+    ],
+    quorumRule: { "afp:form": "explicit", "afp:threshold": GOVERNANCE_BAR },
+    pins: { actionPolicy: GOVERNANCE_POLICY },
+    level: 1,
+  });
+  const govObject = govProposal.activity.object as Record<string, JsonValue>;
+  const govVoters = govObject["afp:voters"] as string[];
+  const govWeights = govObject["afp:voterWeights"] as Record<string, number>;
+  const govSnapshot = String(govObject["afp:quorumSnapshot"]);
+  const recusedEntry = (govObject["afp:excluded"] as Record<string, JsonValue>[]).find(
+    (entry) => entry.agent === meridianActor,
+  )!;
+
+  const judgments: Record<string, P6Assessment> = {};
+  for (const op of pool) {
+    const agentId = op.instance.actorId(op.agent);
+    if (!govVoters.includes(agentId)) continue;
+    judgments[op.agent] = content?.judge
+      ? await content.judge(op.name, op.agent, dossier)
+      : SCRIPTED_JUDGMENT[op.agent];
+    await deliver(
+      op,
+      op.instance.publish(op.agent, [hub.actorId], trigger, "hub", (envelope) =>
+        castVote(envelope, {
+          voteId: `${envelope.actor}/votes/meridian-seat/prepare/1`,
+          round: govRound,
+          hub: hub.actorId,
+          proposalHash: govProposal.digest,
+          quorumSnapshot: govSnapshot,
+          value: judgments[op.agent].verdict,
+          phase: "prepare",
+          seqNo: 1,
+        }),
+      ).activity,
+    );
+  }
+
+  // Member-role seats only: the actuator holds a seat and never held a vote,
+  // so counting it here would make the electorate and the membership disagree
+  // by one for no reason a reader could recover.
+  const memberRoleSeats = (): number => hub.members().filter((agent) => hub.roleOf(agent) === "member").length;
+  const membersBefore = memberRoleSeats();
+  const govDecision = hub.closeRound(govRound);
+  const govDecisionObject = govDecision.activity.object as Record<string, JsonValue>;
+  const govOutcome = String(govDecisionObject["afp:outcome"]);
+  const govAction = GOVERNANCE_POLICY[govOutcome as keyof typeof GOVERNANCE_POLICY];
+  // The decision reaches the members before anyone acts on it — an operator
+  // that never received it cannot resolve the justification its own act names.
+  await hub.run(hubTransportOut);
+  for (const op of foreign) await op.instance.run(op.transport);
+
+  // The consequence is published by a **member**, bound to the decision by
+  // `afp:actsOn` — never by the hub's own key, whatever the hub's role as
+  // sequencing authority. Harbor, which demanded the earlier close, carries
+  // this one out too.
+  let expelledBy = "";
+  if (govAction === GOVERNANCE_POLICY.expel) {
+    const expulsion = harbor.instance.publish(harbor.agent, [hub.actorId], trigger, "hub", (envelope) =>
+      memberExpel(envelope, {
+        agent: meridianActor,
+        hub: hub.actorId,
+        decisionDigest: govDecision.digest,
+        action: govAction,
+      }),
+    ).activity;
+    await deliver(harbor, expulsion);
+    expelledBy = harbor.instance.actorId(harbor.agent);
+  }
+  const membersAfter = memberRoleSeats();
+
+  // --- Beat 10: the next determination, pinned after the expulsion. Four
+  // seats, and nothing to declare — the denominator moved because the
+  // membership did, not because anybody argued it down.
+  const nextRoundId = `${atlas.origin}/rounds/dagmar-iii`;
+  const nextProposal = hub.proposeRound({
+    round: nextRoundId,
+    thread: trigger,
+    question: QUESTION,
+    options: ["yes", "no"],
+    quorumRule: { "afp:form": "explicit", "afp:threshold": GOVERNANCE_BAR },
+    level: 1,
+    successionRule: { "afp:form": "snapshot-order" },
+  });
+  const nextObject = nextProposal.activity.object as Record<string, JsonValue>;
+  await hub.run(hubTransportOut);
+  for (const op of foreign) await op.instance.run(op.transport);
+
   // --- Exports: five case files, the host's carrying the hub. The joint
   // replay reads all five, resolves every received byte against its sender,
   // and runs the equivocation searchlight over every vote in every bundle.
@@ -662,7 +980,7 @@ export async function runP6Demo(
     conviction: {
       actor: meridianActor,
       proofId: String(proofObject.id),
-      halves: [yesHalf, noHalf].map((half) => ({
+      halves: [firstHalf, contradictingHalf].map((half) => ({
         digest: digestOf(half),
         value: String((half.object as Record<string, JsonValue>).value),
         observed: ((half.object as Record<string, JsonValue>)["afp:observedVotes"] as string[]).length,
@@ -672,9 +990,10 @@ export async function runP6Demo(
     restore: {
       actor: anchorActor,
       duplicateDigest: digestOf(anchorDuplicate),
-      sameTupleAsFirst: true,
+      value: assessments["anc-uw"].verdict,
+      sameTupleAsFirst,
       convicted: convictedAfterRestore,
-      revoteSeqNo: 2,
+      revoteSeqNo: ANCHOR_REVOTE_SEQ,
       countedDigest: anchorReceipts[0]?.digest ?? "",
       receiptsForActor: anchorReceipts.length,
     },
@@ -692,6 +1011,39 @@ export async function runP6Demo(
       supersedes,
     },
     actuation: { actor: atlas.instance.actorId("atl-pay"), action, notice },
+    claim: {
+      id: String(claimObject.id),
+      by: meridian.actorId,
+      byOperator: meridian.name,
+      verificationMethod: convictingVm,
+      since: capturedSince,
+      weightStillZero,
+      heldByPeers,
+    },
+    governance: {
+      round: govRound,
+      subject: meridianActor,
+      recusal: {
+        status: String(recusedEntry["afp:status"]),
+        form: String((recusedEntry["afp:cause"] as Record<string, JsonValue>)["afp:form"]),
+        proof: String((recusedEntry["afp:cause"] as Record<string, JsonValue>)["afp:proof"]),
+      },
+      electorate: govVoters,
+      bar: GOVERNANCE_BAR,
+      total: Object.values(govWeights).reduce((a, b) => a + b, 0),
+      judgments,
+      outcome: govOutcome,
+      weightTally: govDecisionObject["afp:weightTally"] as Record<string, number>,
+      action: govAction,
+      expelledBy,
+      membersBefore,
+      membersAfter,
+    },
+    nextRound: {
+      round: nextRoundId,
+      voters: (nextObject["afp:voters"] as string[]).length,
+      excluded: ((nextObject["afp:excluded"] as unknown[]) ?? []).length,
+    },
     exports,
     triggerThread: trigger,
     exportRoot,

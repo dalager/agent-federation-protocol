@@ -86,6 +86,26 @@ independently signed by members and gossip-replicable. Recovery from a bad hub o
 stand up a replacement hub actor, replay CRDT deltas from surviving members' outboxes —
 costly, but a liveness failure, not a correctness one.
 
+**How a governance decision is actually carried out** (ADR-0021 Decision 4b). A governance
+round is an ordinary round with a subject — no second quorum path, no new consensus
+machinery. Its proposal pins `afp:governanceSubject` (the agent the round is about) and an
+`afp:actionPolicy` (ADR-0019) naming a membership action for each of its outcomes; the
+resulting `afp:MemberAdmit`/`afp:MemberExpel` is published by a **member**, carries
+`afp:actsOn` naming the `afp:DecisionRecord` that authorized it, and names that round's own
+subject. Replay checks all three, and the clause above is the one that bites hardest in
+practice: since ADR-0014 the hub is the sequencing authority that signs proposals, so the
+habit of letting the hub sign everything walks straight into a self-signed expulsion. **A
+`MemberExpel` or `MemberAdmit` signed by the hub's own actor is invalid**, and a bundle
+carrying one fails replay by name.
+
+Two consequences of the same rule, worth stating because they are easy to assume the other
+way. The subject of a governance round is **recusable** by the `governance-subject` cause
+form (ADR-0021 Decision 3), so the accused is out of its own electorate — and out of the
+denominator, because the snapshot moved rather than because a proof lowered a bar.
+**Restoration is forward-scoped**: a `MemberAdmit` restores weight for rounds whose
+snapshot is pinned after that decision, and never re-tallies a closed round. Neither
+conviction nor forgiveness reaches backwards into a signed record.
+
 ## Shared state as CRDTs
 
 Explicit state types with defined merge rules. In v3 **every store is keyed

@@ -168,14 +168,34 @@ ones add capability around them.
 > wrong thing, invisible until something was built on top of it. P5 introduces the richest
 > set of new anchoring choices yet — remote hubs, relayed state, cross-instance enrollment
 > — so the same class of defect should be expected there, and a scenario should go first.
+>
+> **It did, twice more, and the pattern held both times.** Campaign 7 (scenario 10) walked
+> P5 before its stack ADR and produced [ADR-0014](adr/0014-p5-shared-hub-stack.md) and
+> [ADR-0015](adr/0015-the-case-file-at-n-parties.md), both built;
+> [ADR-0016](adr/0016-p5-transport.md) then built the transport that was P5's remaining
+> scope, and **P5 is built**. Campaign 8 (scenario 11) found the same defect class one flow
+> further out — the governance round is opened with `Offer{afp:Proposal}`, which is not a
+> task-bearing activity, so it inherited none of the pinning, sufficiency or irrevocability
+> machinery — closed by [ADR-0018](adr/0018-the-round-as-a-commitment.md) and
+> [ADR-0019](adr/0019-acting-on-a-decision.md), both built. Campaign 9 (scenario 12) did it
+> for P6; its state is below.
+>
+> Running alongside those, and driven by an audit rather than a scenario in ADR-0013's
+> manner: [ADR-0017](adr/0017-standards-conformance.md) makes the ActivityPub-compatibility
+> claim true — the `afp` context published at a canonical URL, RFC 9421 native with a cavage
+> shim, dereferenced delivery with every advertised URL answering, WebFinger and FEP-521a
+> transport keys, origin-minted `https` ids replacing `urn:afp:*`, and the deviations from
+> ActivityPub given a normative home. Decisions 1-6 are built and 7 partially; **Decision 8
+> (publishing an FEP) is deliberately deferred** — it is a public act, and the protocol is
+> not ready for that audience yet.
 
 | Phase | Scope | Demo | Gate |
 |---|---|---|---|
 | **P2 — Local hub & L0 deliberation** — **built**, stack in [ADR-0002](adr/0002-p2-hub-and-crdt-stack.md) | `afp:Hub` as a local route beside the agents, enrollment, hub-scoped CRDT capability registry, L0 weighted-quorum voting, `afp:DecisionRecord` closing every round, `afp:GovernanceDecision`, hub lifecycle (`Freeze`/`Archive`). Still one operator — the hub machinery has no federation dependency | *"30 agents agree on the best policy for codebase integrity"*: a local swarm deliberates and closes with a DecisionRecord — `npm run demo:p2` runs exactly this | Any member recomputes the weight tally from the recorded `countedVotes` and agrees; a vote missing from the tally is detectable from the record alone. **Holds:** the independent verifier recomputes the tally, demands every counted vote be producible, and rejects out-of-snapshot votes |
 | **P3 — Local allocation** — **built**, stack in [ADR-0003](adr/0003-p3-allocation-stack.md) | `afp:Bid` with commit-reveal windows (one commitment per bidder, reveals after close), selection rules in both families (ranking **and** set-selection over `afp:coverage`), deterministic tie-break, `afp:Award` naming performer(s) and synthesizer, `afp:Reauction` with its reduced pool bound to the prior award, `afp:Synthesis`, `afp:Settlement`, estimator/bidder separation enforced at bid admission. Local bidding is real load balancing | A question no single agent covers, awarded to a coalition whose size the bid pool forced, answered by a ratified Synthesis carrying its dissent — `npm run demo:p3` runs exactly this, and `npm run demo:p3:llm` runs the same auction with the answers written by a real local model | Any member recomputes the published selection rule over the revealed bids and reaches the same performer set and synthesizer; every reveal matches its commitment hash. **Holds:** the independent verifier rebuilds the admitted bid pool from the record alone, reruns both rule families, and demands the recomputed performers, synthesizer and winning-bid digests equal the Award's — plus answer sufficiency, synthesis binding, and the estimator wall |
 | **P4 — Federation handshake & operator visibility** — **built**, stack in [ADR-0008](adr/0008-p4-federation-stack.md) | `Offer{FederationAgreement}` → countersign → published trust anchor, `afp:MembershipProof`, deny-list and `afp:Defederate`, **payload integrity across the boundary carried by the existing `eddsa-jcs-2022` object proofs, with HTTP Signatures authenticating each hop** (ADR-0008 — no second signature suite), authorized fetch, both halves ([ADR-0013](adr/0013-authorized-fetch.md), built): non-`public` resources return 404 to everyone unentitled, and a signed request from an entitled peer is served — enrollment scoped to locally-hosted hubs until `afp:MembershipProof` exists, `afp:AuditGrant`, dual-publish shadow Notes and the narrow inbound command grammar | Two instances mutually recognize each other; an operator follows an agent from a **stock Mastodon account** and watches the thread | A validly-signed activity from an un-agreed instance is hard-rejected; a `parties` activity returns **404, not 403**, to a federated peer that is not named in it. **And the engagement joint-verifies** ([ADR-0009](adr/0009-federated-replay.md), built): both sides' exports replay in one command — one scoped with `afp:Redacted` stubs and a declared omission — passing clean while a deleted stub, tampered received bytes, or a two-story agreement each fail by name |
-| **P5 — Shared hubs across operators** | Two-level enrollment, hub-relayed digest exchange and anti-entropy (the NAT-realistic default), cross-instance CRDT sync, artifacts served by each originating instance, `hub` visibility enforced across the boundary (which needs the read side of the gate — [ADR-0013](adr/0013-authorized-fetch.md), proposed; today nothing above `public` is served to anyone), `Archive` as a member-quorum GovernanceDecision | A cross-operator task where the hub brokers discovery and allocation but sits on neither the payload nor the result path | Kill the hub mid-task: new allocation stalls, **in-flight work completes** |
-| **P6 — L1 Byzantine voting** | Chained signed votes (`afp:observedVotes`, `afp:seqNo`, `afp:proposalHash`), `afp:EquivocationProof`, snapshot-pinned membership, governance rollup. Activated by the concrete trigger **"≥2 operators live in a hub"** | A 3-instance hub surviving a deliberately equivocating agent | The EquivocationProof verifies standalone from the two conflicting votes; the offender's weight zeroes with no coordination; any *instance*-level consequence requires a ratified GovernanceDecision |
+| **P5 — Shared hubs across operators** — **built**, stack in [ADR-0014](adr/0014-p5-shared-hub-stack.md), [ADR-0015](adr/0015-the-case-file-at-n-parties.md) and [ADR-0016](adr/0016-p5-transport.md) | Two-level enrollment and `afp:MembershipProof`, the hub's own HTTP inbox, hub-relayed digest exchange and anti-entropy (the NAT-realistic default), cross-instance CRDT sync carrying activities, artifacts served by each originating instance and never crossing the hub host, `hub` visibility enforced across the boundary on the read gate ([ADR-0013](adr/0013-authorized-fetch.md), built), the degraded mode when the host is partitioned, `afp:uncounted` for the silence a DecisionRecord could not name, the all-pairs join at N=3, and `Archive` carrying the converged state into the record once | A cross-operator task where the hub brokers discovery and allocation but sits on neither the payload nor the result path — `npm run demo:p5` runs three operators over real sockets and leaves three verifiable case files, and `demo:p5:llm` tells the same hub as scenario 11's snow day | Kill the hub mid-task: new allocation stalls, **in-flight work completes**. **Holds:** ADR-0016's T7 kills the host mid-task with in-flight mesh work completing, and the N=3 joint replay verifies counted votes that genuinely crossed a boundary, with a per-domain check census so a bundle that checked nothing is visible |
+| **P6 — L1 Byzantine voting** — **built**, stack in [ADR-0020](adr/0020-p6-hardened-round-stack.md) and [ADR-0021](adr/0021-conviction-to-consequence.md) | Chained signed votes (`afp:observedVotes`, `afp:seqNo`, `afp:proposalHash`), `afp:EquivocationProof`, snapshot-pinned membership, governance rollup — plus campaign 9's hardening: succession pinned in the proposal, the equivocation predicate ruled on values, the provably-doomed round's early close, and cross-domain concealment detected at replay. Activated by the concrete trigger **"≥2 operators live in a hub"**. ADR-0021 then built the far side of conviction: an authorized membership trail, a recomputable electorate, recusal by declared cause, `afp:KeyCompromiseClaim`, membership actuation as a ratified act, forward-scoped restoration, and a proof that travels as cited enrollment evidence | A 3-instance hub surviving a deliberately equivocating agent — `npm run demo:p6` runs it at **five** instances over real HTTP with one scripted equivocator and one scripted backup-restore told apart by the joint replay, then carries the conviction through to consequence: a capture claim that changes nothing, a governance round that recuses its own subject, a member-published expulsion, and a next round pinning four seats. `demo:p6:llm` runs both questions on a local model | The EquivocationProof verifies standalone from the two conflicting votes; the offender's weight zeroes with no coordination; any *instance*-level consequence requires a ratified GovernanceDecision. **Holds:** gated by `adr0020.test.ts` (14 cases) and `adr0021.test.ts` (24, W5's whole matrix) — and running it at five operators found a defect no unit gate reached, since a real conviction always crosses a boundary |
 | **P7 — Contribution accounting** | `afp:ContributionSummary` and the `afp:ContributionDispute` flow — last, because it consumes P6's certificates and P1's Result flow | An independently recomputed, agreeing ContributionSummary | A second operator recomputes it from certificates and Results and matches; a dispute filed with evidence resolves against the record, not against a claim |
 
 ---
@@ -197,18 +217,19 @@ agreement, and it is the cheapest way to anchor outbox chain heads outside a tru
 where the operator holds every key
 ([06](06-deployment-profiles.md#keep-signing-everything--the-sneakernet-property)).
 
-## Known blockers before P5 opens
+## What blocked P5, and how it closed
 
-[Scenario 10](scenarios/10-the-incident-bridge.md) walks P5 end to end before its stack ADR
-exists, and reports seven findings (campaign 7). Its through-line is the decision P5 cannot
+P5 is built; this section is kept as the record of what stood in its way, because a blocker
+that quietly disappears teaches a later reader nothing.
+
+[Scenario 10](scenarios/10-the-incident-bridge.md) walked P5 end to end before its stack ADR
+existed, and reported seven findings (campaign 7). Its through-line is the decision P5 cannot
 avoid and P4 never had to make: **the hub is somebody's server** — which settles hosting,
 proof of membership, what members do while the host is partitioned, and whose state the
 case file carries, as one question with four faces.
 
-Two of those findings were already known here before the scenario confirmed them — one is
-now closed, and is kept below with its resolution rather than deleted, because a blocker
-that quietly disappears teaches a later reader nothing: both are things a P5 plan will hit in its first
-week, and neither is visible from the phase table above.
+Two of those findings were already known here before the scenario confirmed them, and both
+are now closed. They are kept below with their resolutions.
 
 - ~~**`afp:MembershipProof` exists in prose only.**~~ **Closed** — [ADR-0014](adr/0014-p5-shared-hub-stack.md)
   Decision 1, built and gated: the hub issues a signed, expiring statement naming agent,
@@ -216,7 +237,7 @@ week, and neither is visible from the phase table above.
   it against the hub's published key and requires the named agent to equal the requester
   it already authenticated. ADR-0013's `hub` predicate is widened from "a hub I host" to
   "a hub whose proof I can verify" — deny-list and agreement stages unchanged. P5's hub
-  reads are unblocked, Decisions 2–4 followed the same day, and M6 closed it out over three real HTTP servers. ADR-0015 followed — cross-receiver consistency, the check census, the archived state — and **campaign 7 is closed**: seven findings, two ADRs, opened and shut in a day. P5's remaining scope is the transport it always was: the hub's own HTTP inbox and cross-instance CRDT sync. [ADR-0016](adr/0016-p5-transport.md) now covers this scope.
+  reads are unblocked, Decisions 2–4 followed the same day, and M6 closed it out over three real HTTP servers. ADR-0015 followed — cross-receiver consistency, the check census, the archived state — and **campaign 7 is closed**: seven findings, two ADRs, opened and shut in a day. P5's remaining scope was the transport it always was: the hub's own HTTP inbox and cross-instance CRDT sync. [ADR-0016](adr/0016-p5-transport.md) covered that scope and is **built** — gated end to end over real sockets, and demonstrated by `npm run demo:p5`.
 - ~~**A scoped export can silently disarm the pin checks.**~~ **Closed** —
   [ADR-0010](adr/0010-pinning-without-an-auction.md) Decision 5, built at v3.23. Redacting
   a pin-bearing `Offer` left the thread with no task activity, so the governing pins
@@ -225,14 +246,18 @@ week, and neither is visible from the phase table above.
   widens the redaction surface, which was the whole reason for triaging it as its own track
   rather than folding it into a P5 ADR.
 
-## Known blockers before P6 opens
+## What blocked P6, and how it closed
 
-[Scenario 12](scenarios/12-the-parametric-trigger.md) walks P6 end to end before its stack
-ADR exists — the same move scenario 10 made for P5 — and reports eight findings
-(campaign 9, open). Its through-line is the seam L1's spec never crosses: **the proof is
+P6 is built; this section is kept as the record of what stood in its way, per the standing
+rule that a blocker which quietly disappears teaches a later reader nothing.
+
+[Scenario 12](scenarios/12-the-parametric-trigger.md) walked P6 end to end before its stack
+ADR existed — the same move scenario 10 made for P5 — and reported eight findings
+(campaign 9). **All eight are closed**, and so are the two older defects found while
+decomposing them. Its through-line is the seam L1's spec never crosses: **the proof is
 about a key; every consequence is about a party.** The cryptography held end to end; every
 finding lives after the moment of conviction. Triaged in the
-[campaign 9 ledger](scenarios/README.md#campaign-9--open-scenario-12-the-p6-shakedown)
+[campaign 9 ledger](scenarios/README.md#campaign-9--built-scenario-12-the-p6-shakedown)
 into [ADR-0020](adr/0020-p6-hardened-round-stack.md) (the hardened-round stack —
 **built and gated** (`adr0020.test.ts`, 14 cases): succession pinned in the proposal, the
 equivocation predicate ruled precisely, the provably-doomed round's early close, and
@@ -240,8 +265,10 @@ replay-detected concealment — findings 58, 60, 61 and 62 closed), an ADR-0005 
 (declared change of control — **built and gated**, `adr0005.test.ts`; finding 63 closed), and
 [ADR-0021](adr/0021-conviction-to-consequence.md) (conviction to consequence: a
 recomputable electorate, contest and restoration, recusal, proof portability — Decisions
-1 and 2 **built and gated**, Decisions 3-5 written). Two are worth naming here because a P6 build will hit them in its first
-week, and neither is visible from the phase table above:
+1 and 2 **built and gated** on 2026-08-22, Decisions 3-5 on 2026-08-23 — the recusal
+whose cause the record resolves, conviction to governed consequence with forward-scoped
+restoration, and the proof given a destination). Three are kept below — all now closed, and all worth naming because each was live in the
+built code when it was found:
 
 - ~~**Finding 62 is a live attack surface, not a gap.**~~ **Closed** — ADR-0020
   Decision 3, built the same day: `afp:successionRule` pinned in the proposal,
@@ -252,7 +279,7 @@ week, and neither is visible from the phase table above:
   no replay checks — and since ADR-0018/0019 the proposal carries the deadline, quorum
   rule, binding, electorate, action policy and irrevocability. Stalling rounds to farm
   proposer-ship got *more* valuable with every campaign that made the proposal stronger.
-  It goes first inside ADR-0020.
+  It went first inside ADR-0020.
 - ~~**Finding 58 gates the demo before the demo exists.**~~ **Closed** — ADR-0020
   Decision 2, built: values or `proposalHash` convict, a same-value duplicate is state
   loss with a lawful re-vote path, and gate case G2 is exactly the

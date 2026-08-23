@@ -16,11 +16,11 @@
 > ADR-0018, ADR-0019) appear here only as regression checks — and several of them pass
 > in ways worth recording, because this is the first scenario where they carry real weight.
 
-| **Support status** | **Partially supported — findings 58, 60, 61, 62, 63 closed; 59, 64, 65 open** (campaign 9, opened 2026-08-22) |
+| **Support status** | **Supported — all eight findings closed** (campaign 9, opened 2026-08-22, closed 2026-08-23) |
 |---|---|
-| Resolved by | [ADR-0020](../adr/0020-p6-hardened-round-stack.md) (58, 60, 61, 62 — built) · [ADR-0005 amendment](../adr/0005-operators-are-equal.md) (63 — built) · [ADR-0021](../adr/0021-conviction-to-consequence.md) (59, 64, 65 — Decisions 1-2 built, 3-5 written) — [triage](README.md#campaign-9--open-scenario-12-the-p6-shakedown) |
-| Gated by | `test/adr0020.test.ts` (14 cases — G2 is the backup-restore that must not convict) · `test/adr0005.test.ts` (the merger the snapshot can now see) |
-| See it run | `npm run demo:p6` — beats 3-5, five instances over real HTTP: the equivocator convicted, the backup-restore acquitted, the doomed round closed early, the successor entitled. `npm run demo:p6:llm` runs the same pool with the underwriters' verdicts written by a local model |
+| Resolved by | [ADR-0020](../adr/0020-p6-hardened-round-stack.md) (58, 60, 61, 62 — built) · [ADR-0005 amendment](../adr/0005-operators-are-equal.md) (63 — built) · [ADR-0021](../adr/0021-conviction-to-consequence.md) (59, 64, 65 — built) — [triage](README.md#campaign-9--built-scenario-12-the-p6-shakedown) |
+| Gated by | `test/adr0020.test.ts` (14 cases — G2 is the backup-restore that must not convict) · `test/adr0005.test.ts` (the merger the snapshot can now see) · `test/adr0021.test.ts` (24 cases — the electorate, the recusal, the governed consequence, the travelling proof) |
+| See it run | `npm run demo:p6` — beats 3-5, five instances over real HTTP: the equivocator convicted, the backup-restore acquitted, the doomed round closed early, the successor entitled — and then ADR-0021's far side: the capture claim that changes nothing, the governance round that recuses its own subject by the proof convicting it, the member-published expulsion, and a next round whose electorate is simply smaller. `npm run demo:p6:llm` runs the same pool with the underwriters' verdicts written by a local model |
 
 ## User story
 
