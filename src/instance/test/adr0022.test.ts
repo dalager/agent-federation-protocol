@@ -538,3 +538,361 @@ describe("ADR-0022 Decisions 1 and 3 — a summary declares its frame", () => {
     t.instance.close();
   });
 });
+
+// -------------------------------------------------- Decisions 4 and 5 (slice three)
+
+/**
+ * Credit that does not move, and a dispute that ends.
+ *
+ * Decision 4's rule sounds like a policy preference until you notice what
+ * enforces it: nothing in the recomputation deducts, so a summary that quietly
+ * un-counts work it already credited cannot match a second party's arithmetic.
+ * The check that makes "credit is fixed at acceptance" real is the same one
+ * that makes P7's roadmap gate line real — an independently recomputed,
+ * agreeing summary.
+ */
+
+import { castVote, unenroll } from "../src/hub/activities.ts";
+
+/** Ratify a summary the way 04's own idiom does: a round whose outcome names it. */
+function ratify(t: Quarter, summaryId: string, slug: string) {
+  const round = `${t.config.origin}/rounds/${slug}`;
+  const proposal = t.hub.proposeRound({
+    round,
+    thread: t.thread,
+    question: "Does this summary stand for the period?",
+    options: [summaryId, "reject"],
+  });
+  const snapshot = String((proposal.activity.object as Record<string, unknown>)["afp:quorumSnapshot"]);
+  for (const agent of ["triage", "fixer"]) {
+    t.hub.receive(
+      t.instance.publish(agent, [t.hub.actorId], t.thread, "hub", (envelope) =>
+        castVote(envelope, {
+          voteId: `${envelope.actor}/votes/${slug}`,
+          round,
+          hub: t.hub.actorId,
+          proposalHash: proposal.digest,
+          quorumSnapshot: snapshot,
+          value: summaryId,
+        }),
+      ).activity,
+    );
+  }
+  return t.hub.closeRound(round);
+}
+
+/** Close the hub's chain with an activity the period can point `to`. */
+function chainHead(t: Quarter) {
+  return t.hub.emit([], t.thread, "hub", (envelope) => ({
+    "@context": ["https://www.w3.org/ns/activitystreams", "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"],
+    id: envelope.activityId,
+    type: "afp:Freeze",
+    actor: envelope.actor,
+    to: [],
+    published: envelope.published,
+    context: envelope.thread,
+    "afp:visibility": envelope.visibility,
+    ...(envelope.prevActivity !== null ? { "afp:prevActivity": envelope.prevActivity } : {}),
+    object: t.hub.actorId,
+  }));
+}
+
+describe("ADR-0022 Decision 4 — credit is fixed at acceptance", () => {
+  it("G18 — mutation: an inflated entry fails against a second party's arithmetic", async () => {
+    const t = await quarter();
+    publishSummary(t, frameFor(t, t.settlement.digest));
+    exportQuarter(t);
+
+    const out = mutateBundle(VERIFIER, t.config.exportDir, t.thread, "triage", (outbox) => {
+      for (const item of outbox.orderedItems) {
+        const object = item.object as Record<string, unknown> | undefined;
+        if (object?.type !== "afp:ContributionSummary") continue;
+        (object["afp:entries"] as { "afp:credited": number }[])[0]["afp:credited"] = 40;
+      }
+    });
+    assert.notEqual(out.code, 0, "a number nobody else reaches must not replay clean");
+    assert.match(out.output, /FAIL \] contribution: .* entries recompute from the frame/);
+    assert.match(out.output, /credit disagrees for/);
+    t.instance.close();
+  });
+
+  it("G19 — mutation: un-counting work the record already credited fails the same check", async () => {
+    const t = await quarter();
+    publishSummary(t, frameFor(t, t.settlement.digest));
+    exportQuarter(t);
+
+    // The deduction Decision 4 forbids, attempted directly. It fails because
+    // the recomputation has no way to express it — which is what makes the rule
+    // enforceable rather than a preference.
+    const out = mutateBundle(VERIFIER, t.config.exportDir, t.thread, "triage", (outbox) => {
+      for (const item of outbox.orderedItems) {
+        const object = item.object as Record<string, unknown> | undefined;
+        if (object?.type !== "afp:ContributionSummary") continue;
+        object["afp:entries"] = [];
+      }
+    });
+    assert.notEqual(out.code, 0, "credit deducted after the fact must not replay clean");
+    assert.match(out.output, /FAIL \] contribution: .* entries recompute from the frame/);
+    t.instance.close();
+  });
+
+  it("G20 — a seat that ends inside the period is recorded, and its earlier credit stands", async () => {
+    const t = await quarter();
+    // Accounting is forward-scoped exactly as ADR-0021 made conviction
+    // forward-scoped: the work accepted before the act keeps its credit, and
+    // summing only over *current* members would erase it retroactively by an
+    // act that earlier work took no part in.
+    await t.hub.receive(
+      t.instance.publishAsInstance([t.hub.actorId], t.thread, "hub", (envelope) =>
+        unenroll(envelope, { agent: t.instance.actorId("triage"), hub: t.hub.actorId, reason: "contract ended" }),
+      ).activity,
+    );
+    const head = chainHead(t);
+
+    const entry = publishSummary(t, frameFor(t, head.digest));
+    const object = entry.activity.object as Record<string, unknown>;
+    const membership = object["afp:membership"] as { agent: string; "afp:act": string }[];
+    assert.ok(
+      membership.some((m) => m.agent === t.instance.actorId("triage") && m["afp:act"] === "afp:Unenroll"),
+      "the seat that ended inside the period is on the record",
+    );
+    assert.equal(
+      (object["afp:entries"] as { "afp:credited": number }[])[0]["afp:credited"],
+      4,
+      "and the work it was credited before that still counts",
+    );
+
+    exportQuarter(t);
+    const clean = runVerifier(VERIFIER, t.config.exportDir, t.thread, ["--verbose"]);
+    assert.equal(clean.code, 0, `forward-scoped accounting must replay clean:\n${clean.output}`);
+    assert.match(clean.output, /ok\s*\] contribution: .* credit is fixed at acceptance/);
+    t.instance.close();
+  });
+
+  it("G21 — mutation: a summary that hides the membership change fails", async () => {
+    const t = await quarter();
+    await t.hub.receive(
+      t.instance.publishAsInstance([t.hub.actorId], t.thread, "hub", (envelope) =>
+        unenroll(envelope, { agent: t.instance.actorId("triage"), hub: t.hub.actorId, reason: "contract ended" }),
+      ).activity,
+    );
+    publishSummary(t, frameFor(t, chainHead(t).digest));
+    exportQuarter(t);
+
+    const out = mutateBundle(VERIFIER, t.config.exportDir, t.thread, "triage", (outbox) => {
+      for (const item of outbox.orderedItems) {
+        const object = item.object as Record<string, unknown> | undefined;
+        if (object?.type !== "afp:ContributionSummary") continue;
+        object["afp:membership"] = [];
+      }
+    });
+    assert.notEqual(out.code, 0, "a period that quietly omits a seat ending inside it must not replay clean");
+    assert.match(out.output, /FAIL \] contribution: .* credit is fixed at acceptance/);
+    assert.match(out.output, /afp:membership does not match/);
+    t.instance.close();
+  });
+});
+
+describe("ADR-0022 Decision 5 — a dispute ends", () => {
+  it("G22 — a ratified summary stands, by 04's own ratification idiom", async () => {
+    const t = await quarter();
+    const entry = publishSummary(t, frameFor(t, t.settlement.digest));
+    const summaryId = String((entry.activity.object as Record<string, unknown>).id);
+    // No new consensus path: an ordinary ADR-0018 round whose outcome names the
+    // summary, exactly as a DecisionRecord ratifies a Synthesis (ADR-0007).
+    const decision = ratify(t, summaryId, "ratify-q3");
+    assert.equal((decision.activity.object as Record<string, unknown>)["afp:outcome"], summaryId);
+
+    exportQuarter(t);
+    const clean = runVerifier(VERIFIER, t.config.exportDir, t.thread, ["--verbose"]);
+    assert.equal(clean.code, 0, `a ratified summary must replay clean:\n${clean.output}`);
+    t.instance.close();
+  });
+
+  it("G23 — a draft correction may not supersede a ratified summary", async () => {
+    const t = await quarter();
+    const first = publishSummary(t, frameFor(t, t.settlement.digest));
+    const firstId = String((first.activity.object as Record<string, unknown>).id);
+    ratify(t, firstId, "ratify-first");
+
+    // The correction 04 invites — but the summary it corrects was weighed by
+    // the members, and a ratified answer is retracted only by a ratified one.
+    t.instance.publish("triage", [], t.thread, "public", (envelope) =>
+      contributionSummary(envelope, {
+        summaryId: `${envelope.actor}/summaries/2026-q3-corrected`,
+        hub: t.hub.actorId,
+        computedBy: t.instance.instanceDocument().id as string,
+        frame: frameFor(t, t.settlement.digest),
+        totals: { denominator: 4, credited: {}, unreadable: {}, qualified: {}, membership: [], inputs: [] },
+        supersedes: firstId,
+      }),
+    );
+    exportQuarter(t);
+
+    const out = runVerifier(VERIFIER, t.config.exportDir, t.thread, ["--verbose"]);
+    assert.notEqual(out.code, 0, "a draft must not overwrite a quarter the members voted on");
+    assert.match(out.output, /FAIL \] contribution: .* supersedes a summary it may lawfully supersede/);
+    assert.match(out.output, /retracted only by a ratified one/);
+    t.instance.close();
+  });
+
+  it("G24 — two ratified summaries standing for one period is the ambiguity this removes", async () => {
+    const t = await quarter();
+    const first = publishSummary(t, frameFor(t, t.settlement.digest));
+    ratify(t, String((first.activity.object as Record<string, unknown>).id), "ratify-a");
+
+    const second = t.instance.publish("triage", [], t.thread, "public", (envelope) =>
+      contributionSummary(envelope, {
+        summaryId: `${envelope.actor}/summaries/2026-q3-second`,
+        hub: t.hub.actorId,
+        computedBy: t.instance.instanceDocument().id as string,
+        frame: frameFor(t, t.settlement.digest),
+        totals: { denominator: 4, credited: {}, unreadable: {}, qualified: {}, membership: [], inputs: [] },
+      }),
+    );
+    ratify(t, String((second.activity.object as Record<string, unknown>).id), "ratify-b");
+    exportQuarter(t);
+
+    const out = runVerifier(VERIFIER, t.config.exportDir, t.thread, ["--verbose"]);
+    assert.notEqual(out.code, 0, "two standing answers for one quarter is not an answer");
+    assert.match(out.output, /FAIL \] contribution: .* is the only ratified summary standing for its period/);
+    t.instance.close();
+  });
+});
+
+// -------------------------------------------------------- Disputes (04 § Disputes)
+
+import { contributionDispute } from "../src/hub/summary.ts";
+
+describe("ADR-0022 Decision 5 — a dispute resolves against the record, not against a claim", () => {
+  it("G25 — a mechanical dispute citing real evidence replays clean", async () => {
+    const t = await quarter();
+    const entry = publishSummary(t, frameFor(t, t.settlement.digest));
+    const summaryId = String((entry.activity.object as Record<string, unknown>).id);
+
+    // "You omitted this outbox entry" — 04's own example, and the reason it is
+    // the cheap path: nothing has to adjudicate it, because the summary either
+    // recomputes over the same inputs or it does not.
+    t.instance.publish("fixer", [], t.thread, "public", (envelope) =>
+      contributionDispute(envelope, {
+        disputeId: `${envelope.actor}/disputes/q3-1`,
+        hub: t.hub.actorId,
+        summary: summaryId,
+        ground: "omitted-input",
+        evidence: [t.settlement.digest],
+        content: "the settlement for ticket-4471 is not reflected in our reading of the period",
+      }),
+    );
+
+    exportQuarter(t);
+    const clean = runVerifier(VERIFIER, t.config.exportDir, t.thread, ["--verbose"]);
+    assert.equal(clean.code, 0, `a well-formed dispute must replay clean:\n${clean.output}`);
+    assert.match(clean.output, /ok\s*\] contribution: .* dispute rests on evidence the record carries/);
+    t.instance.close();
+  });
+
+  it("G26 — the builder refuses a dispute that cites nothing", async () => {
+    const t = await quarter();
+    const entry = publishSummary(t, frameFor(t, t.settlement.digest));
+    // 04 and 03 both say "with evidence" and neither had a mechanism, so a
+    // dispute was a sentence anybody could publish about anybody's arithmetic.
+    assert.throws(
+      () =>
+        t.instance.publish("fixer", [], t.thread, "public", (envelope) =>
+          contributionDispute(envelope, {
+            disputeId: `${envelope.actor}/disputes/empty`,
+            hub: t.hub.actorId,
+            summary: String((entry.activity.object as Record<string, unknown>).id),
+            ground: "omitted-input",
+            evidence: [],
+          }),
+        ),
+      /must cite evidence/,
+    );
+    t.instance.close();
+  });
+
+  it("G27 — mutation: a dispute citing evidence the case file does not carry fails by name", async () => {
+    const t = await quarter();
+    const entry = publishSummary(t, frameFor(t, t.settlement.digest));
+    t.instance.publish("fixer", [], t.thread, "public", (envelope) =>
+      contributionDispute(envelope, {
+        disputeId: `${envelope.actor}/disputes/q3-1`,
+        hub: t.hub.actorId,
+        summary: String((entry.activity.object as Record<string, unknown>).id),
+        ground: "omitted-input",
+        evidence: [t.settlement.digest],
+      }),
+    );
+    exportQuarter(t);
+
+    const out = mutateBundle(VERIFIER, t.config.exportDir, t.thread, "fixer", (outbox) => {
+      for (const item of outbox.orderedItems) {
+        const object = item.object as Record<string, unknown> | undefined;
+        if (object?.type !== "afp:ContributionDispute") continue;
+        object["afp:evidence"] = ["sha256:0000000000000000000000000000000000000000000000000000000000000000"];
+      }
+    });
+    assert.notEqual(out.code, 0, "a dispute pointing at nothing must not replay clean");
+    assert.match(out.output, /FAIL \] contribution: .* dispute rests on evidence the record carries/);
+    assert.match(out.output, /resolves to no activity in this case file/);
+    t.instance.close();
+  });
+
+  it("G28 — a quality dispute may not be republished away", async () => {
+    const t = await quarter();
+    const first = publishSummary(t, frameFor(t, t.settlement.digest));
+    const firstId = String((first.activity.object as Record<string, unknown>).id);
+
+    // The case 04 routes to a vote: whether the work met the bar is not a thing
+    // arithmetic settles, so the cheap path is not available for it.
+    t.instance.publish("fixer", [], t.thread, "public", (envelope) =>
+      contributionDispute(envelope, {
+        disputeId: `${envelope.actor}/disputes/q3-quality`,
+        hub: t.hub.actorId,
+        summary: firstId,
+        ground: "quality",
+        evidence: [t.settlement.digest],
+        content: "the ticket was closed but the fault recurred within the week",
+      }),
+    );
+    // ...answered by simply republishing, which is exactly the swallow.
+    t.instance.publish("triage", [], t.thread, "public", (envelope) =>
+      contributionSummary(envelope, {
+        summaryId: `${envelope.actor}/summaries/2026-q3-quietly-corrected`,
+        hub: t.hub.actorId,
+        computedBy: t.instance.instanceDocument().id as string,
+        frame: frameFor(t, t.settlement.digest),
+        totals: { denominator: 4, credited: {}, unreadable: {}, qualified: {}, membership: [], inputs: [] },
+        supersedes: firstId,
+      }),
+    );
+    exportQuarter(t);
+
+    const out = runVerifier(VERIFIER, t.config.exportDir, t.thread, ["--verbose"]);
+    assert.notEqual(out.code, 0, "a contested question must not vanish by republication");
+    assert.match(out.output, /FAIL \] contribution: .* quality dispute escalates rather than being republished away/);
+    assert.match(out.output, /the same path as\s*\n?\s*equivocation|same path as equivocation/);
+    t.instance.close();
+  });
+
+  it("G29 — an open quality dispute is a lawful state, and says so", async () => {
+    const t = await quarter();
+    const entry = publishSummary(t, frameFor(t, t.settlement.digest));
+    t.instance.publish("fixer", [], t.thread, "public", (envelope) =>
+      contributionDispute(envelope, {
+        disputeId: `${envelope.actor}/disputes/q3-open`,
+        hub: t.hub.actorId,
+        summary: String((entry.activity.object as Record<string, unknown>).id),
+        ground: "quality",
+        evidence: [t.settlement.digest],
+      }),
+    );
+    exportQuarter(t);
+
+    const clean = runVerifier(VERIFIER, t.config.exportDir, t.thread, ["--verbose"]);
+    assert.equal(clean.code, 0, `an unanswered dispute is not a defect:\n${clean.output}`);
+    assert.match(clean.output, /open: no correction supersedes the disputed summary yet/);
+    t.instance.close();
+  });
+});

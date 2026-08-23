@@ -33,11 +33,27 @@ can recompute it independently; `afp:computedBy` is a field, not a privileged ro
 }
 ```
 
-**Disputes.** `afp:ContributionDispute{summaryId, evidence}` is usually mechanical — "you
-omitted this outbox entry" is re-checkable by anyone recomputing over the same public
-inputs, resolved by republishing a corrected summary. Genuinely contested cases (did a
-Result meet the quality bar?) escalate to an `afp:GovernanceDecision` vote, the same path
-as equivocation.
+**Disputes.** `afp:ContributionDispute` names the summary it challenges (`afp:summary`),
+the ground it stands on (`afp:ground`, a closed set), and — always — the activity digests
+it rests on (`afp:evidence`). A dispute citing nothing checkable is refused by the emitting
+instance and fails replay by name: this object's entire promise is that a challenge
+resolves *against the record* rather than against a claim, and a challenge with no evidence
+is exactly a claim.
+
+Two of the three grounds are **mechanical** and need no adjudication at all.
+`omitted-input` and `included-input` — "you omitted this outbox entry" — are re-checkable
+by anyone recomputing over the same inputs, and the disputed summary's own checks already
+say whether it recomputes ([ADR-0022](adr/0022-the-summary-declares-its-frame.md)
+Decisions 1 and 3). The dispute's job is to *point*, on the record; the arithmetic
+adjudicates. These are resolved by republishing a corrected summary, which supersedes
+under ADR-0007's grammar.
+
+The third is not. `quality` — did a Result meet the bar? — is a judgement no arithmetic
+settles, and it escalates to an `afp:GovernanceDecision` vote, the same path as
+equivocation. That routing is now enforced rather than recommended: **a summary under an
+unanswered `quality` dispute may not be superseded by a draft.** The correction must
+itself be ratified, or the cheap path silently swallows the expensive one and the question
+nobody could settle by arithmetic simply leaves the record.
 
 > **Explicitly out of scope:** pricing, payment, settlement, exchange rates, any
 > transferable token or credit. The summary is a reputation/accounting artifact; what

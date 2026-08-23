@@ -68,6 +68,24 @@ export interface ContributionTotals {
    * award names the performer) and impossible to credit in detail.
    */
   unreadable: Record<string, number>;
+  /**
+   * ADR-0022 Decision 4: operator → count of credited tasks whose answer the
+   * record later says did not hold. **Recorded, never deducted.** Credit is
+   * fixed at acceptance: a pool that pays only for fixes which turn out
+   * permanent is a pool where nobody touches a hard ticket, and — the reason
+   * that matters here — a number that can move after the fact is not a number
+   * two parties can agree on.
+   */
+  qualified: Record<string, number>;
+  /**
+   * ADR-0022 Decision 4: the membership acts bracketed by the period, recorded
+   * so a reader can see that an operator's quarter ended inside it. Accounting
+   * is forward-scoped exactly as ADR-0021 made conviction forward-scoped: work
+   * accepted before an expulsion counts, and summing only over *current*
+   * members would erase a company's work retroactively by an act it took no
+   * part in.
+   */
+  membership: { agent: string; act: string }[];
   /** The digests summed, sorted — Decision 3's preimage. */
   inputs: string[];
 }
@@ -142,10 +160,39 @@ export function creditOf(result: Record<string, JsonValue>): { agent: string; sh
  * credited under its own URL rather than dropped: an unknown operator is a
  * visible oddity, and a dropped credit is an invisible one.
  */
+/**
+ * ADR-0022 Decision 4: `agent → operating instance`, folded from the Enroll
+ * trail **as of the period's close** and from nothing else.
+ *
+ * Two rules are packed in here and both were learned the hard way. The operator
+ * is the `actor` of the agent's own `afp:Enroll` (ADR-0005 Decision 2 binds an
+ * Enroll to the agent's operating instance, which is what makes this readable
+ * at all). And an `afp:Unenroll` does **not** clear it: leaving a hub ends a
+ * seat, it does not retroactively change who did the work. Resolving the
+ * mapping "as of now" instead would let an agent that leaves after a quarter
+ * re-bucket its own past credit — the same defect ADR-0021 Decision 1 closed
+ * for weights, arriving one layer up in accounting.
+ */
+export function operatorsAt(pool: readonly Activity[], hub: string, atMillis: number): Record<string, string> {
+  const operators: Record<string, string> = {};
+  const seen: Record<string, number> = {};
+  for (const activity of pool) {
+    if (activity.type !== "afp:Enroll") continue;
+    if (activity["afp:hub"] !== hub && activity.target !== hub) continue;
+    const agent = String(activity.object ?? "");
+    const at = Date.parse(String(activity.published ?? "")) || 0;
+    if (!agent || at > atMillis) continue;
+    if (seen[agent] !== undefined && seen[agent] > at) continue;
+    seen[agent] = at;
+    operators[agent] = String(activity.actor ?? "");
+  }
+  return operators;
+}
+
 export function computeContribution(
   poolIn: readonly Activity[],
   frame: SummaryFrame,
-  resolveOperator: (agent: string) => string,
+  fallbackOperator: (agent: string) => string,
 ): ContributionTotals | null {
   // Deduplicated by digest before anything is counted, and this is not
   // defensive tidying: in a joint replay the merged pool legitimately holds the
@@ -170,8 +217,13 @@ export function computeContribution(
   const scope = new Set(frame.inputScope.visibility);
   const readable = (activity: Activity): boolean => scope.has(String(activity["afp:visibility"]) as Visibility);
 
+  const closesAt = Date.parse(String(slice[slice.length - 1]?.published ?? "")) || Number.MAX_SAFE_INTEGER;
+  const operators = operatorsAt(pool, frame.periodRule.hub, closesAt);
+  const resolveOperator = (agent: string): string => operators[agent] ?? fallbackOperator(agent);
+
   const rows: { agent: string; share: number; denominator: number }[] = [];
   const unreadable: Record<string, number> = {};
+  const qualified: Record<string, number> = {};
   const inputs = new Set<string>();
 
   for (const settlement of settlements) {
@@ -199,9 +251,24 @@ export function computeContribution(
       continue;
     }
 
+    // Decision 4: does the record say this answer did not hold? A supersession
+    // on the task's own thread (ADR-0007) is the one marker the protocol
+    // actually has — a bare Result re-opened later has none at all, which is
+    // finding 71's sharp edge and is why the rule is "credit is fixed", not
+    // "credit is provisional".
+    const superseded = pool.some(
+      (a) => a.context === thread && typeof (objectOf(a) ?? {})["afp:supersedes"] === "string",
+    );
+
     for (const result of results) {
       inputs.add(digestOf(result));
-      rows.push(...creditOf(payloadOf(result, "afp:Result")!));
+      const credits = creditOf(payloadOf(result, "afp:Result")!);
+      rows.push(...credits);
+      if (superseded) {
+        for (const operator of new Set(credits.map((c) => resolveOperator(c.agent)))) {
+          qualified[operator] = (qualified[operator] ?? 0) + 1;
+        }
+      }
     }
   }
 
@@ -214,7 +281,33 @@ export function computeContribution(
     credited[operator] = (credited[operator] ?? 0) + (row.share * denominator) / row.denominator;
   }
 
-  return { denominator, credited, unreadable, inputs: [...inputs].sort() };
+  // Decision 4: the membership acts the period brackets. The hub does not
+  // sequence enrollment — an Enroll rides its own instance's chain — so the
+  // bracket is the `published` of the slice's own endpoints, which are the
+  // hub's assertions and carry exactly the authority the period rule already
+  // relies on. Nothing is *selected* by wall-clock; this only labels a window
+  // the chain already fixed.
+  const first = slice[0];
+  const last = slice[slice.length - 1];
+  const opens = first ? String(first.published ?? "") : "";
+  const closes = last ? String(last.published ?? "") : "";
+  const MEMBERSHIP_ACTS = new Set(["afp:Enroll", "afp:Unenroll", "afp:MemberExpel", "afp:MemberAdmit"]);
+  const membership = pool
+    .filter((activity) => {
+      const types = Array.isArray(activity.type) ? activity.type.map(String) : [String(activity.type)];
+      if (!types.some((type) => MEMBERSHIP_ACTS.has(type))) return false;
+      const at = String(activity.published ?? "");
+      return opens !== "" && at >= opens && at <= closes;
+    })
+    .map((activity) => ({
+      agent: String(activity.object ?? ""),
+      act: (Array.isArray(activity.type) ? activity.type.map(String) : [String(activity.type)]).find((type) =>
+        MEMBERSHIP_ACTS.has(type),
+      )!,
+    }))
+    .sort((a, b) => (a.agent + a.act).localeCompare(b.agent + b.act));
+
+  return { denominator, credited, unreadable, qualified, membership, inputs: [...inputs].sort() };
 }
 
 /** Decision 3's preimage, stated once and computed identically on both sides. */
@@ -272,12 +365,87 @@ export function contributionSummary(envelope: Envelope, spec: SummarySpec): { [k
   object["afp:unreadable"] = Object.keys(spec.totals.unreadable)
     .sort()
     .map((operator) => ({ "afp:operator": operator, "afp:count": spec.totals.unreadable[operator] }));
+  // Decision 4: both are recorded rather than folded into the credit — the
+  // whole point is that neither of them moves a number.
+  object["afp:qualified"] = Object.keys(spec.totals.qualified)
+    .sort()
+    .map((operator) => ({ "afp:operator": operator, "afp:count": spec.totals.qualified[operator] }));
+  object["afp:membership"] = spec.totals.membership.map((entry) => ({ agent: entry.agent, "afp:act": entry.act }));
   if (spec.supersedes) object["afp:supersedes"] = spec.supersedes;
 
   return {
     "@context": AFP_CONTEXTS,
     id: envelope.activityId,
     type: "Create",
+    actor: envelope.actor,
+    to: [...envelope.to],
+    published: envelope.published,
+    context: envelope.thread,
+    "afp:visibility": envelope.visibility,
+    ...(envelope.prevActivity !== null ? { "afp:prevActivity": envelope.prevActivity } : {}),
+    object,
+  };
+}
+
+/**
+ * ADR-0022 Decision 5 / 04 § Disputes — the closed registry of grounds a
+ * dispute may stand on.
+ *
+ * The split is 04's own and it is the load-bearing distinction: two of these
+ * are **mechanical** — "you omitted this outbox entry" is re-checkable by
+ * anyone recomputing over the same inputs, and the summary's own checks already
+ * adjudicate it — while the third is a judgement no arithmetic settles and
+ * therefore escalates to a round, the same path as equivocation.
+ */
+export type DisputeGround = "omitted-input" | "included-input" | "quality";
+
+export interface DisputeSpec {
+  disputeId: string;
+  hub: string;
+  /** The `afp:ContributionSummary` id being challenged. */
+  summary: string;
+  ground: DisputeGround;
+  /** Activity digests the challenge rests on — never empty. */
+  evidence: readonly string[];
+  content?: string;
+}
+
+/**
+ * `afp:ContributionDispute` — a challenge to a summary, **with evidence**.
+ *
+ * 04 and 03 both say "with evidence" and neither had a mechanism, so a dispute
+ * was a sentence anybody could publish about anybody's arithmetic. The whole
+ * point of P7's gate line is that a dispute "resolves against the record, not
+ * against a claim", and a dispute that cites nothing checkable is exactly a
+ * claim. Refused here, before signing, for the same reason a co-authored Result
+ * without a split is: a record that admits uncheckable assertions about its own
+ * numbers has given up the property it exists for.
+ *
+ * What this deliberately does **not** do is adjudicate. A mechanical dispute
+ * needs no adjudication — the disputed summary either recomputes or it does
+ * not, and V3/V5 already say which in the same replay. The dispute's job is to
+ * *point*, on the record, at what it says was summed wrongly.
+ */
+export function contributionDispute(envelope: Envelope, spec: DisputeSpec): { [key: string]: JsonValue } {
+  if (spec.evidence.length === 0) {
+    throw new Error(
+      `afp:ContributionDispute must cite evidence (04 § Disputes) — a dispute that cites nothing ` +
+        `checkable is a claim, and P7's whole promise is that disputes resolve against the record`,
+    );
+  }
+  const object: { [key: string]: JsonValue } = {
+    id: spec.disputeId,
+    type: "afp:ContributionDispute",
+    "afp:hub": spec.hub,
+    "afp:summary": spec.summary,
+    "afp:ground": spec.ground,
+    "afp:evidence": [...spec.evidence],
+  };
+  if (spec.content) object.content = spec.content;
+  return {
+    "@context": AFP_CONTEXTS,
+    id: envelope.activityId,
+    type: "afp:ContributionDispute",
     actor: envelope.actor,
     to: [...envelope.to],
     published: envelope.published,

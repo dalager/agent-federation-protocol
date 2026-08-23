@@ -196,7 +196,7 @@ ones add capability around them.
 | **P4 — Federation handshake & operator visibility** — **built**, stack in [ADR-0008](adr/0008-p4-federation-stack.md) | `Offer{FederationAgreement}` → countersign → published trust anchor, `afp:MembershipProof`, deny-list and `afp:Defederate`, **payload integrity across the boundary carried by the existing `eddsa-jcs-2022` object proofs, with HTTP Signatures authenticating each hop** (ADR-0008 — no second signature suite), authorized fetch, both halves ([ADR-0013](adr/0013-authorized-fetch.md), built): non-`public` resources return 404 to everyone unentitled, and a signed request from an entitled peer is served — enrollment scoped to locally-hosted hubs until `afp:MembershipProof` exists, `afp:AuditGrant`, dual-publish shadow Notes and the narrow inbound command grammar | Two instances mutually recognize each other; an operator follows an agent from a **stock Mastodon account** and watches the thread | A validly-signed activity from an un-agreed instance is hard-rejected; a `parties` activity returns **404, not 403**, to a federated peer that is not named in it. **And the engagement joint-verifies** ([ADR-0009](adr/0009-federated-replay.md), built): both sides' exports replay in one command — one scoped with `afp:Redacted` stubs and a declared omission — passing clean while a deleted stub, tampered received bytes, or a two-story agreement each fail by name |
 | **P5 — Shared hubs across operators** — **built**, stack in [ADR-0014](adr/0014-p5-shared-hub-stack.md), [ADR-0015](adr/0015-the-case-file-at-n-parties.md) and [ADR-0016](adr/0016-p5-transport.md) | Two-level enrollment and `afp:MembershipProof`, the hub's own HTTP inbox, hub-relayed digest exchange and anti-entropy (the NAT-realistic default), cross-instance CRDT sync carrying activities, artifacts served by each originating instance and never crossing the hub host, `hub` visibility enforced across the boundary on the read gate ([ADR-0013](adr/0013-authorized-fetch.md), built), the degraded mode when the host is partitioned, `afp:uncounted` for the silence a DecisionRecord could not name, the all-pairs join at N=3, and `Archive` carrying the converged state into the record once | A cross-operator task where the hub brokers discovery and allocation but sits on neither the payload nor the result path — `npm run demo:p5` runs three operators over real sockets and leaves three verifiable case files, and `demo:p5:llm` tells the same hub as scenario 11's snow day | Kill the hub mid-task: new allocation stalls, **in-flight work completes**. **Holds:** ADR-0016's T7 kills the host mid-task with in-flight mesh work completing, and the N=3 joint replay verifies counted votes that genuinely crossed a boundary, with a per-domain check census so a bundle that checked nothing is visible |
 | **P6 — L1 Byzantine voting** — **built**, stack in [ADR-0020](adr/0020-p6-hardened-round-stack.md) and [ADR-0021](adr/0021-conviction-to-consequence.md) | Chained signed votes (`afp:observedVotes`, `afp:seqNo`, `afp:proposalHash`), `afp:EquivocationProof`, snapshot-pinned membership, governance rollup — plus campaign 9's hardening: succession pinned in the proposal, the equivocation predicate ruled on values, the provably-doomed round's early close, and cross-domain concealment detected at replay. Activated by the concrete trigger **"≥2 operators live in a hub"**. ADR-0021 then built the far side of conviction: an authorized membership trail, a recomputable electorate, recusal by declared cause, `afp:KeyCompromiseClaim`, membership actuation as a ratified act, forward-scoped restoration, and a proof that travels as cited enrollment evidence | A 3-instance hub surviving a deliberately equivocating agent — `npm run demo:p6` runs it at **five** instances over real HTTP with one scripted equivocator and one scripted backup-restore told apart by the joint replay, then carries the conviction through to consequence: a capture claim that changes nothing, a governance round that recuses its own subject, a member-published expulsion, and a next round pinning four seats. `demo:p6:llm` runs both questions on a local model | The EquivocationProof verifies standalone from the two conflicting votes; the offender's weight zeroes with no coordination; any *instance*-level consequence requires a ratified GovernanceDecision. **Holds:** gated by `adr0020.test.ts` (14 cases) and `adr0021.test.ts` (24, W5's whole matrix) — and running it at five operators found a defect no unit gate reached, since a real conviction always crosses a boundary |
-| **P7 — Contribution accounting** | `afp:ContributionSummary` and the `afp:ContributionDispute` flow — last, because it consumes P6's certificates and P1's Result flow | An independently recomputed, agreeing ContributionSummary | A second operator recomputes it from certificates and Results and matches; a dispute filed with evidence resolves against the record, not against a claim |
+| **P7 — Contribution accounting** — **stack built**, [ADR-0022](adr/0022-the-summary-declares-its-frame.md) | `afp:ContributionSummary` with a declared **frame** — a hub-observed period, the visibility classes it summed over, the split rule, the vocabulary — plus `afp:contributionSplit` in integer shares, an `afp:inputHash` with a preimage, an `afp:unreadable` census, credit fixed at acceptance with `afp:qualified`/`afp:membership` recorded rather than deducted, and ratification by an ordinary ADR-0018 round as the terminal for `afp:ContributionDispute`. Last, because it consumes P6's certificates and P1's Result flow | An independently recomputed, agreeing ContributionSummary — no demo yet; `adr0022.test.ts` builds a settled quarter and recomputes it | A second operator recomputes it from certificates and Results and matches; a dispute filed with evidence resolves against the record, not against a claim. **Holds:** the entries recompute from the frame or the replay fails by name, an inflated or deducted number cannot match a second party's arithmetic, a partial view is counted rather than silently summed, and two ratified summaries standing for one period is a named failure |
 
 ---
 
@@ -309,12 +309,16 @@ built code when it was found:
   no new wire property. Worth landing ahead of everything else in that ADR, because
   every electorate rule above it reads the trail this defect lets anyone edit.
 
-## Known blockers before P7 opens
+## What blocked P7, and how it closed
 
-[Scenario 13](scenarios/13-the-quarterly-split.md) walks P7 end to end before its stack
-ADR exists — the same move scenarios 10 and 12 made for P5 and P6 — and reports nine
-findings ([campaign 10](scenarios/README.md#campaign-10--open-scenario-13-the-p7-shakedown),
-open). It is the first shakedown in which **nobody misbehaves**: four honest support desks
+P7's stack is built; this section is kept as the record of what stood in its way, per the
+standing rule that a blocker which quietly disappears teaches a later reader nothing.
+
+[Scenario 13](scenarios/13-the-quarterly-split.md) walked P7 end to end before its stack
+ADR existed — the same move scenarios 10 and 12 made for P5 and P6 — and reported nine
+findings ([campaign 10](scenarios/README.md#campaign-10--built-scenario-13-the-p7-shakedown)),
+all closed by [ADR-0022](adr/0022-the-summary-declares-its-frame.md) and its ADR-0017
+amendment the same day. It is the first shakedown in which **nobody misbehaves**: four honest support desks
 split one retainer, and they still cannot agree on the number.
 
 Its through-line is the one thing P7 asks for that no earlier phase needed: **a sum is
@@ -324,10 +328,11 @@ Every mechanism P1–P6 built answers a question about an event you can point at
 events, over which window, seen by whom, credited at what weight, still valid under which
 vocabulary — and each finding is a different edge of that boundary left undrawn.
 
-Two are worth naming here, because a P7 build hits them in its first hour and neither is
-visible from the phase table above:
+Two are kept below because they were the ones a P7 build hit in its first hour, and
+neither was visible from the phase table above:
 
-- **`afp:contributionSplit` is normative and implemented nowhere.** 03 requires it
+- ~~**`afp:contributionSplit` is normative and implemented nowhere.**~~ **Closed** —
+  ADR-0022 Decision 2, built. 03 requires it
   whenever a Result's `attributedTo` names several actors, and rules that a Result
   lacking it counts *for no one*. It has been in the spec since v3.4 (campaign 1's
   finding 7) and appears in no builder and no check. So the collaborative case — the one
@@ -336,7 +341,8 @@ visible from the phase table above:
   implements it as written: a map of fractions summing to 1 is unrepresentable under the
   JCS numeric profile, which is the wall ADR-0005 already hit for vote weights and solved
   with integer shares over an LCM denominator.
-- **"Any member can recompute it" is not true today, and the record cannot say so.** 04
+- ~~**"Any member can recompute it" is not true today, and the record cannot say so.**~~
+  **Closed** — ADR-0022 Decision 1, built. 04
   calls the inputs "fully derived from public signed data"; 07 and ADR-0013 guarantee
   that non-`public` work is served to nobody unentitled — 404, by design. Two members
   therefore recompute the same period honestly and disagree, with no way to tell an

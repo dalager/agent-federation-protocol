@@ -19,10 +19,10 @@
 > quarter's arithmetic has to read them — and two of them turn out to have left an
 > accounting question behind.
 
-| **Support status** | **Partially supported — findings 66-70 and 74 closed; three open** (campaign 10, opened 2026-08-23) |
+| **Support status** | **Supported — all nine findings closed** (campaign 10, opened and closed 2026-08-23) |
 |---|---|
-| Resolved by | [ADR-0022](../adr/0022-the-summary-declares-its-frame.md) — Decisions 1, 2 and 3 **built** (66-70), Decisions 4/5 written (71-73) · its [ADR-0017](../adr/0017-standards-conformance.md) amendment **built** (74) — [triage](README.md#campaign-10--open-scenario-13-the-p7-shakedown) |
-| Gated by | `test/adr0022.test.ts` (17 cases — G6 is the fraction that cannot be canonicalised, G15 the partial view that claims to have read everything) |
+| Resolved by | [ADR-0022](../adr/0022-the-summary-declares-its-frame.md) — all five decisions **built** (66-73) · its [ADR-0017](../adr/0017-standards-conformance.md) amendment **built** (74) — [triage](README.md#campaign-10--built-scenario-13-the-p7-shakedown) |
+| Gated by | `test/adr0022.test.ts` (24 cases — G6 is the fraction that cannot be canonicalised, G15 the partial view that claims to have read everything) |
 | See it run | — (P7 is unbuilt; `npm run demo:p3` and `demo:p6` show the evidence this scenario would sum) |
 
 ## User story

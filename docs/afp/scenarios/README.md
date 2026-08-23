@@ -58,7 +58,7 @@ demo shows the *resolved* world and the walkthrough shows what it cost to get th
 | [10](10-the-incident-bridge.md) | 7 · closed | [ADR-0014](../adr/0014-p5-shared-hub-stack.md), [ADR-0015](../adr/0015-the-case-file-at-n-parties.md) | `npm run demo:p5` | `adr0014.test.ts`, `adr0014-m6.test.ts`, `adr0015.test.ts`, `adr0016.test.ts` |
 | [11](11-the-snow-day.md) | 8 · closed | [ADR-0018](../adr/0018-the-round-as-a-commitment.md), [ADR-0019](../adr/0019-acting-on-a-decision.md) | `npm run demo:p5:llm` | `adr0018.test.ts`, `adr0019.test.ts` |
 | [12](12-the-parametric-trigger.md) | 8 · closed | [ADR-0020](../adr/0020-p6-hardened-round-stack.md) (58, 60, 61, 62) · [ADR-0005 amendment](../adr/0005-operators-are-equal.md) (63) · [ADR-0021](../adr/0021-conviction-to-consequence.md) (59, 64, 65) | `npm run demo:p6` · `demo:p6:llm` | `adr0020.test.ts`, `adr0005.test.ts`, `adr0021.test.ts` |
-| [13](13-the-quarterly-split.md) | 9 · **6 closed, 3 open** | [ADR-0022](../adr/0022-the-summary-declares-its-frame.md) D1-D3 built (66-70) + its [ADR-0017](../adr/0017-standards-conformance.md) amendment (74); D4-D5 written (71-73) | — (no P7 demo yet) | `adr0022.test.ts` |
+| [13](13-the-quarterly-split.md) | 9 · closed | [ADR-0022](../adr/0022-the-summary-declares-its-frame.md) (66-73) + its [ADR-0017](../adr/0017-standards-conformance.md) amendment (74) | — (no P7 demo yet) | `adr0022.test.ts` |
 
 **Where the "See it run" column is empty**, the scenario's shape is covered by its gate
 files rather than by a demo. Three of the four are workloads that live inside another
@@ -463,9 +463,9 @@ weight the same way or replay will need two rules where one should do.
 | 65 | *(**closed** — ADR-0021 Decision 5, built)* The proof does not travel — enrollment weighs vouches not history, reputation consumes settlements not proofs, so a convicted equivocator re-enrolls elsewhere clean | Enrollment MAY cite proofs as evidence; a named reputation-registry derivation MAY consume them; blacklist federation explicitly declined, with reasons |
 
 
-### Campaign 10 → open (scenario 13, the P7 shakedown)
+### Campaign 10 → built (scenario 13, the P7 shakedown)
 
-**Opened 2026-08-23.** Nine findings from [scenario 13](13-the-quarterly-split.md), the
+**Opened and closed 2026-08-23.** Nine findings from [scenario 13](13-the-quarterly-split.md), the
 first workload whose subject is a **set** of events rather than an event — four support
 desks splitting one retainer by what each of them actually did. Written before the P7
 stack ADR on purpose, the third time after scenarios 10 and 12, and the first shakedown
@@ -491,8 +491,8 @@ make checkable.
 **Triaged into one stack ADR** (2026-08-23), following the P2/P3/P4/P5/P6 convention:
 [ADR-0022](../adr/0022-the-summary-declares-its-frame.md) — the summary declares its frame
 (66-73), with 74 amended into [ADR-0017](../adr/0017-standards-conformance.md) where the
-standards-conformance rules live. **Decisions 1, 2 and 3 and the amendment are built** (`adr0022.test.ts`,
-17 cases, suite green at 238); Decisions 4 and 5 are written and not built.
+standards-conformance rules live. **All five decisions and the amendment are built** (`adr0022.test.ts`, 24 cases, suite
+green at 245).
 
 Build order followed the campaign's own logic — the defect that makes an honest party
 invisible first. `afp:contributionSplit` went first because it needs no summary object to
@@ -509,7 +509,7 @@ unimplementable rather than merely awkward.
 | 68 | *(**closed** — ADR-0022 Decision 1, built)* `afp:period` selects on self-asserted `published`, which ADR-0014's finding 45 already ruled cannot carry cross-operator ordering — a ticket straddling a quarter boundary belongs to whichever quarter its author says | Define the period over hub-observed order, ADR-0014's own answer applied to the question it did not anticipate |
 | 69 | *(**closed** — ADR-0022 Decision 3, built)* `afp:inputHash` has no defined preimage: the field exists so a second party can confirm it summed the same things, and nothing says what those are | Define the canonical input set and ordering; recompute at replay; fail a summary whose hash does not match the set it declares |
 | 70 | *(**closed** — ADR-0022 Decision 1, built)* "Any member can recompute it" (04) collides with visibility (07, ADR-0013): non-`public` work is 404 to everyone unentitled, so two members recompute honestly and disagree with no way to tell an entitlement gap from an error | The summary declares its input scope and counts what the computer could not read — ADR-0015's census, in accounting form |
-| 71 | Work that did not hold has no accounting rule and often no marker: `afp:Settlement` actuals move reputation and `afp:supersedes` retracts a ratified Synthesis, but neither states a contribution consequence — and a bare Result on a direct award has no vocabulary at all | Credit at acceptance; record the settlement or supersession as its own fact inside the period; check it, so both readings stop being available |
-| 72 | An expulsion's accounting scope is unstated: ADR-0021 forward-scoped conviction for *weight* and said nothing about contribution, so a summary spanning one either counts the expelled member's accepted work or erases it | State the parallel — accounting is forward-scoped too — and record the membership change inside the period |
-| 73 | A dispute has no terminal: 04 resolves the mechanical case by republishing a corrected summary, producing two unranked summaries for one period with no supersession edge and no rule for which stands | Ratify a summary in an ADR-0018 round; corrections supersede under ADR-0007's grammar; everything else is a draft and says so |
+| 71 | *(**closed** — ADR-0022 Decision 4, built)* Work that did not hold has no accounting rule and often no marker: `afp:Settlement` actuals move reputation and `afp:supersedes` retracts a ratified Synthesis, but neither states a contribution consequence — and a bare Result on a direct award has no vocabulary at all | Credit at acceptance; record the settlement or supersession as its own fact inside the period; check it, so both readings stop being available |
+| 72 | *(**closed** — ADR-0022 Decision 4, built)* An expulsion's accounting scope is unstated: ADR-0021 forward-scoped conviction for *weight* and said nothing about contribution, so a summary spanning one either counts the expelled member's accepted work or erases it | State the parallel — accounting is forward-scoped too — and record the membership change inside the period |
+| 73 | *(**closed** — ADR-0022 Decision 5, built)* A dispute has no terminal: 04 resolves the mechanical case by republishing a corrected summary, producing two unranked summaries for one period with no supersession edge and no rule for which stands | Ratify a summary in an ADR-0018 round; corrections supersede under ADR-0007's grammar; everything else is a draft and says so |
 | 74 | *(**closed** — ADR-0022's ADR-0017 amendment, built)* A summary's inputs are historical by definition, and the vocabulary moves under them: the `afp:bidCommit` → `afp:BidCommit` rename (ADR-0017 D5) shipped with no read-side compatibility, so pre-rename bundles fail replay today, and fail *misleadingly* | Read-side aliases for renamed types (the draft-cavage precedent, ADR-0017 D2); a named failure for a retired spelling; a summary that pins the vocabulary it was computed under |

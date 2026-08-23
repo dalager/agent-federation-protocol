@@ -1,8 +1,8 @@
 # ADR-0022 — The P7 accounting stack: a summary declares its frame, or it is a number in a signed envelope
 
-- **Status:** Accepted. **Decisions 1, 2 and 3 are built** (2026-08-23), gated by
-  `test/adr0022.test.ts` (17 cases, suite green at 238); Decisions 4 and 5 are written
-  and not built — W4's work packages are sized for them
+- **Status:** Accepted, and **built** (2026-08-23) — all five decisions, gated by
+  `test/adr0022.test.ts` (24 cases, suite green at 245), every shipped bundle replaying
+  with unchanged pass status and unmoved check counts
 - **Date:** 2026-08-23
 - **Applies to:** P7, and — for Decision 2 — **every phase from P1 onward**, because a
   co-authored `afp:Result` is producible the moment two agents share a thread and the
@@ -19,7 +19,7 @@
   Decision 1's model), [ADR-0018](0018-the-round-as-a-commitment.md) (declare-before-you-act,
   the discipline this whole ADR applies one layer up), [ADR-0021](0021-conviction-to-consequence.md)
   (forward-scoping, which Decision 4 extends to accounting)
-- **Driven by:** [scenario 13 / campaign 10](../scenarios/README.md#campaign-10--open-scenario-13-the-p7-shakedown),
+- **Driven by:** [scenario 13 / campaign 10](../scenarios/README.md#campaign-10--built-scenario-13-the-p7-shakedown),
   findings **66-74**
 
 ## Context
@@ -154,6 +154,8 @@ built, `afp:inputHash` should be removed from 04's example rather than left stan
 
 ### 4. Credit is fixed at acceptance, and nothing reaches backwards
 
+**Built.**
+
 Two findings, one rule.
 
 **Work that did not hold** (finding 71). The record can say "it did not hold" in two
@@ -176,6 +178,8 @@ by an act it took no part in, which is the exact shape ADR-0021 refused for roun
 
 ### 5. A summary becomes authoritative by ratification, and a correction supersedes
 
+**Built.**
+
 Finding 73. 04 resolves the mechanical dispute by "republishing a corrected summary",
 which produces two unranked summaries for one period, signed by different members,
 with no supersession edge and no rule for which stands. `afp:computedBy` is deliberately
@@ -193,9 +197,15 @@ Ruled, entirely out of machinery that already exists:
 - A correction supersedes under ADR-0007's grammar (`afp:supersedes` naming the ratified
   summary's activity digest), and a ratified summary is superseded only by a ratified
   one — the ratification-parity rule, transplanted unchanged.
-- `afp:ContributionDispute` remains what 04 makes it: the cheap path. Where a dispute is
-  mechanical, the corrected summary and its ratification settle it without a vote being
-  contested; where it is a quality question, it was always going to a round.
+- `afp:ContributionDispute` is **built**, and it is what 04 makes it: the cheap path with
+  a floor under it. It names its summary, its ground (a closed set of 04's own three) and
+  its evidence, and it is refused at the builder and failed at replay if it cites nothing
+  the case file carries — a dispute with no evidence is the claim this object exists to
+  replace. The mechanical grounds are adjudicated by the disputed summary's own
+  recomputation rather than by anything new; `quality` escalates, and that routing has
+  teeth: a summary under an unanswered quality dispute may not be superseded by a draft,
+  or the cheap path swallows the expensive one and the contested question leaves the
+  record.
 
 ## The vocabulary amendment (finding 74)
 
@@ -390,7 +400,33 @@ Two things the build found that the design had not, both worth the slice on thei
    this ADR, the two would have agreed and both would have been wrong in the same way for
    whichever shape the transliteration missed.
 
-Decisions 4 and 5 are written and not built.
+**Decisions 4 and 5 built** (2026-08-23), as W4's third slice — and the check that
+carries Decision 4 is not the one the ADR expected. `afp:qualified` and `afp:membership`
+record what the period contained, but what makes "credit is fixed at acceptance"
+*enforceable* is **V5, the entries themselves recomputing**: nothing in the recomputation
+can express a deduction, so a summary that quietly un-counts work it already credited
+cannot match a second party's arithmetic. That check is also P7's own roadmap gate line —
+"a second operator recomputes it from certificates and Results and matches" — and it was
+missing from W3's original table, which listed the input *set* and never the numbers.
+
+Decision 5 needed no new machinery at all: a summary is ratified by a `DecisionRecord`
+whose `afp:outcome` names it, which is **04's existing ratification idiom**, the same one
+ADR-0007 already reads to tell a ratified Synthesis from a cheap one. Parity transplants
+unchanged (a ratified summary is superseded only by a ratified one), and the terminal
+check — at most one ratified, unsuperseded summary per period — is replay-wide for the
+reason every check of its kind is: the competing summaries live in different members'
+bundles by construction.
+
+**A third build finding, and it is a rule the ADR had not stated.** The two
+implementations disagreed on whose credit an agent's work is, once that agent has left the
+hub: the TypeScript read the hub's live membership, the Python folded the trail as of
+"now", and they bucketed the same Result differently. Both were wrong. The operator is the
+`actor` of the agent's own `afp:Enroll` — where ADR-0005 Decision 2 binds it — resolved
+**as of the period's close**, and an `afp:Unenroll` does not clear it: leaving a hub ends
+a seat, it does not retroactively change who did the work. Resolving as of *now* would let
+an agent that leaves after a quarter re-bucket its own past credit, which is the defect
+ADR-0021 Decision 1 closed for weights, arriving one layer up in accounting. Both
+implementations now fold the same rule from the same evidence.
 
 ## References
 

@@ -210,8 +210,8 @@ finding 41).
 | `afp:capabilityMatch`, `afp:estimatedCost`, `afp:estimatedLatency` | Properties (Bid) | Self-declared fit and estimates, later checked against actuals |
 | `afp:BidCommit` / `afp:BidReveal` | Activity pair | Commit-reveal sealed bidding, deters sniping — `afp:BidCommit` corrects an earlier lowercase-initial spelling defect (ADR-0017 Decision 5); every other activity type in this table capitalizes its initial, and the term now matches |
 | `afp:reputation` | Property (hub-scoped, per agent) | Running score from completions, estimate accuracy, voting integrity |
-| `afp:ContributionSummary` | Object | Periodic, independently-recomputable per-operator contribution roll-up |
-| `afp:ContributionDispute` | Activity | Challenge to a ContributionSummary, with evidence |
+| `afp:ContributionSummary` | Object | Periodic, independently-recomputable per-operator contribution roll-up. Carries `afp:frame` (period rule, input scope, split rule, vocabulary), `afp:inputHash` over the set the frame selects, `afp:unreadable`/`afp:qualified`/`afp:membership` censuses, and is a **draft** until ratified by a round naming it (ADR-0022) |
+| `afp:ContributionDispute` | Activity | Challenge to a ContributionSummary: `afp:summary`, `afp:ground` (`omitted-input` \| `included-input` \| `quality`) and `afp:evidence` (activity digests, never empty). The mechanical grounds are settled by the summary's own recomputation; `quality` escalates to a round and may not be superseded away by a draft (04, ADR-0022) |
 | `afp:DecisionRecord` | Object (in `Create`) | First-class outcome record closing every voting round: outcome, snapshot hash, counted-vote hashes, weight tally |
 | `afp:prevActivity` | Property (any activity) | Optional per-actor outbox hash chain — makes logs append-only-verifiable |
 | `context` (standard AS2) | Property (any activity) | Thread id grouping all activities of one incident/case/item — distinct from `correlationId` |

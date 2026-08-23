@@ -74,7 +74,7 @@ from pins import (
     check_proposal_action_policy,
 )
 from proof import CRYPTOSUITE, decode_multikey, digest_of, verify_proof
-from summary import check_summary_arithmetic, check_summary_frame
+from summary import check_disputes, check_summary_arithmetic, check_summary_frame, check_summary_terminal
 
 
 # --------------------------------------------------------------------- report
@@ -1433,6 +1433,8 @@ def main() -> int:
             check_equivocation_proofs(report, [bundle])
             check_electorate(report, [bundle])
             check_summary_arithmetic(report, [bundle])
+            check_summary_terminal(report, [bundle])
+            check_disputes(report, [bundle])
             check_recusal_causes(report, [bundle])
             check_enroll_evidence(report, [bundle])
             check_revocation_not_erasing(report, [bundle])
@@ -1453,6 +1455,8 @@ def main() -> int:
             check_equivocation_proofs(report, bundles)
             check_electorate(report, bundles)
             check_summary_arithmetic(report, bundles)
+            check_summary_terminal(report, bundles)
+            check_disputes(report, bundles)
             # ADR-0021 Decisions 3-5, all here for one reason: every fact they
             # rest on — the hub's proofs, the accused's signing key, the key
             # history of the party a proof is about — is owned by a domain
