@@ -350,7 +350,24 @@ neither was visible from the phase table above:
   down: ADR-0015's census made "a check that could not be evaluated" visible instead of
   silent, and a summary computed over a partial view is exactly that in accounting form.
 
+## Beyond P7 — to production
+
+The phases add participants; production adds none, so it is not a phase. What stands
+between "the thesis holds" and "an operator can run this for a real consortium" is
+decided as a program of ten claims — transport hardening, key custody, the port as a
+security boundary, port agents, the human window, scenario re-walks, the resident
+process, the deployment profile, operator obligations, release engineering — each with an
+ADR and a gate, sequenced by [ADR-0024](adr/0024-the-road-to-production.md). Its
+definition of done is a scenario: the production Tuesday, written in
+[the operator's Tuesday](scenarios/the-operators-tuesday.md)'s genre about a served
+instance on the public internet.
+
 ## Open questions
+
+The protocol's two standing questions are below. The *record's* own loose ends — decisions
+the ADRs deferred, revisit triggers that fired with a built phase, prose that outlived its
+build — are triaged separately, as traceable subtasks linked to their origin ADRs, in
+[ADR-0023](adr/0023-loose-ends-triaged.md).
 
 - **Directory-of-hubs bootstrap.** Left as an out-of-band, consortium-published list at a
   well-known URL. Hubs churn far less than agents, so a hand-maintained list suffices;

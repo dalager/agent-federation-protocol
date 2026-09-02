@@ -142,6 +142,44 @@ four deliberate P1 mutations, P2's three DecisionRecord mutations, and P3's thre
 mutations (a deleted winning reveal, a swapped performer set, mismatched winning-bid
 evidence) — each fails the replay with a specific pointer.
 
+## Where it stands — 2026-09-02
+
+Every phase the roadmap named is built and gated: P1 through P7, 250 cases in the
+TypeScript suite, the four P7 bundles replaying jointly at 977 checks, thirteen scenarios
+walked and all 74 findings closed. The thesis holds — a stranger with no keys can replay
+what was said, by whom, under which pinned rules — and it holds under mutation.
+
+What that is, and what it is not, was reviewed on 2026-09-02 against the scenarios and
+against the transport and gate code:
+
+- **Usable as a protocol and a record format; not yet a deployable system.** Two
+  independent implementations, gates that fail on purpose, honest ledgers — and no
+  scheduler, no port agents for the external systems the scenarios describe, a demo
+  transport, keys as files. The author's own
+  [operator's Tuesday](docs/afp/scenarios/the-operators-tuesday.md) said it first: a
+  ledger with opinions, and programs that visit it.
+- **Hardened by what AFP added, not by ActivityPub.** AP supplies identity, discovery and
+  vocabulary conventions. Every security property here — object proofs, hash chains, the
+  two-tier gate, commit-reveal, snapshot-pinned electorates, lawful redaction — is the
+  protocol's own. Fediverse software does not consume AFP objects, and
+  [ADR-0029](docs/afp/adr/0029-the-human-window-and-the-activitypub-premise.md) proposes
+  to say so precisely.
+- **Scenarios supported in the coordination core, narrowed at the edges.** Of roughly 131
+  acceptance criteria across the thirteen scenarios, about 113 are built and gated, 11
+  are built as a mechanism the record can carry rather than the workflow the author
+  described, and 7 — every one a human step or an external system — are not built.
+  Scenarios 10–13 hold end to end; 01, 02, 06 and 09 stop at the port.
+
+Two documents carry the consequence, both proposed:
+
+| | |
+|---|---|
+| [ADR-0023](docs/afp/adr/0023-loose-ends-triaged.md) | **The loose ends, triaged** — 31 subtasks from an audit of every ADR, each linked to its origin section, with one disposition: build, decide, reconcile, or park behind a named trigger |
+| [ADR-0024](docs/afp/adr/0024-the-road-to-production.md) | **The road to production** — ten claims and the ten ADRs (0025–0034) that make each checkable: transport hardening, key custody and a signer port, the port as a security boundary, port agents, the human window, scenario re-walks, the resident process, the deployment profile, operator obligations, release engineering. Its definition of done is a scenario — the production Tuesday — not a checklist |
+
+The spec is at Revision 3.33. Nothing in the program changes what a replay proves; all of
+it changes whether anyone could run the thing that produces the replay.
+
 ## Why integrity is in phase one
 
 Signing, hash-chained outboxes, visibility classes and hash-addressed evidence are **P1
