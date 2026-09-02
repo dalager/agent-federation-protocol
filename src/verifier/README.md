@@ -7,6 +7,7 @@ access, no private keys, no network.
 ```bash
 python3 afp_verify.py ../instance/export --thread https://alpha.operator.local/threads/doc-1
 python3 afp_verify.py ../instance/export -v      # show passing checks too
+python3 afp_verify.py ../instance/export-p7/* -v # several bundles: one joint replay
 ```
 
 Exit status is `0` only if every check passes. Requires Python 3.11+ and
@@ -31,7 +32,9 @@ another implementation.
 > binary an auditor can run with nothing installed. No Go toolchain was
 > available in the build environment, so this is Python — which keeps the
 > essential property (different language, zero shared code) and loses the
-> zero-install handoff. It is ~250 lines; a Go port stays open.
+> zero-install handoff. It began at ~250 lines and is now fourteen modules, one
+> per mechanism it replays (see [Beyond P3](#beyond-p3-one-module-per-extension));
+> a Go port stays open.
 
 ## What it checks
 
@@ -59,6 +62,35 @@ another implementation.
 | **(P3) The announced selection rule recomputes to the Award's performer set and synthesizer** | The published rule did not actually pick these winners (rules reimplemented here from spec: `ranking`, `coverage`) |
 | **(P3) A multi-performer Award's `afp:Synthesis` binds present Results, a method, and dissent** | The combined answer floats free of its evidence, or dissent was summarized away |
 | **(P3) Under `afp:estimatorPolicy: exclude`, no performer is a listed estimator** | The agent that framed the budget was awarded the work it estimated |
+
+### Beyond P3: one module per extension
+
+Every ADR after P3 added its own extension to the replay. Each lives in its own module,
+so an auditor asking "what does *this* extension check" finds it in one place; each is a
+deliberate reimplementation from the ADR's own algorithm rather than a port of the
+TypeScript; and each fires only when its material is present, so a bundle written before
+the ADR verifies exactly as it did. The census printed after every replay shows which
+families ran per domain — a family at `0` where you expected work is the question to ask.
+
+| Extension | Specified by | Module | What it checks |
+|---|---|---|---|
+| Roles and voter weights | ADR-0004 D1, ADR-0005 | `decision.py`, `allocation.py` | A requester or observer never bids and is never pinned; only the hub, a member or a requester announces; `afp:voterWeights` recompute per *instance* from the pinned voters and the Enroll trail; an Enroll or Unenroll is issued by the agent's own instance |
+| Assets | ADR-0004 D2 | `asset.py` | `Update{afp:Asset}` replays into a registry; one `(id, version)` is immutable; registration is a member-role act; every `afp:reuses` / `afp:reused` resolves to a registered asset |
+| Reputation | ADR-0004 D3 | `reputation.py` | Bidder scores rederive from settled estimates against actuals under the announced rule — integer percent divergence, exact rational decay, a neutral prior of 50 |
+| Pins and checkable actuation | ADR-0006, ADR-0010 | `pins.py`, `action.py` | Every task-bearing activity on a thread agrees on one pin digest; a Synthesis carries a category from the pinned closed `afp:actionPolicy`; every `afp:actsOn` resolves to a present Synthesis, or a DecisionRecord one hop away; the claimed action equals what the policy names for it; the pinned synthesizer is who emitted the Synthesis, and a partial Synthesis accounts for every leg of its thread |
+| Supersession | ADR-0007, ADR-0011 | `action.py` | `afp:supersedes` resolves in the same thread; a quorum's answer is retracted only by a quorum; every action whose justification was withdrawn has a recorded disposition |
+| The federation boundary | ADR-0008 | `federation.py` | Every cross-boundary activity is covered by a co-signed `afp:FederationAgreement`, present in this export, holding an admitting grant and unexpired when the activity published — checked against *the grant that admits it*, never "some grant exists" |
+| Joint replay and redaction | ADR-0009, ADR-0015 | `federation.py`, `afp_verify.py` | Over several bundles: the co-signed agreement is digest-equal in every party's export; every activity held as received bytes resolves byte-for-byte in the counterparty's export, or is covered by a redaction stub declaring its digest; a stub stands in chain position; an omitted actor is declared in the manifest, not silently absent; an archived hub's carried state hashes to its declared canon |
+| Keys over time | ADR-0012 | `keys.py`, `afp_verify.py` | Every signature resolves to a key valid at its `published` instant per `afp:keyHistory`, and a signing actor's intervals leave no gap; the manifest's own signing key is in its own history; every file is declared in `afp:members` and vice versa; a declared `afp:retentionDuty` has anchors naming real chain heads and keeps the bytes it retains |
+| The round as a commitment | ADR-0018, ADR-0019 | `decision.py`, `action.py` | A decision-subject `afp:Settlement` closes the round it names; an `afp:Departure` names a present, `joint`-binding decision the departing actor was actually pinned to vote on; an action on a decision resolves the DecisionRecord it acts on across own and received bytes |
+| L1 round hardening | ADR-0020 | `equivocation.py`, `decision.py`, `afp_verify.py` | An L1 vote carries well-formed `afp:phase` / `afp:seqNo` / `afp:proposalHash`; an `afp:EquivocationProof` satisfies every leg of the predicate against the actor's published key, resolved across the whole replay; a successor round's proposer is the entitled successor; the searchlight pools every vote across every bundle and fails a conviction pair that no proof on record names |
+| Conviction to consequence | ADR-0021 | `electorate.py`, `decision.py`, `afp_verify.py` | `afp:quorumSnapshot` is the digest of the voter list it travels with; voters plus declared exclusions account for the whole member trail; every `recused` cause resolves against the agent it excludes; an `afp:KeyCompromiseClaim` comes from the convicted agent's own instance and answers a real proof; `MemberExpel` / `MemberAdmit` actuates a round that pinned that subject; a proof cited on an Enroll convicts the agent being enrolled; a revocation cut may not predate a vote a proof embeds |
+| Contribution accounting | ADR-0022 | `summary.py`, `decision.py`, `allocation.py` | A co-authored Result's `afp:contributionSplit` is integer shares over its authors; a summary's frame is present and every form in it resolvable; the entries recompute from the frame over the merged pool, or the replay says `unresolvable` by name; `afp:inputHash` matches its defined preimage; a dispute points at things that exist and ends in a ratified correction — two standing summaries for one period is a named failure; a retired type spelling is named, never silently aliased |
+
+Where a check needs evidence another party holds — the electorate against the hub's
+Enroll trail, a summary against four operators' Results — it is **replay-wide and
+three-valued**: pass, fail, or `unresolvable`. The third is printed in the census rather
+than recorded as a pass.
 
 ## The algorithm, restated
 
@@ -139,14 +171,21 @@ would compromise the verifier's zero-dependency property.
 ## The bundle it reads
 
 ```
-MANIFEST.json           what this bundle contains
+MANIFEST.json           what this bundle contains — signed since ADR-0012, with its
+                        `afp:members` inventory and the signer's `afp:keyHistory`
 instance.jsonld         the instance actor
 roster.jsonld           the signed roster
 actors/<name>.jsonld    agent actors, each carrying a Multikey
 outbox/<name>.jsonld    OrderedCollection of signed activities, in chain order
 outbox/instance.jsonld  the instance's own Vouch/Disown trail — how the roster came to be
+received.jsonld         since P4: the foreign bytes this instance admitted at its boundary,
+                        each one checked against its sender's own bundle in a joint replay
 artifacts/sha256-<hex>  raw bytes, named by their own digest
 ```
+
+Several bundle directories on one command line are one **joint replay** (ADR-0009,
+ADR-0015): each bundle verifies on its own first, then the cross-checks run over the set
+and the census prints what ran per domain.
 
 ## Trying to break it
 

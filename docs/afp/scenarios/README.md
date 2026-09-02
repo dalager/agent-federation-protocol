@@ -31,13 +31,15 @@ protocol does; that review tested whether the build order still matched it.
 
 Every scenario above was written to *break* something, and each one did. This table is the
 answer to the question the walkthroughs deliberately do not answer: **what holds today, and
-how can you see it.** All sixty-five findings raised across the first nine campaigns are
+how can you see it.** All seventy-four findings raised across ten campaigns are
 closed — finding 32's remainder last among the first eight (2026-08-22), when building
 this index caught that campaign 6 had been recording it as resolved while its own prose
-said otherwise, and campaign 9's last three on 2026-08-23 with
-[ADR-0021](../adr/0021-conviction-to-consequence.md)'s remaining decisions. Campaign 10
-([scenario 13](13-the-quarterly-split.md), the P7 shakedown) is **open**: nine findings,
-walked 2026-08-23 before any P7 stack ADR exists, and not yet triaged.
+said otherwise; campaign 9's last three on 2026-08-23 with
+[ADR-0021](../adr/0021-conviction-to-consequence.md)'s remaining decisions; and campaign 10
+([scenario 13](13-the-quarterly-split.md), the P7 shakedown) the same day — nine findings
+walked before any P7 stack ADR existed, triaged into
+[ADR-0022](../adr/0022-the-summary-declares-its-frame.md) with one amendment into
+[ADR-0017](../adr/0017-standards-conformance.md), and built.
 
 A scenario's own text is never rewritten when its findings land — a scenario records what
 was true when it was walked, which is what makes it evidence. So read a walkthrough as

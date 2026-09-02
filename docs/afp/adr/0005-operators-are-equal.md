@@ -1,6 +1,8 @@
 # ADR-0005 — Operators are equal against a hub
 
-- **Status:** Accepted, and **built** except the P4-gated seat check (see [Build status](#build-status)) —
+- **Status:** Accepted, and **built** (see [Build status](#build-status)) — the seat check
+  that waited for P4 landed with [ADR-0017](0017-standards-conformance.md) Decision 4 as the
+  hub's opt-in `seatPolicy: "follow-required"` —
   including the [Amendment (2026-08-22)](#amendment-2026-08-22-declared-change-of-control),
   built and gated the same day, closing [scenario 12](../scenarios/12-the-parametric-trigger.md)
   finding 63
@@ -199,7 +201,8 @@ votes.
 
 ## Build status
 
-Everything but the P4-gated seat check is built. Existing exports verify unchanged: at one
+Everything is built — the seat check last, once P4's handshake and ADR-0017's Follow/Accept
+seats gave it something to check. Existing exports verify unchanged: at one
 instance the weighting reduces to the uniform weight of 1, and every Enroll on the record
 was already issued by the agent's own instance.
 
@@ -208,7 +211,7 @@ was already issued by the agent's own instance.
 | **E1** | Per-instance weighting in `proposeRound`, with `L` from the pinned voters' instances; the enrolling instance folded into hub state and rehydrated on restart | **done** | `hub/weights.ts`, `hub/hub.ts` |
 | **E2** | The verifier recomputes `afp:voterWeights` from the pinned voters and the Enroll trail; a mismatch is a named failure | **done** | `decision.py` |
 | **E3** | Enroll issuer must be the agent's own instance — resolved from the agent's `afp:operatedBy`, at hub admission and mirrored in the verifier | **done** | `hub/hub.ts`, `decision.py` |
-| **E4** | Seat evidence (`Accept{Follow}`) required for enrollment | deferred to P4 | with the handshake |
+| **E4** | Seat evidence (`Accept{Follow}`) required for enrollment | **done** — by [ADR-0017](0017-standards-conformance.md) Decision 4, as the hub's opt-in `seatPolicy: "follow-required"`; the default policy keeps deriving seats from the Enroll trail | `hub/hub.ts`, `instance/following.ts`, gated by `test/adr0017-d4-follow.test.ts` |
 | **E5** | Parity cases for `L` and the per-instance division, in the raw-JSON harness ADR-0004 established | **done** | `test/parity/cases.json` |
 
 The gate is `test/adr0005.test.ts`: two operators, deliberately lopsided, where the one

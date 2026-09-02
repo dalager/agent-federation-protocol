@@ -14,24 +14,32 @@ can recompute it independently; `afp:computedBy` is a field, not a privileged ro
 ```json
 {
   "@context": ["https://www.w3.org/ns/activitystreams", "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"],
-  "id": "https://hub.consortium.example/summaries/2026-w33",
+  "id": "https://hub.consortium.example/summaries/2026-q3",
   "type": "afp:ContributionSummary",
   "afp:hub": "https://hub.consortium.example/actor",
-  "afp:period": { "start": "2026-08-10T00:00:00Z", "end": "2026-08-16T00:00:00Z" },
   "afp:computedBy": "https://gamma.operator.example/actor",
+  "afp:frame": {
+    "afp:periodRule": { "afp:form": "hub-observed", "afp:hub": "https://hub.consortium.example/actor",
+                        "afp:from": "sha256:7c0e…", "afp:to": "sha256:e91b…" },
+    "afp:inputScope": { "afp:visibility": ["public", "hub"] },
+    "afp:splitRule": { "afp:form": "declared-shares" },
+    "afp:vocabulary": "v3.33"
+  },
+  "afp:period": { "start": "2026-07-01T00:00:00Z", "end": "2026-10-01T00:00:00Z" },
+  "afp:denominator": 4,
   "afp:entries": [
-    { "afp:operator": "https://alpha.operator.example/actor", "afp:tasksCompleted": 14,
-      "afp:byCapability": { "afp:cap:image-classification": 9, "afp:cap:translation-en-da": 5 },
-      "afp:evidence": ["https://alpha.operator.example/outbox/result-101#l1-cert",
-                        "https://alpha.operator.example/outbox/result-108#l1-cert"] },
-    { "afp:operator": "https://beta.operator.example/actor", "afp:tasksCompleted": 9,
-      "afp:byCapability": { "afp:cap:image-classification": 9 },
-      "afp:evidence": ["https://beta.operator.example/outbox/result-77#l1-cert"] }
+    { "afp:operator": "https://alpha.operator.example/actor", "afp:credited": 9 },
+    { "afp:operator": "https://beta.operator.example/actor",  "afp:credited": 4 }
   ],
-  "afp:inputHash": "sha256-4b2e...",
+  "afp:inputHash": "sha256:4b2e…",
+  "afp:unreadable": [ { "afp:operator": "https://beta.operator.example/actor", "afp:count": 1 } ],
+  "afp:qualified":  [ { "afp:operator": "https://alpha.operator.example/actor", "afp:count": 1 } ],
+  "afp:membership": [ { "agent": "https://beta.operator.example/agents/b2", "afp:act": "afp:MemberExpel" } ],
   "proof": { "type": "DataIntegrityProof", "cryptosuite": "eddsa-jcs-2022", "proofValue": "..." }
 }
 ```
+
+**The summary declares its frame** ([ADR-0022](adr/0022-the-summary-declares-its-frame.md) Decisions 1, 3 and 4). "Any member can recompute it" is true only if every member reads the same inputs, and 07's classes with ADR-0013's gate guarantee they do not: non-`public` work is 404 to everyone unentitled, so two honest members recompute one period and disagree with no way to tell an entitlement gap from an error. A sum is only as recomputable as its input set is agreed, and the protocol did not name sets. So a summary pins, before any arithmetic, `afp:frame`: the period as a half-open interval between two of the hub's own chain-head digests (`afp:periodRule`, form `hub-observed` — the one order every member observes identically and no member can move; the wall-clock `afp:period` is narration, never what the arithmetic selects on), the visibility classes it summed over (`afp:inputScope`), the split rule (`afp:splitRule`), and the vocabulary revision the inputs were read under. `afp:inputHash` is then `digest_of(sorted(digests of every activity the frame selects))`, recomputed at replay. What the computer could see the existence of and not the content of is counted in `afp:unreadable`, per operator, rather than silently summed around — ADR-0015's census in accounting form, under the same invariant: a quantity that could not be computed is never folded into one that could. Credit is fixed at acceptance and never un-counted: a settlement or supersession inside the period is recorded in `afp:qualified` rather than deducted, and the membership acts inside the period are listed in `afp:membership`, because accounting is forward-scoped — work accepted before an expulsion counts. Credit itself is integer arithmetic, `afp:entries` over one `afp:denominator`, so a co-authored Result's `afp:contributionSplit` (03) and a sole author's whole add in the same sum. A summary is a **draft** until an ordinary ADR-0018 round ratifies it by digest, and a correction supersedes under ADR-0007's grammar — a ratified summary is superseded only by a ratified one, and two ratified summaries standing for one period is a named replay failure ([ADR-0022](adr/0022-the-summary-declares-its-frame.md) Decision 5).
 
 **Disputes.** `afp:ContributionDispute` names the summary it challenges (`afp:summary`),
 the ground it stands on (`afp:ground`, a closed set), and — always — the activity digests
@@ -199,6 +207,10 @@ the pinned voters it does *not* contain, telling a recorded decline from silence
 a tally of two-of-three during a partition is a different decision from two-of-three with
 one refusal and a reader years later should not have to guess which.
 
+**A round that fails to decide still closes here** ([ADR-0018](adr/0018-the-round-as-a-commitment.md) Decision 2). Past its `afp:deadline`, short of its pinned `afp:quorumRule`, or provably unable to reach it, the round closes with `afp:outcome: "afp:no-decision"` and an `afp:noDecisionReason` — `expired`, `threshold-not-met` or `quorum-impossible` — beside the same tally and the same `afp:uncounted` accounting, each reason recomputable from the proposal and the votes. The record is terminal and inert: it ratifies no Synthesis, supersedes nothing, and releases an actuator only through the policy's reserved `afp:no-decision` key, because terminality always releases ([ADR-0019](adr/0019-acting-on-a-decision.md)). Earlier revisions abandoned such a round with an `Undo{Vote}`, which left "we were asked and did not manage to decide" indistinguishable from nobody having asked.
+
+**A binding outcome, and departure from it** ([ADR-0018](adr/0018-the-round-as-a-commitment.md) Decision 3). A proposal MAY declare `afp:binding: "joint"`; absent means advisory. The declaration changes no arithmetic and gives the hub no enforcement power — a protocol cannot reach into a car park — but it names the stakes in the same signed object that pins the electorate deciding them, so no voter can later claim it thought the round was advisory. Its counterpart is `afp:Departure`: a bare activity shaped like `afp:Settlement`, by which a pinned voter states on its own chain and the round's thread that it is not following an outcome it was pinned into — `afp:decision` naming the DecisionRecord activity by digest, the same grain `afp:countedVotes` and `afp:actsOn` use, and a reason in `content`. Replay checks that the decision exists, was declared `joint`, and pinned the departing actor; a Departure from an advisory round, or from an agent that was never seated, departs nothing. Publishing one is costly and honest. *Not* publishing one while defecting is what the record then shows — a joint-binding decision, a member's later activities inconsistent with it, and no departure. Visible non-compliance is the whole mechanism, and it is worth more than unenforceable compliance.
+
 ### Synthesis: answers that are not decisions
 
 `afp:DecisionRecord` answers *"what did we decide"* — a discrete outcome selected by
@@ -296,6 +308,8 @@ producing them, which is the failure mode the `afp:dissent` field exists to prev
 
 Unsettled forever is a legitimate terminal state: work that was never commissioned yields
 no evidence, and inventing a score for it would be worse than leaving it open.
+
+**A `DecisionRecord` is a settleable subject too** ([ADR-0018](adr/0018-the-round-as-a-commitment.md) Decision 4). A settlement MAY name `afp:decision` — the DecisionRecord activity's digest — in place of `afp:task`; exactly one of the two MUST be present, and a settlement carrying both or neither fails replay. It records `afp:observedOutcome`, which MUST be one of the proposal's `afp:options`, `afp:evidence` in 07's hash-addressed artifact shape, and `afp:dissentVindicated` naming the pinned voters whose losing vote the world bore out — so the correct dissenter this section promises to credit can be credited where dissent costs most, in a round rather than an estimate. The allocation settlement is untouched to the byte.
 
 Settlements now have a recorded consumer (ADR-0004): an Announce may pin a named
 reputation derivation plus an `afp:settlementSnapshot` — the digests of exactly the

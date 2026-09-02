@@ -1,4 +1,4 @@
-# AFP reference instance — P1 + P2 + P3 + P4
+# AFP reference instance — P1 through P7
 
 **P1**: one instance, two agents, one verifiable record — no network
 ([05 § P1](../../docs/afp/05-roadmap.md#p1--one-instance-two-agents-one-verifiable-record)).
@@ -15,6 +15,25 @@ with a hash-chained refusal log
 ([ADR-0008](../../docs/afp/adr/0008-p4-federation-stack.md)), and the
 federated joint replay with lawful redaction
 ([ADR-0009](../../docs/afp/adr/0009-federated-replay.md)).
+**P5**: the shared hub — somebody's server with its own inbox and one write door,
+a portable `afp:MembershipProof`, and cross-instance CRDT sync that carries the
+signed activities rather than bare deltas
+([ADR-0014](../../docs/afp/adr/0014-p5-shared-hub-stack.md),
+[ADR-0015](../../docs/afp/adr/0015-the-case-file-at-n-parties.md),
+[ADR-0016](../../docs/afp/adr/0016-p5-transport.md)).
+**P6**: L1 Byzantine voting — chained signed votes, `afp:EquivocationProof`,
+succession and the early close
+([ADR-0020](../../docs/afp/adr/0020-p6-hardened-round-stack.md)) — and the
+governed consequence of a conviction: a recomputable electorate, recusal by
+cause, `afp:KeyCompromiseClaim`, expulsion as a ratified act
+([ADR-0021](../../docs/afp/adr/0021-conviction-to-consequence.md)), on the
+binding, actionable round of
+[ADR-0018](../../docs/afp/adr/0018-the-round-as-a-commitment.md) and
+[ADR-0019](../../docs/afp/adr/0019-acting-on-a-decision.md).
+**P7**: contribution accounting — an `afp:ContributionSummary` that declares its
+frame, `afp:contributionSplit` in integer shares, an `afp:inputHash` with a
+defined preimage, and a dispute that ends
+([ADR-0022](../../docs/afp/adr/0022-the-summary-declares-its-frame.md)).
 
 ```bash
 npm run demo          # P1: writer drafts, reviewer critiques, bundle exported

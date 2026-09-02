@@ -16,10 +16,10 @@ holding no keys.
 
 ## The spec
 
-**[docs/afp/](docs/afp/README.md)** — Revision 3.29, in seven parts, with scenario tests
+**[docs/afp/](docs/afp/README.md)** — Revision 3.33, in seven parts, with scenario tests
 and ADRs.
 
-Eleven **spec-test scenarios** walk real workloads end to end and record what strained;
+Thirteen **spec-test scenarios** walk real workloads end to end and record what strained;
 every finding they raised is closed, and the
 [support index](docs/afp/scenarios/README.md#is-this-workload-supported) says which decision
 closed it and what to run to watch it work. The scenarios themselves are never rewritten
@@ -73,6 +73,35 @@ the hub never sat on the payload path. Stack:
 [ADR-0015](docs/afp/adr/0015-the-case-file-at-n-parties.md),
 [ADR-0016](docs/afp/adr/0016-p5-transport.md).
 
+**P6 is built** — L1 Byzantine voting, and what follows a conviction. Chained signed votes
+(`afp:observedVotes`, `afp:seqNo`, `afp:proposalHash`) pinned to a membership snapshot, an
+`afp:EquivocationProof` that verifies standalone from the two conflicting votes and zeroes
+the offender's weight with no coordination, succession pinned in the proposal, the
+provably-doomed round's early close, and a replay-wide searchlight that catches a concealed
+equivocation across domains. Then the far side of conviction: an authorized membership
+trail, a recomputable electorate, recusal by declared cause, `afp:KeyCompromiseClaim` to
+tell a sanction from an incident, expulsion as the ratified actuation of a governance
+round, forward-scoped restoration, and a proof that travels as cited enrollment evidence.
+Five instances over real HTTP tell a scripted equivocator from a scripted backup-restore by
+the joint replay alone. Stack:
+[ADR-0020](docs/afp/adr/0020-p6-hardened-round-stack.md),
+[ADR-0021](docs/afp/adr/0021-conviction-to-consequence.md) — on the binding, actionable
+round of [ADR-0018](docs/afp/adr/0018-the-round-as-a-commitment.md) and
+[ADR-0019](docs/afp/adr/0019-acting-on-a-decision.md).
+
+**P7 is built** — contribution accounting. An `afp:ContributionSummary` declares its
+**frame** — a hub-observed period bounded by two digests on the hub's own chain, the
+visibility classes it summed over, the split rule and the vocabulary — so a second party
+can recompute the same number, or say by name why it cannot. `afp:contributionSplit` in
+integer shares (a fraction cannot be canonicalised), an `afp:inputHash` with a defined
+preimage, an `afp:unreadable` census so a partial view is counted rather than silently
+summed, credit fixed at acceptance and recorded rather than deducted when work does not
+hold or a seat ends, and a terminal for `afp:ContributionDispute`: a correction supersedes,
+and an ordinary round ratifies it. Four support desks over real HTTP split one retainer,
+nobody misbehaves, and two honest desks still get two different numbers — which the record
+can now explain. Stack:
+[ADR-0022](docs/afp/adr/0022-the-summary-declares-its-frame.md).
+
 | | |
 |---|---|
 | [`src/instance/`](src/instance/) | The instance — TypeScript on Node 22.5+, no dependencies, no build step |
@@ -99,6 +128,7 @@ python3 afp_verify.py ../instance/export-p3 --thread "https://alpha.operator.loc
 python3 afp_verify.py ../instance/export-p4/alpha ../instance/export-p4/beta --verbose
 python3 afp_verify.py ../instance/export-p5/alpha ../instance/export-p5/bravo ../instance/export-p5/gamma --verbose
 python3 afp_verify.py ../instance/export-p6/{atlas,meridian,pelican,anchor,harbor} --verbose
+python3 afp_verify.py ../instance/export-p7/{dayshift,kestrel,lantern,northwind} --verbose
 ```
 
 The verifier is a deliberately independent second implementation in another language — a

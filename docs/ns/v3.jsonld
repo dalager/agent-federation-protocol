@@ -55,6 +55,16 @@
     "afp:fetchedAt": { "@type": "xsd:dateTime" },
     "afp:expires": { "@type": "xsd:dateTime" },
     "afp:validFrom": { "@type": "xsd:dateTime" },
-    "afp:validUntil": { "@type": "xsd:dateTime" }
+    "afp:validUntil": { "@type": "xsd:dateTime" },
+    "start": { "@id": "afp:start", "@type": "xsd:dateTime" },
+    "end": { "@id": "afp:end", "@type": "xsd:dateTime" },
+    "low": "afp:low",
+    "high": "afp:high",
+    "result": "afp:result",
+    "afp:governanceSubject": { "@type": "@id" },
+    "afp:verificationMethod": { "@type": "@id" },
+    "afp:summary": { "@type": "@id" },
+    "afp:hubs": { "@type": "@id" },
+    "afp:since": { "@type": "xsd:dateTime" }
   }
 }
