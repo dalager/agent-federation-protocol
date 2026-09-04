@@ -46,7 +46,10 @@ Adapters:
 - **`file`** — today's PEM files, now created `0600`, optionally encrypted at rest with a
   passphrase from `AFP_KEY_PASSPHRASE_FILE`; the reference adapter, and the only one the
   gate needs.
-- **`remote`** — an HTTP signer behind mutual TLS (`POST /sign` with the bytes' digest),
+- **`remote`** — an HTTP signer behind mutual TLS (`POST /sign`; the request carries the
+  *bytes*, not their digest — Ed25519 hashes internally, so a signature over a
+  caller-supplied digest never verifies over the message. Corrected in
+  [ADR-0035](0035-remote-custody-and-the-asynchronous-port.md), which also costs the port),
   the shape an operator's KMS or HSM proxy fits; a reference implementation in
   `tools/signer/` proves the contract with a file-backed service.
 - **`agent`** — for `self`-custody agents: the instance holds no key at all; the agent
@@ -276,9 +279,19 @@ the HTTP hop is the instance's delivery on the agent's behalf, not the agent's o
 and no hop signature ever enters the record.
 
 **Still not built: the `remote` adapter.** It needs the asynchronous port this build
-deliberately did not adopt (see the revision note above) and should arrive together with
-it; `tools/signer/` does not exist, and G2 is correspondingly absent. `remote` remains a
-`Custody` value the type admits and no adapter produces.
+deliberately did not adopt (see the revision note above); `tools/signer/` does not exist,
+and G2 is correspondingly absent. `remote` remains a `Custody` value the type admits and
+no adapter produces.
+
+> **Costed and designed since, in [ADR-0035](0035-remote-custody-and-the-asynchronous-port.md)**,
+> which corrects this ADR on two counts. The revision note's blast radius was overstated:
+> actor documents assemble from public halves and never sign, so the "99 more" call sites
+> it names are unaffected, and the real constraint is not the count but `AfpInstance`'s
+> constructor, which signs. And Decision 1's `POST /sign` sentence specified a digest,
+> which Ed25519 cannot honour. ADR-0035 also proposes `remote-issued` custody — the HSM
+> issues a short-lived signing key rather than performing every signature — which reaches
+> most of what an operator wants from remote custody through the interval model
+> [ADR-0012](0012-the-long-horizon.md) already built, and needs no promise anywhere.
 
 Gate: `test/adr0026.test.ts` — G1 as an *independent* byte-identity check (the
 `eddsa-jcs-2022` signing input is rebuilt in the test and signed with the bare
