@@ -54,6 +54,29 @@ export function fileSigner(pair: KeyPair): Signer {
 }
 
 /**
+ * The `agent` adapter: `self` custody, meaning it — the instance holds no
+ * private key for this actor at all.
+ *
+ * The agent supplies the signing operation and its own public half; the
+ * instance can ask for a signature and can never produce one on its own,
+ * which is the whole difference from `self` custody as it existed before
+ * ADR-0026 (where the roster said `self` and the instance still minted and
+ * held the PEM). 01 § "the agent–instance boundary" describes exactly this
+ * and nothing had exercised it.
+ *
+ * Synchronous, like every adapter here: an agent in another process reaches
+ * this through a bridge its own operator writes. A signer that must await the
+ * network is the `remote` adapter's problem, and waits for the async port.
+ */
+export function agentSigner(
+  keyId: string,
+  publicKeyMultibase: string,
+  sign: (bytes: Uint8Array) => Uint8Array,
+): Signer {
+  return { keyId, publicKeyMultibase, custody: "agent", sign };
+}
+
+/**
  * A signer over a bare `KeyObject`, for call sites that hold one directly
  * (the HTTP-signature tests, and any caller minting an ephemeral key). Same
  * closure discipline as `fileSigner`.

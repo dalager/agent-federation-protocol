@@ -19,16 +19,18 @@ import { after, describe, it } from "node:test";
 
 import { loadConfig } from "../src/config.ts";
 import { AfpInstance } from "../src/instance.ts";
+import { agentActorId } from "../src/ap/documents.ts";
 import { CountingBrain } from "../src/brains/stub.ts";
 import { attachProof, verifyProof } from "../src/crypto/proof.ts";
 import { canonicalBytes } from "../src/crypto/jcs.ts";
-import { multibaseDecode } from "../src/crypto/multibase.ts";
-import { fileSigner, signerOver } from "../src/crypto/signer.ts";
+import { encodeEd25519Multikey, multibaseDecode, multibaseEncode } from "../src/crypto/multibase.ts";
+import { agentSigner, fileSigner, signerOver } from "../src/crypto/signer.ts";
 import {
   allKeyHistories,
   loadOrCreateHubKeyPair,
   loadOrCreateKeyPair,
   publicKeyFromMultibase,
+  rawPublicKey,
   rotateKeyPair,
 } from "../src/crypto/keys.ts";
 import { exportBundle, refusePrivateMaterial } from "../src/export.ts";
@@ -116,6 +118,122 @@ describe("Decision 1 — the signer port", () => {
     } finally {
       if (previous === undefined) delete process.env.AFP_KEY_PASSPHRASE_FILE;
       else process.env.AFP_KEY_PASSPHRASE_FILE = previous;
+    }
+  });
+});
+
+describe("Decision 1 — the `agent` adapter: self custody that is actually self custody", () => {
+  /** A keypair the instance never sees the private half of. */
+  function outOfProcessAgent(actorId: string) {
+    const { privateKey, publicKey } = generateKeyPairSync("ed25519");
+    const multibase = encodeEd25519Multikey(rawPublicKey(publicKey));
+    let signatures = 0;
+    return {
+      publicKeyMultibase: multibase,
+      get signatures() {
+        return signatures;
+      },
+      signer: agentSigner(`${actorId}#ed25519-key`, multibase, (bytes) => {
+        signatures++;
+        return new Uint8Array(rawSign(null, bytes, privateKey));
+      }),
+    };
+  }
+
+  it("G3: the instance mints no key for an agent-custody agent, and its record replays clean", () => {
+    const paths = workspace();
+    const config = loadConfig(paths);
+    const actorId = agentActorId(config.origin, "solo");
+    const agent = outOfProcessAgent(actorId);
+    const instance = new AfpInstance(config, [
+      {
+        spec: { name: "solo", capabilities: ["afp:cap:assess"], keyCustody: "self", since: "2026-08-17T00:00:00Z" },
+        brain: new CountingBrain("solo", ["afp:cap:assess"], () => ({ ok: true, content: "ok" })),
+        signer: agent.signer,
+      },
+    ]);
+    try {
+      // The property the whole adapter exists for: no private key on disk.
+      assert.equal(existsSync(join(config.keyDir, "solo.pem")), false,
+        "the instance holds no private key for a self-custody agent");
+
+      instance.publish("solo", [], `${config.origin}/threads/solo`, "public", (envelope) => ({
+        "@context": ["https://www.w3.org/ns/activitystreams"],
+        id: envelope.activityId,
+        type: "Create",
+        actor: envelope.actor,
+        to: [...envelope.to],
+        published: envelope.published,
+        context: envelope.thread,
+        "afp:visibility": envelope.visibility,
+        ...(envelope.prevActivity !== null ? { "afp:prevActivity": envelope.prevActivity } : {}),
+        object: { type: "Note", content: "a note" },
+      }) as never);
+      assert.ok(agent.signatures > 0, "the agent's own signer produced the signature");
+
+      const entry = instance.outbox.byActor(actorId).at(-1)!;
+      // Self custody signs as itself — no afp:actingAs indirection.
+      assert.equal(entry.activity["afp:actingAs"], undefined);
+      assert.equal(
+        (entry.activity.proof as { verificationMethod: string }).verificationMethod,
+        `${actorId}#ed25519-key`,
+      );
+      assert.equal(
+        verifyProof(entry.activity, publicKeyFromMultibase(agent.publicKeyMultibase)).ok,
+        true,
+        "and it verifies against the key the agent published",
+      );
+
+      // The actor document publishes the agent's public half, from a signer
+      // whose private half this process never held.
+      const doc = instance.agentDocument("solo") as { assertionMethod: { publicKeyMultibase: string }[] };
+      assert.equal(doc.assertionMethod[0].publicKeyMultibase, agent.publicKeyMultibase);
+
+      // G9 / P1 gate check 11: replay is clean and the record carries no
+      // trace of how the signing was wired.
+      exportBundle(instance, paths.exportDir);
+      const result = runVerifier(VERIFIER, paths.exportDir, `${config.origin}/threads/solo`, ["--verbose"]);
+      assert.equal(result.code, 0, `an agent-custody record replays clean: ${result.output}`);
+      const bundle = readFileSync(join(paths.exportDir, "outbox", "solo.jsonld"), "utf8");
+      for (const leak of ["agentSigner", "custody", "keyDir", "fileSigner"]) {
+        assert.ok(!bundle.includes(leak), `the record leaks no wiring (${leak})`);
+      }
+    } finally {
+      instance.close();
+    }
+  });
+
+  it("the transport key stays instance-held even under agent custody, and says so", () => {
+    // The HTTP hop is the instance's delivery on the agent's behalf, not the
+    // agent's own act — and the key entry publishes that custody so an
+    // auditor can see it (Decision 1's informational `afp:custody`).
+    const paths = workspace();
+    const config = loadConfig(paths);
+    const agent = outOfProcessAgent(agentActorId(config.origin, "solo2"));
+    const instance = new AfpInstance(config, [
+      {
+        spec: { name: "solo2", capabilities: ["afp:cap:assess"], keyCustody: "self", since: "2026-08-17T00:00:00Z" },
+        brain: new CountingBrain("solo2", ["afp:cap:assess"], () => ({ ok: true, content: "ok" })),
+        signer: agent.signer,
+      },
+    ]);
+    try {
+      const doc = instance.agentDocument("solo2") as {
+        assertionMethod: { "afp:custody"?: string }[];
+        authentication: { id: string; "afp:custody"?: string }[];
+      };
+      assert.equal(doc.authentication[0]["afp:custody"], "file", "the hop key's custody is published");
+      assert.ok(doc.authentication[0].id.endsWith("#transport-key"));
+      assert.equal(doc.assertionMethod[0]["afp:custody"], undefined,
+        "the proof key's custody is the roster's afp:keyCustody, not a duplicate here");
+      assert.equal(
+        (instance.rosterDocument().orderedItems as { agent: string; "afp:keyCustody": string }[])
+          .find((e) => e.agent.endsWith("/solo2"))?.["afp:keyCustody"],
+        "self",
+        "and the roster is where the proof key's custody is stated",
+      );
+    } finally {
+      instance.close();
     }
   });
 });
@@ -376,6 +494,24 @@ describe("Decision 4 — an export never carries private material", () => {
     const { privateKey } = generateKeyPairSync("ed25519");
     writeFileSync(join(dir, "oops.pem"), privateKey.export({ type: "pkcs8", format: "pem" }) as string);
     assert.throws(() => refusePrivateMaterial(dir), /private key material/);
+  });
+
+  it("a base58 signature that merely looks like a private Multikey is not a false positive", () => {
+    // Found as an intermittent gate failure: the first cut matched the text
+    // `z3we` anywhere in a file, and every proofValue is `z` + base58btc of a
+    // 64-byte signature, so roughly one bundle in 200k proofs was refused for
+    // carrying a legitimate signature. Custody is decided by DECODING now.
+    const dir = mkdtempSync(join(tmpdir(), "afp-bundle-fp-"));
+    const decoy = `z3we${"1".repeat(80)}`; // long, base58-shaped, decodes to the wrong length
+    writeFileSync(join(dir, "outbox.jsonld"), JSON.stringify({ proof: { proofValue: decoy } }));
+    refusePrivateMaterial(dir); // must not throw
+
+    // The real thing — an Ed25519 private Multikey (0x80 0x26 || 32 bytes) — is caught.
+    const { privateKey } = generateKeyPairSync("ed25519");
+    const raw = (privateKey.export({ type: "pkcs8", format: "der" }) as Buffer).subarray(-32);
+    const privateMultikey = multibaseEncode(Buffer.concat([Buffer.from([0x80, 0x26]), raw]));
+    writeFileSync(join(dir, "leak.jsonld"), JSON.stringify({ key: privateMultikey }));
+    assert.throws(() => refusePrivateMaterial(dir), /private Multikey/);
   });
 
   it("the passphrase itself is caught even when no PEM is present", () => {

@@ -150,7 +150,7 @@ built in its ADR.
 | Claim | ADR | State |
 |---|---|---|
 | C1 | 0025 | built |
-| C2 | 0026 | built, less the `remote`/`agent` signer adapters |
+| C2 | 0026 | built, less the `remote` signer adapter (waits on the async port) |
 | C3 | 0027 | proposed |
 | C4–C6 | 0028, 0029, 0030 | proposed |
 | C7–C8 | 0031, 0032 | proposed |

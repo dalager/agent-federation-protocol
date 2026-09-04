@@ -1,7 +1,7 @@
 # ADR-0026 — Key custody and the signer port: the record's guarantees are cryptographic; the keys' protection must stop being a directory permission
 
-- **Status:** Built (2026-09-04), with two stated exceptions — the `remote` and `agent`
-  signer adapters, and the `afp:custody` field on published key entries — program claim **C2** of
+- **Status:** Built (2026-09-04), with one stated exception — the `remote` signer adapter,
+  which waits on the asynchronous port — program claim **C2** of
   [ADR-0024](0024-the-road-to-production.md); group: **Security**
 - **Date:** 2026-09-02
 - **Applies to:** every private key an instance holds — instance, agent, hub-scoped and
@@ -263,14 +263,22 @@ with the note that under `remote`/`agent` custody there is nothing there to back
 An export bundle is not a backup, and Decision 4's refusal is the backstop for the one
 accident that cannot be undone.
 
-**Not built, and why.** The `remote` adapter needs the asynchronous port this build
+**The `agent` adapter (2026-09-04).** `agentSigner(keyId, publicKeyMultibase, sign)` plus
+an optional `signer` on `AgentRegistration`: when present the instance mints and loads
+**no** private key for that actor, which is what `self` custody was always supposed to
+mean and never did — before this, the roster said `self` while the instance still minted
+and held the PEM. The agent's own signer is the only way to sign as that actor anywhere in
+the process, and the actor document publishes the public half from it. `afp:custody` is
+published on the key entries the roster does not cover (the transport key, and hub-scoped
+keys), the proof key's custody remaining the roster's `afp:keyCustody` — Decision 1's own
+division, not a duplicate. The transport key stays instance-held under every custody mode:
+the HTTP hop is the instance's delivery on the agent's behalf, not the agent's own act,
+and no hop signature ever enters the record.
+
+**Still not built: the `remote` adapter.** It needs the asynchronous port this build
 deliberately did not adopt (see the revision note above) and should arrive together with
-it; `tools/signer/` does not exist. The `agent` adapter — an out-of-process self-custody
-agent presenting signed activities — is natively synchronous and buildable, but has no
-caller to exercise it: no agent in the repository runs `self` custody, so building it now
-would add an untested path rather than a demonstrated one. Both remain `Custody` values
-the type admits and the actor document does not yet publish; gate cases G2, G3 and G9 are
-correspondingly absent.
+it; `tools/signer/` does not exist, and G2 is correspondingly absent. `remote` remains a
+`Custody` value the type admits and no adapter produces.
 
 Gate: `test/adr0026.test.ts` — G1 as an *independent* byte-identity check (the
 `eddsa-jcs-2022` signing input is rebuilt in the test and signed with the bare
@@ -278,10 +286,12 @@ key, so the port is proved not to have changed the algorithm rather than compare
 against itself), the signer's closed-over private half, `0600`, encryption at rest
 round-tripping, G6 (hub-scoped and transport keys in the history, no id
 collisions), G7 (a planted PEM refuses the export), and the manifest-signature
-regression above; G4 (both signatures verify across a rotation), G5 (the backdated cut
-refused by name), the no-bootable-instance dead end, and G8a/G8b/G8c (both scopes stub
-1:1 and replay clean; a bundle disclosing below its declared floor fails). `npm run gate`
-— 282/282; p1/p4–p7 demos clean; the joint P7 replay passes 981 checks and a bundle
+regression above; G3 (an agent-custody agent signs out of process, no PEM is minted, the
+record replays clean and leaks no wiring — P1 gate check 11 across the change); G4 (both
+signatures verify across a rotation), G5 (the backdated cut refused by name), the
+no-bootable-instance dead end, and G8a/G8b/G8c (both scopes stub 1:1 and replay clean; a
+bundle disclosing below its declared floor fails). `npm run gate` — 285/285, run four
+times over for the flake below; p1/p4–p7 demos clean; the joint P7 replay passes 981 checks and a bundle
 written before this ADR still verifies.
 
 ## References

@@ -11,7 +11,7 @@
 import type { JsonValue } from "../crypto/jcs.ts";
 import { attachProof, DATA_INTEGRITY_CONTEXT, type SignedDocument } from "../crypto/proof.ts";
 import type { KeyPair } from "../crypto/keys.ts";
-import type { Signer } from "../crypto/signer.ts";
+import type { Custody, Signer } from "../crypto/signer.ts";
 
 export const AS2_CONTEXT = "https://www.w3.org/ns/activitystreams";
 export const AFP_CONTEXT = "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld";
@@ -84,15 +84,15 @@ export function instanceActor(
 export function agentActor(
   origin: string,
   spec: AgentSpec,
-  key: KeyPair,
+  key: PublishedKey,
   /**
    * Hub-scoped verification methods (ADR-0002 Decision 4), published alongside
    * the P1 `assertionMethod` key rather than replacing it — keys cannot be
    * backfilled onto an already-published actor document.
    */
-  hubKeys: readonly KeyPair[] = [],
+  hubKeys: readonly PublishedKey[] = [],
   /** ADR-0017 Decision 4 (R1): HTTP-signature key, published under `authentication`. */
-  transportKey?: KeyPair,
+  transportKey?: PublishedKey,
 ): { [key: string]: JsonValue } {
   const id = agentActorId(origin, spec.name);
   return {
@@ -152,12 +152,38 @@ export function hubActor(
   };
 }
 
-function multikey(key: KeyPair): JsonValue {
+/**
+ * What a document needs to publish a key: the public half and its identity.
+ * A `KeyPair` satisfies this structurally, and so does the public view of a
+ * signer whose private half the instance never holds (ADR-0026 `agent`
+ * custody) — which is the point of taking the narrower shape here.
+ */
+export interface PublishedKey {
+  keyId: string;
+  controller: string;
+  publicKeyMultibase: string;
+  /**
+   * ADR-0026 Decision 1: where this key's private half lives, published so an
+   * auditor can see custody without being able to reach it. Informational and
+   * never a capability — a document claiming `remote` proves nothing about
+   * where the key really is; it states what the operator says, which is what
+   * ADR-0033 turns into an obligation.
+   *
+   * Omitted for the `assertionMethod` proof key, whose custody the roster
+   * already carries per agent as `afp:keyCustody` (Decision 1's own division:
+   * the roster for the proof key, the key entry for the ones the roster does
+   * not cover).
+   */
+  custody?: Custody;
+}
+
+function multikey(key: PublishedKey): JsonValue {
   return {
     id: key.keyId,
     type: "Multikey",
     controller: key.controller,
     publicKeyMultibase: key.publicKeyMultibase,
+    ...(key.custody !== undefined ? { "afp:custody": key.custody } : {}),
   };
 }
 

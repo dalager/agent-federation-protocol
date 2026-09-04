@@ -23,6 +23,7 @@ import type { JsonValue } from "./crypto/jcs.ts";
 import { attachProof, digestOf } from "./crypto/proof.ts";
 import { allKeyHistories, type KeyHistoryEntry } from "./crypto/keys.ts";
 import { admittingGrant, summarize, type AgreementObject } from "./federation/grants.ts";
+import { multibaseDecode } from "./crypto/multibase.ts";
 import type { Visibility } from "./ap/activities.ts";
 
 /**
@@ -402,16 +403,45 @@ export function exportBundle(
   return { dir, actors: actorNames.length, activities, artifacts: artifacts.length };
 }
 
-/** PEM headers for private material, and the multibase prefix of an Ed25519 private Multikey. */
-const PRIVATE_MARKERS = [
+/** PEM headers for private material. Long literals; no false-positive risk. */
+const PRIVATE_PEM_MARKERS = [
   "-----BEGIN PRIVATE KEY-----",
   "-----BEGIN RSA PRIVATE KEY-----",
   "-----BEGIN EC PRIVATE KEY-----",
   "-----BEGIN OPENSSH PRIVATE KEY-----",
   "-----BEGIN ENCRYPTED PRIVATE KEY-----",
-  // Multikey private prefix (0x80 0x26 varint) — the private twin of `z6Mk…`.
-  "z3we",
 ];
+
+/** Every base58btc multibase token long enough to be key or signature material. */
+const MULTIBASE_TOKEN = /z[1-9A-HJ-NP-Za-km-z]{40,}/g;
+
+/** The multicodec prefix of an Ed25519 *private* Multikey: varint 0x1300 → 0x80 0x26. */
+const ED25519_PRIVATE_PREFIX = [0x80, 0x26];
+
+/**
+ * Is this multibase token an Ed25519 private key?
+ *
+ * Decided by **decoding**, not by matching the `z3we…` prefix as text. Every
+ * `proofValue` in a bundle is `z` + base58btc of a 64-byte signature, so a
+ * substring test for the private prefix hits one by chance roughly once in
+ * 200k proofs — which is not "rare enough to ignore" when the consequence is
+ * an export refusing to write. It was found exactly that way: an intermittent
+ * gate failure on a bundle whose hub outbox happened to contain the four
+ * characters inside a legitimate signature.
+ */
+function isPrivateMultikey(token: string): boolean {
+  let bytes: Uint8Array;
+  try {
+    bytes = multibaseDecode(token);
+  } catch {
+    return false; // not decodable: not key material this function can claim
+  }
+  return (
+    bytes.length === ED25519_PRIVATE_PREFIX.length + 32 &&
+    bytes[0] === ED25519_PRIVATE_PREFIX[0] &&
+    bytes[1] === ED25519_PRIVATE_PREFIX[1]
+  );
+}
 
 /**
  * Scan every file in a written bundle for private key material and throw
@@ -436,10 +466,18 @@ export function refusePrivateMaterial(dir: string, passphraseFile?: string): voi
       // right — an operator attaching their own key file to a Task is exactly
       // the accident this catches.
       const text = bytes.toString("utf8");
-      for (const marker of PRIVATE_MARKERS) {
+      for (const marker of PRIVATE_PEM_MARKERS) {
         if (text.includes(marker)) {
           throw new Error(
-            `export refused: ${path} contains private key material (${marker.slice(0, 32)}…) — ` +
+            `export refused: ${path} contains private key material (${marker}) — ` +
+              `a bundle is what leaves the operator's hands and must carry public halves only`,
+          );
+        }
+      }
+      for (const token of text.match(MULTIBASE_TOKEN) ?? []) {
+        if (isPrivateMultikey(token)) {
+          throw new Error(
+            `export refused: ${path} carries an Ed25519 private Multikey (${token.slice(0, 12)}…) — ` +
               `a bundle is what leaves the operator's hands and must carry public halves only`,
           );
         }

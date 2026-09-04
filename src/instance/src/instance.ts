@@ -24,6 +24,7 @@ import {
   agentActor,
   agentActorId,
   deriveRoster,
+  type PublishedKey,
   instanceActor,
   instanceActorId,
   signedRoster,
@@ -46,6 +47,13 @@ import { followHub as followHubImpl, followingIds as followingIdsImpl, unfollowH
 export interface AgentRegistration {
   spec: AgentSpec;
   brain: Brain;
+  /**
+   * ADR-0026 Decision 1, the `agent` adapter: the agent holds its own key and
+   * hands over a signing capability. When present the instance mints and
+   * holds **no** private key for this actor — which is what `self` custody
+   * was always supposed to mean and never did.
+   */
+  signer?: Signer;
 }
 
 export type ReceiveOutcome =
@@ -103,7 +111,17 @@ export class AfpInstance {
     for (const agent of agents) {
       this.agents.set(agent.spec.name, agent);
       const agentId = agentActorId(config.origin, agent.spec.name);
-      this.keys.set(agent.spec.name, loadOrCreateKeyPair(config.keyDir, agent.spec.name, agentId));
+      if (agent.signer) {
+        // `agent` custody: no PEM is minted, and none is loaded. The signer
+        // the agent supplied is the only way to sign as this actor, here or
+        // anywhere else in the process.
+        this.signers.set(agent.spec.name, agent.signer);
+      } else {
+        this.keys.set(agent.spec.name, loadOrCreateKeyPair(config.keyDir, agent.spec.name, agentId));
+      }
+      // The transport key stays instance-held under every custody mode: the
+      // HTTP hop is the *instance's* delivery on the agent's behalf, not the
+      // agent's own act, and the record never carries a hop signature.
       this.keys.set(`${agent.spec.name}:transport`, loadOrCreateTransportKeyPair(config.keyDir, agent.spec.name, agentId));
     }
 
@@ -148,7 +166,20 @@ export class AfpInstance {
   agentDocument(name: string): { [key: string]: JsonValue } {
     const agent = this.agents.get(name);
     if (!agent) throw new Error(`unknown agent ${name}`);
-    return agentActor(this.config.origin, agent.spec, this.key(name), [], this.transportKey(name));
+    // Under `agent` custody there is no local KeyPair to publish from — the
+    // public view of the supplied signer is the whole of what this instance
+    // knows about that key, which is the property worth publishing.
+    const key: PublishedKey = agent.signer
+      ? {
+          keyId: agent.signer.keyId,
+          controller: this.actorId(name),
+          publicKeyMultibase: agent.signer.publicKeyMultibase,
+        }
+      : this.key(name);
+    return agentActor(this.config.origin, agent.spec, key, [], {
+      ...this.transportKey(name),
+      custody: "file",
+    });
   }
 
   /**
