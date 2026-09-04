@@ -28,6 +28,11 @@ function transport() {
     now: () => NOW,
     isLocal: () => false,
     local: { name: "local", deliver: async () => {} },
+    // ADR-0025: this file mocks `globalThis.fetch` directly against a
+    // non-resolving host — dev mode is what every demo sets for the same
+    // reason, skipping the address policy that would otherwise try (and
+    // fail) to resolve it for real.
+    fetchPolicy: { devMode: true },
   });
 }
 
@@ -40,7 +45,10 @@ function scriptedFetch(statuses: number[]) {
   const schemes: string[] = [];
   globalThis.fetch = (async (url: unknown, init?: { method?: string; headers?: Record<string, string> }) => {
     if ((init?.method ?? "GET") === "GET") {
-      return new Response(JSON.stringify({ id: String(url), inbox: `${String(url)}/inbox` }), { status: 200 });
+      return new Response(JSON.stringify({ id: String(url), inbox: `${String(url)}/inbox` }), {
+        status: 200,
+        headers: { "content-type": "application/activity+json" },
+      });
     }
     schemes.push(init?.headers?.["signature-input"] ? "rfc9421" : "cavage");
     const status = statuses[Math.min(schemes.length - 1, statuses.length - 1)];

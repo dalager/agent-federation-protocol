@@ -1,6 +1,6 @@
 # ADR-0025 — Transport hardening: the process that carries the record survives a hostile network
 
-- **Status:** Proposed (2026-09-02) — program claim **C1** of
+- **Status:** Built (2026-09-04) — program claim **C1** of
   [ADR-0024](0024-the-road-to-production.md); group: **Security**
 - **Date:** 2026-09-02
 - **Applies to:** every HTTP surface the instance exposes or calls — the inboxes, the
@@ -158,7 +158,37 @@ never happen is a production instance running that way silently, hence the loud 
 
 ## Build status
 
-Not built.
+Built, 2026-09-04: `federation/fetchPolicy.ts` (new) — TLS-only outside `AFP_DEV`, address
+policy (loopback/link-local/RFC1918/ULA/multicast/metadata refused, `AFP_TRUSTED_NETS` the
+named escape hatch), no redirects followed, per-kind timeouts, streamed size caps,
+content-type check for `document`. Wired into `federation/inbox.ts`'s `fetchActorDocument`
+and `federation/transport.ts`'s delivery and inbox-resolution fetches — the two call sites
+the ADR named. `config.ts` refuses an `http:` origin unless `devMode` (`AFP_DEV=1`); `cli.ts`
+sets it for every demo command (never `serve`) and `test/helpers.ts` for the gate, so every
+existing demo and all 250 pre-existing tests are unchanged (Decision 1's compatibility
+proof — see G1/G2 below). Decision 3's key-controller binding is enforced in
+`handleInboxPost`. Decision 4's body cap (`AFP_MAX_INBOX_BODY_BYTES`, default 1 MiB) is
+enforced in `ap/server.ts` before the body is buffered, answering `413`. Decision 5's two
+token buckets (`federation/rateLimit.ts`, new) are live in `ap/server.ts` — per-address on
+every request, per-authenticated-actor in `handleInboxPost` after signature verification —
+answering `429` with `Retry-After` on the address bucket. Decision 6 ships as
+`DeliveryQueue.startRealTimeFlush` (`store/queue.ts`): real-interval `flush()` against the
+real clock, for whichever future scheduler drives a served instance's outbound queue
+(`serve` does not yet drive one — that is [ADR-0031](0031-the-resident-process.md)'s scope,
+not this one's); `drain()`'s virtual clock is untouched and stays what the demos and gate
+use. Decision 7's replay cache (`store/dedupe.ts`'s `SeenSignatures`, new) is wired into
+`handleInboxPost` and live whenever a server is constructed with `inbox` options.
+
+**Not built**: the boundary log does not yet gain a `rate-limited` log class (Decision 5's
+last clause) — a rate-limit refusal is answered but not chained into `fed_boundary_log`.
+ADR-0008's row F3 is corrected to point here.
+
+Gate: `test/adr0025.test.ts` — G1, G2 (TLS-only / dev mode), the fetch policy's insecure-
+origin, SSRF, redirect, size-cap and content-type refusals, G6 (key-controller mismatch),
+G7 (body cap, 413), G8 (rate limiting, 429 + Retry-After, over real HTTP), G9 (replay
+cache), and G11 (a full P4 run over real HTTP, with the policy live throughout, still
+exports and both sides agree). `npm run gate` — 263/263, unchanged from before this ADR's
+250.
 
 ## References
 

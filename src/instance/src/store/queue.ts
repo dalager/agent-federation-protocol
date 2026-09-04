@@ -145,6 +145,31 @@ export class DeliveryQueue {
     return total;
   }
 
+  /**
+   * ADR-0025 Decision 6: a served instance's queue flush runs on real
+   * intervals against the real clock — `flush()` alone, never `drain()`'s
+   * virtual-clock loop, which exists for the demos and the gate. Backoff
+   * (`next_attempt_at`, already stored in real milliseconds) is honoured for
+   * free by ticking on a real timer instead of jumping a fake one; a peer's
+   * `429`/`503` is folded in by the caller widening `lastError`-driven
+   * `next_attempt_at` before the next tick — this loop just keeps ticking.
+   *
+   * Returns a stop function. `intervalMs` should be well under
+   * `config.backoffBaseMs` so the schedule the backoff math promises is the
+   * schedule that actually happens.
+   */
+  startRealTimeFlush(transport: Transport, intervalMs: number, onReport?: (report: DeliveryReport) => void): () => void {
+    const timer = setInterval(() => {
+      this.flush(transport, new Date())
+        .then((report) => onReport?.(report))
+        .catch(() => {
+          /* a transport-level throw here is a bug in the transport, not a delivery failure — flush() already caught those */
+        });
+    }, intervalMs);
+    timer.unref?.();
+    return () => clearInterval(timer);
+  }
+
   stats(): Record<DeliveryState, number> {
     const rows = this.db
       .prepare("SELECT state, COUNT(*) AS n FROM delivery_queue GROUP BY state")

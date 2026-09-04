@@ -16,6 +16,8 @@
 import type { JsonValue } from "../crypto/jcs.ts";
 import type { Transport } from "../store/queue.ts";
 import { signRequest, signRequestCavage } from "./httpSig.ts";
+import { policedFetch, type FetchPolicyDeps } from "./fetchPolicy.ts";
+import { devModeFromEnv } from "../config.ts";
 import type { KeyObject } from "node:crypto";
 
 type Scheme = "rfc9421" | "cavage";
@@ -29,6 +31,8 @@ export interface HttpTransportDeps {
   isLocal: (target: string) => boolean;
   /** Fallback for local targets, so one transport serves both worlds. */
   local: Transport;
+  /** ADR-0025: this instance's own fetch policy. Defaults to `AFP_DEV`-inferred, like `fetchActorDocument`. */
+  fetchPolicy?: FetchPolicyDeps;
 }
 
 function signedHeaders(
@@ -58,18 +62,20 @@ export function httpTransport(deps: HttpTransportDeps): Transport {
   const preferred = new Map<string, Scheme>();
   /** Target actor id → its advertised inbox URL (ADR-0017 Decision 3). */
   const inboxCache = new Map<string, string>();
+  const policy: FetchPolicyDeps = deps.fetchPolicy ?? { devMode: devModeFromEnv() };
 
   // The recipient's inbox is read from its dereferenced actor document (AP
   // §7.1), never constructed by convention — `${target}/inbox` happens to be
   // AFP's own layout, but the actor document is the contract. An unfetchable
   // document or one advertising no inbox is a failed hop for the retry
-  // queue, exactly like a refused POST.
+  // queue, exactly like a refused POST — same failure shape a `FetchRefusal`
+  // (ADR-0025) already has.
   const resolveInbox = async (target: string): Promise<URL> => {
     const cached = inboxCache.get(target);
     if (cached !== undefined) return new URL(cached);
-    const response = await fetch(target, { headers: { accept: "application/activity+json" } });
+    const response = await policedFetch(target, "document", policy, { headers: { accept: "application/activity+json" } });
     if (!response.ok) throw new Error(`actor fetch for ${target} failed: ${response.status}`);
-    const doc = (await response.json()) as { inbox?: unknown };
+    const doc = JSON.parse(await response.text()) as { inbox?: unknown };
     if (typeof doc.inbox !== "string") throw new Error(`actor document at ${target} advertises no inbox`);
     inboxCache.set(target, doc.inbox);
     return new URL(doc.inbox);
@@ -84,14 +90,14 @@ export function httpTransport(deps: HttpTransportDeps): Transport {
       const body = JSON.stringify(activity);
 
       const first: Scheme = preferred.get(inbox.origin) ?? "rfc9421";
-      let response = await fetch(inbox, { method: "POST", headers: signedHeaders(first, deps, inbox, body), body });
+      let response = await policedFetch(inbox, "inbox", policy, { method: "POST", headers: signedHeaders(first, deps, inbox, body), body });
 
       // A 400/401 on the leading scheme means "I did not understand or accept
       // this signature" — knock again with the other scheme before declaring
       // the hop failed. Anything else is not a scheme problem.
       if ((response.status === 400 || response.status === 401) && !preferred.has(inbox.origin)) {
         const second: Scheme = first === "rfc9421" ? "cavage" : "rfc9421";
-        const retry = await fetch(inbox, { method: "POST", headers: signedHeaders(second, deps, inbox, body), body });
+        const retry = await policedFetch(inbox, "inbox", policy, { method: "POST", headers: signedHeaders(second, deps, inbox, body), body });
         if (retry.ok) {
           preferred.set(inbox.origin, second);
           return;

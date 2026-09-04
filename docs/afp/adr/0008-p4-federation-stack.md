@@ -278,7 +278,7 @@ signatures, no mocked wire — running scenario 08's shape end to end, plus
 |---|---|---|
 | **F1** ✅ | `afp:FederationAgreement` with grants; handshake builders; gate module (agreement → deny-list → proof → soft-reputation, check 4 skipped for direct grants) | P4a |
 | **F2** ✅ | The boundary on the existing seams: `HttpTransport` implementing `Transport.deliver` (send), inbox `POST` on `ap/server.ts` (receive) — signature verification, then the gate, then the same dispatch local transport feeds | P4a |
-| **F3** ✅ | Hash-chained boundary log + optional `afp:BoundaryDigest`; rate limiting in front | P4a |
+| **F3** ✅ | Hash-chained boundary log + optional `afp:BoundaryDigest`; rate limiting in front — built by [ADR-0025](0025-transport-hardening.md) Decision 5 (this row originally claimed it prematurely; the 2026-09-02 review found no limiter existed until then) | P4a |
 | **F4** ✅ | Expiry semantics at the gate; verifier: grant admissibility, expiry instants, and the global `published`-monotonicity check | P4a |
 | **F5** ✅ | Boundary ingestion: sandbox + summarize duties enforced at the receiving port | P4a |
 | **F6** ✅ | Spec text: 01/03/04 amendments, roadmap-row and 01:13 wording cleanup, error codes named per the house rule | P4a |

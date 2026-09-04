@@ -22,6 +22,15 @@ import { Hub } from "../src/hub/hub.ts";
 import type { Envelope, Visibility } from "../src/ap/activities.ts";
 import type { JsonValue } from "../src/crypto/jcs.ts";
 
+// ADR-0025 Decision 1: the gate runs real HTTP servers over plain
+// `http://127.0.0.1` origins throughout — that is what "real sockets, no
+// mocked wire" (ADR-0008 Decision 6) has always meant here. Setting this once,
+// at import time, is the test-harness equivalent of the demo scripts' own
+// `AFP_DEV=1` and keeps every existing gate byte-identical.
+if (process.env.AFP_DEV === undefined) {
+  process.env.AFP_DEV = "1";
+}
+
 const workspaces: string[] = [];
 
 export function workspace(): { dataDir: string; exportDir: string; brain: "stub" } {

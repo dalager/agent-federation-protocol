@@ -25,6 +25,8 @@ import { webfingerResponse } from "./webfinger.ts";
 import { nodeinfoDiscovery, nodeinfoDocument } from "./nodeinfo.ts";
 import type { OutboxEntry } from "../store/outbox.ts";
 import type { JsonValue } from "../crypto/jcs.ts";
+import { RateLimiter } from "../federation/rateLimit.ts";
+import { SeenSignatures } from "../store/dedupe.ts";
 
 const AP_CONTENT_TYPE = "application/activity+json";
 
@@ -115,9 +117,27 @@ function referencingEntries(instance: AfpInstance, digest: string): OutboxEntry[
 }
 
 export function createHttpServer(instance: AfpInstance, options: ServerOptions = {}): Server {
+  // ADR-0025 Decision 5: one bucket per source address, shared across every
+  // route this server answers — cheap, unauthenticated, and the first thing
+  // a hostile burst meets. Decision 7's replay cache lives here too, scoped
+  // to this server the same way.
+  const addressLimiter = new RateLimiter(instance.config.rateLimitPerAddress, instance.config.rateLimitPerAddressWindowMs);
+  const actorLimiter = new RateLimiter(instance.config.rateLimitPerActor, instance.config.rateLimitPerActorWindowMs);
+  const seenSignatures = options.inbox ? new SeenSignatures(instance.db, instance.config.replayCacheTtlMs) : null;
+
   return createServer((req, res) => {
     const url = new URL(req.url ?? "/", instance.config.origin);
     const path = url.pathname;
+    const remoteAddress = req.socket.remoteAddress ?? "unknown";
+
+    const now = instance.clock.now();
+    addressLimiter.sweep(now.getTime());
+    if (!addressLimiter.allow(remoteAddress, now.getTime())) {
+      res.setHeader("Retry-After", String(addressLimiter.retryAfterSeconds(remoteAddress, now.getTime())));
+      res.writeHead(429, { "content-type": "application/json" });
+      res.end(JSON.stringify({ error: "rate limited" }));
+      return;
+    }
 
     // ADR-0017 Decision 3: `application/ld+json` with the AS2 profile is
     // honoured as equivalent to `application/activity+json` (AP §3.2) — a
@@ -151,13 +171,32 @@ export function createHttpServer(instance: AfpInstance, options: ServerOptions =
     const inboxHub = hubInboxMatch ? options.hubs?.find((h) => h.hubId === hubInboxMatch[1] && h.receive) : undefined;
 
     if (req.method === "POST" && options.inbox && (inboxHub || path === "/actor/inbox" || /^\/agents\/[\w-]+\/inbox$/.test(path))) {
+      // ADR-0025 Decision 4: capped and refused before parsing, not after
+      // buffering — a hostile body never gets far enough to be JSON.parse'd.
+      const cap = instance.config.maxInboxBodyBytes;
       const chunks: Buffer[] = [];
-      req.on("data", (chunk) => chunks.push(chunk));
+      let received = 0;
+      let overCap = false;
+      req.on("data", (chunk: Buffer) => {
+        if (overCap) return;
+        received += chunk.length;
+        if (received > cap) {
+          overCap = true;
+          res.writeHead(413, { "content-type": "application/json" });
+          res.end(JSON.stringify({ error: "payload too large" }));
+          req.destroy();
+          return;
+        }
+        chunks.push(chunk);
+      });
       req.on("end", () => {
+        if (overCap) return;
         const body = Buffer.concat(chunks).toString("utf8");
         handleInboxPost(
           {
             ...options.inbox!,
+            ...(seenSignatures ? { replay: seenSignatures } : {}),
+            actorRateLimit: { allow: (key: string, nowMs: number) => actorLimiter.allow(key, nowMs) },
             ...(inboxHub
               ? {
                   receive: (activity: { [key: string]: JsonValue }) => inboxHub.receive!(activity),

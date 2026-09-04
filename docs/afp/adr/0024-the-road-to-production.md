@@ -149,7 +149,8 @@ built in its ADR.
 
 | Claim | ADR | State |
 |---|---|---|
-| C1–C3 | 0025, 0026, 0027 | proposed |
+| C1 | 0025 | built |
+| C2–C3 | 0026, 0027 | proposed |
 | C4–C6 | 0028, 0029, 0030 | proposed |
 | C7–C8 | 0031, 0032 | proposed |
 | C9–C10 | 0033, 0034 | proposed |

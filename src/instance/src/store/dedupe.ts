@@ -8,7 +8,52 @@
  * twice or silently drops legitimate redeliveries — 03 § Correlation.
  */
 
+import { createHash } from "node:crypto";
 import type { Db } from "./db.ts";
+
+/**
+ * ADR-0025 Decision 7: a signed request cannot be replayed inside its own
+ * skew window. Keyed by (keyId, created, signature bytes) — cheap, bounded
+ * by the same TTL as the skew window itself, and closes the one hole the
+ * method-derived covered set (ADR-0013 Decision 1) leaves open for GETs: a
+ * signature that never touches a body can be replayed verbatim.
+ */
+export class SeenSignatures {
+  private readonly db: Db;
+  private readonly ttlMs: number;
+
+  constructor(db: Db, ttlMs: number) {
+    this.db = db;
+    this.ttlMs = ttlMs;
+    this.db.exec(
+      `CREATE TABLE IF NOT EXISTS seen_signatures (
+         fingerprint TEXT PRIMARY KEY,
+         seen_at     TEXT NOT NULL,
+         expires_at  TEXT NOT NULL
+       )`,
+    );
+  }
+
+  private fingerprint(keyId: string, created: string, signature: string): string {
+    return createHash("sha256").update(keyId).update("\0").update(created).update("\0").update(signature).digest("hex");
+  }
+
+  /** Returns true on first presentation (caller proceeds); false on replay (caller refuses). */
+  markSeen(keyId: string, created: string, signature: string, now = new Date()): boolean {
+    this.purgeExpired(now);
+    const fp = this.fingerprint(keyId, created, signature);
+    const existing = this.db.prepare("SELECT 1 FROM seen_signatures WHERE fingerprint = ?").get(fp);
+    if (existing) return false;
+    this.db
+      .prepare("INSERT INTO seen_signatures (fingerprint, seen_at, expires_at) VALUES (?, ?, ?)")
+      .run(fp, now.toISOString(), new Date(now.getTime() + this.ttlMs).toISOString());
+    return true;
+  }
+
+  private purgeExpired(now: Date): void {
+    this.db.prepare("DELETE FROM seen_signatures WHERE expires_at <= ?").run(now.toISOString());
+  }
+}
 
 export class SeenIds {
   private readonly db: Db;

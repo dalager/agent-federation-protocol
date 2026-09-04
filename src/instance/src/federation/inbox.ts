@@ -23,6 +23,8 @@ import { verifyProof } from "../crypto/proof.ts";
 import { extractKeyId, verifyRequest, type RequestAuthHeaders } from "./httpSig.ts";
 import { transportKeyFromDocument } from "./resolveTransportKey.ts";
 import type { Federation } from "./federation.ts";
+import { policedFetch, type FetchPolicyDeps } from "./fetchPolicy.ts";
+import { devModeFromEnv } from "../config.ts";
 
 export interface InboxDeps {
   federation: Federation;
@@ -40,18 +42,44 @@ export interface InboxDeps {
    * instance/agent inboxes, whose admission the gate alone decides.
    */
   admitWrite?: (actor: string, activity: { [key: string]: JsonValue }) => boolean;
+  /** ADR-0025 Decision 7: the replay cache. Absent means replay is not checked (compatibility default). */
+  replay?: { markSeen(keyId: string, created: string, signature: string, now: Date): boolean };
+  /** ADR-0025 Decision 5: per-authenticated-actor bucket, checked once transport authentication has resolved a keyId. */
+  actorRateLimit?: { allow(key: string, nowMs: number): boolean };
 }
 
 /**
  * The default `fetchDocument`: the unauthenticated actor-document GET the
- * whole signature regress bootstraps on. One implementation — a change to it
- * (timeout, redirect policy, content-type check) is security-relevant and
- * must not fork between the served instance and the demos.
+ * whole signature regress bootstraps on. One implementation — timeout,
+ * redirect policy and content-type check now live in `fetchPolicy.ts`
+ * (ADR-0025 Decision 2) — must not fork between the served instance and the
+ * demos, so both go through `policedFetch`.
  */
-export async function fetchActorDocument(url: string): Promise<{ [key: string]: JsonValue } | null> {
+export function fetchActorDocument(
+  url: string,
+  policy?: FetchPolicyDeps,
+): Promise<{ [key: string]: JsonValue } | null> {
+  // Every call site that does not thread its own instance config through
+  // (every demo file, and any caller written before this ADR) gets the same
+  // answer `loadConfig` would give it: dev mode iff `AFP_DEV=1`. Nothing
+  // here changes behaviour for a caller that already passes its own policy.
+  return fetchDocumentPoliced(url, policy ?? { devMode: devModeFromEnv() });
+}
+
+async function fetchDocumentPoliced(
+  url: string,
+  policy: FetchPolicyDeps,
+): Promise<{ [key: string]: JsonValue } | null> {
   try {
-    const response = await fetch(url, { headers: { accept: "application/activity+json" } });
-    return response.ok ? ((await response.json()) as { [key: string]: JsonValue }) : null;
+    const response = await policedFetch(url, "document", policy, { headers: { accept: "application/activity+json" } });
+    if (!response.ok) return null;
+    const doc = JSON.parse(await response.text()) as { [key: string]: JsonValue };
+    // Decision 3: the document fetched for a keyId must answer as the id it
+    // claims — refused by the caller (below) as `key-controller-mismatch`
+    // when this is used to resolve a keyId's controller; here it is left to
+    // the caller because `fetchDocument` also resolves plain actor lookups
+    // that carry no keyId to bind against.
+    return doc;
   } catch {
     return null;
   }
@@ -88,6 +116,13 @@ export async function handleInboxPost(
   if (keyId) {
     const controller = keyId.split("#")[0];
     const doc = await deps.fetchDocument(controller);
+    // ADR-0025 Decision 3: the document answering for this keyId must claim
+    // to *be* that controller. A document fetched at one URL while naming
+    // another `id` is the substitution this binding closes — refused before
+    // its key is ever trusted, not merely unresolved.
+    if (doc && doc.id !== controller) {
+      return { status: 401, body: { error: "key-controller-mismatch" } };
+    }
     const resolved = transportKeyFromDocument(doc, keyId);
     if (resolved) resolvedKeys.set(keyId, resolved);
   }
@@ -96,6 +131,25 @@ export async function handleInboxPost(
   if (!transport.ok) {
     // 04's rule: unsigned or invalid deliveries are audit-logged and dropped.
     return { status: 401, body: { error: "transport authentication failed" } };
+  }
+
+  // ADR-0025 Decision 7: a verified signature is refused a second time
+  // inside its own skew window. After verification, not before — the
+  // fingerprint keys on the signature bytes verifyRequest just proved
+  // genuine, not on an attacker's unverified claim.
+  if (deps.replay && transport.keyId && headers.date) {
+    if (!deps.replay.markSeen(transport.keyId, headers.date, headers.signature ?? "", deps.now())) {
+      return { status: 401, body: { error: "replayed signature" } };
+    }
+  }
+
+  // Decision 5's second bucket: per authenticated actor, now that the
+  // signature is proven genuine — a compromised-but-rate-limited peer
+  // cannot flood past what the address bucket alone would catch.
+  if (deps.actorRateLimit && transport.keyId) {
+    if (!deps.actorRateLimit.allow(transport.keyId, deps.now().getTime())) {
+      return { status: 429, body: { error: "rate limited" } };
+    }
   }
 
   let activity: { [key: string]: JsonValue };

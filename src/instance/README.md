@@ -444,16 +444,20 @@ Each operator sets an origin and a port, then serves:
 
 ```bash
 # terminal 1 — Alpha
-AFP_ORIGIN=http://127.0.0.1:8787 AFP_PORT=8787 AFP_DATA_DIR=./data-alpha npm run serve
+AFP_DEV=1 AFP_ORIGIN=http://127.0.0.1:8787 AFP_PORT=8787 AFP_DATA_DIR=./data-alpha npm run serve
 
 # terminal 2 — Beta
-AFP_ORIGIN=http://127.0.0.1:8788 AFP_PORT=8788 AFP_DATA_DIR=./data-beta npm run serve
+AFP_DEV=1 AFP_ORIGIN=http://127.0.0.1:8788 AFP_PORT=8788 AFP_DATA_DIR=./data-beta npm run serve
 ```
 
 `AFP_ORIGIN` must be the URL the *other* side can actually reach — it is baked
 into every actor id and key id, so signature verification resolves keys through
 it. (In production it is your public HTTPS origin; the two `127.0.0.1` origins
-above are the local two-terminal case.)
+above are the local two-terminal case.) `AFP_DEV=1` is what makes a plain-http
+loopback origin acceptable at all — outside development mode `AFP_ORIGIN`
+must be `https:` and the fetch policy refuses loopback/private targets
+([ADR-0025](../../docs/afp/adr/0025-transport-hardening.md)); every demo sets
+it for you, `serve` does not.
 
 A cold instance answers GETs immediately:
 
@@ -631,6 +635,12 @@ Environment variables, all optional (see `src/config.ts`):
 | `AFP_LLM_TIMEOUT_MS` | `120000` | |
 | `AFP_MAX_DELIVERY_ATTEMPTS` | `5` | Before dead-lettering |
 | `AFP_PORT` | `8787` | `npm run serve` |
+| `AFP_DEV` | `0` | `1` permits an `http:` origin, loopback/private fetch targets, and literal-IP hosts ([ADR-0025](../../docs/afp/adr/0025-transport-hardening.md)). Every demo sets it; `serve` does not |
+| `AFP_TRUSTED_NETS` | *(none)* | Comma-separated CIDRs the address policy admits outside dev mode — an operator's own private ranges (e.g. a hub on a VPN) |
+| `AFP_MAX_INBOX_BODY_BYTES` | `1048576` | Inbox POST body cap, enforced before parsing (413 on overflow) |
+| `AFP_RATE_LIMIT_PER_ADDRESS` / `_WINDOW_MS` | `20` / `1000` | Unauthenticated per-source-address bucket |
+| `AFP_RATE_LIMIT_PER_ACTOR` / `_WINDOW_MS` | `60` / `60000` | Per-authenticated-actor bucket, checked after signature verification |
+| `AFP_REPLAY_CACHE_TTL_MS` | `300000` | How long a signed request's (keyId, date, signature) blocks a second presentation |
 
 `AFP_LLM_API_KEY` is read at the point of use and never stored, logged, or
 written into the record. A local endpoint generally needs none.
@@ -654,9 +664,20 @@ own identifier there.
 Gossip anti-entropy and Mastodon visibility. Cross-operator hubs landed with P5,
 Byzantine rounds and the governed consequence of a conviction with P6, and
 contribution accounting with P7; federation agreements, real HTTP transport and
-HTTP Signatures landed with P4. What P1 *does* carry is the whole integrity floor —
-signing, hash-chained outboxes, visibility classes and hash-addressed evidence —
-because those four are nearly free at two agents and cannot be backfilled later.
+HTTP Signatures landed with P4; TLS enforcement, an SSRF-safe fetch policy, real
+rate limiting and a signed-request replay cache landed with
+[ADR-0025](../../docs/afp/adr/0025-transport-hardening.md). What P1 *does* carry
+is the whole integrity floor — signing, hash-chained outboxes, visibility
+classes and hash-addressed evidence — because those four are nearly free at two
+agents and cannot be backfilled later.
+
+Still open toward a production deployment: key custody behind a signer port
+([ADR-0026](../../docs/afp/adr/0026-key-custody-and-the-signer-port.md)), a
+brain-boundary that bounds hostile text
+([ADR-0027](../../docs/afp/adr/0027-the-port-is-a-security-boundary.md)), and
+an unattended resident process
+([ADR-0031](../../docs/afp/adr/0031-the-resident-process.md)) — `serve` today
+answers requests but drives no scheduler of its own.
 
 The HTTP surface is deliberately thin: actor documents and the roster are
 `public` because verifying a signature requires fetching a key. Everything else

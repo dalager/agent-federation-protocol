@@ -14,6 +14,14 @@ import { exportBundle } from "./export.ts";
 
 const command = process.argv[2] ?? "demo";
 
+// ADR-0025 Decision 1: every demo (and `export`, which touches no network)
+// runs over plain `http://127.0.0.1` origins by construction — that is the
+// point of a demo. `serve` is the one command that runs a real deployment,
+// so it is the one command left to the operator's own `AFP_DEV`.
+if (command !== "serve" && process.env.AFP_DEV === undefined) {
+  process.env.AFP_DEV = "1";
+}
+
 /** Last path segment — enough of a name for console narration. */
 const short = (url: unknown): string | undefined => String(url).split("/").pop();
 
@@ -910,9 +918,14 @@ async function main(): Promise<void> {
       // instance — POST {actor}/inbox verifies the HTTP Signature, then the
       // agreement gate, then dispatches like local delivery.
       const { Federation } = await import("./federation/federation.ts");
-      const { fetchActorDocument } = await import("./federation/inbox.ts");
+      const { fetchActorDocument: fetchActorDocumentRaw } = await import("./federation/inbox.ts");
       const actorId = String(instance.instanceDocument().id);
       const federation = new Federation(instance.db, actorId, () => instance.clock.now());
+      // ADR-0025: this instance's own policy — not the env-inferred default
+      // every demo relies on — since `serve` is the one command allowed to
+      // run in production mode.
+      const fetchActorDocument = (url: string) =>
+        fetchActorDocumentRaw(url, { devMode: config.devMode, trustedNets: config.trustedNets });
 
       // ADR-0013: the read half of the same gate. Without this the server
       // would serve `public` and 404 everything else to everyone — the

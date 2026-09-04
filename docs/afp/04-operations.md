@@ -492,6 +492,11 @@ state machine idempotent, order-tolerant, and timeout-driven.
 
 ## Security & trust
 
+> Mechanism for the claims below — TLS enforcement, the SSRF-safe fetch policy, redirect
+> refusal, size caps, real rate limiting, real-time backoff, the key-controller binding,
+> and the signed-request replay cache — is [ADR-0025](adr/0025-transport-hardening.md).
+> This section states the requirement; that ADR is where it is built.
+
 - **HTTP Signature verification is mandatory** on every inbox POST — unsigned or invalid
   activities are audit-logged and dropped, never processed.
 - **The two-tier gate** runs on every task-relevant activity, in the executed order:
