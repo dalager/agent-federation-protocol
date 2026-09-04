@@ -215,6 +215,37 @@ describe("Decision 7 — a signed request cannot be replayed inside the skew win
   });
 });
 
+// The TTL tables under both dedupe layers: expiry is decided by the query,
+// not by the sweep, so amortizing the sweep cannot widen or narrow a window.
+describe("dedupe TTL tables — expiry is a property of the query", () => {
+  it("an entry past its TTL reads as absent and can be re-marked, without a sweep having run", () => {
+    const config = loadConfig({ ...workspace(), seenIdTtlMs: 1000, replayCacheTtlMs: 1000 });
+    const instance = new AfpInstance(config, []);
+    try {
+      const t0 = new Date("2026-08-21T10:00:00.000Z");
+      // Inside the TTL: a repeat is a repeat.
+      assert.equal(instance.seen.markSeen("urn:a1", t0), true);
+      assert.equal(instance.seen.markSeen("urn:a1", new Date(t0.getTime() + 500)), false);
+      assert.equal(instance.seen.has("urn:a1", new Date(t0.getTime() + 500)), true);
+
+      // Past the TTL but well inside the sweep interval, so no DELETE has run:
+      // the row is still on disk and must nonetheless read as absent.
+      const afterTtl = new Date(t0.getTime() + 1500);
+      assert.equal(instance.seen.has("urn:a1", afterTtl), false, "an expired row must read as absent");
+      assert.equal(instance.seen.markSeen("urn:a1", afterTtl), true, "an expired id must be markable again");
+      assert.equal(instance.seen.markSeen("urn:a1", afterTtl), false, "and the fresh window must then hold");
+
+      // The same property, one layer up, for the signature cache.
+      const sig = ["k1", "Fri, 21 Aug 2026 10:00:00 GMT", "afp=:AA==:"] as const;
+      assert.equal(instance.seenSignatures.markSeen(...sig, t0), true);
+      assert.equal(instance.seenSignatures.markSeen(...sig, t0), false);
+      assert.equal(instance.seenSignatures.markSeen(...sig, afterTtl), true, "past the TTL it is a new presentation");
+    } finally {
+      instance.close();
+    }
+  });
+});
+
 // G11 — nothing here touches the record.
 describe("G11 — the record is untouched", () => {
   it("a full P4 run (real HTTP, the fetch policy live throughout) still exports and both sides agree", async () => {

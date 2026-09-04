@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS seen_ids (
   seen_at     TEXT NOT NULL,
   expires_at  TEXT NOT NULL
 );
+CREATE INDEX IF NOT EXISTS seen_ids_expires ON seen_ids (expires_at);
 
 -- Layer 2 of 2: task-level replay, keyed by correlationId rather than activity id.
 CREATE TABLE IF NOT EXISTS pending_tasks (

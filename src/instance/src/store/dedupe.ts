@@ -6,10 +6,69 @@
  * (see `tasks.ts`), which absorbs the same *task* arriving as a genuinely new
  * activity. An implementation with only one of the two either executes work
  * twice or silently drops legitimate redeliveries — 03 § Correlation.
+ *
+ * Two layers of the same shape live here — activity ids, and (ADR-0025
+ * Decision 7) request signatures — over one `TtlSeenTable`: a first-sighting
+ * test against a TTL. **Expiry is decided by the query, never by the sweep.**
+ * A row past its `expires_at` reads as absent whether or not it has been
+ * deleted yet, so the sweep is space reclamation and nothing more, and can be
+ * amortized instead of run on every call.
  */
 
 import { createHash } from "node:crypto";
 import type { Db } from "./db.ts";
+
+/** How often expired rows are actually deleted. Bounds the table; never decides expiry. */
+const PURGE_INTERVAL_MS = 60_000;
+
+/**
+ * A TTL-scoped "have I seen this key" table. `table` and `keyColumn` are
+ * module constants below, never caller input.
+ */
+class TtlSeenTable {
+  private readonly db: Db;
+  private readonly table: string;
+  private readonly keyColumn: string;
+  private readonly ttlMs: number;
+  private lastPurgeMs = 0;
+
+  constructor(db: Db, table: string, keyColumn: string, ttlMs: number) {
+    this.db = db;
+    this.table = table;
+    this.keyColumn = keyColumn;
+    this.ttlMs = ttlMs;
+  }
+
+  /** True on the first sighting within the TTL (caller proceeds); false on a repeat (caller drops). */
+  markSeen(key: string, now: Date): boolean {
+    this.purgeIfDue(now);
+    if (this.has(key, now)) return false;
+    // An expired row for this key may still be sitting here — it read as
+    // absent above, and this replaces it with a fresh window.
+    this.db
+      .prepare(
+        `INSERT INTO ${this.table} (${this.keyColumn}, seen_at, expires_at) VALUES (?, ?, ?)
+           ON CONFLICT (${this.keyColumn}) DO UPDATE SET seen_at = excluded.seen_at, expires_at = excluded.expires_at`,
+      )
+      .run(key, now.toISOString(), new Date(now.getTime() + this.ttlMs).toISOString());
+    return true;
+  }
+
+  /** Unexpired-only by construction: an expired row is indistinguishable from no row. */
+  has(key: string, now: Date): boolean {
+    return (
+      this.db
+        .prepare(`SELECT 1 FROM ${this.table} WHERE ${this.keyColumn} = ? AND expires_at > ?`)
+        .get(key, now.toISOString()) != null
+    );
+  }
+
+  private purgeIfDue(now: Date): void {
+    if (now.getTime() - this.lastPurgeMs < PURGE_INTERVAL_MS) return;
+    this.lastPurgeMs = now.getTime();
+    this.db.prepare(`DELETE FROM ${this.table} WHERE expires_at <= ?`).run(now.toISOString());
+  }
+}
 
 /**
  * ADR-0025 Decision 7: a signed request cannot be replayed inside its own
@@ -19,14 +78,10 @@ import type { Db } from "./db.ts";
  * signature that never touches a body can be replayed verbatim.
  */
 export class SeenSignatures {
-  private readonly db: Db;
-  private readonly ttlMs: number;
-  private lastPurgeMs = 0;
+  private readonly table: TtlSeenTable;
 
   constructor(db: Db, ttlMs: number) {
-    this.db = db;
-    this.ttlMs = ttlMs;
-    this.db.exec(
+    db.exec(
       `CREATE TABLE IF NOT EXISTS seen_signatures (
          fingerprint TEXT PRIMARY KEY,
          seen_at     TEXT NOT NULL,
@@ -34,6 +89,7 @@ export class SeenSignatures {
        );
        CREATE INDEX IF NOT EXISTS seen_signatures_expires ON seen_signatures (expires_at);`,
     );
+    this.table = new TtlSeenTable(db, "seen_signatures", "fingerprint", ttlMs);
   }
 
   private fingerprint(keyId: string, created: string, signature: string): string {
@@ -42,35 +98,15 @@ export class SeenSignatures {
 
   /** Returns true on first presentation (caller proceeds); false on replay (caller refuses). */
   markSeen(keyId: string, created: string, signature: string, now = new Date()): boolean {
-    // The table is bounded by the TTL either way, so the sweep is amortized
-    // to once per TTL window rather than run as a DELETE on every verified
-    // request. Correctness does not depend on it: an entry past its
-    // `expires_at` is one the skew window has already made unusable.
-    if (now.getTime() - this.lastPurgeMs >= this.ttlMs) {
-      this.purgeExpired(now);
-      this.lastPurgeMs = now.getTime();
-    }
-    const fp = this.fingerprint(keyId, created, signature);
-    const existing = this.db.prepare("SELECT 1 FROM seen_signatures WHERE fingerprint = ?").get(fp);
-    if (existing) return false;
-    this.db
-      .prepare("INSERT INTO seen_signatures (fingerprint, seen_at, expires_at) VALUES (?, ?, ?)")
-      .run(fp, now.toISOString(), new Date(now.getTime() + this.ttlMs).toISOString());
-    return true;
-  }
-
-  private purgeExpired(now: Date): void {
-    this.db.prepare("DELETE FROM seen_signatures WHERE expires_at <= ?").run(now.toISOString());
+    return this.table.markSeen(this.fingerprint(keyId, created, signature), now);
   }
 }
 
 export class SeenIds {
-  private readonly db: Db;
-  private readonly ttlMs: number;
+  private readonly table: TtlSeenTable;
 
   constructor(db: Db, ttlMs: number) {
-    this.db = db;
-    this.ttlMs = ttlMs;
+    this.table = new TtlSeenTable(db, "seen_ids", "activity_id", ttlMs);
   }
 
   /**
@@ -80,27 +116,10 @@ export class SeenIds {
    * if it is a redelivery (caller should drop).
    */
   markSeen(activityId: string, now = new Date()): boolean {
-    this.purgeExpired(now);
-    const existing = this.db
-      .prepare("SELECT 1 FROM seen_ids WHERE activity_id = ?")
-      .get(activityId);
-    if (existing) return false;
-
-    this.db
-      .prepare("INSERT INTO seen_ids (activity_id, seen_at, expires_at) VALUES (?, ?, ?)")
-      .run(
-        activityId,
-        now.toISOString(),
-        new Date(now.getTime() + this.ttlMs).toISOString(),
-      );
-    return true;
+    return this.table.markSeen(activityId, now);
   }
 
-  has(activityId: string): boolean {
-    return this.db.prepare("SELECT 1 FROM seen_ids WHERE activity_id = ?").get(activityId) != null;
-  }
-
-  private purgeExpired(now: Date): void {
-    this.db.prepare("DELETE FROM seen_ids WHERE expires_at <= ?").run(now.toISOString());
+  has(activityId: string, now = new Date()): boolean {
+    return this.table.has(activityId, now);
   }
 }
