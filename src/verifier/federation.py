@@ -101,6 +101,86 @@ def summarize_activity(activity: dict) -> dict:
     }
 
 
+VISIBILITY_ORDER = ["public", "hub", "parties", "internal"]
+
+
+def check_export_scope(report, manifest: dict, all_activities: list[dict]) -> None:
+    """ADR-0009 Decision 4 / ADR-0026 Decision 5: a bundle is held to the
+    scope it declares.
+
+    What is checkable from the outside is *over*-disclosure, and only that. A
+    bundle cannot prove it withheld the right things — the withheld bytes are
+    by construction absent, and a stub is opaque by design. But a bundle that
+    says "everything at or above `hub`" while disclosing an `internal`
+    activity, or "what this agreement admits" while disclosing an activity
+    those grants would have refused, has broken its own declaration in the one
+    direction that matters: it disclosed more than it claimed. That is the
+    check.
+
+    A bundle with no `afp:exportScope`, or one scoped by thread (the P4
+    grammar), is unaffected — nothing here can fail a bundle written before
+    these scopes existed.
+    """
+    scope = manifest.get("afp:exportScope")
+    if not isinstance(scope, dict):
+        return
+
+    disclosed = [a for a in all_activities if a.get("type") != "afp:Redacted"]
+
+    floor = scope.get("afp:visibilityAtLeast")
+    if isinstance(floor, str) and floor in VISIBILITY_ORDER:
+        limit = VISIBILITY_ORDER.index(floor)
+        below = [
+            a for a in disclosed
+            if VISIBILITY_ORDER.index(a["afp:visibility"]) > limit
+            if isinstance(a.get("afp:visibility"), str) and a["afp:visibility"] in VISIBILITY_ORDER
+        ]
+        report.record(
+            f"scope: every disclosed activity is at or above the declared {floor!r} floor",
+            not below,
+            "" if not below else
+            f"{len(below)} disclosed activities fall below the declared floor "
+            f"(e.g. {below[0].get('id')} at {below[0].get('afp:visibility')!r}) — the bundle "
+            f"discloses more than its own afp:exportScope claims (ADR-0026 Decision 5)",
+        )
+
+    agreement_digest = scope.get("afp:agreement")
+    if isinstance(agreement_digest, str):
+        # The agreement the scope names must itself be in the bundle, or the
+        # claim is unverifiable — say so rather than pass it over.
+        agreement = None
+        for activity in all_activities:
+            obj = activity.get("object")
+            if isinstance(obj, dict) and obj.get("type") == "afp:FederationAgreement":
+                if digest_of(obj) == agreement_digest:
+                    agreement = obj
+                    break
+        if agreement is None:
+            report.record(
+                "scope: the agreement this bundle is scoped to travels with it",
+                False,
+                f"afp:exportScope names agreement {agreement_digest} but no "
+                f"Create/Offer{{afp:FederationAgreement}} in this bundle has that digest — "
+                f"a grant-scoped bundle that omits its own agreement cannot be checked "
+                f"against the grants it claims",
+            )
+            return
+        refused = [
+            a for a in disclosed
+            if admitting_grant(agreement, summarize_activity(a)) is None
+            and not (isinstance(a.get("object"), dict)
+                     and a["object"].get("type") == "afp:FederationAgreement")
+        ]
+        report.record(
+            "scope: every disclosed activity is one the named agreement admits",
+            not refused,
+            "" if not refused else
+            f"{len(refused)} disclosed activities are outside the grants of "
+            f"{agreement_digest} (e.g. {refused[0].get('id')}) — the bundle discloses more "
+            f"than the agreement it claims to be scoped by (ADR-0026 Decision 5)",
+        )
+
+
 # ---------------------------------------------------------- boundary replay
 
 

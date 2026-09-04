@@ -1,6 +1,7 @@
 # ADR-0026 — Key custody and the signer port: the record's guarantees are cryptographic; the keys' protection must stop being a directory permission
 
-- **Status:** Decisions 1, 3, 4 built (2026-09-04); Decisions 2, 5, 6 proposed — program claim **C2** of
+- **Status:** Built (2026-09-04), with two stated exceptions — the `remote` and `agent`
+  signer adapters, and the `afp:custody` field on published key entries — program claim **C2** of
   [ADR-0024](0024-the-road-to-production.md); group: **Security**
 - **Date:** 2026-09-02
 - **Applies to:** every private key an instance holds — instance, agent, hub-scoped and
@@ -157,8 +158,8 @@ custody mode a published obligation so at least it is stated.
 
 ## Build status
 
-**Decisions 1, 3 and 4 built, 2026-09-04.** Decisions 2 (the rotate/revoke CLI),
-5 (the two export scopes) and 6 (the backup runbook) are not built; C2 is not closed.
+**All six decisions built, 2026-09-04**, except the two adapters named below. C2 is
+otherwise closed.
 
 **Decision 1 — the signer port**, `crypto/signer.ts` (new): `Signer { keyId,
 publicKeyMultibase, custody, sign(bytes) }`, with `fileSigner(pair)` and
@@ -227,14 +228,61 @@ than passed over. This also caught a real fixture defect: ADR-0005's gate helper
 folded foreign instances into a host bundle by editing `afp:members` without
 re-signing, and now re-signs as a real exporter would.
 
+**Decision 2 — rotation and revocation as a runbook and a CLI**, `instance/keyOps.ts` (new)
++ `cli.ts`: `npm run keys -- list | rotate | revoke`. `rotate` closes the outgoing
+interval and mints the next ordinal; `revoke` cuts the interval and mints nothing
+("we were compromised" and "what signs next" are separate decisions), with `--claim`
+publishing the `afp:KeyCompromiseClaim` in the same act. The **ADR-0021 Decision 4d
+refusal is enforced at the CLI**: a `--since` at or before a vote that an on-record
+`afp:EquivocationProof` embeds and this key signed is refused, naming the vote and the
+earliest instant that would be acceptable — replay catches backdating after the fact,
+this catches it at the moment the operator would commit it. The runbook is in the
+instance README.
+
+> **Key commands deliberately do not boot the agents.** Revocation mints no successor,
+> which leaves the key store with no active key — a state `loadOrCreateKeyPair` refuses
+> by design (ADR-0012 D2). The first cut of this command constructed an `AfpInstance`
+> and was therefore unable to run `keys rotate`, the sanctioned way out, at exactly the
+> moment it was needed. `keyOps` takes `{ keyDir, origin, db }` instead; a gate case
+> pins the dead end shut.
+
+**Decision 5 — export scopes**, `export.ts`: `{ visibilityAtLeast }` and `{ agreement }`
+join the thread-set scope behind the one `inScope` predicate, so the 1:1 stub mechanism,
+the ADR-0010 D5 pins guard and the received-activity filter are unchanged by adding a
+scope kind. The manifest declares which scope produced the bundle. `federation.py`
+`check_export_scope` holds a bundle to what it claims — **over-disclosure is the
+checkable direction**: a bundle cannot prove it withheld the right things (the withheld
+bytes are absent by construction), but one claiming a `hub` floor while disclosing an
+`internal` activity, or claiming an agreement's grants while disclosing what those
+grants refuse, has broken its own declaration. A grant-scoped bundle that omits the
+agreement it names is reported rather than passed over. **Closes ADR-0023 row L2.**
+
+**Decision 6 — backup separates keys from data**: two runbooks in the instance README,
+the record through SQLite's backup API and the keys through their own encrypted path,
+with the note that under `remote`/`agent` custody there is nothing there to back up.
+An export bundle is not a backup, and Decision 4's refusal is the backstop for the one
+accident that cannot be undone.
+
+**Not built, and why.** The `remote` adapter needs the asynchronous port this build
+deliberately did not adopt (see the revision note above) and should arrive together with
+it; `tools/signer/` does not exist. The `agent` adapter — an out-of-process self-custody
+agent presenting signed activities — is natively synchronous and buildable, but has no
+caller to exercise it: no agent in the repository runs `self` custody, so building it now
+would add an untested path rather than a demonstrated one. Both remain `Custody` values
+the type admits and the actor document does not yet publish; gate cases G2, G3 and G9 are
+correspondingly absent.
+
 Gate: `test/adr0026.test.ts` — G1 as an *independent* byte-identity check (the
 `eddsa-jcs-2022` signing input is rebuilt in the test and signed with the bare
 key, so the port is proved not to have changed the algorithm rather than compared
 against itself), the signer's closed-over private half, `0600`, encryption at rest
 round-tripping, G6 (hub-scoped and transport keys in the history, no id
 collisions), G7 (a planted PEM refuses the export), and the manifest-signature
-regression above. `npm run gate` — 276/276; p1/p4–p7 demos clean; the joint P7
-replay passes 981 checks and a bundle written before this ADR still verifies.
+regression above; G4 (both signatures verify across a rotation), G5 (the backdated cut
+refused by name), the no-bootable-instance dead end, and G8a/G8b/G8c (both scopes stub
+1:1 and replay clean; a bundle disclosing below its declared floor fails). `npm run gate`
+— 282/282; p1/p4–p7 demos clean; the joint P7 replay passes 981 checks and a bundle
+written before this ADR still verifies.
 
 ## References
 

@@ -60,7 +60,7 @@ from electorate import (
     proofs_convicting,
 )
 from equivocation import convicts, equivocation_proof_votes, proof_round, vote_tuple_of
-from federation import check_federation, check_joint
+from federation import check_export_scope, check_federation, check_joint
 from keys import (
     check_key_intervals,
     check_manifest_key_history,
@@ -746,6 +746,8 @@ def verify_export(export: Path, thread: str | None, report: Report) -> dict:
     # scoped export (ADR-0009 Decision 5) may *declare* an omission, which is
     # discretion; an undeclared gap remains what it always was.
     export_scope = manifest.get("afp:exportScope") or {}
+    # ADR-0026 Decision 5: hold the bundle to the scope it declares.
+    check_export_scope(report, manifest, all_activities)
     declared_omissions = set(export_scope.get("afp:omittedActors", []) or [])
     for agent in sorted(authority.rostered):
         if agent in declared_omissions:

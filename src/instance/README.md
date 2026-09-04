@@ -646,6 +646,74 @@ Environment variables, all optional (see `src/config.ts`):
 `AFP_LLM_API_KEY` is read at the point of use and never stored, logged, or
 written into the record. A local endpoint generally needs none.
 
+## Key custody — the runbook
+
+Every private key lives under `$AFP_DATA_DIR/keys/` as a `0600` PEM, behind the
+signer port ([ADR-0026](../../docs/afp/adr/0026-key-custody-and-the-signer-port.md)
+Decision 1). Nothing else in the process holds one: callers get a `Signer` that
+can sign and cannot export.
+
+```bash
+npm run keys -- list                  # every key, every interval, per actor
+npm run keys -- list writer
+npm run keys -- rotate writer         # routine hygiene: mint a successor
+npm run keys -- rotate writer --kind transport
+npm run keys -- rotate writer --kind hub:windward
+npm run keys -- revoke writer "$KEY_ID" --since 2026-09-04T10:00:00Z
+npm run keys -- revoke writer "$KEY_ID" --since 2026-09-04T10:00:00Z --claim sha256:<proof>
+```
+
+**Rotation** closes the outgoing key's interval and mints the next ordinal. The
+retired key stays in `afp:keyHistory` forever, so everything it signed
+in-interval keeps verifying — rotation is hygiene, not a compromise. Re-export
+afterwards so the new history travels, and hand peers the updated actor
+document.
+
+**Revocation** cuts the interval at the compromise instant and mints *nothing*:
+"we were compromised" and "what signs next" are separate decisions, and
+collapsing them hides which one happened. Follow it with a `rotate` when you
+have decided. Two things are worth knowing before you run it:
+
+- **The cut may not predate evidence.** If an `afp:EquivocationProof` on your
+  record embeds a vote that key signed, a `--since` at or before that vote is
+  **refused**, naming the vote ([ADR-0021](../../docs/afp/adr/0021-conviction-to-consequence.md)
+  Decision 4d). Backdating past your own convicting votes is not a revocation.
+- **`--claim` publishes an `afp:KeyCompromiseClaim`**, which is a claim and not
+  evidence. It lets the record tell `zeroed` from `zeroed-contested`; it moves
+  no weight by itself. Argue it in a governance round.
+
+`keys` never boots the agents — deliberately. A revocation with no successor
+leaves the store with no active key, which the loader refuses by design, so a
+command that needed a running instance could not run `rotate` at exactly the
+moment you need it.
+
+## Backup — keys and data are two runbooks, not one
+
+A single `cp -r` of the data directory sweeps the private keys into whatever
+the backup lands in. Back the two up separately, with different handling
+([ADR-0026](../../docs/afp/adr/0026-key-custody-and-the-signer-port.md) Decision 6):
+
+```bash
+# 1. The record — safe to store like any other database backup.
+sqlite3 "$AFP_DATA_DIR/afp.db" ".backup '/backups/afp-$(date -I).db'"
+cp -r "$AFP_DATA_DIR/artifacts" /backups/artifacts/
+
+# 2. The keys — a secret, and handled like one. Never into the same bucket.
+#    Under `remote` or `agent` custody there is nothing here to back up at all,
+#    which is the point of the port.
+tar -czf - -C "$AFP_DATA_DIR" keys | age -r "$RECIPIENT" > /secure/afp-keys-$(date -I).tar.gz.age
+```
+
+Restore is the reverse, keys first — an instance with a record and no keys
+cannot sign, and will refuse rather than mint replacements over a history that
+already exists.
+
+An export bundle is **not** a backup: it deliberately carries public halves
+only, and the exporter refuses to write one that contains private material
+(Decision 4). That refusal is a backstop, not a strategy — it fires on the
+accident of an operator attaching a key file to a task, which is the one
+mistake that cannot be undone once the bundle is handed over.
+
 ## Model provenance
 
 A `Result` produced by a model carries `afp:producedBy`:

@@ -11,6 +11,7 @@ import { agentRegistrations } from "./demo.ts";
 import { checkEndpoint } from "./brains/openai.ts";
 import { createHttpServer } from "./ap/server.ts";
 import { exportBundle } from "./export.ts";
+import { keyCompromiseClaim } from "./ap/activities.ts";
 
 const command = process.argv[2] ?? "demo";
 
@@ -910,6 +911,108 @@ async function main(): Promise<void> {
       break;
     }
 
+    // ADR-0026 Decision 2: rotation and revocation as an operator surface.
+    //   afp keys list  [<actor>]
+    //   afp keys rotate <actor> [--kind proof|transport|hub:<id>] [--at <instant>]
+    //   afp keys revoke <actor> <keyId> --since <instant> [--claim <proofDigest>]
+    //
+    // Deliberately does NOT construct an AfpInstance: a revocation with no
+    // successor leaves the store with no active key, which the loader refuses
+    // by design — so booting an instance here would make `keys rotate`
+    // impossible to run at exactly the moment an operator needs it.
+    case "keys": {
+      const config = loadConfig();
+      const { parseKind, rotateKey, revokeKey, locate, RevocationRefused } = await import("./instance/keyOps.ts");
+      const { allKeyHistories } = await import("./crypto/keys.ts");
+      const { openDb } = await import("./store/db.ts");
+      const db = openDb(config.dbPath);
+      const deps = { keyDir: config.keyDir, origin: config.origin, db };
+      try {
+        const sub = process.argv[3];
+        const flag = (name: string): string | undefined => {
+          const at = process.argv.indexOf(`--${name}`);
+          return at === -1 ? undefined : process.argv[at + 1];
+        };
+
+        if (sub === "list") {
+          const actors = process.argv[4]
+            ? [process.argv[4]]
+            : ["@instance", ...agentRegistrations(config).map((r) => r.spec.name)];
+          for (const actor of actors) {
+            const { controller, file } = locate(deps, actor, { kind: "proof" });
+            console.log(`\n${actor}  (${controller})`);
+            for (const entry of allKeyHistories(config.keyDir, file, controller)) {
+              const window = `${entry.validFrom ?? "—"} .. ${entry.validUntil ?? "active"}`;
+              console.log(`  ${entry.keyId.split("#")[1].padEnd(24)} ${window}${entry.retiredBy ? `  ${entry.retiredBy}` : ""}`);
+            }
+          }
+          break;
+        }
+
+        if (sub === "rotate") {
+          const actor = process.argv[4];
+          if (!actor) throw new Error("usage: keys rotate <actor> [--kind proof|transport|hub:<id>] [--at <instant>]");
+          const kind = parseKind(flag("kind"));
+          const at = flag("at") ? new Date(flag("at")!) : new Date();
+          const successor = rotateKey(deps, actor, kind, at);
+          console.log(`rotated ${actor} (${flag("kind") ?? "proof"}) at ${at.toISOString()}`);
+          console.log(`  successor: ${successor.keyId}`);
+          console.log(`  the retired key keeps its interval — everything it signed in-interval still verifies`);
+          console.log(`  next: re-export so the new afp:keyHistory travels, and hand peers the updated actor document`);
+          break;
+        }
+
+        if (sub === "revoke") {
+          const actor = process.argv[4];
+          const keyId = process.argv[5];
+          const since = flag("since");
+          if (!actor || !keyId || !since) {
+            throw new Error("usage: keys revoke <actor> <keyId> --since <instant> [--claim <proofDigest>]");
+          }
+          try {
+            revokeKey(deps, actor, parseKind(flag("kind")), keyId, new Date(since));
+          } catch (error) {
+            if (error instanceof RevocationRefused) {
+              console.error(`\nrefused: ${error.message}\n`);
+              process.exit(2);
+            }
+            throw error;
+          }
+          console.log(`revoked ${keyId} as of ${since}`);
+          const claim = flag("claim");
+          if (claim) {
+            // The claim is published on the instance's own chain, so this one
+            // path does need an instance — and can have one, because the
+            // instance key is not the key being revoked in the case that
+            // matters. If it is, mint the successor first.
+            const instance = new AfpInstance(config, agentRegistrations(config));
+            try {
+              const published = instance.publishAsInstance(
+                [],
+                `${config.origin}/threads/key-custody`,
+                "public",
+                (envelope) => keyCompromiseClaim(envelope, { proof: claim, verificationMethod: keyId, since }),
+              );
+              console.log(`  published afp:KeyCompromiseClaim ${published.activityId}`);
+              console.log(`  a claim is not evidence: it lets the record tell zeroed from zeroed-contested,`);
+              console.log(`  and changes no weight by itself (ADR-0021 Decision 4a)`);
+            } finally {
+              instance.close();
+            }
+          }
+          console.log(`  no successor was minted — "what signs next" is a separate decision (ADR-0012 D2)`);
+          console.log(`  next: keys rotate ${actor}${flag("kind") ? ` --kind ${flag("kind")}` : ""}, then re-export`);
+          break;
+        }
+
+        console.error("usage: keys [list|rotate|revoke] …");
+        process.exit(1);
+      } finally {
+        db.close();
+      }
+      break;
+    }
+
     case "serve": {
       const config = loadConfig();
       const instance = new AfpInstance(config, agentRegistrations(config));
@@ -959,7 +1062,7 @@ async function main(): Promise<void> {
     }
 
     default:
-      console.error(`unknown command: ${command}\nusage: cli.ts [demo|p2|p3|p3:llm|p4|p5|p5:llm|p6|p6:llm|p7|p7:llm|export|serve]`);
+      console.error(`unknown command: ${command}\nusage: cli.ts [demo|p2|p3|p3:llm|p4|p5|p5:llm|p6|p6:llm|p7|p7:llm|export|keys|serve]`);
       process.exit(1);
   }
 }

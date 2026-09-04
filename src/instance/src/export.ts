@@ -22,6 +22,8 @@ import { AFP_CONTEXTS } from "./ap/documents.ts";
 import type { JsonValue } from "./crypto/jcs.ts";
 import { attachProof, digestOf } from "./crypto/proof.ts";
 import { allKeyHistories, type KeyHistoryEntry } from "./crypto/keys.ts";
+import { admittingGrant, summarize, type AgreementObject } from "./federation/grants.ts";
+import type { Visibility } from "./ap/activities.ts";
 
 /**
  * A scoped export (ADR-0009 Decisions 4–5). Redaction is an export-time
@@ -33,9 +35,37 @@ import { allKeyHistories, type KeyHistoryEntry } from "./crypto/keys.ts";
  */
 export interface ExportScope {
   /** Threads this bundle answers for; activities on other threads become stubs. */
-  threads: readonly string[];
+  threads?: readonly string[];
+  /**
+   * ADR-0009 Decision 4 / ADR-0026 Decision 5 — the visibility floor. Every
+   * activity *below* the floor becomes a stub. The floor is a custody
+   * decision: "everything a regulator may see" is a statement about
+   * disclosure class, not about which threads happened to be interesting.
+   */
+  visibilityAtLeast?: Visibility;
+  /**
+   * The agreement-grant scope: the bundle a counterparty is entitled to,
+   * produced without a human judging each thread. Every activity the named
+   * agreement's grants would not have admitted becomes a stub — the same
+   * `admittingGrant` the boundary gate runs, so what a peer may read back is
+   * exactly what it could have been sent.
+   */
+  agreement?: AgreementObject;
   /** Agents whose whole chain is withheld — declared, never silently absent. */
   omitActors?: readonly string[];
+}
+
+/**
+ * The disclosure classes, most open first (07 § Four visibility classes). A
+ * floor admits its own class and everything more open than it.
+ */
+const VISIBILITY_ORDER: Visibility[] = ["public", "hub", "parties", "internal"];
+
+function atOrAboveFloor(visibility: string, floor: Visibility): boolean {
+  const rank = VISIBILITY_ORDER.indexOf(visibility as Visibility);
+  // An unknown or absent class is never treated as clearing a floor: the
+  // export's job here is to withhold on doubt, not to guess a class.
+  return rank !== -1 && rank <= VISIBILITY_ORDER.indexOf(floor);
 }
 
 export interface ExportSummary {
@@ -111,8 +141,20 @@ export function exportBundle(
   let activities = 0;
   const actorNames: string[] = [];
 
-  const inScope = (activity: { [key: string]: JsonValue }): boolean =>
-    !scope || scope.threads.includes(String(activity.context ?? ""));
+  // Exactly one scope predicate applies, chosen by which field the caller
+  // set. Each one answers the same question — may this activity be disclosed
+  // in this bundle — so everything downstream (the stub mechanism, the
+  // ADR-0010 D5 pins guard, the received-activity filter) is unchanged by
+  // adding a scope kind.
+  const inScope = (activity: { [key: string]: JsonValue }): boolean => {
+    if (!scope) return true;
+    if (scope.threads !== undefined) return scope.threads.includes(String(activity.context ?? ""));
+    if (scope.visibilityAtLeast !== undefined) {
+      return atOrAboveFloor(String(activity["afp:visibility"] ?? ""), scope.visibilityAtLeast);
+    }
+    if (scope.agreement !== undefined) return admittingGrant(scope.agreement, summarize(activity)) !== null;
+    return true;
+  };
 
   /**
    * ADR-0010 Decision 5: pins are frame, not content. An export MUST NOT
@@ -312,8 +354,15 @@ export function exportBundle(
     "afp:members": [...members].sort(),
     ...(scope
       ? {
+          // The manifest declares which scope produced this bundle, so a
+          // replay can hold the bundle to the rule it claims rather than
+          // inferring one from what happens to be present.
           "afp:exportScope": {
-            "afp:threads": [...scope.threads],
+            ...(scope.threads !== undefined ? { "afp:threads": [...scope.threads] } : {}),
+            ...(scope.visibilityAtLeast !== undefined
+              ? { "afp:visibilityAtLeast": scope.visibilityAtLeast }
+              : {}),
+            ...(scope.agreement !== undefined ? { "afp:agreement": digestOf(scope.agreement) } : {}),
             "afp:omittedActors": [...(scope.omitActors ?? [])].map((name) => instance.actorId(name)),
           },
         }

@@ -32,7 +32,11 @@ import {
   rotateKeyPair,
 } from "../src/crypto/keys.ts";
 import { exportBundle, refusePrivateMaterial } from "../src/export.ts";
-import { cleanupWorkspaces, runVerifier, testHub, testInstance, workspace } from "./helpers.ts";
+import { agreementObject } from "../src/federation/federation.ts";
+import { admittingGrant, summarize } from "../src/federation/grants.ts";
+import { digestOf } from "../src/crypto/proof.ts";
+import { cleanupWorkspaces, publishRaw, runVerifier, testHub, testInstance, workspace } from "./helpers.ts";
+import { RevocationRefused, revokeKey, rotateKey, votesEmbeddedInProofs } from "../src/instance/keyOps.ts";
 import { VERIFIER } from "./adr0010-fixtures.ts";
 
 after(cleanupWorkspaces);
@@ -167,6 +171,197 @@ describe("Decision 3 — afp:keyHistory names every key that ever signed", () =>
     const signed = attachProof({ id: "urn:h" }, { signer: instance.signer("v2") });
     assert.equal(verifyProof(signed, publicKeyFromMultibase(proofEntry.publicKeyMultibase)).ok, true);
     instance.close();
+  });
+});
+
+// ---------------------------------------------------------------- Decision 2
+
+describe("Decision 2 — rotation and revocation as an operator surface", () => {
+  function deps(instance: AfpInstance) {
+    return { keyDir: instance.config.keyDir, origin: instance.config.origin, db: instance.db };
+  }
+
+  it("G4: after a rotation, both the old and the new signatures verify", () => {
+    const { instance } = testInstance(["r1"], "afp:cap:assess");
+    try {
+      const before = instance.signer("r1");
+      const signedBefore = attachProof({ id: "urn:before" }, { signer: before });
+
+      const successor = rotateKey(deps(instance), "r1", { kind: "proof" }, new Date("2026-08-21T10:00:00.000Z"));
+      assert.equal(successor.keyId, `${instance.actorId("r1")}#ed25519-key-2`);
+
+      const signedAfter = attachProof({ id: "urn:after" }, { signer: fileSigner(successor) });
+
+      // The retired key keeps its interval, so what it signed still verifies.
+      const history = allKeyHistories(instance.config.keyDir, "r1", instance.actorId("r1"));
+      const oldEntry = history.find((e) => e.keyId.endsWith("#ed25519-key"))!;
+      const newEntry = history.find((e) => e.keyId.endsWith("#ed25519-key-2"))!;
+      assert.equal(verifyProof(signedBefore, publicKeyFromMultibase(oldEntry.publicKeyMultibase)).ok, true);
+      assert.equal(verifyProof(signedAfter, publicKeyFromMultibase(newEntry.publicKeyMultibase)).ok, true);
+      assert.equal(oldEntry.retiredBy, "rotation");
+      assert.equal(oldEntry.validUntil, "2026-08-21T10:00:00.000Z");
+    } finally {
+      instance.close();
+    }
+  });
+
+  it("G5: a revocation cut earlier than a vote an on-record proof embeds is refused, by name", () => {
+    const { instance } = testInstance(["v3"], "afp:cap:vote");
+    try {
+      const keyId = `${instance.actorId("v3")}#ed25519-key`;
+      // An afp:EquivocationProof on the record, embedding a vote this key
+      // signed at a known instant — the evidence ADR-0021 D4d protects.
+      const vote = attachProof(
+        { id: "urn:vote:1", type: "afp:Vote", published: "2026-08-21T12:00:00.000Z" },
+        { signer: instance.signer("v3"), created: "2026-08-21T12:00:00.000Z" },
+      );
+      publishRaw(instance, "v3", [], `${instance.config.origin}/threads/x`, "public", {
+        type: "Announce",
+        object: {
+          id: "urn:proof:1",
+          type: "afp:EquivocationProof",
+          "afp:votes": [vote, { ...vote, id: "urn:vote:2" }],
+        },
+      });
+
+      const found = votesEmbeddedInProofs(deps(instance));
+      assert.ok(found.some((v) => v.verificationMethod === keyId), "the embedded vote is discoverable");
+
+      // A cut BEFORE the embedded vote would retroactively unsign convicting
+      // evidence — refused.
+      assert.throws(
+        () => revokeKey(deps(instance), "v3", { kind: "proof" }, keyId, new Date("2026-08-20T00:00:00.000Z")),
+        (error: unknown) =>
+          error instanceof RevocationRefused && /2026-08-21T12:00:00.000Z/.test((error as Error).message),
+      );
+
+      // A cut AFTER it is an ordinary revocation and proceeds.
+      revokeKey(deps(instance), "v3", { kind: "proof" }, keyId, new Date("2026-08-22T00:00:00.000Z"));
+      const entry = allKeyHistories(instance.config.keyDir, "v3", instance.actorId("v3"))
+        .find((e) => e.keyId === keyId)!;
+      assert.equal(entry.retiredBy, "revocation");
+      assert.equal(entry.validUntil, "2026-08-22T00:00:00.000Z");
+    } finally {
+      instance.close();
+    }
+  });
+
+  it("key operations do not need a bootable instance — the revoked-with-no-successor dead end", () => {
+    // Revocation mints no successor (ADR-0012 D2), which leaves the store
+    // with no active key; the loader refuses that by design. If a key command
+    // required a full instance it could not run at exactly the moment the
+    // operator needs `rotate` — so it does not.
+    const { instance, config } = testInstance(["d1"], "afp:cap:assess");
+    const keyDir = config.keyDir;
+    const origin = config.origin;
+    const actorId = instance.actorId("d1");
+    const db = instance.db;
+    revokeKey({ keyDir, origin, db }, "d1", { kind: "proof" }, `${actorId}#ed25519-key`, new Date("2026-08-22T00:00:00.000Z"));
+
+    assert.throws(() => loadOrCreateKeyPair(keyDir, "d1", actorId), /no active key/);
+    const successor = rotateKey({ keyDir, origin, db }, "d1", { kind: "proof" }, new Date("2026-08-23T00:00:00.000Z"));
+    assert.equal(successor.keyId, `${actorId}#ed25519-key-2`, "rotate is still the way out");
+    instance.close();
+  });
+});
+
+// ---------------------------------------------------------------- Decision 5
+
+describe("Decision 5 — export scopes: visibility floor and agreement grant", () => {
+  /** An instance with one `parties` thread and one `public` one. */
+  function twoClasses() {
+    const paths = workspace();
+    const config = loadConfig(paths);
+    const instance = new AfpInstance(config, [
+      {
+        spec: { name: "s1", capabilities: ["afp:cap:assess"], keyCustody: "instance", since: "2026-08-17T00:00:00Z" },
+        brain: new CountingBrain("s1", ["afp:cap:assess"], () => ({ ok: true, content: "ok" })),
+      },
+    ]);
+    // The Vouch trail the roster derives from is already `public`; add one
+    // `parties` activity so the floor has something to withhold.
+    instance.delegate({
+      from: "s1", to: "s1", capability: "afp:cap:assess",
+      content: "private matter", thread: `${config.origin}/threads/closed`, correlationId: "c-1",
+    });
+    return { instance, config, paths };
+  }
+
+  it("G8a: a visibility-floor scope stubs everything below the floor, 1:1", () => {
+    const { instance, paths } = twoClasses();
+    try {
+      exportBundle(instance, paths.exportDir, [], { visibilityAtLeast: "public" });
+      const manifest = JSON.parse(readFileSync(join(paths.exportDir, "MANIFEST.json"), "utf8"));
+      assert.equal(manifest["afp:exportScope"]["afp:visibilityAtLeast"], "public",
+        "the manifest declares the floor it was produced under");
+
+      const outbox = JSON.parse(readFileSync(join(paths.exportDir, "outbox", "s1.jsonld"), "utf8"));
+      const stubs = outbox.orderedItems.filter((i: { type: string }) => i.type === "afp:Redacted");
+      const shown = outbox.orderedItems.filter((i: { type: string }) => i.type !== "afp:Redacted");
+      assert.ok(stubs.length > 0, "the `parties` activity is withheld");
+      assert.ok(
+        shown.every((i: Record<string, string>) => i["afp:visibility"] === "public"),
+        "nothing below the floor is disclosed",
+      );
+      // 1:1 in chain position — the stub mechanism must not hide scale.
+      assert.equal(outbox.orderedItems.length, outbox.totalItems);
+
+      const clean = runVerifier(VERIFIER, paths.exportDir, "", ["--verbose"]);
+      assert.equal(clean.code, 0, `a floor-scoped bundle replays clean: ${clean.output}`);
+      assert.match(clean.output, /scope: every disclosed activity is at or above the declared/);
+    } finally {
+      instance.close();
+    }
+  });
+
+  it("G8b: a bundle disclosing below its declared floor is caught by the verifier", () => {
+    const { instance, paths } = twoClasses();
+    try {
+      // Export everything, then claim a floor the bundle does not honour —
+      // the over-disclosure a scoped bundle must not get away with.
+      exportBundle(instance, paths.exportDir);
+      const manifestPath = join(paths.exportDir, "MANIFEST.json");
+      const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+      manifest["afp:exportScope"] = { "afp:visibilityAtLeast": "public", "afp:omittedActors": [] };
+      delete manifest.proof;
+      writeFileSync(manifestPath, JSON.stringify(attachProof(manifest, { signer: instance.signer("@instance") }), null, 2));
+
+      const result = runVerifier(VERIFIER, paths.exportDir, "", ["--verbose"]);
+      assert.notEqual(result.code, 0, "a bundle that discloses below its declared floor must fail");
+      assert.match(result.output, /FAIL.*at or above the declared 'public' floor/s);
+    } finally {
+      instance.close();
+    }
+  });
+
+  it("G8c: an agreement-grant scope discloses exactly what those grants admit", () => {
+    const { instance, paths, config } = twoClasses();
+    try {
+      // A grant admitting delegation on afp:cap:assess — the same shape the
+      // boundary gate matches, so what a peer may read back is what it could
+      // have been sent.
+      const agreement = agreementObject({
+        parties: [String(instance.instanceDocument().id), "https://beta.example/actor"],
+        grants: [{ "afp:grantType": "direct-delegation", "afp:capabilities": ["afp:cap:assess"] }],
+        expires: "2027-01-01T00:00:00.000Z",
+      });
+      exportBundle(instance, paths.exportDir, [], { agreement });
+
+      const manifest = JSON.parse(readFileSync(join(paths.exportDir, "MANIFEST.json"), "utf8"));
+      assert.equal(manifest["afp:exportScope"]["afp:agreement"], digestOf(agreement),
+        "the manifest names the agreement by digest");
+
+      const outbox = JSON.parse(readFileSync(join(paths.exportDir, "outbox", "s1.jsonld"), "utf8"));
+      const shown = outbox.orderedItems.filter((i: { type: string }) => i.type !== "afp:Redacted");
+      assert.ok(shown.length > 0, "the delegation the grant admits is disclosed");
+      assert.ok(
+        shown.every((i: Record<string, unknown>) => admittingGrant(agreement, summarize(i as never)) !== null),
+        "every disclosed activity is one the grant admits",
+      );
+      assert.equal(config.origin.length > 0, true);
+    } finally {
+      instance.close();
+    }
   });
 });
 
