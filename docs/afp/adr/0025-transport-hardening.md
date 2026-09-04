@@ -176,12 +176,19 @@ answering `429` with `Retry-After` on the address bucket. Decision 6 ships as
 real clock, for whichever future scheduler drives a served instance's outbound queue
 (`serve` does not yet drive one — that is [ADR-0031](0031-the-resident-process.md)'s scope,
 not this one's); `drain()`'s virtual clock is untouched and stays what the demos and gate
-use. Decision 7's replay cache (`store/dedupe.ts`'s `SeenSignatures`, new) is wired into
-`handleInboxPost` and live whenever a server is constructed with `inbox` options.
+use. Decision 7's replay cache (`store/dedupe.ts`'s `SeenSignatures`, new) is owned by
+`AfpInstance` beside the activity-id dedupe it is the signature-level twin of, and wired
+into `handleInboxPost`.
 
 **Not built**: the boundary log does not yet gain a `rate-limited` log class (Decision 5's
 last clause) — a rate-limit refusal is answered but not chained into `fed_boundary_log`.
-ADR-0008's row F3 is corrected to point here.
+The two refusal sites are not equally ready for it: the per-actor refusal in
+`handleInboxPost` already has `federation` in scope and sits beside gate refusals that do
+log, needing only the body parsed before the check rather than after; the per-address
+refusal fires pre-parse, for every route rather than the inbox alone, with no actor,
+claimed type or `Federation` in scope — logging that one means first moving the check (or
+its log side-effect) down into the inbox branch. ADR-0008's row F3 is corrected to point
+here.
 
 Gate: `test/adr0025.test.ts` — G1, G2 (TLS-only / dev mode), the fetch policy's insecure-
 origin, SSRF, redirect, size-cap and content-type refusals, G6 (key-controller mismatch),

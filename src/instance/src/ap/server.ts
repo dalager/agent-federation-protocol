@@ -26,7 +26,6 @@ import { nodeinfoDiscovery, nodeinfoDocument } from "./nodeinfo.ts";
 import type { OutboxEntry } from "../store/outbox.ts";
 import type { JsonValue } from "../crypto/jcs.ts";
 import { RateLimiter } from "../federation/rateLimit.ts";
-import { SeenSignatures } from "../store/dedupe.ts";
 
 const AP_CONTENT_TYPE = "application/activity+json";
 
@@ -119,11 +118,12 @@ function referencingEntries(instance: AfpInstance, digest: string): OutboxEntry[
 export function createHttpServer(instance: AfpInstance, options: ServerOptions = {}): Server {
   // ADR-0025 Decision 5: one bucket per source address, shared across every
   // route this server answers — cheap, unauthenticated, and the first thing
-  // a hostile burst meets. Decision 7's replay cache lives here too, scoped
-  // to this server the same way.
+  // a hostile burst meets. In-memory and keyed on transport facts the
+  // instance has no reason to know, so the server owns these; Decision 7's
+  // replay cache is a store over `instance.db` and is owned there, next to
+  // the activity-id dedupe it is the signature-level twin of.
   const addressLimiter = new RateLimiter(instance.config.rateLimitPerAddress, instance.config.rateLimitPerAddressWindowMs);
   const actorLimiter = new RateLimiter(instance.config.rateLimitPerActor, instance.config.rateLimitPerActorWindowMs);
-  const seenSignatures = options.inbox ? new SeenSignatures(instance.db, instance.config.replayCacheTtlMs) : null;
 
   return createServer((req, res) => {
     const url = new URL(req.url ?? "/", instance.config.origin);
@@ -194,7 +194,7 @@ export function createHttpServer(instance: AfpInstance, options: ServerOptions =
         handleInboxPost(
           {
             ...options.inbox!,
-            replay: seenSignatures ?? undefined,
+            replay: instance.seenSignatures,
             actorRateLimit: actorLimiter,
             ...(inboxHub
               ? {

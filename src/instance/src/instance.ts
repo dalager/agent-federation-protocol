@@ -15,7 +15,7 @@ import { attachProof, digestOf } from "./crypto/proof.ts";
 import { openDb, type Db } from "./store/db.ts";
 import { Outbox, type OutboxEntry } from "./store/outbox.ts";
 import { InboxLog } from "./store/inboxLog.ts";
-import { SeenIds } from "./store/dedupe.ts";
+import { SeenIds, SeenSignatures } from "./store/dedupe.ts";
 import { Tasks } from "./store/tasks.ts";
 import { Artifacts, type ArtifactRef } from "./store/artifacts.ts";
 import { DeliveryQueue, type Transport } from "./store/queue.ts";
@@ -64,6 +64,8 @@ export class AfpInstance {
   readonly outbox: Outbox;
   readonly inboxLog: InboxLog;
   readonly seen: SeenIds;
+  /** ADR-0025 Decision 7's signature-replay cache — `seen` one layer up, and instance-owned for the same reason. */
+  readonly seenSignatures: SeenSignatures;
   readonly tasks: Tasks;
   readonly artifacts: Artifacts;
   readonly queue: DeliveryQueue;
@@ -87,6 +89,7 @@ export class AfpInstance {
     this.outbox = new Outbox(this.db);
     this.inboxLog = new InboxLog(this.db);
     this.seen = new SeenIds(this.db, config.seenIdTtlMs);
+    this.seenSignatures = new SeenSignatures(this.db, config.replayCacheTtlMs);
     this.tasks = new Tasks(this.db);
     this.artifacts = new Artifacts(this.db, config.artifactDir, config.origin);
     this.queue = new DeliveryQueue(this.db, config.maxDeliveryAttempts, config.backoffBaseMs);
