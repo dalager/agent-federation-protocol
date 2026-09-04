@@ -29,6 +29,7 @@ import { exportBundle } from "../src/export.ts";
 import { createResult } from "../src/ap/activities.ts";
 import { cleanupWorkspaces, mutateBundle, runVerifier, testHub, testInstance } from "./helpers.ts";
 import { VERIFIER } from "./adr0010-fixtures.ts";
+import { fileSigner } from "../src/crypto/signer.ts";
 
 after(cleanupWorkspaces);
 
@@ -82,7 +83,7 @@ async function threeParty() {
 
   const path = "/agents/w/outbox";
   const key = instance.key("a1");
-  const signedHeaders = signRequest("GET", path, "server.example", "", key.keyId, key.privateKey, NOW);
+  const signedHeaders = signRequest("GET", path, "server.example", "", fileSigner(key), NOW);
   const hubActivity = { "afp:visibility": "hub", "afp:hub": hub.actorId } as { [key: string]: JsonValue };
 
   return { instance, hub, agentId, deps, path, signedHeaders, hubActivity };
@@ -156,7 +157,7 @@ describe("ADR-0014: a member proves enrollment to a peer that does not host the 
         "afp:role": "member",
         "afp:expires": new Date(NOW.getTime() + 600_000).toISOString(),
       },
-      { privateKey: key.privateKey, verificationMethod: key.keyId, created: NOW.toISOString() },
+      { signer: fileSigner(key), created: NOW.toISOString() },
     ) as { [key: string]: JsonValue };
     const auth = await authorizeRead(t.deps(), {
       path: t.path,
@@ -187,7 +188,7 @@ describe("ADR-0014: a member proves enrollment to a peer that does not host the 
 /** Re-sign the GET at a later instant, so the date header stays inside skew. */
 function signRequestAt(t: Awaited<ReturnType<typeof threeParty>>, at: Date) {
   const key = t.instance.key("a1");
-  return signRequest("GET", t.path, "server.example", "", key.keyId, key.privateKey, at);
+  return signRequest("GET", t.path, "server.example", "", fileSigner(key), at);
 }
 
 describe("ADR-0014 Decisions 2-4: the mesh edge, the hub's head, and the two silences", () => {

@@ -48,6 +48,7 @@ import { exportBundle } from "../src/export.ts";
 import type { JsonValue } from "../src/crypto/jcs.ts";
 import { cleanupWorkspaces, runVerifier, workspace } from "./helpers.ts";
 import { VERIFIER } from "./adr0010-fixtures.ts";
+import { fileSigner } from "../src/crypto/signer.ts";
 
 after(cleanupWorkspaces);
 
@@ -124,8 +125,7 @@ async function operator(
   });
   await new Promise<void>((resolve) => server.listen(port, "127.0.0.1", resolve));
   const transport = httpTransport({
-    keyId: instance.key("@instance").keyId,
-    privateKey: instance.key("@instance").privateKey,
+    signer: fileSigner(instance.key("@instance")),
     now: () => clock.now(),
     isLocal: (target) => instance.nameOf(target) !== null || target === actorId,
     local: instance.localTransport(),
@@ -243,7 +243,7 @@ describe("ADR-0014 M6: three operators, one hub, one partition", () => {
     const outboxPath = "/agents/e-noc/outbox";
     const gammaHost = new URL(gamma.origin).host;
     const readOutbox = async (proofHeader?: string): Promise<{ [key: string]: JsonValue }[]> => {
-      const signed = signRequest("GET", outboxPath, gammaHost, "", snocKey.keyId, snocKey.privateKey, clock.now());
+      const signed = signRequest("GET", outboxPath, gammaHost, "", fileSigner(snocKey), clock.now());
       const response = await fetch(`${gamma.origin}${outboxPath}`, {
         headers: {
           accept: "application/activity+json",

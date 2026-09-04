@@ -641,6 +641,7 @@ Environment variables, all optional (see `src/config.ts`):
 | `AFP_RATE_LIMIT_PER_ADDRESS` / `_WINDOW_MS` | `20` / `1000` | Unauthenticated per-source-address bucket |
 | `AFP_RATE_LIMIT_PER_ACTOR` / `_WINDOW_MS` | `60` / `60000` | Per-authenticated-actor bucket, checked after signature verification |
 | `AFP_REPLAY_CACHE_TTL_MS` | `300000` | How long a signed request's (keyId, date, signature) blocks a second presentation |
+| `AFP_KEY_PASSPHRASE_FILE` | *(none)* | File holding the passphrase the `file` signer adapter encrypts PEMs with at rest ([ADR-0026](../../docs/afp/adr/0026-key-custody-and-the-signer-port.md)). Unset, PEMs are unencrypted — as before. Protects a stolen backup, not a compromised host |
 
 `AFP_LLM_API_KEY` is read at the point of use and never stored, logged, or
 written into the record. A local endpoint generally needs none.

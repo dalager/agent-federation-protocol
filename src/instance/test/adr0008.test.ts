@@ -32,6 +32,7 @@ import { httpTransport } from "../src/federation/transport.ts";
 import { admittingGrant, summarize } from "../src/federation/grants.ts";
 import { sandboxAttachment, summarizeForeignResult } from "../src/federation/ingest.ts";
 import { cleanupWorkspaces, workspace } from "./helpers.ts";
+import { fileSigner } from "../src/crypto/signer.ts";
 
 after(cleanupWorkspaces);
 
@@ -93,8 +94,7 @@ async function operator(name: string, agents: readonly string[], clock: ReturnTy
 
 function boundaryTransport(op: Operator, clock: ReturnType<typeof jumpClock>) {
   return httpTransport({
-    keyId: op.instance.key("@instance").keyId,
-    privateKey: op.instance.key("@instance").privateKey,
+    signer: fileSigner(op.instance.key("@instance")),
     now: () => clock.now(),
     isLocal: (target) => op.instance.nameOf(target) !== null || target === op.actorId,
     local: op.instance.localTransport(),

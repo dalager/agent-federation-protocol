@@ -44,6 +44,7 @@ import { Hub } from "./hub/hub.ts";
 import { exportBundle, type ExportSummary } from "./export.ts";
 import { jumpClock } from "./demoP3.ts";
 import type { JsonValue } from "./crypto/jcs.ts";
+import { fileSigner } from "./crypto/signer.ts";
 
 const CAPABILITY = "afp:cap:assess";
 /** ADR-0018 Decision 2 — the outcome of a round that did not decide. */
@@ -153,8 +154,7 @@ async function operator(
   });
   await new Promise<void>((resolveListen) => server.listen(port, "127.0.0.1", resolveListen));
   const transport = httpTransport({
-    keyId: instance.transportKey("@instance").keyId,
-    privateKey: instance.transportKey("@instance").privateKey,
+    signer: fileSigner(instance.transportKey("@instance")),
     now: () => clock.now(),
     isLocal: (target) => instance.nameOf(target) !== null || target === actorId,
     local: instance.localTransport(),
@@ -173,7 +173,7 @@ async function postToHubInbox(
   const path = "/hubs/bridge/inbox";
   const body = JSON.stringify(activity);
   const key = op.instance.transportKey("@instance");
-  const signed = signRequest("POST", path, new URL(hubOrigin).host, body, key.keyId, key.privateKey, clock.now());
+  const signed = signRequest("POST", path, new URL(hubOrigin).host, body, fileSigner(key), clock.now());
   const response = await fetch(`${hubOrigin}${path}`, {
     method: "POST",
     headers: {
@@ -400,8 +400,7 @@ export async function runP5Demo(
   // replay: evidence that crossed a boundary is received bytes, or it is
   // nowhere).
   const hubTransportOut = httpTransport({
-    keyId: alpha.instance.transportKey("@instance").keyId,
-    privateKey: alpha.instance.transportKey("@instance").privateKey,
+    signer: fileSigner(alpha.instance.transportKey("@instance")),
     now: () => clock.now(),
     isLocal: (target) => alpha.instance.nameOf(target) !== null || target === alpha.actorId,
     local: alpha.instance.localTransport(),
@@ -512,8 +511,7 @@ export async function runP5Demo(
 
   const seatsBefore = replica.members().length;
   const replicaPullTransport = httpTransport({
-    keyId: alpha.instance.transportKey("@instance").keyId,
-    privateKey: alpha.instance.transportKey("@instance").privateKey,
+    signer: fileSigner(alpha.instance.transportKey("@instance")),
     now: () => clock.now(),
     isLocal: () => false,
     local: { name: "none", deliver: async () => {} },

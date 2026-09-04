@@ -29,6 +29,7 @@ import { httpTransport } from "../src/federation/transport.ts";
 import { exportBundle } from "../src/export.ts";
 import { vouch } from "../src/ap/activities.ts";
 import { cleanupWorkspaces, workspace } from "./helpers.ts";
+import { fileSigner } from "../src/crypto/signer.ts";
 
 after(cleanupWorkspaces);
 
@@ -85,8 +86,7 @@ async function operator(agents: readonly string[], clock: ReturnType<typeof jump
   });
   await new Promise<void>((resolve) => server.listen(port, "127.0.0.1", resolve));
   const transport = httpTransport({
-    keyId: instance.key("@instance").keyId,
-    privateKey: instance.key("@instance").privateKey,
+    signer: fileSigner(instance.key("@instance")),
     now: () => clock.now(),
     isLocal: (target) => instance.nameOf(target) !== null || target === actorId,
     local: instance.localTransport(),

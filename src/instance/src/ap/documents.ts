@@ -11,6 +11,7 @@
 import type { JsonValue } from "../crypto/jcs.ts";
 import { attachProof, DATA_INTEGRITY_CONTEXT, type SignedDocument } from "../crypto/proof.ts";
 import type { KeyPair } from "../crypto/keys.ts";
+import type { Signer } from "../crypto/signer.ts";
 
 export const AS2_CONTEXT = "https://www.w3.org/ns/activitystreams";
 export const AFP_CONTEXT = "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld";
@@ -212,7 +213,7 @@ export function deriveRoster(
 export function signedRoster(
   origin: string,
   agents: readonly AgentSpec[],
-  instanceKey: KeyPair,
+  instanceSigner: Signer,
   created?: string,
 ): SignedDocument {
   const roster: { [key: string]: JsonValue } = {
@@ -235,9 +236,5 @@ export function signedRoster(
     })),
   };
 
-  return attachProof(roster, {
-    privateKey: instanceKey.privateKey,
-    verificationMethod: instanceKey.keyId,
-    created,
-  });
+  return attachProof(roster, { signer: instanceSigner, created });
 }

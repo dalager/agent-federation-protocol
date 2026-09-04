@@ -24,6 +24,7 @@ import { controlTransfer, vouch } from "../src/ap/activities.ts";
 import { agreementObject, createAgreement } from "../src/federation/federation.ts";
 import { Hub } from "../src/hub/hub.ts";
 import { exportBundle } from "../src/export.ts";
+import { attachProof } from "../src/crypto/proof.ts";
 import { mkdtempSync, cpSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -93,6 +94,23 @@ function mergeForeignInstance(hostDir: string, foreign: AfpInstance, prefix: str
   const members = new Set<string>([...(manifest["afp:members"] ?? []), ...written]);
   manifest["afp:members"] = [...members].sort();
   writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+}
+
+/**
+ * Re-sign the host manifest after folding foreign instances into it.
+ *
+ * `mergeForeignInstance` edits `afp:members`, and the manifest is a signed
+ * document (ADR-0012 Decision 1) — so leaving the old proof in place would
+ * produce a bundle whose self-description does not verify. ADR-0026 added the
+ * check that notices; an exporter assembling a joint bundle would re-sign,
+ * and so does this fixture.
+ */
+function resignManifest(hostDir: string, host: AfpInstance): void {
+  const manifestPath = join(hostDir, "MANIFEST.json");
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  delete manifest.proof;
+  const signed = attachProof(manifest, { signer: host.signer("@instance") });
+  writeFileSync(manifestPath, JSON.stringify(signed, null, 2));
 }
 
 /**
@@ -381,6 +399,7 @@ describe("ADR-0005 amendment: declared change of control (scenario 12, finding 6
     const exported = exportBundle(alpha.instance, alpha.config.exportDir, [hub]);
     mergeForeignInstance(exported.dir, beta.instance, "beta");
     mergeForeignInstance(exported.dir, gamma.instance, "gamma");
+    resignManifest(exported.dir, alpha.instance);
 
     const clean = runVerifier(VERIFIER, exported.dir, "", ["--verbose"]);
     assert.equal(clean.code, 0, `clean merged bundle should verify: ${clean.output}`);

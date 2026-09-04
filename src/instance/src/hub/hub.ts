@@ -14,6 +14,7 @@
 import type { KeyObject } from "node:crypto";
 import type { JsonValue } from "../crypto/jcs.ts";
 import { keyHistory, loadOrCreateKeyPair, loadOrCreateTransportKeyPair, publicKeyFromMultibase, type KeyHistoryEntry, type KeyPair } from "../crypto/keys.ts";
+import { fileSigner, type Signer } from "../crypto/signer.ts";
 import { attachProof, digestOf, verifyProof } from "../crypto/proof.ts";
 import { instantMillis } from "../crypto/time.ts";
 import type { Db } from "../store/db.ts";
@@ -179,6 +180,7 @@ export class Hub {
   private readonly origin: string;
   private readonly instanceActorId: string;
   private readonly key: KeyPair;
+  private readonly signer: Signer;
   private readonly transportKey: KeyPair;
   private readonly fetchActor: HubDeps["fetchActor"];
   private readonly resolveActivity: (activityId: string) => { [key: string]: JsonValue } | null;
@@ -269,6 +271,8 @@ export class Hub {
     this.crdt = new CRDTStore(this.db);
     this.keyDir = deps.keyDir;
     this.key = loadOrCreateKeyPair(deps.keyDir, `hub-${deps.hubId}`, this.actorId);
+    // ADR-0026 Decision 1: the hub signs through the port like everything else.
+    this.signer = fileSigner(this.key);
     this.transportKey = loadOrCreateTransportKeyPair(deps.keyDir, `hub-${deps.hubId}`, this.actorId);
     this.outbox = new Outbox(this.db);
     this.queue = new DeliveryQueue(this.db, deps.maxDeliveryAttempts, deps.backoffBaseMs);
@@ -410,11 +414,7 @@ export class Hub {
       "afp:role": role,
       "afp:expires": new Date(this.now().getTime() + ttlMs).toISOString(),
     };
-    return attachProof(statement, {
-      privateKey: this.key.privateKey,
-      verificationMethod: this.key.keyId,
-      created: this.now().toISOString(),
-    });
+    return attachProof(statement, { signer: this.signer, created: this.now().toISOString() });
   }
 
   members(): string[] {
@@ -1482,11 +1482,9 @@ export class Hub {
     };
 
     const activity = build(envelope);
-    const signed = attachProof(activity, {
-      privateKey: this.key.privateKey,
-      verificationMethod: this.key.keyId,
-      created: now,
-    }) as unknown as { [key: string]: JsonValue };
+    const signed = attachProof(activity, { signer: this.signer, created: now }) as unknown as {
+      [key: string]: JsonValue;
+    };
 
     const entry = this.outbox.append(signed);
     for (const target of to) this.queue.enqueue(target, signed, this.now());

@@ -24,9 +24,10 @@ import {
   verify as nodeVerify,
   type KeyObject,
 } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
+import { mkdirSync, readFileSync, readdirSync, writeFileSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { decodeEd25519Multikey, encodeEd25519Multikey } from "./multibase.ts";
+import { keyPassphraseFromEnv } from "../config.ts";
 
 export type RetiredBy = "rotation" | "revocation";
 
@@ -102,9 +103,68 @@ export function publicKeyFromMultibase(multibase: string): KeyObject {
   });
 }
 
+/**
+ * ADR-0012 Decision 1's ordinal convention, applied to any key-id base: the
+ * first key keeps the unversioned id, every rotation after it appends its
+ * ordinal. Shared by the three kinds (proof, transport, hub-scoped) so that a
+ * rotated key of *any* kind gets a distinct id — without which two entries in
+ * `afp:keyHistory` would collide on one id and the interval check
+ * (`keys.py`, keyed on `verificationMethod`) would silently judge the wrong
+ * one.
+ */
+function withOrdinal(base: string, ordinal: number): string {
+  return ordinal === 1 ? base : `${base}-${ordinal}`;
+}
+
 /** `#ed25519-key` for the first key, `#ed25519-key-<ordinal>` for every rotation after it. */
 function keyIdFor(controller: string, ordinal: number): string {
-  return ordinal === 1 ? `${controller}#ed25519-key` : `${controller}#ed25519-key-${ordinal}`;
+  return withOrdinal(`${controller}#ed25519-key`, ordinal);
+}
+
+/** The hop-signing key's id (ADR-0017 D4 R1), under the same ordinal convention. */
+export function transportKeyId(controller: string, ordinal: number): string {
+  return withOrdinal(`${controller}#transport-key`, ordinal);
+}
+
+/** A vote-signing key's id, scoped to one hub (02, `afp:hubKey`). */
+export function hubScopedKeyId(controller: string, hubId: string, ordinal: number): string {
+  return withOrdinal(`${controller}#hub-key-${hubId}`, ordinal);
+}
+
+/** The ordinal a `loadOrCreate*` result resolved to, read back off its proof-shaped id. */
+function ordinalOfKeyId(keyId: string): number {
+  return Number(/#ed25519-key-(\d+)$/.exec(keyId)?.[1] ?? 1);
+}
+
+/**
+ * ADR-0026 Decision 1: the `file` adapter's optional encryption at rest.
+ *
+ * The passphrase is read from the file named by `AFP_KEY_PASSPHRASE_FILE` at
+ * the point of use and never held anywhere else. Set, new keys are written as
+ * encrypted PKCS#8 and existing ones are read with it; unset, everything
+ * behaves exactly as it did before this ADR — which is what keeps every
+ * existing key directory loadable.
+ *
+ * This protects a stolen backup and nothing else: the passphrase lives on the
+ * same host as the keys. That limit is stated in the ADR rather than papered
+ * over; the port is what lets custody actually improve.
+ */
+function readPrivatePem(path: string): KeyObject {
+  const pem = readFileSync(path, "utf8");
+  const passphrase = keyPassphraseFromEnv();
+  // An encrypted PEM needs the passphrase; an unencrypted one must not be
+  // handed one, so the header decides rather than the configuration.
+  return pem.includes("ENCRYPTED PRIVATE KEY") && passphrase !== undefined
+    ? createPrivateKey({ key: pem, passphrase })
+    : createPrivateKey(pem);
+}
+
+function writePrivatePem(path: string, privateKey: KeyObject): void {
+  const passphrase = keyPassphraseFromEnv();
+  const pem = (passphrase === undefined
+    ? privateKey.export({ type: "pkcs8", format: "pem" })
+    : privateKey.export({ type: "pkcs8", format: "pem", cipher: "aes-256-cbc", passphrase })) as string;
+  writeFileSync(path, pem, { mode: 0o600 });
 }
 
 function pemPath(keyDir: string, name: string, ordinal: number): string {
@@ -160,12 +220,18 @@ function activeEntry(entries: KeyIndexEntry[]): KeyIndexEntry | undefined {
   return undefined;
 }
 
-function loadKeyPairAt(keyDir: string, name: string, controller: string, entry: KeyIndexEntry): KeyPair {
+function loadKeyPairAt(
+  keyDir: string,
+  name: string,
+  controller: string,
+  entry: KeyIndexEntry,
+  keyIdOf: (controller: string, ordinal: number) => string = keyIdFor,
+): KeyPair {
   const path = pemPath(keyDir, name, entry.ordinal);
-  const privateKey = createPrivateKey(readFileSync(path, "utf8"));
+  const privateKey = readPrivatePem(path);
   const publicKey = createPublicKey(privateKey);
   return {
-    keyId: keyIdFor(controller, entry.ordinal),
+    keyId: keyIdOf(controller, entry.ordinal),
     controller,
     privateKey,
     publicKey,
@@ -192,7 +258,7 @@ export function loadOrCreateHubKeyPair(
   hubId: string,
 ): KeyPair {
   const pair = loadOrCreateKeyPair(keyDir, `${name}--hub-${hubId}`, controller);
-  return { ...pair, keyId: `${controller}#hub-key-${hubId}` };
+  return { ...pair, keyId: hubScopedKeyId(controller, hubId, ordinalOfKeyId(pair.keyId)) };
 }
 
 /**
@@ -208,7 +274,7 @@ export function loadOrCreateTransportKeyPair(
   controller: string,
 ): KeyPair {
   const pair = loadOrCreateKeyPair(keyDir, `${name}--transport`, controller);
-  return { ...pair, keyId: `${controller}#transport-key` };
+  return { ...pair, keyId: transportKeyId(controller, ordinalOfKeyId(pair.keyId)) };
 }
 
 /**
@@ -253,9 +319,7 @@ export function loadOrCreateKeyPair(keyDir: string, name: string, controller: st
   const path = pemPath(keyDir, name, 1);
   mkdirSync(dirname(path), { recursive: true });
   const pair = generateKeyPairSync("ed25519");
-  writeFileSync(path, pair.privateKey.export({ type: "pkcs8", format: "pem" }) as string, {
-    mode: 0o600,
-  });
+  writePrivatePem(path, pair.privateKey);
   // No validFrom on a first key: the key store has no clock of its own, and the
   // instance's clock may be a test or replay clock running years from wall time
   // — stamping one here would date the key by when the *process* ran rather
@@ -292,9 +356,7 @@ export function rotateKeyPair(
   const nextOrdinal = Math.max(...entries.map((e) => e.ordinal)) + 1;
   const nextPath = pemPath(keyDir, name, nextOrdinal);
   const pair = generateKeyPairSync("ed25519");
-  writeFileSync(nextPath, pair.privateKey.export({ type: "pkcs8", format: "pem" }) as string, {
-    mode: 0o600,
-  });
+  writePrivatePem(nextPath, pair.privateKey);
 
   // Close the current key's interval where one is still open; after a
   // revocation the interval is already cut, and the cut stays exactly as the
@@ -333,9 +395,14 @@ export function revokeKeyPair(keyDir: string, name: string, compromisedAt: Date)
  * The full signing-key history for one actor, oldest first — what the
  * exporter collects into the manifest's `afp:keyHistory` (ADR-0012 Decision 1).
  */
-export function keyHistory(keyDir: string, name: string, controller: string): KeyHistoryEntry[] {
+export function keyHistory(
+  keyDir: string,
+  name: string,
+  controller: string,
+  keyIdOf: (controller: string, ordinal: number) => string = keyIdFor,
+): KeyHistoryEntry[] {
   return effectiveIndex(keyDir, name).map((entry) => {
-    const pair = loadKeyPairAt(keyDir, name, controller, entry);
+    const pair = loadKeyPairAt(keyDir, name, controller, entry, keyIdOf);
     return {
       keyId: pair.keyId,
       publicKeyMultibase: pair.publicKeyMultibase,
@@ -344,4 +411,42 @@ export function keyHistory(keyDir: string, name: string, controller: string): Ke
       retiredBy: pair.retiredBy,
     };
   });
+}
+
+/** The hub ids this actor holds a hub-scoped key for, read off the key directory. */
+export function hubScopesOf(keyDir: string, name: string): string[] {
+  if (!existsSync(keyDir)) return [];
+  const prefix = `${name}--hub-`;
+  const scopes = new Set<string>();
+  for (const file of readdirSync(keyDir)) {
+    if (!file.startsWith(prefix)) continue;
+    // `<name>--hub-<id>.pem`, `<name>--hub-<id>-2.pem`, `<name>--hub-<id>.keys.json`
+    const rest = file.slice(prefix.length).replace(/\.keys\.json$/, "").replace(/\.pem$/, "");
+    scopes.add(rest.replace(/-\d+$/, ""));
+  }
+  return [...scopes].sort();
+}
+
+/**
+ * ADR-0026 Decision 3: every key this actor ever signed *anything* with —
+ * the proof key, each hub-scoped vote key, and the transport key.
+ *
+ * Transport keys sign hops, not activities, and their signatures never enter
+ * a bundle; they enter the history anyway, because a revoked transport key
+ * with an interval is how a boundary-log entry's authentication can be
+ * re-judged later. Closes ADR-0023 row L1 — the hub-scoped and transport keys
+ * were previously outside `afp:keyHistory` entirely, which ADR-0021 Q7 called
+ * "a live hole".
+ */
+export function allKeyHistories(keyDir: string, name: string, controller: string): KeyHistoryEntry[] {
+  const entries = keyHistory(keyDir, name, controller);
+  for (const hubId of hubScopesOf(keyDir, name)) {
+    entries.push(
+      ...keyHistory(keyDir, `${name}--hub-${hubId}`, controller, (c, ordinal) =>
+        hubScopedKeyId(c, hubId, ordinal),
+      ),
+    );
+  }
+  entries.push(...keyHistory(keyDir, `${name}--transport`, controller, transportKeyId));
+  return entries;
 }

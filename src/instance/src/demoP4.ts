@@ -37,6 +37,7 @@ import { httpTransport } from "./federation/transport.ts";
 import { signRequest } from "./federation/httpSig.ts";
 import { exportBundle, type ExportSummary } from "./export.ts";
 import { jumpClock } from "./demoP3.ts";
+import { fileSigner } from "./crypto/signer.ts";
 
 /** Grab a free localhost port — the origin must be known before the instance exists. */
 function freePort(): Promise<number> {
@@ -117,8 +118,7 @@ async function operator(
   await new Promise<void>((resolveListen) => server.listen(port, "127.0.0.1", resolveListen));
 
   const transport = httpTransport({
-    keyId: instance.transportKey("@instance").keyId,
-    privateKey: instance.transportKey("@instance").privateKey,
+    signer: fileSigner(instance.transportKey("@instance")),
     now: () => clock.now(),
     isLocal: (target) => instance.nameOf(target) !== null || target === actorId,
     local: instance.localTransport(),
@@ -259,7 +259,7 @@ export async function runP4Demo(options: { rootDir?: string; exportRoot?: string
     let headers: Record<string, string> = { accept: "application/activity+json" };
     if (as !== null) {
       const key = as.operator.instance.transportKey(as.agent);
-      const signed = signRequest("GET", url.pathname, url.host, "", key.keyId, key.privateKey, clock.now());
+      const signed = signRequest("GET", url.pathname, url.host, "", fileSigner(key), clock.now());
       headers = { ...headers, ...signed };
     }
     const response = await fetch(target, { headers });

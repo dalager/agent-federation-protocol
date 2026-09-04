@@ -80,6 +80,7 @@ import { Hub } from "./hub/hub.ts";
 import { exportBundle, type ExportSummary } from "./export.ts";
 import { jumpClock } from "./demoP3.ts";
 import type { JsonValue } from "./crypto/jcs.ts";
+import { fileSigner } from "./crypto/signer.ts";
 
 const CAPABILITY = "afp:cap:assess";
 const HUB_ID = "windward";
@@ -283,8 +284,7 @@ async function member(
   });
   await new Promise<void>((resolveListen) => server.listen(port, "127.0.0.1", resolveListen));
   const transport = httpTransport({
-    keyId: instance.transportKey("@instance").keyId,
-    privateKey: instance.transportKey("@instance").privateKey,
+    signer: fileSigner(instance.transportKey("@instance")),
     now: () => clock.now(),
     isLocal: (target) => instance.nameOf(target) !== null || target === actorId,
     local: instance.localTransport(),
@@ -302,7 +302,7 @@ async function postToHubInbox(
   const path = `/hubs/${HUB_ID}/inbox`;
   const body = JSON.stringify(activity);
   const key = op.instance.transportKey("@instance");
-  const signed = signRequest("POST", path, new URL(hubOrigin).host, body, key.keyId, key.privateKey, clock.now());
+  const signed = signRequest("POST", path, new URL(hubOrigin).host, body, fileSigner(key), clock.now());
   const response = await fetch(`${hubOrigin}${path}`, {
     method: "POST",
     headers: { "content-type": "application/activity+json", ...signed },
@@ -707,8 +707,7 @@ export async function runP6Demo(
   // operator that never received the decision cannot resolve the
   // justification its own action names (ADR-0015).
   const hubTransportOut = httpTransport({
-    keyId: atlas.instance.transportKey("@instance").keyId,
-    privateKey: atlas.instance.transportKey("@instance").privateKey,
+    signer: fileSigner(atlas.instance.transportKey("@instance")),
     now: () => clock.now(),
     isLocal: (target) => atlas.instance.nameOf(target) !== null || target === atlas.actorId,
     local: atlas.instance.localTransport(),

@@ -64,6 +64,7 @@ from federation import check_federation, check_joint
 from keys import (
     check_key_intervals,
     check_manifest_key_history,
+    check_manifest_signature,
     history_keys,
     parse_key_history,
 )
@@ -634,6 +635,21 @@ def verify_export(export: Path, thread: str | None, report: Report) -> dict:
     keys = collect_public_keys(export, history)
     report.record("keys: actor documents publish verification keys", bool(keys),
                   "no assertionMethod entries found in any actor document")
+
+    # ADR-0012 Decision 1 made the manifest a signed document precisely so
+    # that "the export's self-description stops being the one part of a bundle
+    # anybody could edit freely" — but nothing here ever checked the
+    # signature, only which key was named. So the whole self-description
+    # (`afp:keyHistory`, `afp:members`, `afp:exportScope`, `afp:retentionDuty`,
+    # `afp:anchors`) was editable at will and every bundle still passed.
+    #
+    # Verified against keys published by the ACTOR DOCUMENTS, never against
+    # the manifest's own history: the history is inside the document being
+    # verified, so resolving through it would let a forger insert the public
+    # half of whatever key they signed their rewrite with. A method that only
+    # the history knows about is therefore unauthenticatable here, and says so
+    # rather than passing quietly.
+    check_manifest_signature(report, manifest, collect_public_keys(export))
 
     roster_path = export / "roster.jsonld"
     if report.record("roster: present", roster_path.exists()):

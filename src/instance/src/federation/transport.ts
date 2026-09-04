@@ -18,14 +18,13 @@ import type { Transport } from "../store/queue.ts";
 import { signRequest, signRequestCavage } from "./httpSig.ts";
 import { policedFetch, type FetchPolicyDeps } from "./fetchPolicy.ts";
 import { devModeFromEnv } from "../config.ts";
-import type { KeyObject } from "node:crypto";
+import type { Signer } from "../crypto/signer.ts";
 
 type Scheme = "rfc9421" | "cavage";
 
 export interface HttpTransportDeps {
-  /** The hop's signing identity — the instance key, not an agent's. */
-  keyId: string;
-  privateKey: KeyObject;
+  /** The hop's signing identity — the instance's transport signer, not an agent's (ADR-0026 D1). */
+  signer: Signer;
   now: () => Date;
   /** Which targets are local (handled elsewhere) vs cross-boundary. */
   isLocal: (target: string) => boolean;
@@ -43,10 +42,10 @@ function signedHeaders(
 ): Record<string, string> {
   const common = { "content-type": "application/activity+json" };
   if (scheme === "cavage") {
-    const s = signRequestCavage("POST", inbox.pathname, inbox.host, body, deps.keyId, deps.privateKey, deps.now());
+    const s = signRequestCavage("POST", inbox.pathname, inbox.host, body, deps.signer, deps.now());
     return { ...common, host: s.host, date: s.date, ...(s.digest ? { digest: s.digest } : {}), signature: s.signature };
   }
-  const s = signRequest("POST", inbox.pathname, inbox.host, body, deps.keyId, deps.privateKey, deps.now());
+  const s = signRequest("POST", inbox.pathname, inbox.host, body, deps.signer, deps.now());
   return {
     ...common,
     host: s.host,

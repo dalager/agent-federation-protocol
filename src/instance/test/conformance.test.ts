@@ -33,6 +33,7 @@ import { attachProof, verifyProof } from "../src/crypto/proof.ts";
 import { publicKeyFromMultibase, loadOrCreateKeyPair } from "../src/crypto/keys.ts";
 import { exportBundle } from "../src/export.ts";
 import type { JsonValue } from "../src/crypto/jcs.ts";
+import { fileSigner } from "../src/crypto/signer.ts";
 
 after(cleanupWorkspaces);
 
@@ -131,8 +132,7 @@ describe("cryptosuite", () => {
     };
 
     const signed = attachProof(doc, {
-      privateKey: key.privateKey,
-      verificationMethod: key.keyId,
+      signer: fileSigner(key),
       created: "2026-08-17T09:00:00.000Z",
     });
     const publicKey = publicKeyFromMultibase(key.publicKeyMultibase);

@@ -33,6 +33,7 @@ import { attachProof, verifyProof } from "../src/crypto/proof.ts";
 import { publicKeyFromMultibase, loadOrCreateKeyPair } from "../src/crypto/keys.ts";
 import { exportBundle } from "../src/export.ts";
 import type { JsonValue } from "../src/crypto/jcs.ts";
+import { fileSigner } from "../src/crypto/signer.ts";
 
 after(cleanupWorkspaces);
 
@@ -311,8 +312,7 @@ describe("P1 acceptance gate", () => {
     delete activity.proof;
     activity.object.content = "FORGED: approved, ship it.";
     forgedOutbox.orderedItems[tail] = attachProof(activity, {
-      privateKey: reviewerKey.privateKey,
-      verificationMethod: reviewerKey.keyId,
+      signer: fileSigner(reviewerKey),
       created: String(activity.published),
     });
     writeFileSync(forgedPath, JSON.stringify(forgedOutbox, null, 2));

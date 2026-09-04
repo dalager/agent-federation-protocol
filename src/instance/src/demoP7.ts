@@ -77,6 +77,7 @@ import { GOVERNANCE_OPTIONS, GOVERNANCE_POLICY } from "./demoP6.ts";
 import { exportBundle, type ExportSummary } from "./export.ts";
 import { jumpClock } from "./demoP3.ts";
 import type { JsonValue } from "./crypto/jcs.ts";
+import { fileSigner } from "./crypto/signer.ts";
 
 const CAPABILITY = "afp:cap:support";
 const HUB_ID = "nightdesk";
@@ -140,8 +141,7 @@ async function desk(
   });
   await new Promise<void>((resolveListen) => server.listen(port, "127.0.0.1", resolveListen));
   const transport = httpTransport({
-    keyId: instance.transportKey("@instance").keyId,
-    privateKey: instance.transportKey("@instance").privateKey,
+    signer: fileSigner(instance.transportKey("@instance")),
     now: () => clock.now(),
     isLocal: (target) => instance.nameOf(target) !== null || target === actorId,
     local: instance.localTransport(),
@@ -342,7 +342,7 @@ export async function runP7Demo(
     const path = `/hubs/${HUB_ID}/inbox`;
     const body = JSON.stringify(activity);
     const key = op.instance.transportKey("@instance");
-    const signed = signRequest("POST", path, new URL(northwind.origin).host, body, key.keyId, key.privateKey, clock.now());
+    const signed = signRequest("POST", path, new URL(northwind.origin).host, body, fileSigner(key), clock.now());
     return fetch(`${northwind.origin}${path}`, {
       method: "POST",
       headers: { "content-type": "application/activity+json", ...signed },
@@ -628,8 +628,7 @@ export async function runP7Demo(
 
   // Everything the hub sequenced reaches the desks before anyone adds it up.
   const hubTransportOut = httpTransport({
-    keyId: northwind.instance.transportKey("@instance").keyId,
-    privateKey: northwind.instance.transportKey("@instance").privateKey,
+    signer: fileSigner(northwind.instance.transportKey("@instance")),
     now: () => clock.now(),
     isLocal: (target) => northwind.instance.nameOf(target) !== null || target === northwind.actorId,
     local: northwind.instance.localTransport(),

@@ -12,6 +12,7 @@ import { generateKeyPairSync } from "node:crypto";
 import { afterEach, describe, it } from "node:test";
 
 import { httpTransport } from "../src/federation/transport.ts";
+import { signerOver } from "../src/crypto/signer.ts";
 
 const { privateKey } = generateKeyPairSync("ed25519");
 const NOW = new Date("2026-08-21T10:00:00.000Z");
@@ -23,8 +24,7 @@ afterEach(() => {
 
 function transport() {
   return httpTransport({
-    keyId: "https://alpha.example/actor#ed25519-key",
-    privateKey,
+    signer: signerOver("https://alpha.example/actor#ed25519-key", privateKey),
     now: () => NOW,
     isLocal: () => false,
     local: { name: "local", deliver: async () => {} },

@@ -29,6 +29,7 @@ import {
   signRequestCavage,
   verifyRequest,
 } from "../src/federation/httpSig.ts";
+import { signerOver } from "../src/crypto/signer.ts";
 
 const { publicKey, privateKey } = generateKeyPairSync("ed25519");
 const KEY_ID = "https://alpha.example/actor#ed25519-key";
@@ -47,25 +48,25 @@ describe("HTTP Signature: the covered set comes from the method, never from the 
 
   it("round-trips both shapes natively (RFC 9421)", () => {
     const body = JSON.stringify({ type: "Create" });
-    const post = signRequest("POST", "/actor/inbox", "alpha.example", body, KEY_ID, privateKey, NOW);
+    const post = signRequest("POST", "/actor/inbox", "alpha.example", body, signerOver(KEY_ID, privateKey), NOW);
     assert.ok(post["content-digest"], "a POST signature carries the Content-Digest it binds");
     assert.match(post["signature-input"], /^afp=\("@method" "@authority" "@path" "date" "content-digest"\);created=\d+/);
     assert.equal(extractKeyId(post), KEY_ID);
     assert.equal(verifyRequest("POST", "/actor/inbox", post, body, resolveKey, NOW).ok, true);
 
-    const get = signRequest("GET", "/agents/writer/outbox", "alpha.example", "", KEY_ID, privateKey, NOW);
+    const get = signRequest("GET", "/agents/writer/outbox", "alpha.example", "", signerOver(KEY_ID, privateKey), NOW);
     assert.equal(get["content-digest"], undefined, "a GET signs no digest — there is no body to bind");
     assert.equal(verifyRequest("GET", "/agents/writer/outbox", get, "", resolveKey, NOW).ok, true);
   });
 
   it("round-trips the cavage shim, and extractKeyId reads both schemes", () => {
     const body = JSON.stringify({ type: "Create" });
-    const post = signRequestCavage("POST", "/actor/inbox", "alpha.example", body, KEY_ID, privateKey, NOW);
+    const post = signRequestCavage("POST", "/actor/inbox", "alpha.example", body, signerOver(KEY_ID, privateKey), NOW);
     assert.ok(post.digest, "a shim POST carries the legacy Digest it binds");
     assert.equal(extractKeyId(post), KEY_ID);
     assert.equal(verifyRequest("POST", "/actor/inbox", post, body, resolveKey, NOW).ok, true);
 
-    const get = signRequestCavage("GET", "/actor", "alpha.example", "", KEY_ID, privateKey, NOW);
+    const get = signRequestCavage("GET", "/actor", "alpha.example", "", signerOver(KEY_ID, privateKey), NOW);
     assert.equal(verifyRequest("GET", "/actor", get, "", resolveKey, NOW).ok, true);
   });
 
@@ -74,7 +75,7 @@ describe("HTTP Signature: the covered set comes from the method, never from the 
     // it on a POST carrying an arbitrary body. If the verifier believed the
     // declaration, the signature would verify over a base that never mentioned
     // the body, and the body would be unauthenticated.
-    const forged = signRequest("GET", "/actor/inbox", "alpha.example", "", KEY_ID, privateKey, NOW);
+    const forged = signRequest("GET", "/actor/inbox", "alpha.example", "", signerOver(KEY_ID, privateKey), NOW);
     const attackerBody = JSON.stringify({ type: "Delete", object: "everything" });
     const result = verifyRequest("POST", "/actor/inbox", forged, attackerBody, resolveKey, NOW);
     assert.equal(result.ok, false);
@@ -82,7 +83,7 @@ describe("HTTP Signature: the covered set comes from the method, never from the 
   });
 
   it("refuses a cavage POST that declares it covered no digest — same downgrade, shim scheme", () => {
-    const forged = signRequestCavage("POST", "/actor/inbox", "alpha.example", "", KEY_ID, privateKey, NOW);
+    const forged = signRequestCavage("POST", "/actor/inbox", "alpha.example", "", signerOver(KEY_ID, privateKey), NOW);
     const stripped = {
       ...forged,
       signature: forged.signature.replace(
@@ -98,7 +99,7 @@ describe("HTTP Signature: the covered set comes from the method, never from the 
 
   it("refuses a native POST with no Content-Digest header at all", () => {
     const body = JSON.stringify({ type: "Create" });
-    const signed = signRequest("POST", "/actor/inbox", "alpha.example", body, KEY_ID, privateKey, NOW);
+    const signed = signRequest("POST", "/actor/inbox", "alpha.example", body, signerOver(KEY_ID, privateKey), NOW);
     const { "content-digest": _dropped, ...withoutDigest } = signed;
     const result = verifyRequest("POST", "/actor/inbox", withoutDigest, body, resolveKey, NOW);
     assert.equal(result.ok, false);
@@ -106,14 +107,14 @@ describe("HTTP Signature: the covered set comes from the method, never from the 
   });
 
   it("refuses a GET signature replayed onto a different path", () => {
-    const get = signRequest("GET", "/agents/writer/outbox", "alpha.example", "", KEY_ID, privateKey, NOW);
+    const get = signRequest("GET", "/agents/writer/outbox", "alpha.example", "", signerOver(KEY_ID, privateKey), NOW);
     const result = verifyRequest("GET", "/agents/reviewer/outbox", get, "", resolveKey, NOW);
     assert.equal(result.ok, false);
     assert.match(result.reason, /signature does not verify/);
   });
 
   it("refuses a GET outside the skew window — date and created both bound replay", () => {
-    const get = signRequest("GET", "/actor", "alpha.example", "", KEY_ID, privateKey, NOW);
+    const get = signRequest("GET", "/actor", "alpha.example", "", signerOver(KEY_ID, privateKey), NOW);
     const late = new Date(NOW.getTime() + 6 * 60 * 1000);
     const result = verifyRequest("GET", "/actor", get, "", resolveKey, late);
     assert.equal(result.ok, false);
@@ -132,13 +133,13 @@ describe("HTTP Signature: the covered set comes from the method, never from the 
     // `content-digest` is not in a GET's covered set, so a supplied one is
     // simply not part of the signed base — it can neither help nor hurt, and
     // must not change the verdict.
-    const get = signRequest("GET", "/actor", "alpha.example", "", KEY_ID, privateKey, NOW);
+    const get = signRequest("GET", "/actor", "alpha.example", "", signerOver(KEY_ID, privateKey), NOW);
     const withDigest = { ...get, "content-digest": "sha-256=:bm90LXJlYWw=:" };
     assert.equal(verifyRequest("GET", "/actor", withDigest, "", resolveKey, NOW).ok, true);
   });
 
   it("an expired signature is refused even inside the date skew", () => {
-    const get = signRequest("GET", "/actor", "alpha.example", "", KEY_ID, privateKey, NOW);
+    const get = signRequest("GET", "/actor", "alpha.example", "", signerOver(KEY_ID, privateKey), NOW);
     const created = Math.floor(NOW.getTime() / 1000);
     const expired = {
       ...get,

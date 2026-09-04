@@ -30,7 +30,8 @@
  * discipline was never cavage-specific (ADR-0017 Decision 2).
  */
 
-import { createHash, createPrivateKey, createPublicKey, sign, verify, type KeyObject } from "node:crypto";
+import { createHash, createPrivateKey, createPublicKey, verify, type KeyObject } from "node:crypto";
+import type { Signer } from "../crypto/signer.ts";
 
 const SKEW_MS = 5 * 60 * 1000;
 
@@ -123,19 +124,18 @@ export function signRequest(
   path: string,
   host: string,
   body: string,
-  keyId: string,
-  privateKey: KeyObject,
+  signer: Signer,
   now: Date,
 ): SignedRequestHeaders {
   const covered = coveredComponents(method);
   const date = now.toUTCString();
   const digest = covered.includes("content-digest") ? contentDigest(body) : undefined;
   const created = Math.floor(now.getTime() / 1000);
-  const params = signatureParams(covered, created, keyId);
+  const params = signatureParams(covered, created, signer.keyId);
   const values: ComponentValues = { host, date, "content-digest": digest };
-  const signature = sign(null, Buffer.from(signatureBase(covered, params, method, path, values)), privateKey).toString(
-    "base64",
-  );
+  const signature = Buffer.from(
+    signer.sign(new Uint8Array(Buffer.from(signatureBase(covered, params, method, path, values)))),
+  ).toString("base64");
   return {
     host,
     date,
@@ -151,24 +151,21 @@ export function signRequestCavage(
   path: string,
   host: string,
   body: string,
-  keyId: string,
-  privateKey: KeyObject,
+  signer: Signer,
   now: Date,
 ): CavageSignedRequestHeaders {
   const covered = coveredHeaders(method);
   const date = now.toUTCString();
   const digest = covered.includes("digest") ? legacyDigest(body) : undefined;
-  const signature = sign(
-    null,
-    Buffer.from(cavageSigningString(covered, method, path, { host, date, digest })),
-    privateKey,
+  const signature = Buffer.from(
+    signer.sign(new Uint8Array(Buffer.from(cavageSigningString(covered, method, path, { host, date, digest })))),
   ).toString("base64");
   return {
     host,
     date,
     ...(digest !== undefined ? { digest } : {}),
     signature:
-      `keyId="${keyId}",algorithm="hs2019",headers="${covered.join(" ")}",` +
+      `keyId="${signer.keyId}",algorithm="hs2019",headers="${covered.join(" ")}",` +
       `signature="${signature}"`,
   };
 }

@@ -49,6 +49,7 @@ import { Hub } from "../src/hub/hub.ts";
 import { digestOf } from "../src/crypto/proof.ts";
 import type { JsonValue } from "../src/crypto/jcs.ts";
 import { cleanupWorkspaces, workspace } from "./helpers.ts";
+import { fileSigner } from "../src/crypto/signer.ts";
 
 after(cleanupWorkspaces);
 
@@ -92,8 +93,7 @@ async function operator(name: string, agents: readonly string[], clock: ReturnTy
   });
   await new Promise<void>((resolve) => server.listen(port, "127.0.0.1", resolve));
   const transport = httpTransport({
-    keyId: instance.key("@instance").keyId,
-    privateKey: instance.key("@instance").privateKey,
+    signer: fileSigner(instance.key("@instance")),
     now: () => clock.now(),
     isLocal: (target) => instance.nameOf(target) !== null || target === actorId,
     local: instance.localTransport(),
@@ -112,7 +112,7 @@ async function postToHubInbox(
   const path = "/hubs/bridge/inbox";
   const body = JSON.stringify(activity);
   const key = op.instance.key("@instance");
-  const signed = signRequest("POST", path, new URL(hubOrigin).host, body, key.keyId, key.privateKey, clock.now());
+  const signed = signRequest("POST", path, new URL(hubOrigin).host, body, fileSigner(key), clock.now());
   const response = await fetch(`${hubOrigin}${path}`, {
     method: "POST",
     headers: {
@@ -333,8 +333,7 @@ describe("ADR-0016: the hub's inbox and cross-instance CRDT sync, over real sock
     assert.equal(offerPosted.status, 202, `the digest offer is admitted: ${JSON.stringify(offerPosted.body)}`);
 
     const alphaHubTransport = httpTransport({
-      keyId: alpha.instance.key("@instance").keyId,
-      privateKey: alpha.instance.key("@instance").privateKey,
+      signer: fileSigner(alpha.instance.key("@instance")),
       now: () => clock.now(),
       isLocal: () => false,
       local: { name: "none", deliver: async () => {} },

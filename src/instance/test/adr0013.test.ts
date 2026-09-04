@@ -23,6 +23,7 @@ import type { JsonValue } from "../src/crypto/jcs.ts";
 import { signRequest } from "../src/federation/httpSig.ts";
 import { authorizeRead, type ReadGateDeps } from "../src/federation/readGate.ts";
 import { cleanupWorkspaces, testInstance } from "./helpers.ts";
+import { fileSigner } from "../src/crypto/signer.ts";
 
 after(cleanupWorkspaces);
 
@@ -69,7 +70,7 @@ function signedGate(over: Partial<ReadGateDeps> = {}) {
   const doc = instance.agentDocument("b1");
   const key = instance.key("b1");
   const path = "/agents/w/outbox";
-  const headers = signRequest("GET", path, "alpha.example", "", key.keyId, key.privateKey, NOW);
+  const headers = signRequest("GET", path, "alpha.example", "", fileSigner(key), NOW);
 
   const d = deps({
     fetchDocument: async (url: string) => (url === agentId ? doc : null),

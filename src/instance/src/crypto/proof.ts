@@ -18,7 +18,8 @@
 import { createHash, type KeyObject } from "node:crypto";
 import { canonicalBytes, type JsonValue } from "./jcs.ts";
 import { multibaseDecode, multibaseEncode } from "./multibase.ts";
-import { sign, verify } from "./keys.ts";
+import { verify } from "./keys.ts";
+import type { Signer } from "./signer.ts";
 
 export const CRYPTOSUITE = "eddsa-jcs-2022";
 export const DATA_INTEGRITY_CONTEXT = "https://w3id.org/security/data-integrity/v1";
@@ -64,8 +65,12 @@ function buildSigningInput(
 }
 
 export interface SignOptions {
-  privateKey: KeyObject;
-  verificationMethod: string;
+  /**
+   * ADR-0026 Decision 1: the signing capability, not the key. The
+   * verification method comes from the signer's own `keyId`, so a caller can
+   * no longer sign as one key while claiming another.
+   */
+  signer: Signer;
   /** Overridable so tests and replays are reproducible. */
   created?: string;
 }
@@ -76,12 +81,13 @@ export function attachProof(
   options: SignOptions,
 ): SignedDocument {
   const created = options.created ?? new Date().toISOString();
+  const verificationMethod = options.signer.keyId;
 
   const proofConfig: { [key: string]: JsonValue } = {
     type: "DataIntegrityProof",
     cryptosuite: CRYPTOSUITE,
     created,
-    verificationMethod: options.verificationMethod,
+    verificationMethod,
     proofPurpose: "assertionMethod",
   };
   // Present while hashing, absent on the wire.
@@ -89,12 +95,12 @@ export function attachProof(
     proofConfig["@context"] = document["@context"];
   }
 
-  const signature = sign(options.privateKey, buildSigningInput(document, proofConfig));
+  const signature = options.signer.sign(buildSigningInput(document, proofConfig));
   const proof: Proof = {
     type: "DataIntegrityProof",
     cryptosuite: CRYPTOSUITE,
     created,
-    verificationMethod: options.verificationMethod,
+    verificationMethod,
     proofPurpose: "assertionMethod",
     proofValue: multibaseEncode(signature),
   };

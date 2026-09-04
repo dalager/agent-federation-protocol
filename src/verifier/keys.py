@@ -24,7 +24,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from decision import instant_millis
-from proof import decode_multikey
+from proof import decode_multikey, verify_proof
 
 
 @dataclass
@@ -105,13 +105,26 @@ def check_key_intervals(
     Scoped **per key, not per bundle**: a `verificationMethod` that appears in
     `afp:keyHistory` MUST satisfy its interval, but one that does not appear
     resolves exactly as it does today, with no interval check and no finding.
-    This matters concretely — an agent's hub-scoped key (`afp:cap:vote`,
-    bid commits, reveals) is never entered into the history the export
-    collects (instance, per-agent P1 key, per-hub key), so its signatures
-    would otherwise be flagged for a gap that was never declared and was
-    never meant to be checked. An undeclared key is the compatibility path;
-    a key the history *does* declare, signing outside its interval, is the
-    finding worth naming.
+    An undeclared key is the compatibility path; a key the history *does*
+    declare, signing outside its interval, is the finding worth naming.
+
+    ADR-0026 Decision 3 widened what a writer declares: an agent's hub-scoped
+    vote key and its transport key are now in the history too, where before
+    only the instance key, the per-agent P1 key and the per-hub key were
+    (ADR-0023 row L1, "a live hole" per ADR-0021 Q7). This function needed no
+    change for that — being keyed on `verificationMethod` rather than on actor
+    is exactly what let the new entries fall under the check automatically —
+    but the reach is worth stating precisely. This check reads
+    `proof.verificationMethod` on the activities an outbox carries. In every
+    bundle shipped today those are signed by the proof key — under `instance`
+    custody the instance key signs on the agent's behalf, so no exported
+    activity, and no vote embedded in an `afp:EquivocationProof`, is signed by
+    a hub-scoped or transport key. Declaring those keys therefore ARMS the
+    interval check without yet exercising it: the day a hub-scoped signature
+    does travel in a bundle it is judged, and until then the entries are a
+    record of what exists rather than a check that fires. A bundle from a
+    writer that predates ADR-0026 declares fewer keys and is judged on the
+    ones it does declare.
 
     `labeled_activities` is every non-stub activity across every outbox, each
     paired with the same `f"{actor}[{index}] {id}"` label the signature check
@@ -165,6 +178,44 @@ def check_key_intervals(
             f"covers — a chain signed by something the bundle refuses to name "
             f"(ADR-0012)",
         )
+
+
+def check_manifest_signature(report, manifest: dict, actor_keys: dict[str, bytes]) -> None:
+    """ADR-0012 Decision 1: the manifest is a signed document, so its own
+    bytes must verify — not merely name a plausible key.
+
+    `actor_keys` MUST come from the bundle's actor documents alone. The
+    manifest's `afp:keyHistory` is part of the document under verification;
+    resolving the signing key through it would let anyone who rewrites a
+    manifest also supply the public half of the key they rewrote it with, and
+    the check would congratulate them.
+
+    An unsigned manifest is pre-ADR-0012 and is skipped (Compatibility); a
+    signed one whose method no actor document publishes is reported, because
+    "signed by something this bundle will not name" is exactly the case a
+    forger needs and an honest exporter never produces.
+    """
+    proof = manifest.get("proof")
+    if not isinstance(proof, dict):
+        return  # unsigned: pre-ADR-0012 bundle
+
+    method = proof.get("verificationMethod")
+    if method not in actor_keys:
+        report.record(
+            "keys: the manifest's signature verifies",
+            False,
+            f"manifest signed with {method!r}, which no actor document in this bundle "
+            f"publishes — an export's self-description must be verifiable against the "
+            f"keys the bundle itself carries (ADR-0012 Decision 1)",
+        )
+        return
+
+    reason = verify_proof(manifest, actor_keys)
+    report.record(
+        "keys: the manifest's signature verifies",
+        reason is None,
+        reason or "",
+    )
 
 
 def check_manifest_key_history(report, manifest: dict, history: list[KeyRecord] | None) -> None:

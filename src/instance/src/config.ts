@@ -8,6 +8,7 @@
  */
 
 import { resolve } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
 
 export interface Config {
   /** Public origin the instance publishes itself under. */
@@ -60,6 +61,17 @@ export interface Config {
   readonly rateLimitPerActorWindowMs: number;
   /** TTL for the signed-request replay cache — the signature skew window. */
   readonly replayCacheTtlMs: number;
+
+  // ---------------------------------------------------------- ADR-0026
+
+  /**
+   * ADR-0026 Decision 1: a file holding the passphrase the `file` signer
+   * adapter's PEMs are encrypted with at rest. Absent means unencrypted PEMs,
+   * which is every deployment before this ADR. The passphrase itself is read
+   * at the point of use and never enters a Config field, a log or the record
+   * — this names the file, not the secret.
+   */
+  readonly keyPassphraseFile?: string;
 }
 
 /**
@@ -70,6 +82,19 @@ export interface Config {
  */
 export function devModeFromEnv(): boolean {
   return env("AFP_DEV", "0") === "1";
+}
+
+/**
+ * ADR-0026 Decision 1: the passphrase protecting the `file` adapter's PEMs at
+ * rest, read from the file `AFP_KEY_PASSPHRASE_FILE` names. Read at the point
+ * of use, never stored on `Config` — the same discipline `AFP_LLM_API_KEY`
+ * has always had.
+ */
+export function keyPassphraseFromEnv(): string | undefined {
+  const file = env("AFP_KEY_PASSPHRASE_FILE", "");
+  if (!file || !existsSync(file)) return undefined;
+  const passphrase = readFileSync(file, "utf8").trim();
+  return passphrase.length > 0 ? passphrase : undefined;
 }
 
 function env(name: string, fallback: string): string {
@@ -132,6 +157,7 @@ export function loadConfig(overrides: Partial<Config> = {}): Config {
     rateLimitPerActor: envInt("AFP_RATE_LIMIT_PER_ACTOR", 60),
     rateLimitPerActorWindowMs: envInt("AFP_RATE_LIMIT_PER_ACTOR_WINDOW_MS", 60 * 1000),
     replayCacheTtlMs: envInt("AFP_REPLAY_CACHE_TTL_MS", 5 * 60 * 1000),
+    ...(env("AFP_KEY_PASSPHRASE_FILE", "") ? { keyPassphraseFile: env("AFP_KEY_PASSPHRASE_FILE", "") } : {}),
   };
 
   return { ...base, ...overrides };

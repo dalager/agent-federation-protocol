@@ -15,13 +15,13 @@
  *   artifacts/sha256-<hex> raw bytes, named by digest
  */
 
-import { mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdirSync, writeFileSync, rmSync, readdirSync, readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import type { AfpInstance } from "./instance.ts";
 import { AFP_CONTEXTS } from "./ap/documents.ts";
 import type { JsonValue } from "./crypto/jcs.ts";
 import { attachProof, digestOf } from "./crypto/proof.ts";
-import { keyHistory, type KeyHistoryEntry } from "./crypto/keys.ts";
+import { allKeyHistories, type KeyHistoryEntry } from "./crypto/keys.ts";
 
 /**
  * A scoped export (ADR-0009 Decisions 4–5). Redaction is an export-time
@@ -283,8 +283,10 @@ export function exportBundle(
       ...(entry.retiredBy !== undefined ? { "afp:retiredBy": entry.retiredBy } : {}),
     });
   };
+  // ADR-0026 Decision 3: every key that ever signed anything for this actor —
+  // proof, hub-scoped, transport — not just the proof key.
   const collectKeyHistory = (name: string, controller: string): void => {
-    for (const entry of keyHistory(instance.config.keyDir, name, controller)) {
+    for (const entry of allKeyHistories(instance.config.keyDir, name, controller)) {
       pushHistoryEntry(controller, entry);
     }
   };
@@ -340,13 +342,66 @@ export function exportBundle(
   // DataIntegrityProof and JCS canonicalization as everything else, from the
   // instance's *current* key, so the export's self-description stops being
   // the one part of a bundle anybody could edit freely.
-  const instanceKey = instance.key("@instance");
-  writeJson(
-    join(dir, "MANIFEST.json"),
-    attachProof(manifest, { privateKey: instanceKey.privateKey, verificationMethod: instanceKey.keyId }),
-  );
+  writeJson(join(dir, "MANIFEST.json"), attachProof(manifest, { signer: instance.signer("@instance") }));
+
+  // ADR-0026 Decision 4: the last thing before the bundle is handed over —
+  // nothing private may leave with it. Cheap, and the one accident an
+  // operator cannot undo, because a bundle is the artefact that goes to a
+  // regulator, a counterparty or a public archive.
+  refusePrivateMaterial(dir, instance.config.keyPassphraseFile);
 
   return { dir, actors: actorNames.length, activities, artifacts: artifacts.length };
+}
+
+/** PEM headers for private material, and the multibase prefix of an Ed25519 private Multikey. */
+const PRIVATE_MARKERS = [
+  "-----BEGIN PRIVATE KEY-----",
+  "-----BEGIN RSA PRIVATE KEY-----",
+  "-----BEGIN EC PRIVATE KEY-----",
+  "-----BEGIN OPENSSH PRIVATE KEY-----",
+  "-----BEGIN ENCRYPTED PRIVATE KEY-----",
+  // Multikey private prefix (0x80 0x26 varint) — the private twin of `z6Mk…`.
+  "z3we",
+];
+
+/**
+ * Scan every file in a written bundle for private key material and throw
+ * rather than let it be handed over. Throws *after* the write so the caller
+ * sees the offending directory and can inspect it; the refusal is the point,
+ * not tidiness.
+ */
+export function refusePrivateMaterial(dir: string, passphraseFile?: string): void {
+  const passphrase = passphraseFile && existsSync(passphraseFile)
+    ? readFileSync(passphraseFile, "utf8").trim()
+    : "";
+
+  const walk = (current: string): void => {
+    for (const entry of readdirSync(current, { withFileTypes: true })) {
+      const path = join(current, entry.name);
+      if (entry.isDirectory()) {
+        walk(path);
+        continue;
+      }
+      const bytes = readFileSync(path);
+      // Artifacts are arbitrary bytes; a marker check over them is still
+      // right — an operator attaching their own key file to a Task is exactly
+      // the accident this catches.
+      const text = bytes.toString("utf8");
+      for (const marker of PRIVATE_MARKERS) {
+        if (text.includes(marker)) {
+          throw new Error(
+            `export refused: ${path} contains private key material (${marker.slice(0, 32)}…) — ` +
+              `a bundle is what leaves the operator's hands and must carry public halves only`,
+          );
+        }
+      }
+      if (passphrase.length > 0 && text.includes(passphrase)) {
+        throw new Error(`export refused: ${path} contains the key passphrase`);
+      }
+    }
+  };
+
+  walk(dir);
 }
 
 function writeJson(path: string, value: unknown): void {

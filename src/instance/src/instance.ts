@@ -12,6 +12,7 @@ import type { Config } from "./config.ts";
 import type { JsonValue } from "./crypto/jcs.ts";
 import { loadOrCreateKeyPair, loadOrCreateTransportKeyPair, type KeyPair } from "./crypto/keys.ts";
 import { attachProof, digestOf } from "./crypto/proof.ts";
+import { fileSigner, type Signer } from "./crypto/signer.ts";
 import { openDb, type Db } from "./store/db.ts";
 import { Outbox, type OutboxEntry } from "./store/outbox.ts";
 import { InboxLog } from "./store/inboxLog.ts";
@@ -71,6 +72,8 @@ export class AfpInstance {
   readonly queue: DeliveryQueue;
 
   private readonly keys = new Map<string, KeyPair>();
+  /** ADR-0026: one signer per key name, minted on first use. */
+  private readonly signers = new Map<string, Signer>();
   private readonly agents = new Map<string, AgentRegistration>();
 
   readonly config: Config;
@@ -156,7 +159,7 @@ export class AfpInstance {
    */
   rosterDocument() {
     const { members, lastChange } = deriveRoster(this.outbox.byActor(instanceActorId(this.config.origin)));
-    return signedRoster(this.config.origin, members, this.key("@instance"), lastChange || undefined);
+    return signedRoster(this.config.origin, members, this.signer("@instance"), lastChange || undefined);
   }
 
   /**
@@ -234,6 +237,26 @@ export class AfpInstance {
   /** The transport (HTTP-signature) key for `"@instance"` or an agent name. */
   transportKey(name: string): KeyPair {
     return this.key(`${name}:transport`);
+  }
+
+  /**
+   * ADR-0026 Decision 1: the signing *capability* for `name`, which is what
+   * every signing path takes. Under the `file` adapter this closes over the
+   * loaded key; under a future `remote` or `agent` adapter the same accessor
+   * hands back a signer that reaches a KMS or an out-of-process agent, and no
+   * caller changes.
+   */
+  signer(name: string): Signer {
+    const cached = this.signers.get(name);
+    if (cached) return cached;
+    const made = fileSigner(this.key(name));
+    this.signers.set(name, made);
+    return made;
+  }
+
+  /** The transport signer — the hop-signing counterpart of `signer`. */
+  transportSigner(name: string): Signer {
+    return this.signer(`${name}:transport`);
   }
 
   // ----------------------------------------------------------------- outbound
@@ -319,10 +342,8 @@ export class AfpInstance {
     const activity = options.build(envelope);
     if (options.actingAs) activity["afp:actingAs"] = options.actingAs;
 
-    const signer = this.key(options.signerName);
     const signed = attachProof(activity, {
-      privateKey: signer.privateKey,
-      verificationMethod: signer.keyId,
+      signer: this.signer(options.signerName),
       created: now,
     }) as unknown as { [key: string]: JsonValue };
 

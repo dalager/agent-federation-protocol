@@ -25,6 +25,7 @@ import type { JsonValue } from "../src/crypto/jcs.ts";
 import { createServer as createProbe } from "node:net";
 import { jumpClock } from "../src/demoP3.ts";
 import { cleanupWorkspaces, publishRaw, workspace } from "./helpers.ts";
+import { fileSigner } from "../src/crypto/signer.ts";
 
 /** Grab a free localhost port (origin must be known before the instance exists). */
 function freePort(): Promise<number> {
@@ -144,7 +145,7 @@ describe("ADR-0017 Decision 3: spec-shaped delivery", () => {
 
       const key = instance.key("@instance");
       const url = new URL(`${origin}/actor/inbox`);
-      const signed = signRequest("GET", url.pathname, url.host, "", key.keyId, key.privateKey, clock.now());
+      const signed = signRequest("GET", url.pathname, url.host, "", fileSigner(key), clock.now());
       const owner = await fetch(url, { headers: { ...signed } });
       assert.equal(owner.status, 200, "the instance's own signature reads its inbox");
       const inbox = (await owner.json()) as { type: string; totalItems: number; orderedItems: unknown[] };

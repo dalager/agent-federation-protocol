@@ -26,6 +26,7 @@ import type { JsonValue } from "../src/crypto/jcs.ts";
 import { createServer as createProbe } from "node:net";
 import { jumpClock } from "../src/demoP3.ts";
 import { cleanupWorkspaces, workspace } from "./helpers.ts";
+import { fileSigner, signerOver } from "../src/crypto/signer.ts";
 
 /** Grab a free localhost port (origin must be known before the instance exists). */
 function freePort(): Promise<number> {
@@ -118,7 +119,7 @@ describe("ADR-0017 Decision 4: transport keys", () => {
 
       const key = instance.transportKey("@instance");
       const url = new URL(`${origin}/actor/inbox`);
-      const signed = signRequest("GET", url.pathname, url.host, "", key.keyId, key.privateKey, clock.now());
+      const signed = signRequest("GET", url.pathname, url.host, "", fileSigner(key), clock.now());
       const response = await fetch(url, { headers: { ...signed } });
       assert.equal(response.status, 200, "the transport key admits the owner's inbox view");
     } finally {
@@ -137,7 +138,7 @@ describe("ADR-0017 Decision 4: transport keys", () => {
 
       const key = instance.key("@instance");
       const url = new URL(`${origin}/actor/inbox`);
-      const signed = signRequest("GET", url.pathname, url.host, "", key.keyId, key.privateKey, clock.now());
+      const signed = signRequest("GET", url.pathname, url.host, "", fileSigner(key), clock.now());
       const response = await fetch(url, { headers: { ...signed } });
       assert.equal(response.status, 200, "the assertionMethod fallback still admits the legacy proof key");
     } finally {
@@ -161,8 +162,7 @@ describe("ADR-0017 Decision 4: transport keys", () => {
         url.pathname,
         url.host,
         "",
-        `${origin}/actor#unknown-key`,
-        stranger.privateKey,
+        signerOver(`${origin}/actor#unknown-key`, stranger.privateKey),
         clock.now(),
       );
       const response = await fetch(url, { headers: { ...signed } });
