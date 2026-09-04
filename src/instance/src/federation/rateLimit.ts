@@ -17,6 +17,7 @@ export class RateLimiter {
   private readonly buckets = new Map<string, Bucket>();
   private readonly capacity: number;
   private readonly windowMs: number;
+  private lastSweep = 0;
 
   constructor(capacity: number, windowMs: number) {
     this.capacity = capacity;
@@ -27,8 +28,16 @@ export class RateLimiter {
    * `true` if `key` may proceed (and one token is consumed); `false` if the
    * bucket is exhausted for the current window. Fixed-window, not
    * sliding — simple, and conservative defaults absorb the edge burst.
+   *
+   * Sweeping closed windows is amortized in here rather than asked of the
+   * caller: a scan proportional to the number of distinct keys runs at most
+   * once per window, not once per request.
    */
   allow(key: string, now: number): boolean {
+    if (now - this.lastSweep >= this.windowMs) {
+      this.sweep(now);
+      this.lastSweep = now;
+    }
     let bucket = this.buckets.get(key);
     if (!bucket || now - bucket.windowStart >= this.windowMs) {
       bucket = { tokens: this.capacity, windowStart: now };
@@ -47,7 +56,7 @@ export class RateLimiter {
   }
 
   /** Bound memory on a long-lived process: drop windows that have long since closed. */
-  sweep(now: number, staleAfterMs: number = this.windowMs * 4): void {
+  private sweep(now: number, staleAfterMs: number = this.windowMs * 4): void {
     for (const [key, bucket] of this.buckets) {
       if (now - bucket.windowStart > staleAfterMs) this.buckets.delete(key);
     }

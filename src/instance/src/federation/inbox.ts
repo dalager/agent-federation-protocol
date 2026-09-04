@@ -55,31 +55,20 @@ export interface InboxDeps {
  * (ADR-0025 Decision 2) — must not fork between the served instance and the
  * demos, so both go through `policedFetch`.
  */
-export function fetchActorDocument(
+export async function fetchActorDocument(
   url: string,
-  policy?: FetchPolicyDeps,
-): Promise<{ [key: string]: JsonValue } | null> {
   // Every call site that does not thread its own instance config through
   // (every demo file, and any caller written before this ADR) gets the same
-  // answer `loadConfig` would give it: dev mode iff `AFP_DEV=1`. Nothing
-  // here changes behaviour for a caller that already passes its own policy.
-  return fetchDocumentPoliced(url, policy ?? { devMode: devModeFromEnv() });
-}
-
-async function fetchDocumentPoliced(
-  url: string,
-  policy: FetchPolicyDeps,
+  // answer `loadConfig` would give it: dev mode iff `AFP_DEV=1`.
+  policy: FetchPolicyDeps = { devMode: devModeFromEnv() },
 ): Promise<{ [key: string]: JsonValue } | null> {
   try {
     const response = await policedFetch(url, "document", policy, { headers: { accept: "application/activity+json" } });
     if (!response.ok) return null;
-    const doc = JSON.parse(await response.text()) as { [key: string]: JsonValue };
-    // Decision 3: the document fetched for a keyId must answer as the id it
-    // claims — refused by the caller (below) as `key-controller-mismatch`
-    // when this is used to resolve a keyId's controller; here it is left to
-    // the caller because `fetchDocument` also resolves plain actor lookups
-    // that carry no keyId to bind against.
-    return doc;
+    // Decision 3's controller binding is the *caller's* check, not this
+    // one's: `fetchDocument` also resolves plain actor lookups that carry no
+    // keyId to bind the document's `id` against.
+    return JSON.parse(await response.text()) as { [key: string]: JsonValue };
   } catch {
     return null;
   }

@@ -21,6 +21,7 @@ import type { Db } from "./db.ts";
 export class SeenSignatures {
   private readonly db: Db;
   private readonly ttlMs: number;
+  private lastPurgeMs = 0;
 
   constructor(db: Db, ttlMs: number) {
     this.db = db;
@@ -30,7 +31,8 @@ export class SeenSignatures {
          fingerprint TEXT PRIMARY KEY,
          seen_at     TEXT NOT NULL,
          expires_at  TEXT NOT NULL
-       )`,
+       );
+       CREATE INDEX IF NOT EXISTS seen_signatures_expires ON seen_signatures (expires_at);`,
     );
   }
 
@@ -40,7 +42,14 @@ export class SeenSignatures {
 
   /** Returns true on first presentation (caller proceeds); false on replay (caller refuses). */
   markSeen(keyId: string, created: string, signature: string, now = new Date()): boolean {
-    this.purgeExpired(now);
+    // The table is bounded by the TTL either way, so the sweep is amortized
+    // to once per TTL window rather than run as a DELETE on every verified
+    // request. Correctness does not depend on it: an entry past its
+    // `expires_at` is one the skew window has already made unusable.
+    if (now.getTime() - this.lastPurgeMs >= this.ttlMs) {
+      this.purgeExpired(now);
+      this.lastPurgeMs = now.getTime();
+    }
     const fp = this.fingerprint(keyId, created, signature);
     const existing = this.db.prepare("SELECT 1 FROM seen_signatures WHERE fingerprint = ?").get(fp);
     if (existing) return false;

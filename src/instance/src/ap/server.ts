@@ -130,10 +130,9 @@ export function createHttpServer(instance: AfpInstance, options: ServerOptions =
     const path = url.pathname;
     const remoteAddress = req.socket.remoteAddress ?? "unknown";
 
-    const now = instance.clock.now();
-    addressLimiter.sweep(now.getTime());
-    if (!addressLimiter.allow(remoteAddress, now.getTime())) {
-      res.setHeader("Retry-After", String(addressLimiter.retryAfterSeconds(remoteAddress, now.getTime())));
+    const nowMs = instance.clock.now().getTime();
+    if (!addressLimiter.allow(remoteAddress, nowMs)) {
+      res.setHeader("Retry-After", String(addressLimiter.retryAfterSeconds(remoteAddress, nowMs)));
       res.writeHead(429, { "content-type": "application/json" });
       res.end(JSON.stringify({ error: "rate limited" }));
       return;
@@ -195,8 +194,8 @@ export function createHttpServer(instance: AfpInstance, options: ServerOptions =
         handleInboxPost(
           {
             ...options.inbox!,
-            ...(seenSignatures ? { replay: seenSignatures } : {}),
-            actorRateLimit: { allow: (key: string, nowMs: number) => actorLimiter.allow(key, nowMs) },
+            replay: seenSignatures ?? undefined,
+            actorRateLimit: actorLimiter,
             ...(inboxHub
               ? {
                   receive: (activity: { [key: string]: JsonValue }) => inboxHub.receive!(activity),

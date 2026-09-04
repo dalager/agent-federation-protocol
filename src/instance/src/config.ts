@@ -1,7 +1,10 @@
 /**
- * Environment abstraction. Nothing in the codebase reads `process.env` directly,
- * and no secret ever appears here — API keys are read by name at the point of
- * use, keys live on disk outside the repo.
+ * Environment abstraction. Every environment read in the codebase goes through
+ * this module — `loadConfig` for an instance's own settings, `devModeFromEnv`
+ * for the handful of fetch call sites that run before a `Config` is in scope
+ * (ADR-0025; making the policy a required argument there instead is the
+ * standing cleanup). No secret ever appears here — API keys are read by name at
+ * the point of use, keys live on disk outside the repo.
  */
 
 import { resolve } from "node:path";

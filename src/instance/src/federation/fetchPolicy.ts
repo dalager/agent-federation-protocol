@@ -33,14 +33,6 @@ export interface FetchPolicyDeps {
   trustedNets?: readonly string[];
 }
 
-export interface PolicedResponse {
-  readonly status: number;
-  readonly ok: boolean;
-  readonly headers: Headers;
-  text(): Promise<string>;
-  arrayBuffer(): Promise<ArrayBuffer>;
-}
-
 const TIMEOUTS: Record<FetchKind, { connectMs: number; totalMs: number }> = {
   document: { connectMs: 5_000, totalMs: 15_000 },
   inbox: { connectMs: 5_000, totalMs: 15_000 },
@@ -150,11 +142,10 @@ async function readCapped(response: Response, cap: number): Promise<Buffer> {
   if (declared && Number(declared) > cap) {
     throw new FetchRefusal("size", `declared content-length ${declared} exceeds the ${cap}-byte cap`);
   }
-  if (!response.body) {
-    const buf = Buffer.from(await response.arrayBuffer());
-    if (buf.length > cap) throw new FetchRefusal("size", `body is ${buf.length} bytes, cap is ${cap}`);
-    return buf;
-  }
+  // A bodyless answer is legitimate on this path — a peer accepting a
+  // delivery with `204` is the common case — so it reads as zero bytes
+  // rather than as a refusal.
+  if (!response.body) return Buffer.alloc(0);
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;
@@ -190,7 +181,7 @@ export async function policedFetch(
   kind: FetchKind,
   deps: FetchPolicyDeps,
   init: PolicedFetchInit = {},
-): Promise<PolicedResponse> {
+): Promise<Response> {
   const target = typeof url === "string" ? new URL(url) : url;
 
   if (target.protocol !== "https:" && !(deps.devMode && target.protocol === "http:")) {
@@ -236,15 +227,16 @@ export async function policedFetch(
       }
     }
 
+    // The body is already drained and capped, so what comes back is an
+    // ordinary `Response` over bytes this policy has vouched for — callers
+    // get the real `.status`/`.ok`/`.headers`/`.text()` surface, not a
+    // hand-rolled stand-in for it.
     const bytes = await readCapped(response, SIZE_CAPS[kind]);
-    const text = bytes.toString("utf8");
-    return {
-      status: response.status,
-      ok: response.ok,
-      headers: response.headers,
-      text: () => Promise.resolve(text),
-      arrayBuffer: () => Promise.resolve(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)),
-    };
+    // `204`/`205`/`304` may not carry a body at all — handing one to the
+    // `Response` constructor throws, and a peer that accepted a delivery
+    // with `204` must not become a failed hop over a technicality.
+    const bodyless = response.status === 204 || response.status === 205 || response.status === 304;
+    return new Response(bodyless ? null : bytes, { status: response.status, headers: response.headers });
   } finally {
     clearTimeout(totalTimer);
   }
