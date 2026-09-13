@@ -29,6 +29,8 @@ import { RateLimiter } from "../federation/rateLimit.ts";
 import { handleWebhook, matchWebhookRoute, type WebhookRoute } from "../ports/webhook.ts";
 import { renderingRoute } from "../render/routes.ts";
 import { handleCommandPost, matchCommandRoute } from "../ports/command.ts";
+import { metrics } from "../runtime/metrics.ts";
+import { healthRoute, type HealthDeps } from "../runtime/health.ts";
 
 const AP_CONTENT_TYPE = "application/activity+json";
 
@@ -64,6 +66,8 @@ export interface ServerOptions {
     /** ADR-0017 Decision 4 (R5): instance actor ids with a live seat — GET /hubs/:id/followers. */
     followers?(): string[];
   }[];
+  /** ADR-0031 Decision 2: `/healthz`, `/readyz`, `/metrics` — unauthenticated, no-store. */
+  health?: HealthDeps;
 }
 
 /**
@@ -137,6 +141,7 @@ export function createHttpServer(instance: AfpInstance, options: ServerOptions =
 
     const nowMs = instance.clock.now().getTime();
     if (!addressLimiter.allow(remoteAddress, nowMs)) {
+      metrics.rateLimited("address");
       res.setHeader("Retry-After", String(addressLimiter.retryAfterSeconds(remoteAddress, nowMs)));
       res.writeHead(429, { "content-type": "application/json" });
       res.end(JSON.stringify({ error: "rate limited" }));
@@ -277,6 +282,12 @@ export function createHttpServer(instance: AfpInstance, options: ServerOptions =
 
     (async () => {
       try {
+        // ADR-0031 Decision 2: health/readiness/metrics — unauthenticated,
+        // ahead of every gated route, the same shape as `renderingRoute`.
+        if (options.health && (await healthRoute(instance, options.health, { path, send, noStore: () => res.setHeader("Cache-Control", "no-store") }))) {
+          return;
+        }
+
         // ADR-0029 Decision 2 ("Watch"): renderings, gated identically to the
         // outbox/artifact routes above — same `authorizeRead` call, same
         // `markUncacheable`, same `onGrantedFetch` on a grant-admitted fetch.

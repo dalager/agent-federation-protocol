@@ -405,6 +405,24 @@ export function createAct(
   };
 }
 
+/**
+ * ADR-0031 Decision 1 / ADR-0008 Decision 3: the optional heartbeat —
+ * `Create{afp:BoundaryDigest}` on the instance's own chain, `internal`
+ * visibility (it is the operator's own commitment to the boundary log, not a
+ * federated claim). `digest` is `federation.boundaryDigest()`'s payload,
+ * unmodified — the outbox carries the heartbeat-sized commitment; the
+ * boundary log itself carries the detail.
+ */
+export function createBoundaryDigest(
+  envelope: Envelope,
+  digest: { [key: string]: JsonValue },
+): { [key: string]: JsonValue } {
+  return {
+    ...base(envelope, "Create"),
+    object: { ...digest, id: `${envelope.actor}/boundary-digests/${envelope.activityId.split("/").pop()}` },
+  };
+}
+
 export function correlationIdOf(activity: { [key: string]: JsonValue }): string | null {
   const direct = activity["afp:correlationId"];
   if (typeof direct === "string") return direct;

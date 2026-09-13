@@ -504,6 +504,15 @@ nothing more. Every gap is compensated explicitly:
 Overarching principle: treat every inbox POST as a **hint**, and build every coordination
 state machine idempotent, order-tolerant, and timeout-driven.
 
+[ADR-0031](adr/0031-the-resident-process.md) mechanizes the compensations above for a
+served instance running unattended: the sweep turns an overdue task into its `Error`
+without a program call, real-time retry honours a peer's own `Retry-After` rather than a
+fixed schedule, scheduled convergence carries the urgent push (an admitted `Enroll`,
+`Unenroll` or proof fans out immediately rather than waiting for the next tick), and the
+optional heartbeat is the periodic `afp:BoundaryDigest` this table's rationale already
+named. None of it is a new compensation — the boundary log in SQLite stays the record,
+hash-chained and exportable, with the JSON-lines log stream as its operational shadow.
+
 ## Security & trust
 
 > Mechanism for the claims below — TLS enforcement, the SSRF-safe fetch policy, redirect

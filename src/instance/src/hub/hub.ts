@@ -175,6 +175,16 @@ export class Hub {
   readonly queue: DeliveryQueue;
   /** Allocation lives beside the hub — same process, same dispatch port (ADR-0003 Decision 1). */
   readonly allocation: Allocator;
+  /**
+   * ADR-0031 Decision 1: the scheduler's urgent-push hook. Set by whoever
+   * drives this hub's `converge` loop; fired after an admitted `afp:Enroll`,
+   * `afp:Unenroll` or `Announce{afp:EquivocationProof}` dispatches, so a
+   * membership or conviction change propagates to peers immediately instead
+   * of waiting for the next scheduled tick (02 § Gossip's decaying fan-out,
+   * triggered rather than timed). No effect on `dispatch` itself — the hub
+   * does not know or care who is listening.
+   */
+  onUrgent?: (activity: { [key: string]: JsonValue }) => void | Promise<void>;
 
   private readonly db: Db;
   private readonly origin: string;
@@ -506,7 +516,26 @@ export class Hub {
     this.seen.add(activityId);
 
     await this.dispatch(activity);
+    if (this.onUrgent && this.isUrgent(activity)) await this.onUrgent(activity);
     return { status: "dispatched" };
+  }
+
+  /**
+   * ADR-0031 Decision 1: which admitted types warrant an immediate push
+   * rather than waiting for the next scheduled `converge` tick — membership
+   * changes and equivocation convictions, the same set 02's rumor path
+   * treats as urgent. Liveness registers are deliberately excluded (ADR-0016
+   * Decision 3): they already ride the scheduled path only.
+   */
+  private isUrgent(activity: { [key: string]: JsonValue }): boolean {
+    const type = String(activity.type ?? "");
+    if (type === "afp:Enroll" || type === "afp:Unenroll") return true;
+    const object = activity.object;
+    const objectType =
+      object && typeof object === "object" && !Array.isArray(object)
+        ? String((object as Record<string, JsonValue>).type ?? "")
+        : "";
+    return type === "Announce" && objectType === "afp:EquivocationProof";
   }
 
   /**
@@ -1448,6 +1477,26 @@ export class Hub {
   offerSync(target: string, thread = `${this.origin}/threads/anti-entropy`): OutboxEntry {
     return this.emit([target], thread, "hub", (envelope) =>
       offerDigest(envelope, { hub: this.hubIdentity, versionVectors: this.syncVector() }),
+    );
+  }
+
+  /**
+   * ADR-0031 Decision 1's urgent push: send `target` everything this hub
+   * holds, unsolicited, rather than wait for `target` to `offerSync` and
+   * discover it is behind. Built from `onDigestOffer`'s own logic with the
+   * remote vector taken as empty — "behind everything" — since the scheduler
+   * fires this the instant a membership change or a conviction lands and has
+   * no cheaper way to know what a given peer is missing. Idempotent at the
+   * receiving end exactly as `onStateDeltas` always is: a peer that already
+   * holds an activity re-merges it as a no-op (`Hub.seen`).
+   */
+  pushSync(target: string, thread = `${this.origin}/threads/anti-entropy`): OutboxEntry {
+    const missing = this.crdt
+      .activitiesBehind(this.hubId, {})
+      .map((id) => this.resolveActivity(id))
+      .filter((a): a is { [key: string]: JsonValue } => a !== null);
+    return this.emit([target], thread, "hub", (envelope) =>
+      acceptStateDeltas(envelope, { hub: this.hubIdentity, inReplyTo: "", activities: missing }),
     );
   }
 

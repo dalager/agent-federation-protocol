@@ -19,7 +19,7 @@ import { InboxLog } from "./store/inboxLog.ts";
 import { SeenIds, SeenSignatures } from "./store/dedupe.ts";
 import { Tasks } from "./store/tasks.ts";
 import { Artifacts, type ArtifactRef } from "./store/artifacts.ts";
-import { DeliveryQueue, type Transport } from "./store/queue.ts";
+import { DeliveryQueue, type QueueItem, type Transport } from "./store/queue.ts";
 import {
   agentActor,
   agentActorId,
@@ -116,7 +116,7 @@ export class AfpInstance {
     this.seenSignatures = new SeenSignatures(this.db, config.replayCacheTtlMs);
     this.tasks = new Tasks(this.db);
     this.artifacts = new Artifacts(this.db, config.artifactDir, config.origin);
-    this.queue = new DeliveryQueue(this.db, config.maxDeliveryAttempts, config.backoffBaseMs);
+    this.queue = new DeliveryQueue(this.db, config.maxDeliveryAttempts, config.backoffBaseMs, config.backoffCeilingMs);
 
     const instanceId = instanceActorId(config.origin);
     this.keys.set("@instance", loadOrCreateKeyPair(config.keyDir, "instance", instanceId));
@@ -535,29 +535,38 @@ export class AfpInstance {
 
     for (let pass = 0; pass < 8; pass++) {
       const report = await this.queue.drain(transport, this.clock.now());
-
-      for (const dead of report.deadLettered) {
-        const sender = this.nameOf(String(dead.activity.actor ?? ""));
-        if (!sender) continue;
-        this.publish(
-          sender,
-          [],
-          String(dead.activity.context ?? `${this.config.origin}/threads/local`),
-          "internal",
-          (envelope) =>
-            createError(envelope, {
-              errorId: `${envelope.actor}/errors/undeliverable-${dead.id}`,
-              correlationId: correlationIdOf(dead.activity) ?? dead.activityId,
-              code: "afp:err:undeliverable",
-              reason: `delivery to ${dead.target} failed after ${dead.attempts} attempts: ${dead.lastError}`,
-            }),
-        );
-      }
-
+      this.recordDeadLetters(report.deadLettered);
       if (report.delivered === 0 && report.deadLettered.length === 0) break;
     }
 
     this.sweepOverdue();
+  }
+
+  /**
+   * A dead-lettered delivery is never a silent drop (04 § Reliability, gate
+   * check 4): each one becomes a local `afp:Error` on the sender's own
+   * thread. Factored out of `run` so the scheduler's `flush` tick (ADR-0031
+   * Decision 1) surfaces dead letters the identical way without
+   * reimplementing this loop.
+   */
+  recordDeadLetters(deadLettered: readonly QueueItem[]): void {
+    for (const dead of deadLettered) {
+      const sender = this.nameOf(String(dead.activity.actor ?? ""));
+      if (!sender) continue;
+      this.publish(
+        sender,
+        [],
+        String(dead.activity.context ?? `${this.config.origin}/threads/local`),
+        "internal",
+        (envelope) =>
+          createError(envelope, {
+            errorId: `${envelope.actor}/errors/undeliverable-${dead.id}`,
+            correlationId: correlationIdOf(dead.activity) ?? dead.activityId,
+            code: "afp:err:undeliverable",
+            reason: `delivery to ${dead.target} failed after ${dead.attempts} attempts: ${dead.lastError}`,
+          }),
+      );
+    }
   }
 
   /**

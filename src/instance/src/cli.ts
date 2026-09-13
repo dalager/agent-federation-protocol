@@ -12,6 +12,9 @@ import { checkEndpoint } from "./brains/openai.ts";
 import { createHttpServer } from "./ap/server.ts";
 import { exportBundle } from "./export.ts";
 import { keyCompromiseClaim } from "./ap/activities.ts";
+import { logger } from "./runtime/log.ts";
+import type { Scheduler } from "./runtime/scheduler.ts";
+import { metrics } from "./runtime/metrics.ts";
 
 const command = process.argv[2] ?? "demo";
 
@@ -1040,12 +1043,16 @@ async function main(): Promise<void> {
     case "serve": {
       const config = loadConfig();
       const instance = new AfpInstance(config, agentRegistrations(config));
+      const log = logger("cli:serve");
 
       // ADR-0008: the federation gate and signed inbox are live on a served
       // instance — POST {actor}/inbox verifies the HTTP Signature, then the
       // agreement gate, then dispatches like local delivery.
       const { Federation } = await import("./federation/federation.ts");
       const { fetchActorDocument: fetchActorDocumentRaw } = await import("./federation/inbox.ts");
+      const { httpTransport } = await import("./federation/transport.ts");
+      const { Scheduler } = await import("./runtime/scheduler.ts");
+      const { installShutdown } = await import("./runtime/shutdown.ts");
       const actorId = String(instance.instanceDocument().id);
       const federation = new Federation(instance.db, actorId, () => instance.clock.now());
       // ADR-0025: this instance's own policy — not the env-inferred default
@@ -1053,6 +1060,16 @@ async function main(): Promise<void> {
       // run in production mode.
       const fetchActorDocument = (url: string) =>
         fetchActorDocumentRaw(url, { devMode: config.devMode, trustedNets: config.trustedNets });
+
+      // ADR-0031 Decision 2: `/readyz`'s self-check reuses `serve`'s own
+      // fetch policy (dev mode fetches loopback directly) — the same
+      // function the inbox's boundary uses to resolve a sender's key.
+      // `scheduler` is filled in below, once it exists — this object is the
+      // one `createHttpServer` closes over, so mutating it afterward is
+      // seen by every request.
+      const health: { scheduler?: Scheduler; fetchActor: typeof fetchActorDocument } = {
+        fetchActor: fetchActorDocument,
+      };
 
       // ADR-0013: the read half of the same gate. Without this the server
       // would serve `public` and 404 everything else to everyone — the
@@ -1075,12 +1092,42 @@ async function main(): Promise<void> {
           grants: () => [],
           now: () => instance.clock.now(),
         },
+        health,
       });
+      // Outbound delivery for the scheduler's `flush` loop: local targets
+      // (this instance's own agents) short-circuit to in-process dispatch;
+      // everything else is a signed HTTP hop.
+      const transport = httpTransport({
+        signer: instance.transportSigner("@instance"),
+        now: () => instance.clock.now(),
+        isLocal: (target) => instance.nameOf(target) !== null,
+        local: instance.localTransport(),
+      });
+
+      // `serve` hosts no hub of its own, so `converge` has no replicas
+      // unless a future embedding program supplies them (WP-1's scope: the
+      // scheduler generalizes ADR-0025's real-time loop; wiring a resident
+      // hub into `serve` is not this ADR's claim).
+      const scheduler = new Scheduler({
+        instance,
+        transport,
+        hubReplicas: [],
+        federation,
+        config: config.scheduler,
+      });
+      health.scheduler = scheduler;
+      metrics.trackQueue(() => instance.queue.stats());
+      scheduler.start();
+
+      installShutdown({ server, scheduler, instance, transport, timeoutMs: 10_000 });
+
       server.listen(config.httpPort, () => {
-        console.log(`AFP instance on http://localhost:${config.httpPort}  (origin: ${config.origin})`);
-        console.log("  GET  /actor  /roster  /agents/:name  /agents/:name/outbox");
-        console.log("  POST /actor/inbox  /agents/:name/inbox   (HTTP Signature + agreement gate)");
-        console.log("  GET  above `public`: signed + gated (ADR-0013); unsigned sees `public` only, 404 otherwise");
+        log.info("listening", { url: `http://localhost:${config.httpPort}`, origin: config.origin });
+        log.info("routes", {
+          read: "GET /actor /roster /agents/:name /agents/:name/outbox",
+          inbox: "POST /actor/inbox /agents/:name/inbox   (HTTP Signature + agreement gate)",
+          gate: "GET above `public`: signed + gated (ADR-0013); unsigned sees `public` only, 404 otherwise",
+        });
       });
       break;
     }

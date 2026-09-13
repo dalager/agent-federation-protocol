@@ -25,6 +25,7 @@ import { transportKeyFromDocument } from "./resolveTransportKey.ts";
 import type { Federation } from "./federation.ts";
 import { policedFetch, type FetchPolicyDeps } from "./fetchPolicy.ts";
 import { devModeFromEnv } from "../config.ts";
+import { metrics } from "../runtime/metrics.ts";
 
 export interface InboxDeps {
   federation: Federation;
@@ -137,6 +138,7 @@ export async function handleInboxPost(
   // cannot flood past what the address bucket alone would catch.
   if (deps.actorRateLimit && transport.keyId) {
     if (!deps.actorRateLimit.allow(transport.keyId, deps.now().getTime())) {
+      metrics.rateLimited("actor");
       return { status: 429, body: { error: "rate limited" } };
     }
   }

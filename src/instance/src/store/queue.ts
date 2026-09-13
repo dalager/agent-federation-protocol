@@ -13,6 +13,25 @@
 import type { Db } from "./db.ts";
 import type { JsonValue } from "../crypto/jcs.ts";
 
+/**
+ * ADR-0031 Decision 6: a transport's typed refusal — a non-2xx answer from
+ * the peer — so `flush` can tell "the peer asked us to wait" from an
+ * ordinary failed hop. Defined here, beside the `Transport` port it belongs
+ * to, so the store never depends on any one transport; `federation/transport.ts`
+ * throws it and re-exports it for its own callers.
+ */
+export class DeliveryRefused extends Error {
+  readonly status: number;
+  readonly retryAfterMs: number | null;
+
+  constructor(message: string, status: number, retryAfterMs: number | null) {
+    super(message);
+    this.name = "DeliveryRefused";
+    this.status = status;
+    this.retryAfterMs = retryAfterMs;
+  }
+}
+
 export type DeliveryState = "pending" | "delivered" | "dead";
 
 export interface QueueItem {
@@ -41,11 +60,14 @@ export class DeliveryQueue {
   private readonly db: Db;
   private readonly maxAttempts: number;
   private readonly backoffBaseMs: number;
+  /** ADR-0031 Decision 6: the exponential schedule never waits longer than this. */
+  private readonly backoffCeilingMs: number;
 
-  constructor(db: Db, maxAttempts: number, backoffBaseMs: number) {
+  constructor(db: Db, maxAttempts: number, backoffBaseMs: number, backoffCeilingMs = Infinity) {
     this.db = db;
     this.maxAttempts = maxAttempts;
     this.backoffBaseMs = backoffBaseMs;
+    this.backoffCeilingMs = backoffCeilingMs;
   }
 
   enqueue(target: string, activity: { [key: string]: JsonValue }, now = new Date()): number {
@@ -73,7 +95,38 @@ export class DeliveryQueue {
           ORDER BY id ASC`,
       )
       .all(now.getTime()) as Record<string, unknown>[];
-    return rows.map(toItem);
+    const items = rows.map(toItem);
+    if (items.length === 0) return items;
+
+    // ADR-0031 Decision 6: a peer's own minimum, independent of any one
+    // item's schedule — other peers' items are unaffected.
+    const targets = [...new Set(items.map((item) => item.target))];
+    const placeholders = targets.map(() => "?").join(",");
+    const blocked = new Map(
+      (
+        this.db
+          .prepare(`SELECT target, not_before FROM peer_backoff WHERE target IN (${placeholders})`)
+          .all(...targets) as { target: string; not_before: number }[]
+      ).map((row) => [row.target, row.not_before]),
+    );
+    return items.filter((item) => (blocked.get(item.target) ?? -Infinity) <= now.getTime());
+  }
+
+  /** The per-peer minimum next-attempt time set by a `Retry-After` (ADR-0031 D6), or null. */
+  peerNotBefore(target: string): number | null {
+    const row = this.db.prepare("SELECT not_before FROM peer_backoff WHERE target = ?").get(target) as
+      | { not_before: number }
+      | undefined;
+    return row ? Number(row.not_before) : null;
+  }
+
+  private setPeerBackoff(target: string, notBefore: number): void {
+    this.db
+      .prepare(
+        `INSERT INTO peer_backoff (target, not_before) VALUES (?, ?)
+           ON CONFLICT(target) DO UPDATE SET not_before = MAX(not_before, excluded.not_before)`,
+      )
+      .run(target, notBefore);
   }
 
   /**
@@ -96,20 +149,28 @@ export class DeliveryQueue {
         report.delivered++;
       } catch (error) {
         const message = (error as Error).message ?? String(error);
+        // ADR-0031 Decision 6: a peer's own `Retry-After` sets a floor under
+        // this item's schedule AND a minimum for every other item to that
+        // same peer — other peers are untouched (`setPeerBackoff` keys on
+        // `item.target` alone).
+        const retryAfterMs = error instanceof DeliveryRefused ? error.retryAfterMs : null;
+        if (retryAfterMs !== null) this.setPeerBackoff(item.target, now.getTime() + retryAfterMs);
+
         if (attempts >= this.maxAttempts) {
           this.db
             .prepare("UPDATE delivery_queue SET state = 'dead', attempts = ?, last_error = ? WHERE id = ?")
             .run(attempts, message, item.id);
           report.deadLettered.push({ ...item, attempts, state: "dead", lastError: message });
         } else {
-          const delay = this.backoffBaseMs * 2 ** (attempts - 1);
+          const backoff = Math.min(this.backoffBaseMs * 2 ** (attempts - 1), this.backoffCeilingMs);
+          const nextAttemptAt = Math.max(now.getTime() + backoff, retryAfterMs !== null ? now.getTime() + retryAfterMs : 0);
           this.db
             .prepare(
               `UPDATE delivery_queue
                   SET attempts = ?, next_attempt_at = ?, last_error = ?
                 WHERE id = ?`,
             )
-            .run(attempts, now.getTime() + delay, message, item.id);
+            .run(attempts, nextAttemptAt, message, item.id);
           report.retried++;
         }
       }
@@ -130,8 +191,16 @@ export class DeliveryQueue {
     let clock = start;
 
     for (let pass = 0; pass < this.maxAttempts + 2; pass++) {
+      // ADR-0031 Decision 6: the earliest instant anything is attemptable is
+      // the item's own schedule or its peer's `Retry-After` floor, whichever
+      // is later — otherwise a 429'd item would read as due, be skipped by
+      // `ready()`, and spin this loop to its pass limit without advancing.
       const pending = this.db
-        .prepare("SELECT MIN(next_attempt_at) AS next FROM delivery_queue WHERE state = 'pending'")
+        .prepare(
+          `SELECT MIN(MAX(q.next_attempt_at, COALESCE(p.not_before, 0))) AS next
+             FROM delivery_queue q LEFT JOIN peer_backoff p ON p.target = q.target
+            WHERE q.state = 'pending'`,
+        )
         .get() as { next: number | null };
       if (pending.next === null) break;
 

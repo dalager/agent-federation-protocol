@@ -26,6 +26,7 @@ import {
   type TaskAttachment,
 } from "./brains/port.ts";
 import type { AfpInstance, ReceiveOutcome } from "./instance.ts";
+import { metrics } from "./runtime/metrics.ts";
 
 export class Inbox {
   private readonly instance: AfpInstance;
@@ -69,6 +70,7 @@ export class Inbox {
     }
 
     await this.dispatch(activity);
+    metrics.inboxAdmitted();
     return { status: "dispatched" };
   }
 
@@ -87,6 +89,7 @@ export class Inbox {
       return this.dropDelivery("duplicate", activityId, actorUrl, `activity ${activityId} already delivered`);
     }
     await this.dispatch(activity);
+    metrics.inboxAdmitted();
     return { status: "dispatched" };
   }
 
@@ -106,6 +109,7 @@ export class Inbox {
     this.instance.db
       .prepare("INSERT INTO audit_log (at, outcome, activity_id, actor, reason) VALUES (?, ?, ?, ?, ?)")
       .run(this.instance.clock.now().toISOString(), outcome, activityId || null, actor || null, reason);
+    metrics.inboxRefused(outcome);
     return { status: outcome, reason } as ReceiveOutcome;
   }
 

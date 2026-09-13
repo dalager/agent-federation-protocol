@@ -22,6 +22,26 @@ import type { Signer } from "../crypto/signer.ts";
 
 type Scheme = "rfc9421" | "cavage";
 
+// ADR-0031 Decision 6: the typed refusal is the queue's (`store/queue.ts`,
+// beside the `Transport` port); this transport throws it with the message
+// text unchanged from the plain `Error` it replaced — existing tests match
+// on it — and re-exports it for callers that reach it from here.
+import { DeliveryRefused } from "../store/queue.ts";
+export { DeliveryRefused };
+
+/**
+ * RFC 9110 `Retry-After`: either delta-seconds or an HTTP-date. `null` when
+ * absent or unparseable — the caller falls back to its own backoff schedule.
+ */
+function parseRetryAfterMs(value: string | null, now: Date): number | null {
+  if (!value) return null;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1000;
+  const when = Date.parse(value);
+  if (Number.isNaN(when)) return null;
+  return Math.max(0, when - now.getTime());
+}
+
 export interface HttpTransportDeps {
   /** The hop's signing identity — the instance's transport signer, not an agent's (ADR-0026 D1). */
   signer: Signer;
@@ -107,7 +127,8 @@ export function httpTransport(deps: HttpTransportDeps): Transport {
       }
 
       if (!response.ok) {
-        throw new Error(`inbox POST to ${inbox} refused: ${response.status}`);
+        const retryAfterMs = parseRetryAfterMs(response.headers.get("retry-after"), deps.now());
+        throw new DeliveryRefused(`inbox POST to ${inbox} refused: ${response.status}`, response.status, retryAfterMs);
       }
     },
   };

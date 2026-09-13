@@ -593,6 +593,68 @@ and gate-checked, into your received store. At any point, export
 (`npm run export`, or `exportBundle(...)` with a scope) and hand the folder —
 or both operators' folders together — to the Python verifier.
 
+## Running it as a resident process
+
+`serve` is not just a request handler between calls — [ADR-0031](../../docs/afp/adr/0031-the-resident-process.md)
+gives it a pulse. Four loops run on their own interval, each idempotent and
+safe alongside inbox traffic:
+
+| Loop | Env var | Default | Does |
+|---|---|---|---|
+| **sweep** | `AFP_SWEEP_MS` | `30000` | an overdue task becomes a recorded `afp:Error` (`deadline-missed`) |
+| **flush** | `AFP_FLUSH_MS` | `10000` | retries the delivery queue with a real clock, `Retry-After` honoured per peer, dead-letters past the configured attempts |
+| **converge** | `AFP_CONVERGE_MS` | `60000` | one `Offer{afp:Digest}` per hub replica this process runs (`serve` hosts none of its own unless an embedding program supplies them); an urgent `Enroll`/`Unenroll`/proof pushes immediately instead of waiting for the tick |
+| **heartbeat** | `AFP_HEARTBEAT_MS` | `0` (off) | the optional `afp:BoundaryDigest` activity, published on an interval when enabled |
+
+`AFP_JITTER_MS` (default `0`) adds a uniform random spread to every interval so
+concurrent instances do not tick in lockstep.
+
+**Shutdown drains.** `SIGTERM`/`SIGINT` stop accepting new inbox POSTs, let
+in-flight handlers finish, run one final flush, stop the scheduler, and release
+the store's lock before exiting — a second signal during drain exits
+immediately rather than wait on a drain that may itself be stuck.
+
+**One writer, enforced.** The store opens in WAL mode behind a lock file beside
+it, naming the owning process id. A second process pointed at the same
+`AFP_DATA_DIR` refuses to start with a named `StoreLocked` error rather than
+silently corrupting the file; a lock naming a dead pid is stale and taken over.
+
+**Three endpoints answer for the process itself**, all unauthenticated (the
+same bootstrap class as `/actor` — they name no data, so anonymity costs
+nothing) and `Cache-Control: no-store`:
+
+```bash
+curl -s http://127.0.0.1:8787/healthz
+# ok
+
+curl -s http://127.0.0.1:8787/readyz
+# {"ok": true}
+
+curl -s http://127.0.0.1:8787/readyz    # a failing check names itself, and nothing else
+# {"ok": false, "reason": "signer-unavailable"}
+
+curl -s http://127.0.0.1:8787/metrics | head
+# HELP afp_inbox_admissions_total Inbound activities admitted past the trust gate
+# TYPE afp_inbox_admissions_total counter
+# afp_inbox_admissions_total 0
+# ...
+```
+
+`/readyz` checks, in order: the store answers a trivial query, the signer
+answers (sign-then-verify a fixed byte string), the self-check of
+[ADR-0032](../../docs/afp/adr/0032-deployment-profile.md) Decision 2 (this
+instance's own `/actor`, fetched back and required to name its own id), and
+the scheduler has ticked at least once. `/metrics` is Prometheus text
+exposition, counts only — no ids, no actors, no thread names: inbox admissions
+and refusals by class, rate-limit refusals by scope, queue depth and
+dead-letters, sweep and scheduler-tick counts, and convergence lag per hub.
+
+Logs are JSON lines on stderr, one per event, carrying a level and a
+component — `AFP_LOG_LEVEL` (`debug`/`info`/`warn`/`error`, default `info`;
+`silent` mutes the stream, which the gate uses). This stream is the
+operational shadow of a served instance; the boundary log in SQLite stays the
+*record* — hash-chained, exportable — exactly as before.
+
 ## Defining the agent collection
 
 `src/profiles.ts` is the recipe: **one `AgentProfile` per agent, from which
@@ -691,6 +753,15 @@ src/
     command.ts        ADR-0029: executeCommand, the local carrier
                       (`POST /agents/:name/command`) — the same decision
                       function the inbox's onMention calls
+  runtime/             ADR-0031: the resident process
+    scheduler.ts       the four loops (sweep, flush, converge, heartbeat),
+                       `tick(name)` deterministic and fake-timer-friendly,
+                       `lastTick` — `/readyz`'s liveness check reads it
+    shutdown.ts        SIGTERM/SIGINT drain: stop accepting, finish in-flight,
+                       final flush, release the lock, exit
+    log.ts             JSON-lines structured logging, `AFP_LOG_LEVEL`
+    metrics.ts         the `/metrics` registry — counts only, no ids
+    health.ts          `/healthz`, `/readyz`, `/metrics` — the server hook
   render/              ADR-0029 ("Watch"): the 04 § Renderings convention as
                       code
     rendering.ts       renderThread/renderTimeline, narrativeText,
@@ -768,6 +839,13 @@ Environment variables, all optional (see `src/config.ts`):
 | `AFP_KEY_PASSPHRASE_FILE` | *(none)* | File holding the passphrase the `file` signer adapter encrypts PEMs with at rest ([ADR-0026](../../docs/afp/adr/0026-key-custody-and-the-signer-port.md)). Unset, PEMs are unencrypted — as before. Protects a stolen backup, not a compromised host |
 | `AFP_CONTROLLERS` | *(none)* | Comma-separated actor URLs authorized to answer through `ApprovalPort` ([ADR-0028](../../docs/afp/adr/0028-port-agents.md) Decision 4) and the command grammar at `POST /agents/:name/command` ([ADR-0029](../../docs/afp/adr/0029-the-human-window-and-the-activitypub-premise.md) Decision 2) — configuration standing in for [ADR-0033](../../docs/afp/adr/0033-operator-obligations.md)'s signed policy document until it exists |
 | `AFP_FEDIVERSE_WINDOW` | `0` | `1` dual-publishes a `public` shadow Note alongside every operator-visible event ([ADR-0029](../../docs/afp/adr/0029-the-human-window-and-the-activitypub-premise.md) Decision 3). Off by default; every shipped bundle is byte-identical either way |
+| `AFP_SWEEP_MS` | `30000` | The resident scheduler's sweep-loop interval ([ADR-0031](../../docs/afp/adr/0031-the-resident-process.md) Decision 1) |
+| `AFP_FLUSH_MS` | `10000` | The resident scheduler's flush-loop (delivery-queue retry) interval |
+| `AFP_CONVERGE_MS` | `60000` | The resident scheduler's hub-convergence interval |
+| `AFP_HEARTBEAT_MS` | `0` | `> 0` enables the optional `afp:BoundaryDigest` heartbeat, published on this interval |
+| `AFP_JITTER_MS` | `0` | Uniform random spread added to every scheduler interval, so concurrent instances do not tick in lockstep |
+| `AFP_BACKOFF_CEILING_MS` | `300000` | The exponential delivery-backoff schedule's cap |
+| `AFP_LOG_LEVEL` | `info` | `debug`/`info`/`warn`/`error`, or `silent` to mute the JSON-lines stream entirely |
 
 `AFP_LLM_API_KEY` is read at the point of use and never stored, logged, or
 written into the record. A local endpoint generally needs none.
@@ -856,7 +934,7 @@ own identifier there.
 
 ## What this instance deliberately does not do yet
 
-Gossip anti-entropy, and delivery to a real Mastodon inbox — the shadow timeline itself
+Delivery to a real Mastodon inbox — the shadow timeline itself
 landed with [ADR-0029](../../docs/afp/adr/0029-the-human-window-and-the-activitypub-premise.md),
 behind `AFP_FEDIVERSE_WINDOW`; delivering it needs an RSA keypair per actor and the
 draft-cavage shim this instance does not have, and stays parked
@@ -871,12 +949,9 @@ classes and hash-addressed evidence — because those four are nearly free at tw
 agents and cannot be backfilled later.
 
 Still open toward a production deployment: key custody behind a signer port
-([ADR-0026](../../docs/afp/adr/0026-key-custody-and-the-signer-port.md)), a
+([ADR-0026](../../docs/afp/adr/0026-key-custody-and-the-signer-port.md)) and a
 brain-boundary that bounds hostile text
-([ADR-0027](../../docs/afp/adr/0027-the-port-is-a-security-boundary.md)), and
-an unattended resident process
-([ADR-0031](../../docs/afp/adr/0031-the-resident-process.md)) — `serve` today
-answers requests but drives no scheduler of its own.
+([ADR-0027](../../docs/afp/adr/0027-the-port-is-a-security-boundary.md)).
 
 The HTTP surface is deliberately thin: actor documents and the roster are
 `public` because verifying a signature requires fetching a key. Everything else

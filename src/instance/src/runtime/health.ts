@@ -1,0 +1,113 @@
+/**
+ * ADR-0031 Decision 2: `/healthz`, `/readyz`, `/metrics`.
+ *
+ * All three are unauthenticated (ADR-0013 Decision 2's bootstrap class — they
+ * name no data, so anonymity costs nothing) and `Cache-Control: no-store`.
+ * Shaped like `render/routes.ts`'s `renderingRoute`: one function server.ts
+ * calls that reports whether it handled the request, so the routing table in
+ * `ap/server.ts` grows by a few lines.
+ */
+
+import { publicKeyFromMultibase, verify } from "../crypto/keys.ts";
+import type { AfpInstance } from "../instance.ts";
+import type { Scheduler } from "./scheduler.ts";
+import { render as renderMetrics } from "./metrics.ts";
+import type { JsonValue } from "../crypto/jcs.ts";
+
+export interface HealthDeps {
+  /** Absent (a server built without a scheduler) reports `scheduler-not-running`. */
+  scheduler?: Scheduler;
+  /**
+   * ADR-0032 Decision 2's self-check: fetch this instance's own `/actor`
+   * through the same fetch policy `serve` uses, and require its `id` to
+   * equal the instance's own actor id. Injectable so a test can make it
+   * fail or return a mismatched document; `serve` wires the real fetch.
+   */
+  fetchActor?: (url: string) => Promise<{ [key: string]: JsonValue } | null>;
+  /**
+   * Test-only override of the signer check: called in place of the default
+   * sign-then-verify round trip. Throw to report the signer as unavailable.
+   */
+  signerProbe?: () => void;
+}
+
+export interface HealthRouteContext {
+  path: string;
+  send: (status: number, body: unknown, contentType?: string) => void;
+  /** Sets `Cache-Control: no-store` on the response before `send`. */
+  noStore: () => void;
+}
+
+function defaultSignerProbe(instance: AfpInstance): void {
+  const signer = instance.signer("@instance");
+  const message = new TextEncoder().encode("afp:readyz-signer-probe");
+  const signature = signer.sign(message);
+  const publicKey = publicKeyFromMultibase(signer.publicKeyMultibase);
+  if (!verify(publicKey, message, signature)) {
+    throw new Error("signer produced a signature that does not verify");
+  }
+}
+
+/**
+ * Runs the four checks in order, stopping at the first failure — `readyz`'s
+ * body names only that one check, nothing else about the instance.
+ */
+async function checkReady(instance: AfpInstance, deps: HealthDeps): Promise<{ ok: true } | { ok: false; reason: string }> {
+  try {
+    instance.db.prepare("SELECT 1").get();
+  } catch {
+    return { ok: false, reason: "store-unavailable" };
+  }
+
+  try {
+    (deps.signerProbe ?? (() => defaultSignerProbe(instance)))();
+  } catch {
+    return { ok: false, reason: "signer-unavailable" };
+  }
+
+  if (deps.fetchActor) {
+    try {
+      const selfId = instance.instanceDocument().id as string;
+      const doc = await deps.fetchActor(`${instance.config.origin}/actor`);
+      if (!doc || doc.id !== selfId) {
+        return { ok: false, reason: "self-check-mismatch" };
+      }
+    } catch {
+      return { ok: false, reason: "self-check-failed" };
+    }
+  }
+
+  if (!deps.scheduler) {
+    return { ok: false, reason: "scheduler-not-running" };
+  }
+  const ticked = Object.values(deps.scheduler.lastTick).some((at) => at !== undefined);
+  if (!ticked) {
+    return { ok: false, reason: "scheduler-not-ticked" };
+  }
+
+  return { ok: true };
+}
+
+/** Returns whether it handled the request — `false` means "not a health route". */
+export async function healthRoute(instance: AfpInstance, deps: HealthDeps, ctx: HealthRouteContext): Promise<boolean> {
+  if (ctx.path === "/healthz") {
+    ctx.noStore();
+    ctx.send(200, "ok", "text/plain");
+    return true;
+  }
+
+  if (ctx.path === "/readyz") {
+    const result = await checkReady(instance, deps);
+    ctx.noStore();
+    ctx.send(result.ok ? 200 : 503, result.ok ? { ok: true } : { ok: false, reason: result.reason }, "application/json");
+    return true;
+  }
+
+  if (ctx.path === "/metrics") {
+    ctx.noStore();
+    ctx.send(200, renderMetrics(), "text/plain; version=0.0.4");
+    return true;
+  }
+
+  return false;
+}

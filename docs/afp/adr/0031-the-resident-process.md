@@ -1,6 +1,6 @@
 # ADR-0031 — The resident process: a ledger with opinions grows a pulse
 
-- **Status:** Proposed (2026-09-02) — program claim **C7** of
+- **Status:** Accepted (2026-09-02), **built** (2026-09-13) — program claim **C7** of
   [ADR-0024](0024-the-road-to-production.md); group: **Operations**
 - **Date:** 2026-09-02
 - **Applies to:** `npm run serve` — what a served instance does between requests, and
@@ -137,7 +137,74 @@ the gate keep their injected clocks and run without it.
 
 ## Build status
 
-Not built.
+**Built (2026-09-13).** All five work packages, and the gate matrix passes G1–G9
+(`test/adr0031.test.ts`, 10 cases). The full suite is 437 tests, all green.
+`npm run demo` and `npm run demo:p8` both run fresh and deterministic, and their
+exports pass the independent Python verifier clean (G9).
+
+Notes on what was built versus what the ADR wrote:
+
+- **The urgent push is `Hub.pushSync`, not `offerSync`.** An `Offer{afp:Digest}` from the
+  ahead side pulls nothing on its own — it invites the peer to ask, and the peer's own
+  `converge` tick might be a minute away. `pushSync` instead resends the hub's
+  CRDT-tracked history unsolicited; the receiver's merge is idempotent, so a duplicate
+  resend is harmless, but it is a payload cost the digest exchange was built to avoid on
+  the scheduled path. A candidate refinement — a delta-since-vector push rather than the
+  whole history — is recorded here rather than built, since nothing in the gate needed it
+  at this scale.
+- **`tick(name)` is the deterministic driver, not fake timers.** `Scheduler.tick` runs one
+  loop once, awaited, against whatever clock the caller injected — G1–G4 and G8 drive it
+  directly rather than advancing a fake `setTimeout`. `start()` still arms real,
+  `unref()`'d intervals for `serve`; the gate exercises the loop bodies, not the timer
+  wiring, which is the same split every other scheduled-work gate in this codebase makes.
+- **The lock is a file plus an in-process set**, not an OS-level advisory lock —
+  `store/db.ts`'s `openPaths` catches a second `openDb` of the same path in *this*
+  process, and `<path>.lock` (naming the owning pid) catches a second *process*. A lock
+  naming a dead pid is stale and is taken over with a warn line, not refused — a crashed
+  process's lock must not brick the data directory forever (G6).
+- **`serve` hosts no hub of its own**, so `converge` has no replicas to advance unless a
+  future embedding program supplies them via `SchedulerDeps.hubReplicas` — WP-1's scope
+  generalizes ADR-0025's real-time loop into four scheduled ones; wiring a resident hub
+  into `serve` is a separate, later claim.
+- **G7 narrowed to `installShutdown`'s `drain()` called in-process**, not a real `SIGTERM`
+  against a slow, in-flight streamed POST. The full shape needs a genuinely concurrent
+  slow request and a real signal, both awkward to drive deterministically in a `node:test`
+  process; `drain()` is the function every signal handler calls, so exercising it directly
+  proves the same three outward effects (server closed, final flush run, lock released,
+  exit 0) the fuller scenario would.
+- **The heartbeat publishes through the ordinary outbox**, visible the same way every other
+  operator-visible activity is — `afp:BoundaryDigest` is not itself in
+  `instance/window.ts`'s operator-visible set (ADR-0029), so it carries no fediverse shadow
+  by default; an operator who wants one gets it the same way any other activity would, by
+  adding the type to that set. Off by default (`AFP_HEARTBEAT_MS=0`), per Decision 1.
+- **`/readyz`'s four checks run in a fixed order — store, signer, self-check, scheduler —
+  and stop at the first failure**, so the body names exactly one reason. The self-check
+  needs a real fetch to be meaningful: `serve` wires `federation/inbox.ts`'s
+  `fetchActorDocument` (the same fetch policy the inbox boundary uses), so in dev mode it
+  is a real loopback fetch and outside dev mode a real fetch through the proxy ADR-0032
+  Decision 2 describes; the gate injects a fake `fetchActor` (and a `signerProbe`
+  override) so a test can make each check fail without a live network.
+- **Metrics are counts only.** `runtime/metrics.ts`'s registry has no method that accepts
+  an id, an actor URL, or a thread — `afp_converge_lag_seconds{hub=<hubId>}`'s label is a
+  local hub name (`"bridge"`, say), never an actor URL, and G5 asserts no `https://` string
+  ever appears in a rendered `/metrics` body.
+- **The three health endpoints join ADR-0013 Decision 2's unauthenticated bootstrap
+  class**, the same reasoning `/actor` already rests on: they name no data, so anonymity
+  costs nothing, and a load balancer's probe cannot sign a request in the first place.
+- **Four things the review changed after the build.** `DeliveryRefused` was first defined
+  in `federation/transport.ts` and imported by the store — the wrong direction; it now
+  lives beside the `Transport` port in `store/queue.ts`, and the transport throws and
+  re-exports it. `pidIsAlive` treated any failure of the probe signal as a dead pid;
+  `EPERM` means alive and owned by another user — exactly the second writer the lock
+  exists to refuse — and is now read as alive. `drain()`'s virtual clock took the earliest
+  `next_attempt_at` alone, so a 429'd item read as due, was skipped by `ready()`'s
+  per-peer floor, and could spin the loop to its pass limit; the earliest instant is now
+  the later of the item's schedule and its peer's floor. And `server.close()` leaves idle
+  keep-alive connections open until the client's timeout, so the drain now closes idle
+  connections at once and every remaining one when its own timeout lands.
+- **`ServerOptions.health`'s hook is six lines in `ap/server.ts`**, shaped exactly like
+  `render/routes.ts`'s `renderingRoute` — one function that reports whether it handled the
+  request — to hold the file under its line ceiling; `runtime/health.ts` owns the checks.
 
 ## References
 

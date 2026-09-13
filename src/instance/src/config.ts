@@ -105,6 +105,25 @@ export interface Config {
    * anything that can read a public outbox".
    */
   readonly fediverseWindow: boolean;
+
+  // ---------------------------------------------------------- ADR-0031
+
+  /**
+   * ADR-0031 Decision 1: the resident scheduler's four loops. `heartbeatMs`
+   * of `0` means off — the default, since the heartbeat is an operator
+   * option (ADR-0008 Decision 3), not the premise. `jitterMs` bounds a
+   * uniform random spread added to each interval so concurrent instances do
+   * not tick in lockstep; `0` (the default) is exact.
+   */
+  readonly scheduler: {
+    readonly sweepMs: number;
+    readonly flushMs: number;
+    readonly convergeMs: number;
+    readonly heartbeatMs: number;
+    readonly jitterMs: number;
+  };
+  /** ADR-0031 Decision 6: the exponential backoff schedule's cap in ms. */
+  readonly backoffCeilingMs: number;
 }
 
 /**
@@ -205,6 +224,14 @@ export function loadConfig(overrides: Partial<Config> = {}): Config {
       .map((s) => s.trim())
       .filter((s) => s.length > 0),
     fediverseWindow: env("AFP_FEDIVERSE_WINDOW", "0") === "1",
+    scheduler: {
+      sweepMs: envInt("AFP_SWEEP_MS", 30_000),
+      flushMs: envInt("AFP_FLUSH_MS", 10_000),
+      convergeMs: envInt("AFP_CONVERGE_MS", 60_000),
+      heartbeatMs: envInt("AFP_HEARTBEAT_MS", 0),
+      jitterMs: envInt("AFP_JITTER_MS", 0),
+    },
+    backoffCeilingMs: envInt("AFP_BACKOFF_CEILING_MS", 5 * 60 * 1000),
   };
 
   return { ...base, ...overrides };

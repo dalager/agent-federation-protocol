@@ -7,10 +7,71 @@
  */
 
 import { DatabaseSync } from "node:sqlite";
-import { mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
+import { logger } from "../runtime/log.ts";
+
+const log = logger("store/db");
 
 export type Db = DatabaseSync;
+
+/**
+ * ADR-0031 Decision 4: one writer, enforced. `openDb` and this set together
+ * hold the property "at most one live `Db` per path, in this process or any
+ * other" — the in-process half so a second `openDb` of the same path in the
+ * same process is refused too, not only a second process.
+ */
+const openPaths = new Set<string>();
+
+export class StoreLocked extends Error {
+  constructor(path: string, pid: number) {
+    super(`store at ${path} is locked by pid ${pid} — a resident process already holds it (ADR-0031 Decision 4)`);
+    this.name = "StoreLocked";
+  }
+}
+
+function lockPathFor(dbPath: string): string {
+  return `${dbPath}.lock`;
+}
+
+function pidIsAlive(pid: number): boolean {
+  if (pid === process.pid) return true;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    // EPERM is "alive, owned by someone else" — the one case a takeover
+    // would be exactly the second writer this lock exists to refuse.
+    return (error as NodeJS.ErrnoException).code === "EPERM";
+  }
+}
+
+/**
+ * Take the lock file beside `dbPath`, or throw `StoreLocked`. A lock naming a
+ * dead pid is stale — taken over with a warn line rather than refused, since
+ * a crashed process's lock must not brick the data directory forever.
+ */
+function acquireLock(dbPath: string): void {
+  const lockPath = lockPathFor(dbPath);
+  if (existsSync(lockPath)) {
+    const held = JSON.parse(readFileSync(lockPath, "utf8")) as { pid: number; openedAt: string };
+    if (pidIsAlive(held.pid) && held.pid !== process.pid) {
+      throw new StoreLocked(dbPath, held.pid);
+    }
+    if (held.pid !== process.pid) {
+      log.warn("taking over stale lock", { path: lockPath, deadPid: held.pid });
+    }
+  }
+  writeFileSync(lockPath, JSON.stringify({ pid: process.pid, openedAt: new Date().toISOString() }));
+}
+
+function releaseLock(dbPath: string): void {
+  try {
+    rmSync(lockPathFor(dbPath), { force: true });
+  } catch {
+    /* best-effort: a missing lock file at close time is not an error */
+  }
+}
 
 const SCHEMA = `
 -- Append-only activity log, one hash chain per actor.
@@ -105,13 +166,47 @@ CREATE TABLE IF NOT EXISTS artifacts (
   source_url TEXT,
   fetched_at TEXT
 );
+
+-- ADR-0031 Decision 6: a per-peer minimum next-attempt time, set from a
+-- peer's own Retry-After — independent of any one queue item's backoff, so
+-- a 429 from one peer never touches the schedule for any other.
+CREATE TABLE IF NOT EXISTS peer_backoff (
+  target      TEXT PRIMARY KEY,
+  not_before  INTEGER NOT NULL
+);
 `;
 
+/**
+ * ADR-0031 Decision 4: one writer, enforced. A file path is opened at most
+ * once live at a time — in this process (the `openPaths` set) or any other
+ * (the `<path>.lock` file, holding the owning pid). `:memory:` needs no lock:
+ * it is never shared across a restart or a second process by construction.
+ */
 export function openDb(path: string): Db {
-  if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
+  if (path === ":memory:") {
+    const db = new DatabaseSync(path);
+    db.exec("PRAGMA foreign_keys = ON");
+    db.exec(SCHEMA);
+    return db;
+  }
+
+  if (openPaths.has(path)) {
+    throw new StoreLocked(path, process.pid);
+  }
+  mkdirSync(dirname(path), { recursive: true });
+  acquireLock(path);
+  openPaths.add(path);
+
   const db = new DatabaseSync(path);
   db.exec("PRAGMA journal_mode = WAL");
   db.exec("PRAGMA foreign_keys = ON");
   db.exec(SCHEMA);
+
+  const nativeClose = db.close.bind(db);
+  db.close = () => {
+    nativeClose();
+    openPaths.delete(path);
+    releaseLock(path);
+  };
   return db;
 }
