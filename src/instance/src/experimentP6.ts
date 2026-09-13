@@ -43,6 +43,7 @@
 import { NO_DECISION_CATEGORY } from "./ap/pins.ts";
 import type { LlmEndpoint } from "./brains/openai.ts";
 import { checkEndpoint, makeLlmBrain } from "./brains/openai.ts";
+import { localAttachment, localProvenance } from "./brains/port.ts";
 import {
   ACTION_POLICY,
   GOVERNANCE_OPTIONS,
@@ -315,10 +316,10 @@ async function ask(
   const outcome = await brain.handle({
     capability: CAPABILITY,
     content: question.content,
-    attachments: question.attachments.map((text) => ({
-      mediaType: "text/markdown",
-      bytes: encoder.encode(text),
-    })),
+    provenance: localProvenance(desk.agent),
+    attachments: question.attachments.map((text) =>
+      localAttachment(encoder.encode(text), "text/markdown", desk.agent),
+    ),
     thread: "",
   });
   if (!outcome.ok) throw new Error(`model call for ${desk.agent} failed: ${outcome.reason}`);

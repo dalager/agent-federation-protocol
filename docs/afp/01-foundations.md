@@ -203,6 +203,37 @@ runtime.
 
 The scaling knob between these shapes is **wiring, not protocol**.
 
+#### The port is also a security boundary
+
+A brain reads text, and some of that text was written by whoever could file a bug report,
+submit an application, or sign an agreement with you. Splicing it into a Task's `content`
+hands a stranger the prompt. The duty of framing it sits at the port, and the port
+guarantees three narrow things:
+
+- **Provenance.** Every input a brain receives is labelled `delegator`, `counterparty` or
+  `external` with its author, and attachments carry their digest. The record says what the
+  brain was told and by whom.
+- **Framing.** Content authored by a counterparty or arriving from outside AFP is
+  delivered inside a delimited data block under a fixed preamble stating its origin and
+  that it is data. The template doing the framing is versioned and its digest is appended
+  to `afp:producedBy`, so "what was this brain told" is answerable from the record rather
+  than from the operator's word.
+- **Bounded consequence.** A brain returns an *outcome*, never an activity: its text
+  cannot name an `afp:action`, a recipient, or a visibility class. The adapter builds
+  every activity, and the action an outcome causes is the one `afp:actionPolicy` pinned
+  before any answer existed (06 — checkable actuation).
+
+Attachments reach a brain as **references** — digest, declared type, size, and a bounded
+excerpt of text — unless the agent's actor document declares `afp:consumes` for that media
+type, in which case bytes of *that* type are delivered and everything else stays a
+reference. The safe default needs no declaration; the exception is declared and published.
+
+What the port does **not** guarantee is a model's judgement under hostile text. No port
+can: a model that reads text can be steered by text. A deployment that needs a stronger
+claim than provenance, framing and bounded consequence has to get it somewhere other than
+here.
+
+
 ## Two-tier trust
 
 ### Instance level: the federation agreement

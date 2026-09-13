@@ -1,6 +1,6 @@
 # ADR-0027 — The port is a security boundary: what a brain is told, and what it may be told by
 
-- **Status:** Proposed (2026-09-02) — program claim **C3** of
+- **Status:** Accepted (2026-09-02), **built** (2026-09-10) — program claim **C3** of
   [ADR-0024](0024-the-road-to-production.md); group: **Security**
 - **Date:** 2026-09-02
 - **Applies to:** every agent–instance port (01 § ports & adapters): the brain port
@@ -138,7 +138,31 @@ more.
 
 ## Build status
 
-Not built.
+**Built (2026-09-10).** All five work packages, and the gate matrix passes G1–G8
+(`test/adr0027.test.ts`, 9 cases — G8 plus one for the excerpt bound and the
+`afp:producedBy` shape). The full gate is 294 checks green, every offline demo runs, and
+the P1 export still verifies against the independent Python verifier.
+
+Three notes on what was built versus what the ADR wrote:
+
+- **Decision 1 is sited at `Artifacts.put`,** not spread across each port's own call site.
+  Every artifact — a local Task's attachment, a brain's output, a counterparty's Result —
+  comes through that one door, so the ingestion duty is enforced once and a refusal raises
+  `IngestionRefused` rather than returning a verdict a caller can ignore. `ingest.ts`
+  keeps the checking logic; the store calls it.
+- **Provenance for an attachment is derived, not declared by the sender.** Evidence that
+  entered from outside AFP carries `sourceUrl` in the artifact index (07), and that is what
+  marks it `external` — whoever relayed it. An actor on this instance is the `delegator`;
+  anyone else is a `counterparty`. `external` therefore already works without ADR-0028's
+  port agents.
+- **G2 is narrower than the ADR's wording.** A stub brain sends no prompt anywhere, so
+  there is no template digest on its record; the test asserts behavioural equivalence
+  under hostile versus benign text, the external provenance, and that rendering the
+  request quarantines the stranger's words. The digest-on-the-record claim binds in G3,
+  where a brain actually prompts. The test says so in place.
+
+The scenario-06 and scenario-09 re-walks (Decision 6, second half) remain for
+[ADR-0030](0030-scenario-re-walks-and-the-coverage-index.md).
 
 ## References
 

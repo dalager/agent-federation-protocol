@@ -15,6 +15,7 @@
 
 import type { LlmEndpoint } from "./brains/openai.ts";
 import { checkEndpoint, makeLlmBrain } from "./brains/openai.ts";
+import { localProvenance } from "./brains/port.ts";
 import { runP3Demo, type P3DemoResult } from "./demoP3.ts";
 import { ESTIMATION_PANEL, type AgentProfile } from "./profiles.ts";
 import type { Config } from "./config.ts";
@@ -61,7 +62,13 @@ function synthesizerSystem(): string {
 
 async function ask(endpoint: LlmEndpoint, name: string, system: string, user: string) {
   const brain = makeLlmBrain(name, ["afp:cap:estimate"], system, endpoint);
-  const outcome = await brain.handle({ capability: "afp:cap:estimate", content: user, attachments: [], thread: "" });
+  const outcome = await brain.handle({
+    capability: "afp:cap:estimate",
+    content: user,
+    provenance: localProvenance(name),
+    attachments: [],
+    thread: "",
+  });
   if (!outcome.ok) throw new Error(`model call for ${name} failed: ${outcome.reason}`);
   return { content: outcome.content, producedBy: outcome.producedBy ?? endpoint.model };
 }

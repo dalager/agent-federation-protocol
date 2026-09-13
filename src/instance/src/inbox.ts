@@ -16,7 +16,13 @@ import { verifyProof } from "./crypto/proof.ts";
 import { instanceActorId } from "./ap/documents.ts";
 import { acceptTask, correlationIdOf, createError, createResult } from "./ap/activities.ts";
 import { Artifacts } from "./store/artifacts.ts";
-import type { BrainArtifact } from "./brains/port.ts";
+import {
+  consumesBytes,
+  excerptOf,
+  type Provenance,
+  type ProvenanceSource,
+  type TaskAttachment,
+} from "./brains/port.ts";
 import type { AfpInstance, ReceiveOutcome } from "./instance.ts";
 
 export class Inbox {
@@ -159,15 +165,17 @@ export class Inbox {
       acceptTask(envelope, String(activity.id ?? ""), correlationId),
     );
 
-    const attachments = this.materialize(task.attachment);
+    const delegator = String(activity.actor ?? "");
+    const provenance = this.provenanceOf(delegator);
+    const attachments = this.materialize(task.attachment, provenance, performer.brain.consumes);
     const outcome = await performer.brain.handle({
       capability: String(task["afp:capability"] ?? ""),
       content: String(task.content ?? ""),
+      provenance,
       attachments,
       thread,
     });
 
-    const delegator = String(activity.actor ?? "");
     if (!outcome.ok) {
       const entry = this.instance.publish(performerName, [delegator], thread, "parties", (envelope) =>
         createError(envelope, {
@@ -214,12 +222,22 @@ export class Inbox {
   }
 
   /**
-   * Turn attachment Links into bytes for a brain, discarding anything whose
-   * digest does not match — a brain never sees unverified evidence.
+   * ADR-0027 Decision 2: turn attachment Links into what a brain is allowed to
+   * see.
+   *
+   * Every attachment arrives as a *reference* — digest, declared type, size,
+   * and a bounded excerpt of text — carrying the provenance of whoever put it
+   * there. Bytes are added only for the media types the agent declared it
+   * consumes (`afp:consumes`). Anything whose digest does not match is
+   * discarded: a brain never sees unverified evidence.
    */
-  materialize(attachment: JsonValue | undefined): BrainArtifact[] {
+  materialize(
+    attachment: JsonValue | undefined,
+    authored: Provenance,
+    consumes?: readonly string[],
+  ): TaskAttachment[] {
     if (!Array.isArray(attachment)) return [];
-    const out: BrainArtifact[] = [];
+    const out: TaskAttachment[] = [];
     for (const link of attachment) {
       if (!link || typeof link !== "object" || Array.isArray(link)) continue;
       const digest = (link as { [key: string]: JsonValue })["afp:digest"];
@@ -227,9 +245,37 @@ export class Inbox {
       if (typeof digest !== "string") continue;
       const bytes = this.instance.artifacts.get(digest);
       if (!bytes) continue;
-      out.push({ mediaType: typeof mediaType === "string" ? mediaType : "application/octet-stream", bytes });
+      const type = typeof mediaType === "string" ? mediaType : "application/octet-stream";
+
+      // Evidence that entered from outside AFP is `external` whoever relayed
+      // it: nobody vouched for a fetched page or a client submission.
+      const record = this.instance.artifacts.lookup(digest);
+      const provenance: Provenance = record?.sourceUrl
+        ? { source: "external", author: record.sourceUrl, digest }
+        : { ...authored, digest };
+
+      out.push({
+        digest,
+        mediaType: type,
+        size: bytes.length,
+        excerpt: excerptOf(bytes, type),
+        provenance,
+        ...(consumesBytes(consumes, type) ? { bytes } : {}),
+      });
     }
     return out;
+  }
+
+  /**
+   * ADR-0027 Decision 2: who authored an inbound activity's words. An actor on
+   * this instance is the `delegator`; anyone else is a `counterparty`, whatever
+   * agreement stands with them — "we have an agreement" and "their text is safe
+   * to obey" are unrelated claims (ADR-0008 Decision 5).
+   */
+  provenanceOf(actorUrl: string): Provenance {
+    const local = actorUrl.startsWith(`${this.instance.config.origin}/`);
+    const source: ProvenanceSource = local ? "delegator" : "counterparty";
+    return { source, author: actorUrl };
   }
 
 }

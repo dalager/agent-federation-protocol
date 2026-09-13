@@ -42,6 +42,7 @@ import type { LlmEndpoint } from "./brains/openai.ts";
 import { checkEndpoint, makeLlmBrain } from "./brains/openai.ts";
 import { runP5Demo, type P5Assessment, type P5DemoResult } from "./demoP5.ts";
 import type { Brain } from "./brains/port.ts";
+import { localAttachment, localProvenance } from "./brains/port.ts";
 
 const CAPABILITY = "afp:cap:assess";
 
@@ -206,7 +207,8 @@ async function ask(
   const outcome = await brain.handle({
     capability: CAPABILITY,
     content: `${QUESTION}\n\nWhat you can see:`,
-    attachments: [{ mediaType: "text/markdown", bytes: encoder.encode(desk.evidence) }],
+    provenance: localProvenance(desk.agent),
+    attachments: [localAttachment(encoder.encode(desk.evidence), "text/markdown", desk.agent)],
     thread: "",
   });
   if (!outcome.ok) throw new Error(`model call for ${desk.agent} failed: ${outcome.reason}`);

@@ -28,6 +28,13 @@ export interface Config {
   readonly llmModel: string;
   readonly llmMaxTokens: number;
   readonly llmTimeoutMs: number;
+  /**
+   * ADR-0027 Decision 5: endpoint origins the `llm` brain may talk to. A brain
+   * built against anything else is refused at startup. Defaults to the
+   * configured `llmBaseUrl` alone — the reference brain's only network is the
+   * endpoint it was configured with, and widening that is an explicit act.
+   */
+  readonly llmAllowedEndpoints: readonly string[];
   /** Delivery attempts before an activity is dead-lettered. */
   readonly maxDeliveryAttempts: number;
   /** Base backoff in ms; attempt N waits base * 2^(N-1). */
@@ -128,6 +135,14 @@ export function loadConfig(overrides: Partial<Config> = {}): Config {
     );
   }
 
+  const llmBaseUrl = env("AFP_LLM_BASE_URL", "http://localhost:13305/api/v1");
+  // ADR-0027 Decision 5: an unset allow-list is not "anything" — it is the one
+  // endpoint this instance was configured with.
+  const llmAllowedEndpoints = env("AFP_LLM_ALLOWED_ENDPOINTS", "")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+
   const base: Config = {
     origin,
     operator: env("AFP_OPERATOR", "Alpha Operator"),
@@ -139,10 +154,11 @@ export function loadConfig(overrides: Partial<Config> = {}): Config {
     exportDir: resolve(overrides.exportDir ?? env("AFP_EXPORT_DIR", "./export")),
     httpPort: envInt("AFP_PORT", 8787),
     brain,
-    llmBaseUrl: env("AFP_LLM_BASE_URL", "http://localhost:13305/api/v1"),
+    llmBaseUrl,
     llmModel: env("AFP_LLM_MODEL", "Qwen3.6-35B-A3B-NoThinking"),
     llmMaxTokens: envInt("AFP_LLM_MAX_TOKENS", 900),
     llmTimeoutMs: envInt("AFP_LLM_TIMEOUT_MS", 120000),
+    llmAllowedEndpoints: llmAllowedEndpoints.length > 0 ? llmAllowedEndpoints : [llmBaseUrl],
     maxDeliveryAttempts: envInt("AFP_MAX_DELIVERY_ATTEMPTS", 5),
     backoffBaseMs: envInt("AFP_BACKOFF_BASE_MS", 50),
     seenIdTtlMs: envInt("AFP_SEEN_ID_TTL_MS", 24 * 60 * 60 * 1000),

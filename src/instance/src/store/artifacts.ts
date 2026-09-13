@@ -11,6 +11,7 @@ import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import type { Db } from "./db.ts";
 import { sha256Hex } from "../crypto/proof.ts";
+import { sandboxAttachment } from "../federation/ingest.ts";
 
 export interface ArtifactRef {
   /** `sha256:<hex>` */
@@ -28,6 +29,18 @@ export interface ArtifactRef {
 export interface ExternalSource {
   sourceUrl: string;
   fetchedAt: string;
+}
+
+/**
+ * ADR-0027 Decision 1: what a port throws when bytes contradict what they
+ * claim to be. Distinct from a generic Error so a caller at a boundary can
+ * turn it into a refusal on the record instead of a crash.
+ */
+export class IngestionRefused extends Error {
+  constructor(reason: string) {
+    super(`ingestion refused: ${reason}`);
+    this.name = "IngestionRefused";
+  }
 }
 
 export class Artifacts {
@@ -52,6 +65,13 @@ export class Artifacts {
    * `source` records where evidence came from when it entered from outside AFP —
    * a fetched page, a client submission, an operator's brief. Without it the
    * trail stops at "the agent said so" (07 § Artifacts).
+   *
+   * ADR-0027 Decision 1: this is the door every artifact comes through — a
+   * local Task's attachment, a brain's output, a counterparty's Result — so
+   * the ingestion duty is enforced here rather than only at the federation
+   * boundary. The digest half is free (we compute it); what this adds is the
+   * size cap and the declared-type-versus-bytes check, and a contradiction is
+   * refused rather than corrected.
    */
   put(
     bytes: Uint8Array,
@@ -60,6 +80,8 @@ export class Artifacts {
     source?: ExternalSource,
   ): ArtifactRef {
     const digest = `sha256:${sha256Hex(bytes)}`;
+    const verdict = sandboxAttachment(bytes, { digest, mediaType });
+    if (!verdict.ok) throw new IngestionRefused(verdict.reason);
     const path = this.pathFor(digest);
     if (!existsSync(path)) writeFileSync(path, bytes);
 

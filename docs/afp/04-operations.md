@@ -355,6 +355,14 @@ convention, not machinery:
   keeps verification independent of sampling, so a verifier never re-runs a brain and
   never checks this field's contents. It is evidence for a reader, not an input to a
   check (scenario 09, finding 33).
+- **`afp:producedBy` SHOULD also name the framing the brain was asked under** — the
+  digest of the versioned prompt template that quarantined third-party text, appended as
+  `<model> @ <endpoint> ; template sha256:…` (ADR-0027). "What made this claim" and "what
+  was it told" are different questions, and the second one is what scenario 09's regulator
+  is actually asking. The field remains non-normative for replay: a verifier can fetch the
+  template and read the framing, but never re-runs a brain to check it. Note also that the
+  value is a **string**, not an IRI — it always was, and the `@context` no longer says
+  otherwise.
 
 ### What closes the trail at the edges
 

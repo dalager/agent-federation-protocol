@@ -12,8 +12,8 @@
  */
 
 import type { Brain, TaskOutcome, TaskRequest } from "./port.ts";
+import { producedByLine, renderUserPrompt } from "./prompt.ts";
 
-const decoder = new TextDecoder();
 const encoder = new TextEncoder();
 
 export interface LlmEndpoint {
@@ -24,6 +24,42 @@ export interface LlmEndpoint {
   timeoutMs: number;
   /** Optional — a local server usually needs none. Read at the point of use. */
   apiKey?: string;
+  /**
+   * ADR-0027 Decision 5: origins this endpoint may be. Travels with the
+   * endpoint rather than being threaded through every caller, so a workflow
+   * that only ever sees an `LlmEndpoint` still gets the check. Absent means
+   * "the configured base URL and nothing else".
+   */
+  allowedOrigins?: readonly string[];
+}
+
+/**
+ * ADR-0027 Decision 5: the `llm` brain's only network is the configured
+ * endpoint, and which endpoints are configurable is decided at startup rather
+ * than discovered at the first request. An origin absent from the allow-list
+ * is refused when the brain is built, so a deployment that mistypes a host —
+ * or a config path an attacker reached — fails loudly and offline.
+ */
+export function assertEndpointAllowed(endpoint: LlmEndpoint, allowed: readonly string[]): void {
+  let origin: string;
+  try {
+    origin = new URL(endpoint.baseUrl).origin;
+  } catch {
+    throw new Error(`AFP_LLM_BASE_URL is not a URL: ${endpoint.baseUrl}`);
+  }
+  const permitted = allowed.map((entry) => {
+    try {
+      return new URL(entry).origin;
+    } catch {
+      return entry;
+    }
+  });
+  if (!permitted.includes(origin)) {
+    throw new Error(
+      `llm endpoint ${origin} is not in the allow-list [${permitted.join(", ")}] — ` +
+        "set AFP_LLM_ALLOWED_ENDPOINTS to permit it (ADR-0027 Decision 5)",
+    );
+  }
 }
 
 interface ChatCompletion {
@@ -82,23 +118,35 @@ async function complete(
   return { text, model: payload.model ?? endpoint.model };
 }
 
+export interface LlmBrainOptions {
+  /** ADR-0027 Decision 2: media types this brain consumes as bytes. */
+  consumes?: readonly string[];
+  /** ADR-0027 Decision 5: permitted endpoint origins. Defaults to the endpoint's own. */
+  allowedEndpoints?: readonly string[];
+  /** Test seam: the last user prompt sent, so the gate can assert the framing. */
+  onPrompt?: (user: string) => void;
+}
+
 export function makeLlmBrain(
   name: string,
   capabilities: readonly string[],
   systemPrompt: string,
   endpoint: LlmEndpoint,
+  options: LlmBrainOptions = {},
 ): Brain {
+  // Decision 5: refused at build time, not at the first request.
+  assertEndpointAllowed(endpoint, options.allowedEndpoints ?? endpoint.allowedOrigins ?? [endpoint.baseUrl]);
+
   return {
     name,
     capabilities,
+    ...(options.consumes ? { consumes: options.consumes } : {}),
     async handle(request: TaskRequest): Promise<TaskOutcome> {
-      const attachments = request.attachments
-        .map((artifact, index) =>
-          `--- attachment ${index + 1} (${artifact.mediaType}) ---\n${decoder.decode(artifact.bytes)}`,
-        )
-        .join("\n\n");
-
-      const user = attachments ? `${request.content}\n\n${attachments}` : request.content;
+      // ADR-0027 Decisions 2 and 3: attachments are not decoded into the
+      // prompt here. `renderUserPrompt` delivers references and bounded
+      // excerpts, and quarantines anything a stranger authored.
+      const user = renderUserPrompt(request);
+      options.onPrompt?.(user);
 
       try {
         const { text, model } = await complete(endpoint, systemPrompt, user);
@@ -106,10 +154,11 @@ export function makeLlmBrain(
           ok: true,
           content: text,
           summary: firstLine(text),
-          // Which model produced this becomes part of the record: an auditor
-          // asking "what made this claim" should not have to take the agent's
-          // word for it (04 § Rationale externalization).
-          producedBy: `${model} @ ${endpoint.baseUrl}`,
+          // Which model produced this, and under which framing, becomes part
+          // of the record: an auditor asking "what made this claim" and "what
+          // was it told" should not have to take the agent's word for either
+          // (04 § Rationale externalization; ADR-0027 Decision 3).
+          producedBy: producedByLine(model, endpoint.baseUrl),
           attachments: [{ mediaType: "text/markdown", bytes: encoder.encode(`${text}\n`) }],
         };
       } catch (error) {

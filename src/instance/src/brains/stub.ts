@@ -7,10 +7,9 @@
  * brain in `openai.ts` implements the same port and is selected by configuration.
  */
 
-import type { Brain, TaskOutcome, TaskRequest } from "./port.ts";
+import { textOf, type Brain, type TaskOutcome, type TaskRequest } from "./port.ts";
 
 const encoder = new TextEncoder();
-const decoder = new TextDecoder();
 
 /** Counts invocations, so a replayed task can be shown *not* to run twice. */
 export class CountingBrain implements Brain {
@@ -18,15 +17,19 @@ export class CountingBrain implements Brain {
 
   readonly name: string;
   readonly capabilities: readonly string[];
+  /** ADR-0027 Decision 2: media types this brain consumes as bytes, if any. */
+  readonly consumes?: readonly string[];
   private readonly respond: (request: TaskRequest) => TaskOutcome;
 
   constructor(
     name: string,
     capabilities: readonly string[],
     respond: (request: TaskRequest) => TaskOutcome,
+    consumes?: readonly string[],
   ) {
     this.name = name;
     this.capabilities = capabilities;
+    if (consumes) this.consumes = consumes;
     this.respond = respond;
   }
 
@@ -38,8 +41,10 @@ export class CountingBrain implements Brain {
 
 export function makeWriter(): CountingBrain {
   return new CountingBrain("writer", ["afp:cap:draft"], (request) => {
+    // ADR-0027 Decision 2: read what the port allowed — the bounded excerpt,
+    // or the full bytes when this agent declared it consumes the type.
     const source = request.attachments[0];
-    const brief = source ? decoder.decode(source.bytes) : request.content;
+    const brief = source ? textOf(source) : request.content;
     const draft = [
       "# Migration readiness note",
       "",
@@ -59,11 +64,15 @@ export function makeWriter(): CountingBrain {
 }
 
 export function makeReviewer(): CountingBrain {
+  // ADR-0027 Decision 2: the reviewer reads a whole draft, so it declares the
+  // type it consumes rather than depending on the excerpt bound. The stub and
+  // the endpoint-backed reviewer declare the same thing, so the offline gate
+  // and the llm demo agree about what a reviewer was given.
   return new CountingBrain("reviewer", ["afp:cap:review"], (request) => {
     const draft = request.attachments[0];
     if (!draft) return { ok: false, reason: "no draft attached to review" };
 
-    const text = decoder.decode(draft.bytes);
+    const text = textOf(draft);
     const approved = text.includes("parallel-run");
     const critique = approved
       ? "Approved: the parallel-run assumption is stated explicitly."
@@ -75,7 +84,7 @@ export function makeReviewer(): CountingBrain {
       summary: approved ? "approved" : "changes requested",
       attachments: [{ mediaType: "text/markdown", bytes: encoder.encode(`# Review\n\n${critique}\n`) }],
     };
-  });
+  }, ["text/markdown"]);
 }
 
 /** A brain that always fails — used to exercise dead-lettering and `afp:Error`. */

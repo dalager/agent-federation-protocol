@@ -31,6 +31,13 @@ export interface AgentSpec {
    */
   url?: string;
   capabilities: readonly string[];
+  /**
+   * ADR-0027 Decision 2: media types this agent consumes as *bytes*. Absent or
+   * empty means the port hands it references and bounded excerpts only. An
+   * exception to the safe default has to be declared, and the declaration is
+   * published — an auditor can see which agents were given raw material.
+   */
+  consumes?: readonly string[];
   keyCustody: KeyCustody;
   since: string;
 }
@@ -104,6 +111,7 @@ export function agentActor(
     preferredUsername: spec.name,
     "afp:operatedBy": instanceActorId(origin),
     "afp:capabilities": [...spec.capabilities],
+    ...(spec.consumes && spec.consumes.length > 0 ? { "afp:consumes": [...spec.consumes] } : {}),
     inbox: `${id}/inbox`,
     outbox: `${id}/outbox`,
     "afp:visibility": "public",

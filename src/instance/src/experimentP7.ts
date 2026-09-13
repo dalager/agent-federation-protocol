@@ -36,6 +36,7 @@
 
 import type { LlmEndpoint } from "./brains/openai.ts";
 import { checkEndpoint, makeLlmBrain } from "./brains/openai.ts";
+import { localAttachment, localProvenance } from "./brains/port.ts";
 import { runP7Demo, type P7Content, type P7DemoResult, type P7Judgement } from "./demoP7.ts";
 
 const CAPABILITY = "afp:cap:support";
@@ -148,7 +149,8 @@ async function ask(
   const outcome = await brain.handle({
     capability: CAPABILITY,
     content,
-    attachments: attachments.map((text) => ({ mediaType: "text/markdown", bytes: encoder.encode(text) })),
+    provenance: localProvenance(agent),
+    attachments: attachments.map((text) => localAttachment(encoder.encode(text), "text/markdown", agent)),
     thread: "",
   });
   if (!outcome.ok) throw new Error(`model call for ${agent} failed: ${outcome.reason}`);

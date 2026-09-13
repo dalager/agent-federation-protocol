@@ -28,7 +28,6 @@
     "afp:policy": { "@type": "@id" },
     "afp:hub": { "@type": "@id" },
     "afp:hubKey": { "@type": "@id" },
-    "afp:producedBy": { "@type": "@id" },
     "afp:prevActivity": { "@type": "@id" },
     "afp:supersedes": { "@type": "@id" },
     "afp:priorAward": { "@type": "@id" },

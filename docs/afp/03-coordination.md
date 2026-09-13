@@ -141,6 +141,17 @@ carries — and the task text agents act on is the **port's own bounded summary*
 port's own words. The reporter's prose is what the investigation is *about*, never what
 it is *asked to do*.
 
+ADR-0027 mechanizes this duty rather than leaving it stated. It applies at
+**every** port, not only the federation boundary: the size cap and declared-type-versus-
+bytes check that refuses a counterparty's lie about an attachment refuses a local Task's
+attachment the same way, and a contradiction is refused rather than corrected. And what
+reaches a brain is bounded by construction — inputs are labelled with their provenance,
+attachments arrive as references and bounded excerpts unless the agent published
+`afp:consumes` for that media type, and third-party words arrive inside a framed data
+block whose template digest is on the record. The claim stays exactly this size:
+provenance, framing, and the bounded consequence 06 already pinned — not a verdict on
+whether a document was trying to steer anyone.
+
 Conversely, for side effects an agent executes in an external system (opening a change
 proposal, filing a tracker record, merging), the authoritative outcome lives outside AFP.
 Port agents **MUST reconcile**: emit a follow-up `Result` into the same `context` carrying

@@ -15,6 +15,7 @@ import { makeReviewer, makeWriter } from "./brains/stub.ts";
 import { makeLlmBrain, REVIEWER_PROMPT, WRITER_PROMPT } from "./brains/openai.ts";
 import { exportBundle, type ExportSummary } from "./export.ts";
 import type { Brain } from "./brains/port.ts";
+import { localAttachment, localProvenance } from "./brains/port.ts";
 import type { LlmEndpoint } from "./brains/openai.ts";
 
 const encoder = new TextEncoder();
@@ -43,6 +44,9 @@ export function endpointOf(config: Config): LlmEndpoint {
     maxTokens: config.llmMaxTokens,
     timeoutMs: config.llmTimeoutMs,
     apiKey: process.env.AFP_LLM_API_KEY,
+    // ADR-0027 Decision 5: the allow-list travels with the endpoint, so every
+    // brain built from it — here, and in the P3–P7 experiments — is checked.
+    allowedOrigins: config.llmAllowedEndpoints,
   };
 }
 
@@ -51,7 +55,12 @@ function brains(config: Config): { writer: Brain; reviewer: Brain } {
     const endpoint = endpointOf(config);
     return {
       writer: makeLlmBrain("writer", ["afp:cap:draft"], WRITER_PROMPT, endpoint),
-      reviewer: makeLlmBrain("reviewer", ["afp:cap:review"], REVIEWER_PROMPT, endpoint),
+      // ADR-0027 Decision 2: the reviewer reads a source document, so it
+      // declares the type it consumes as bytes rather than relying on the
+      // excerpt bound holding for every draft length.
+      reviewer: makeLlmBrain("reviewer", ["afp:cap:review"], REVIEWER_PROMPT, endpoint, {
+        consumes: ["text/markdown"],
+      }),
     };
   }
   return { writer: makeWriter(), reviewer: makeReviewer() };
@@ -62,11 +71,23 @@ export function agentRegistrations(config: Config): AgentRegistration[] {
   const since = "2026-08-17T00:00:00Z";
   return [
     {
-      spec: { name: "writer", capabilities: writer.capabilities, keyCustody: "instance", since },
+      spec: {
+        name: "writer",
+        capabilities: writer.capabilities,
+        ...(writer.consumes ? { consumes: writer.consumes } : {}),
+        keyCustody: "instance",
+        since,
+      },
       brain: writer,
     },
     {
-      spec: { name: "reviewer", capabilities: reviewer.capabilities, keyCustody: "instance", since },
+      spec: {
+        name: "reviewer",
+        capabilities: reviewer.capabilities,
+        ...(reviewer.consumes ? { consumes: reviewer.consumes } : {}),
+        keyCustody: "instance",
+        since,
+      },
       brain: reviewer,
     },
   ];
@@ -112,7 +133,8 @@ export async function runDemo(
   const drafted = await writer.handle({
     capability: "afp:cap:draft",
     content: "Draft a readiness note from the attached brief.",
-    attachments: [{ mediaType: "text/plain", bytes: encoder.encode(BRIEF) }],
+    provenance: localProvenance("writer"),
+    attachments: [localAttachment(encoder.encode(BRIEF), "text/plain", "writer")],
     thread,
   });
   if (!drafted.ok) throw new Error(`writer could not draft: ${drafted.reason}`);
@@ -139,7 +161,8 @@ export async function runDemo(
   const revised = await writer.handle({
     capability: "afp:cap:draft",
     content: `Revise your note to address this critique.\n\n${critique}`,
-    attachments: [{ mediaType: "text/plain", bytes: encoder.encode(BRIEF) }],
+    provenance: localProvenance("writer"),
+    attachments: [localAttachment(encoder.encode(BRIEF), "text/plain", "writer")],
     thread,
   });
   if (!revised.ok) throw new Error(`writer could not revise: ${revised.reason}`);
