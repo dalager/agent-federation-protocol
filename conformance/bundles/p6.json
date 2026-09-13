@@ -1,0 +1,12 @@
+{
+  "fixture": "../fixtures/p6",
+  "bundles": [
+    "atlas",
+    "meridian",
+    "pelican",
+    "anchor",
+    "harbor"
+  ],
+  "thread": null,
+  "verdict": "pass"
+}

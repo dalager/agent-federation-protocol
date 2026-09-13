@@ -1,0 +1,35 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "http://127.0.0.1:38159/hubs/windward",
+  "type": [
+    "Group",
+    "afp:Hub"
+  ],
+  "name": "windward",
+  "preferredUsername": "windward",
+  "inbox": "http://127.0.0.1:38159/hubs/windward/inbox",
+  "outbox": "http://127.0.0.1:38159/hubs/windward/outbox",
+  "followers": "http://127.0.0.1:38159/hubs/windward/followers",
+  "afp:visibility": "public",
+  "afp:operatedBy": "http://127.0.0.1:38159/actor",
+  "assertionMethod": [
+    {
+      "id": "http://127.0.0.1:38159/hubs/windward#ed25519-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:38159/hubs/windward",
+      "publicKeyMultibase": "z6MkqypUEsGf9rTv7kjF2f5ZdwGXPy2c8Mo8BRnQKHzJwjRP"
+    }
+  ],
+  "authentication": [
+    {
+      "id": "http://127.0.0.1:38159/hubs/windward#transport-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:38159/hubs/windward",
+      "publicKeyMultibase": "z6MkfX96YLYcDFbVBdc84h4Qtig1jNa7eQgycABijA9crB4J"
+    }
+  ]
+}

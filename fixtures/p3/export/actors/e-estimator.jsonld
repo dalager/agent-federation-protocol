@@ -1,0 +1,35 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "https://alpha.operator.local/agents/e-estimator",
+  "type": "Service",
+  "name": "e-estimator",
+  "preferredUsername": "e-estimator",
+  "afp:operatedBy": "https://alpha.operator.local/actor",
+  "afp:capabilities": [
+    "afp:cap:estimate"
+  ],
+  "inbox": "https://alpha.operator.local/agents/e-estimator/inbox",
+  "outbox": "https://alpha.operator.local/agents/e-estimator/outbox",
+  "afp:visibility": "public",
+  "assertionMethod": [
+    {
+      "id": "https://alpha.operator.local/agents/e-estimator#ed25519-key",
+      "type": "Multikey",
+      "controller": "https://alpha.operator.local/agents/e-estimator",
+      "publicKeyMultibase": "z6MkfQJqSBjZ4ASQaoyR5UfwN6mbELR2S812EBakk3uLq1d7"
+    }
+  ],
+  "authentication": [
+    {
+      "id": "https://alpha.operator.local/agents/e-estimator#transport-key",
+      "type": "Multikey",
+      "controller": "https://alpha.operator.local/agents/e-estimator",
+      "publicKeyMultibase": "z6MkvrXeCnAd1VUGVVETdM4pb5muEjbrqWV3ykf6JTR8paid",
+      "afp:custody": "file"
+    }
+  ]
+}

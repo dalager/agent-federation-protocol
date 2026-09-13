@@ -1,0 +1,35 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "https://alpha.operator.local/agents/b-compliance",
+  "type": "Service",
+  "name": "b-compliance",
+  "preferredUsername": "b-compliance",
+  "afp:operatedBy": "https://alpha.operator.local/actor",
+  "afp:capabilities": [
+    "afp:cap:estimate"
+  ],
+  "inbox": "https://alpha.operator.local/agents/b-compliance/inbox",
+  "outbox": "https://alpha.operator.local/agents/b-compliance/outbox",
+  "afp:visibility": "public",
+  "assertionMethod": [
+    {
+      "id": "https://alpha.operator.local/agents/b-compliance#ed25519-key",
+      "type": "Multikey",
+      "controller": "https://alpha.operator.local/agents/b-compliance",
+      "publicKeyMultibase": "z6Mks6dJUKRoNrz1pXkNhWzBaABXwPUBU8Ff12gi5VdcSDmL"
+    }
+  ],
+  "authentication": [
+    {
+      "id": "https://alpha.operator.local/agents/b-compliance#transport-key",
+      "type": "Multikey",
+      "controller": "https://alpha.operator.local/agents/b-compliance",
+      "publicKeyMultibase": "z6MkqgAMZeCWF4amVPfFQiPgvqipDPCR5fRBgd3CiMA21eRE",
+      "afp:custody": "file"
+    }
+  ]
+}

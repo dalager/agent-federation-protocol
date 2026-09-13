@@ -1,0 +1,35 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "http://127.0.0.1:37593/agents/har-uw",
+  "type": "Service",
+  "name": "har-uw",
+  "preferredUsername": "har-uw",
+  "afp:operatedBy": "http://127.0.0.1:37593/actor",
+  "afp:capabilities": [
+    "afp:cap:assess"
+  ],
+  "inbox": "http://127.0.0.1:37593/agents/har-uw/inbox",
+  "outbox": "http://127.0.0.1:37593/agents/har-uw/outbox",
+  "afp:visibility": "public",
+  "assertionMethod": [
+    {
+      "id": "http://127.0.0.1:37593/agents/har-uw#ed25519-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:37593/agents/har-uw",
+      "publicKeyMultibase": "z6Mkg2vGcsWGyH3Ae18MyUYr1GA4gRmfzVM1adaB27cceUnm"
+    }
+  ],
+  "authentication": [
+    {
+      "id": "http://127.0.0.1:37593/agents/har-uw#transport-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:37593/agents/har-uw",
+      "publicKeyMultibase": "z6MktFFgWRotHC1JELpgeq93xX7SEYdGUBBbt9LvQCuWh1Tw",
+      "afp:custody": "file"
+    }
+  ]
+}

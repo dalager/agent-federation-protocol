@@ -1,0 +1,37 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "http://127.0.0.1:37593/actor",
+  "type": [
+    "Application",
+    "afp:Instance"
+  ],
+  "name": "harbor instance",
+  "preferredUsername": "instance",
+  "afp:operator": "Harbor Re",
+  "inbox": "http://127.0.0.1:37593/actor/inbox",
+  "outbox": "http://127.0.0.1:37593/actor/outbox",
+  "following": "http://127.0.0.1:37593/actor/following",
+  "afp:roster": "http://127.0.0.1:37593/roster",
+  "afp:policy": "http://127.0.0.1:37593/afp/policy",
+  "afp:visibility": "public",
+  "assertionMethod": [
+    {
+      "id": "http://127.0.0.1:37593/actor#ed25519-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:37593/actor",
+      "publicKeyMultibase": "z6MkrcVdKXHkeY1gAUKikScH85KC4JdMBpjXcneDqC6cyVo4"
+    }
+  ],
+  "authentication": [
+    {
+      "id": "http://127.0.0.1:37593/actor#transport-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:37593/actor",
+      "publicKeyMultibase": "z6MkhhzJJyR254jW9aC1LxgyEEG6ScX1CLV6cc3BewimWUba"
+    }
+  ]
+}

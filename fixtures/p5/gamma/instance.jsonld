@@ -1,0 +1,37 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "http://127.0.0.1:38229/actor",
+  "type": [
+    "Application",
+    "afp:Instance"
+  ],
+  "name": "gamma instance",
+  "preferredUsername": "instance",
+  "afp:operator": "Gamma Operator",
+  "inbox": "http://127.0.0.1:38229/actor/inbox",
+  "outbox": "http://127.0.0.1:38229/actor/outbox",
+  "following": "http://127.0.0.1:38229/actor/following",
+  "afp:roster": "http://127.0.0.1:38229/roster",
+  "afp:policy": "http://127.0.0.1:38229/afp/policy",
+  "afp:visibility": "public",
+  "assertionMethod": [
+    {
+      "id": "http://127.0.0.1:38229/actor#ed25519-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:38229/actor",
+      "publicKeyMultibase": "z6MknW6Q84WEyq5A568ZdVQrg1L3mjipxKgGbQc3zU7p3wq1"
+    }
+  ],
+  "authentication": [
+    {
+      "id": "http://127.0.0.1:38229/actor#transport-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:38229/actor",
+      "publicKeyMultibase": "z6MkwPsBrKHrmYkdRd6iVDzxwfqR12TUwT14MVycyoBEiTBm"
+    }
+  ]
+}

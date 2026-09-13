@@ -1,0 +1,74 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "format": "afp-export/1",
+  "instance": "https://alpha.operator.local/actor",
+  "exportedAt": "2026-09-13T19:01:25.871Z",
+  "actors": [
+    "writer",
+    "reviewer"
+  ],
+  "activities": 8,
+  "artifacts": 3,
+  "cryptosuite": "eddsa-jcs-2022",
+  "afp:keyHistory": [
+    {
+      "afp:actor": "https://alpha.operator.local/actor",
+      "id": "https://alpha.operator.local/actor#ed25519-key",
+      "publicKeyMultibase": "z6MkhEv1zeZQxPgQ2r2v8zDvSJtYwuiFa38VNyRSc3u1iepJ"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/actor",
+      "id": "https://alpha.operator.local/actor#transport-key",
+      "publicKeyMultibase": "z6MkqEJdHzokUXwwLWKQv8c3SBoTKwej5a9tKRmihGoYuJmR"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/writer",
+      "id": "https://alpha.operator.local/agents/writer#ed25519-key",
+      "publicKeyMultibase": "z6MkgGffuB7p6QszGMBnCZc9tY74xEr129thdm1arjaSdKaA"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/writer",
+      "id": "https://alpha.operator.local/agents/writer#transport-key",
+      "publicKeyMultibase": "z6MkhzVVDjKG3htgabQuTHXX1s4ifK8u1ySyYuPTSoRymeq8"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/reviewer",
+      "id": "https://alpha.operator.local/agents/reviewer#ed25519-key",
+      "publicKeyMultibase": "z6MkqVq2bFmf7gcfYQ62xjPt4AQLrzvhTNwFvXpu1BSgSj2D"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/reviewer",
+      "id": "https://alpha.operator.local/agents/reviewer#transport-key",
+      "publicKeyMultibase": "z6MkkYMcPgqwToRebRemtpkJeYqWJF39p24f7UeJLYM61uti"
+    }
+  ],
+  "afp:members": [
+    "actors/reviewer.jsonld",
+    "actors/writer.jsonld",
+    "artifacts/sha256-4714bfa7b1b4e0b303bf8c4eaf770b1432bab48c7b971f26a23d7a0756e88058",
+    "artifacts/sha256-67af861885c785bab4092b5ba57c11711bebee17bd1a41edf771330e7ab0a602",
+    "artifacts/sha256-b38d0cb4889f0c094135e2cea96cb0f3c890cbb7155913ddd2f22cedc9b46653",
+    "instance.jsonld",
+    "outbox/instance.jsonld",
+    "outbox/reviewer.jsonld",
+    "outbox/writer.jsonld",
+    "policy.jsonld",
+    "roster.jsonld"
+  ],
+  "afp:policy": {
+    "id": "https://alpha.operator.local/afp/policy",
+    "afp:digest": "sha256:da3720f0a6c33b8d428f07bb057b3ceff7e89217ae6d71e02d56ab965407d055"
+  },
+  "proof": {
+    "type": "DataIntegrityProof",
+    "cryptosuite": "eddsa-jcs-2022",
+    "created": "2026-09-13T19:01:25.871Z",
+    "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+    "proofPurpose": "assertionMethod",
+    "proofValue": "z2x1dEQmQBv7ZNj9xdnbfKjuhiu1281qfBYyseFhXH2fXXvXWy3arzdNm8UkDgt3i866JF6F4hZdcuJw9iAQGRP5w"
+  }
+}

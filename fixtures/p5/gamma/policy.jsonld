@@ -1,0 +1,34 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "http://127.0.0.1:38229/afp/policy",
+  "type": "afp:Policy",
+  "attributedTo": "http://127.0.0.1:38229/actor",
+  "published": "2026-08-17T09:00:06.000Z",
+  "afp:seatPolicy": "follow-required",
+  "afp:controllers": [],
+  "afp:defaultVisibility": "internal",
+  "afp:custody": {
+    "afp:instance": "file"
+  },
+  "afp:brains": [
+    {
+      "afp:model": "stub"
+    }
+  ],
+  "afp:governance": {
+    "afp:subjectPrecondition": "any-member",
+    "afp:electorateFloor": "no-decision:electorate-exhausted"
+  },
+  "proof": {
+    "type": "DataIntegrityProof",
+    "cryptosuite": "eddsa-jcs-2022",
+    "created": "2026-08-17T09:00:06.000Z",
+    "verificationMethod": "http://127.0.0.1:38229/actor#ed25519-key",
+    "proofPurpose": "assertionMethod",
+    "proofValue": "z4ABGbXzfUNi5rv8Ckw1NnXh3xRJwgvJrgHPtyGrqB2CKGE1UCh1WdQRdx9vUg4sBNCFwvGVDLKpjoZmgXLMzzdKd"
+  }
+}

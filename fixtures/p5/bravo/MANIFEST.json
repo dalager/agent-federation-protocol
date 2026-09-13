@@ -1,0 +1,72 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "format": "afp-export/1",
+  "instance": "http://127.0.0.1:36453/actor",
+  "exportedAt": "2026-09-13T19:01:26.210Z",
+  "actors": [
+    "s-noc",
+    "hub-bridge"
+  ],
+  "activities": 13,
+  "artifacts": 0,
+  "cryptosuite": "eddsa-jcs-2022",
+  "afp:keyHistory": [
+    {
+      "afp:actor": "http://127.0.0.1:36453/actor",
+      "id": "http://127.0.0.1:36453/actor#ed25519-key",
+      "publicKeyMultibase": "z6Mkjbk7wed5s9Ngsa8uWfyoJB4d4dSEmKTbq6isbBwMMGCB"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:36453/actor",
+      "id": "http://127.0.0.1:36453/actor#transport-key",
+      "publicKeyMultibase": "z6MkpCjLkjR2jgVPdwirtCq5ZqReLzUkvDv6oAPKgSFUqGZc"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:36453/agents/s-noc",
+      "id": "http://127.0.0.1:36453/agents/s-noc#ed25519-key",
+      "publicKeyMultibase": "z6MkhFDkBAyo4XXYcfKMSMJD79THnMMY9SkRQKPwzkRZ886H"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:36453/agents/s-noc",
+      "id": "http://127.0.0.1:36453/agents/s-noc#hub-key-bridge",
+      "publicKeyMultibase": "z6MkknyXwotkm6aamuN31K7YfnTKoRkCCqLNiaU6DQCrsLMX"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:36453/agents/s-noc",
+      "id": "http://127.0.0.1:36453/agents/s-noc#transport-key",
+      "publicKeyMultibase": "z6MkjpzhSTpAX4HBHbpQZPtzb8j2hjLYsZfXtCnGVVoeB2Z4"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:36453/hubs/bridge",
+      "id": "http://127.0.0.1:36453/hubs/bridge#ed25519-key",
+      "publicKeyMultibase": "z6MkvDGr9VE71vxvWNiQtMMYEhGqsZemEo5JLziYma749qv8"
+    }
+  ],
+  "afp:members": [
+    "actors/hub-bridge.jsonld",
+    "actors/s-noc.jsonld",
+    "instance.jsonld",
+    "outbox/hub-bridge.jsonld",
+    "outbox/instance.jsonld",
+    "outbox/s-noc.jsonld",
+    "policy.jsonld",
+    "received.jsonld",
+    "roster.jsonld"
+  ],
+  "afp:policy": {
+    "id": "http://127.0.0.1:36453/afp/policy",
+    "afp:digest": "sha256:54340c42d9bec32736489a11ba01846949a5c90dc2f17fb138754bc0db35a5f2"
+  },
+  "proof": {
+    "type": "DataIntegrityProof",
+    "cryptosuite": "eddsa-jcs-2022",
+    "created": "2026-09-13T19:01:26.210Z",
+    "verificationMethod": "http://127.0.0.1:36453/actor#ed25519-key",
+    "proofPurpose": "assertionMethod",
+    "proofValue": "z3tsHiSqtxomuC3FPgb4G2kKmyHVisoEZ8bxjJR6Fq69YqTtvcaigjw4aQm113aqMSog8rnCJqWkUpThgdMWQfYvb"
+  }
+}

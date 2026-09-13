@@ -13,3 +13,10 @@ ruvector.db
 
 # Local MCP server registration — tooling config, not project source
 .mcp.json
+
+# ADR-0034 Decision 4 — scripts/release-archive.sh's build output
+dist/
+
+# Python packaging artifacts of `pip install ./src/verifier` (ADR-0034 Decision 4)
+src/verifier/build/
+src/verifier/*.egg-info/

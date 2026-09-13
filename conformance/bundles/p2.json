@@ -1,0 +1,8 @@
+{
+  "fixture": "../fixtures/p2",
+  "bundles": [
+    "export"
+  ],
+  "thread": "https://alpha.operator.local/threads/codebase-integrity",
+  "verdict": "pass"
+}

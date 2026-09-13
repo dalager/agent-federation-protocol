@@ -1,0 +1,69 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "format": "afp-export/1",
+  "instance": "http://127.0.0.1:45089/actor",
+  "exportedAt": "2026-09-13T19:01:26.021Z",
+  "actors": [
+    "b-assessor"
+  ],
+  "activities": 7,
+  "artifacts": 0,
+  "cryptosuite": "eddsa-jcs-2022",
+  "afp:keyHistory": [
+    {
+      "afp:actor": "http://127.0.0.1:45089/actor",
+      "id": "http://127.0.0.1:45089/actor#ed25519-key",
+      "publicKeyMultibase": "z6MkwgPK6VNvom8aDRBgJWKZaeP8SiETDAcK8KhB5HGoeKsz"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:45089/actor",
+      "id": "http://127.0.0.1:45089/actor#transport-key",
+      "publicKeyMultibase": "z6MkvbJjYubPnxKJF11qvtfuzQGQpWq4CWT44iuaMxzVsNLQ"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:45089/agents/b-assessor",
+      "id": "http://127.0.0.1:45089/agents/b-assessor#ed25519-key",
+      "publicKeyMultibase": "z6MknatMae9ACP1JVFhhjYvMRkbBfzTqzACWxX5anYYof5no"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:45089/agents/b-assessor",
+      "id": "http://127.0.0.1:45089/agents/b-assessor#transport-key",
+      "publicKeyMultibase": "z6MkpLUqQ7AQjxXgXudAS2r5A8dMJ5LC2s5DxVvaFoGUZaif"
+    }
+  ],
+  "afp:members": [
+    "actors/b-assessor.jsonld",
+    "instance.jsonld",
+    "outbox/b-assessor.jsonld",
+    "outbox/instance.jsonld",
+    "policy.jsonld",
+    "received.jsonld",
+    "roster.jsonld"
+  ],
+  "afp:policy": {
+    "id": "http://127.0.0.1:45089/afp/policy",
+    "afp:digest": "sha256:b1d5236c406b2d37c8b0f8103150d8b26ce3eb910d8d899c8bc5f71b022fc431"
+  },
+  "afp:exportScope": {
+    "afp:threads": [
+      "http://127.0.0.1:40923/threads/fed",
+      "http://127.0.0.1:40923/threads/sub-1",
+      "http://127.0.0.1:45089/threads/roster"
+    ],
+    "afp:omittedActors": [
+      "http://127.0.0.1:45089/agents/b-private"
+    ]
+  },
+  "proof": {
+    "type": "DataIntegrityProof",
+    "cryptosuite": "eddsa-jcs-2022",
+    "created": "2026-09-13T19:01:26.021Z",
+    "verificationMethod": "http://127.0.0.1:45089/actor#ed25519-key",
+    "proofPurpose": "assertionMethod",
+    "proofValue": "z1UfXekueQS3s2ZGQg9dgudcuyrwEysbVuFrwy5M2g7cZoY4nuc6CiA6whpsG6BSmrTaykCrERKRU7mtb6a6Z3aQ"
+  }
+}

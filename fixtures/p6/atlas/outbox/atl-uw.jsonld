@@ -1,0 +1,182 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "http://127.0.0.1:38159/agents/atl-uw/outbox",
+  "type": "OrderedCollection",
+  "attributedTo": "http://127.0.0.1:38159/agents/atl-uw",
+  "totalItems": 4,
+  "orderedItems": [
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "http://127.0.0.1:38159/agents/atl-uw/activities/0001",
+      "type": "Create",
+      "actor": "http://127.0.0.1:38159/agents/atl-uw",
+      "to": [
+        "http://127.0.0.1:38159/hubs/windward"
+      ],
+      "published": "2026-08-17T09:06:17.000Z",
+      "context": "http://127.0.0.1:38159/threads/dagmar-trigger",
+      "afp:visibility": "hub",
+      "object": {
+        "id": "http://127.0.0.1:38159/agents/atl-uw/votes/dagmar/prepare/1",
+        "type": "afp:Vote",
+        "afp:hub": "http://127.0.0.1:38159/hubs/windward",
+        "afp:round": "http://127.0.0.1:38159/rounds/dagmar",
+        "afp:proposalHash": "sha256:4468affa50b1661dc6566a682569c115c997ccd5b8cb8011d5c78918b5c83f63",
+        "afp:quorumSnapshot": "sha256:e4c85cb33596ee0f65f2b0eb4259783786b418dbe1929d1376a9e65bb5a00a51",
+        "value": "yes",
+        "afp:phase": "prepare",
+        "afp:seqNo": 1,
+        "afp:observedVotes": []
+      },
+      "afp:actingAs": "http://127.0.0.1:38159/agents/atl-uw",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:06:17.000Z",
+        "verificationMethod": "http://127.0.0.1:38159/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "zdVNtPWNAycBURvYuJJt6W1SjhRbs6wEbQd8b1jspFZyL4s36aKVTtmpgfCM5BbzMVFqJMfYwgGWCpQ28eajVghT"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "http://127.0.0.1:38159/agents/atl-uw/activities/0002",
+      "type": "Offer",
+      "actor": "http://127.0.0.1:38159/agents/atl-uw",
+      "to": [
+        "http://127.0.0.1:38159/hubs/windward"
+      ],
+      "published": "2026-08-17T09:18:01.000Z",
+      "context": "http://127.0.0.1:38159/threads/dagmar-trigger",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:d8bcd5974baecef06986c476e7bfff9312910e2f483d0264f45a3b9af519306f",
+      "object": {
+        "id": "http://127.0.0.1:38159/agents/atl-uw/proposals/dagmar-ii",
+        "type": "afp:Proposal",
+        "afp:hub": "http://127.0.0.1:38159/hubs/windward",
+        "afp:round": "http://127.0.0.1:38159/rounds/dagmar-ii",
+        "content": "Did Storm Dagmar cross the contract's pinned parametric thresholds?",
+        "afp:options": [
+          "yes",
+          "no"
+        ],
+        "afp:quorumSnapshot": "sha256:e4c85cb33596ee0f65f2b0eb4259783786b418dbe1929d1376a9e65bb5a00a51",
+        "afp:voters": [
+          "http://127.0.0.1:36727/agents/mer-uw",
+          "http://127.0.0.1:38159/agents/atl-uw",
+          "http://127.0.0.1:40309/agents/pel-uw",
+          "http://127.0.0.1:35437/agents/anc-uw",
+          "http://127.0.0.1:37593/agents/har-uw"
+        ],
+        "afp:voterWeights": {
+          "http://127.0.0.1:36727/agents/mer-uw": 1,
+          "http://127.0.0.1:38159/agents/atl-uw": 1,
+          "http://127.0.0.1:40309/agents/pel-uw": 1,
+          "http://127.0.0.1:35437/agents/anc-uw": 1,
+          "http://127.0.0.1:37593/agents/har-uw": 1
+        },
+        "afp:deadline": "2026-08-20T09:18:02.000Z",
+        "afp:quorumRule": {
+          "afp:form": "explicit",
+          "afp:threshold": 4
+        },
+        "afp:binding": "joint",
+        "afp:level": 1,
+        "afp:successionRule": {
+          "afp:form": "snapshot-order"
+        },
+        "afp:supersedesRound": "sha256:4468affa50b1661dc6566a682569c115c997ccd5b8cb8011d5c78918b5c83f63"
+      },
+      "afp:actingAs": "http://127.0.0.1:38159/agents/atl-uw",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:18:01.000Z",
+        "verificationMethod": "http://127.0.0.1:38159/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "zqAXcWkqGHrmqp6cuyvVeKANdv5X2nkpJK22n6N3mHVaiEL8htLFNy93F2VQrYnuzTovx4RjrJiWP594YM1KFwjR"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "http://127.0.0.1:38159/agents/atl-uw/activities/0003",
+      "type": "Create",
+      "actor": "http://127.0.0.1:38159/agents/atl-uw",
+      "to": [],
+      "published": "2026-08-17T09:20:08.000Z",
+      "context": "http://127.0.0.1:38159/threads/dagmar-trigger",
+      "afp:visibility": "internal",
+      "afp:prevActivity": "sha256:d6cc813632af82e734469993a32fb38056afdc05051eefb533d85be09f3359fb",
+      "object": {
+        "id": "http://127.0.0.1:38159/agents/atl-uw/errors/undeliverable-33",
+        "type": "afp:Error",
+        "afp:correlationId": "http://127.0.0.1:38159/agents/atl-uw/activities/0002",
+        "afp:errorCode": "afp:err:undeliverable",
+        "content": "delivery to http://127.0.0.1:38159/hubs/windward failed after 5 attempts: inbox POST to http://127.0.0.1:38159/hubs/windward/inbox refused: 403",
+        "attributedTo": "http://127.0.0.1:38159/agents/atl-uw"
+      },
+      "afp:actingAs": "http://127.0.0.1:38159/agents/atl-uw",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:20:08.000Z",
+        "verificationMethod": "http://127.0.0.1:38159/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "zjJUacykTtjyYuyWLrKWnVhHiwKyBh7WQqPo6EinibeB63h9jK7yTDpr9HziTasi3HswiQkU8ngQmmgQJQ23i83x"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "http://127.0.0.1:38159/agents/atl-uw/activities/0004",
+      "type": "Create",
+      "actor": "http://127.0.0.1:38159/agents/atl-uw",
+      "to": [
+        "http://127.0.0.1:38159/hubs/windward"
+      ],
+      "published": "2026-08-17T09:20:22.000Z",
+      "context": "http://127.0.0.1:38159/threads/dagmar-trigger",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:57d15c3836b0be7ce28d5d6fac1e1e88ee1a38921b9c6e75763f89c709401007",
+      "object": {
+        "id": "http://127.0.0.1:38159/agents/atl-uw/votes/meridian-seat/prepare/1",
+        "type": "afp:Vote",
+        "afp:hub": "http://127.0.0.1:38159/hubs/windward",
+        "afp:round": "http://127.0.0.1:38159/rounds/meridian-seat",
+        "afp:proposalHash": "sha256:758c01bccb93dd34f1a983289a6d60118f6bbef0b2b6afe72e97206aeae796ba",
+        "afp:quorumSnapshot": "sha256:a7ab06b084906004bb09f2b1a6d1af61b2c5a14a340cb02952471be616e05ca1",
+        "value": "expel",
+        "afp:phase": "prepare",
+        "afp:seqNo": 1
+      },
+      "afp:actingAs": "http://127.0.0.1:38159/agents/atl-uw",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:20:22.000Z",
+        "verificationMethod": "http://127.0.0.1:38159/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z59x64LrMJ46N1GXk7u1aiG5aNc16fh1e19AbmFZx1M68p3d9x5cDgtJtL9bNKwwsnRwZGsumcLtyCYdFGXjaQdqo"
+      }
+    }
+  ]
+}

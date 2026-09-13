@@ -1,0 +1,181 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "http://127.0.0.1:36727/actor/outbox",
+  "type": "OrderedCollection",
+  "attributedTo": "http://127.0.0.1:36727/actor",
+  "totalItems": 5,
+  "orderedItems": [
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "http://127.0.0.1:36727/actor/activities/0001",
+      "type": "afp:Vouch",
+      "actor": "http://127.0.0.1:36727/actor",
+      "to": [],
+      "published": "2026-08-17T09:00:05.000Z",
+      "context": "http://127.0.0.1:36727/threads/roster",
+      "afp:visibility": "public",
+      "object": {
+        "type": "afp:RosterEntry",
+        "agent": "http://127.0.0.1:36727/agents/mer-uw",
+        "status": "active",
+        "afp:keyCustody": "instance",
+        "afp:capabilities": [
+          "afp:cap:assess"
+        ],
+        "since": "2026-08-17T09:00:05.000Z"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:05.000Z",
+        "verificationMethod": "http://127.0.0.1:36727/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z3YCQqD2HKUJhMSsG7RZSRebeXrxFM7wRPQgpPq4K8CGvFWbjquL7jcpbN7HjeYZWKqc6Hin6vxAWToX145STXNRx"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "http://127.0.0.1:36727/actor/activities/0002",
+      "type": "Create",
+      "actor": "http://127.0.0.1:36727/actor",
+      "to": [
+        "http://127.0.0.1:38159/actor"
+      ],
+      "published": "2026-08-17T09:00:42.000Z",
+      "context": "http://127.0.0.1:38159/threads/fed",
+      "afp:visibility": "parties",
+      "object": {
+        "type": "afp:FederationAgreement",
+        "afp:parties": [
+          "http://127.0.0.1:38159/actor",
+          "http://127.0.0.1:36727/actor"
+        ],
+        "afp:grants": [
+          {
+            "afp:grantType": "direct-delegation",
+            "afp:capabilities": [
+              "afp:cap:assess"
+            ]
+          },
+          {
+            "afp:grantType": "hub",
+            "afp:hub": "http://127.0.0.1:38159/hubs/windward"
+          }
+        ],
+        "afp:expires": "2026-08-21T09:00:12.000Z"
+      },
+      "afp:prevActivity": "sha256:499b28d97a383c7a7ef6fb8e3d6e81118525efe3ff5dc47e4c0491e95c50d57c",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:42.000Z",
+        "verificationMethod": "http://127.0.0.1:36727/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z4NC4VfgAzH4uy1bykfDrRr6bTBxNxYkN541YP2ySsStHYhKiUFm9rmsZK1JptFf56AL2sR22zUeUTaxpvhrBpeWo"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "http://127.0.0.1:36727/actor/activities/0003",
+      "type": "Follow",
+      "actor": "http://127.0.0.1:36727/actor",
+      "to": [
+        "http://127.0.0.1:38159/hubs/windward"
+      ],
+      "published": "2026-08-17T09:03:24.000Z",
+      "context": "http://127.0.0.1:36727/threads/seats",
+      "afp:visibility": "public",
+      "afp:prevActivity": "sha256:da498e2c1abf0a9202d07d9f259242690fc9a2210b56c67870656157bee984d7",
+      "object": "http://127.0.0.1:38159/hubs/windward",
+      "afp:hub": "http://127.0.0.1:38159/hubs/windward",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:03:24.000Z",
+        "verificationMethod": "http://127.0.0.1:36727/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z3MXXFhsLLkJrDVGamvxMNfeVWKK1bs6mihpZwYxxCou4gTGpuyGsWXdPoG7UMuov3vDrafHM9gg75GFNQwKPKVjh"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "http://127.0.0.1:36727/actor/activities/0004",
+      "type": "afp:Enroll",
+      "actor": "http://127.0.0.1:36727/actor",
+      "to": [
+        "http://127.0.0.1:38159/hubs/windward"
+      ],
+      "published": "2026-08-17T09:04:49.000Z",
+      "context": "http://127.0.0.1:38159/threads/enroll",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:82c7edeae8f8b895757893073eae39da7086d41fb6cfa59492ab00db31c0c13c",
+      "object": "http://127.0.0.1:36727/agents/mer-uw",
+      "target": "http://127.0.0.1:38159/hubs/windward",
+      "afp:hub": "http://127.0.0.1:38159/hubs/windward",
+      "afp:capabilities": [
+        "afp:cap:assess"
+      ],
+      "afp:hubKey": "http://127.0.0.1:36727/agents/mer-uw#hub-key-windward",
+      "afp:role": "member",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:04:49.000Z",
+        "verificationMethod": "http://127.0.0.1:36727/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z5HxCDD9XzFTcScMMg2nQE85f9CgYW4ZoeeWeZcbw2hsriMZZTAw32WNxARDzmAvEespaRSXQ9bctECTnzbewrD1s"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "http://127.0.0.1:36727/actor/activities/0005",
+      "type": "Create",
+      "actor": "http://127.0.0.1:36727/actor",
+      "to": [],
+      "published": "2026-08-17T09:20:13.000Z",
+      "context": "http://127.0.0.1:38159/threads/dagmar-trigger",
+      "afp:visibility": "parties",
+      "afp:prevActivity": "sha256:5885800fcaff33540625e3480f732960a656accdbb364bc40955ee26acd04849",
+      "object": {
+        "id": "http://127.0.0.1:36727/actor/activities/0005#key-compromise-claim",
+        "type": "afp:KeyCompromiseClaim",
+        "afp:proof": "sha256:caa8f28e8dd38b3642f2213dae567b134c1177b5a6e50c4600843fd7485d0efd",
+        "afp:verificationMethod": "http://127.0.0.1:36727/actor#ed25519-key",
+        "afp:since": "2026-08-15T21:20:12.000Z",
+        "content": "Our signing key was in the hands of a third party from the night of the 18th. We did not cast either of those ballots and we are not asking anyone to take that on trust."
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:20:13.000Z",
+        "verificationMethod": "http://127.0.0.1:36727/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z3sAep8gmB39xLFKEaXBypuHJnxoXywfb45apHAzf1JWUNHw2GSzxyxofgDBumHJDMEwfdiBcECjsGWZ4stRmpqQz"
+      }
+    }
+  ]
+}

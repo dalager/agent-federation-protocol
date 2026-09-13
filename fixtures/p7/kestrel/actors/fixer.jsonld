@@ -1,0 +1,35 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "http://127.0.0.1:36411/agents/fixer",
+  "type": "Service",
+  "name": "fixer",
+  "preferredUsername": "fixer",
+  "afp:operatedBy": "http://127.0.0.1:36411/actor",
+  "afp:capabilities": [
+    "afp:cap:support"
+  ],
+  "inbox": "http://127.0.0.1:36411/agents/fixer/inbox",
+  "outbox": "http://127.0.0.1:36411/agents/fixer/outbox",
+  "afp:visibility": "public",
+  "assertionMethod": [
+    {
+      "id": "http://127.0.0.1:36411/agents/fixer#ed25519-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:36411/agents/fixer",
+      "publicKeyMultibase": "z6MkmexxWY91Jd6Ujhf3TWxfZTn2kpr6AdvcGWH8TQTvkSfs"
+    }
+  ],
+  "authentication": [
+    {
+      "id": "http://127.0.0.1:36411/agents/fixer#transport-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:36411/agents/fixer",
+      "publicKeyMultibase": "z6Mkefq4q69V7DyaqFAjKUXHPXcMr6hz2TJW1A6VWZLC3Pb6",
+      "afp:custody": "file"
+    }
+  ]
+}

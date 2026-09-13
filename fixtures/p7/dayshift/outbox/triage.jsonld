@@ -1,0 +1,167 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "http://127.0.0.1:32977/agents/triage/outbox",
+  "type": "OrderedCollection",
+  "attributedTo": "http://127.0.0.1:32977/agents/triage",
+  "totalItems": 3,
+  "orderedItems": [
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "http://127.0.0.1:32977/agents/triage/activities/0001",
+      "type": "Create",
+      "actor": "http://127.0.0.1:32977/agents/triage",
+      "to": [
+        "http://127.0.0.1:46689/hubs/nightdesk"
+      ],
+      "published": "2026-08-20T12:13:30.000Z",
+      "context": "http://127.0.0.1:46689/threads/nightdesk-q3",
+      "afp:visibility": "hub",
+      "object": {
+        "id": "http://127.0.0.1:32977/agents/triage/votes/lantern-seat",
+        "type": "afp:Vote",
+        "afp:hub": "http://127.0.0.1:46689/hubs/nightdesk",
+        "afp:round": "http://127.0.0.1:46689/rounds/lantern-seat",
+        "afp:proposalHash": "sha256:344d3acf27c817681d6ea2733ce17b1b551635402291441343c950e0b977f167",
+        "afp:quorumSnapshot": "sha256:5afa74f99b28394923cd3762a81b02fa9a74110bb2b0946bff41c0bffaf2ef05",
+        "value": "expel"
+      },
+      "afp:actingAs": "http://127.0.0.1:32977/agents/triage",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-20T12:13:30.000Z",
+        "verificationMethod": "http://127.0.0.1:32977/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z5do7RsHcYiJsdKPaGC9Y4SHSmGDPEBCX7zveAzguDpYgKwNGj6NTaByBKwTLQ28JEqqvkxgH1f33dV7zftA2mUDz"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "http://127.0.0.1:32977/agents/triage/activities/0002",
+      "type": "Create",
+      "actor": "http://127.0.0.1:32977/agents/triage",
+      "to": [],
+      "published": "2026-08-22T14:35:15.000Z",
+      "context": "http://127.0.0.1:46689/threads/nightdesk-q3",
+      "afp:visibility": "public",
+      "afp:prevActivity": "sha256:a02fa4dd9c2c33be33bc1032279d0b36a916944a8fb41fb6c96080ff9d21a821",
+      "object": {
+        "id": "http://127.0.0.1:32977/agents/triage/summaries/2026-q3",
+        "type": "afp:ContributionSummary",
+        "afp:hub": "http://127.0.0.1:46689/hubs/nightdesk",
+        "afp:computedBy": "http://127.0.0.1:32977/actor",
+        "afp:frame": {
+          "afp:periodRule": {
+            "afp:form": "hub-observed",
+            "afp:hub": "http://127.0.0.1:46689/hubs/nightdesk",
+            "afp:from": "sha256:e254649367c40de02b42c537ba49b12c40caa01ce6d972fbb2e9c1f6575d7553",
+            "afp:to": "sha256:ce3e6714bcdd93a8423996beece6f7e677f518f79c870e499122aded9da498ce"
+          },
+          "afp:inputScope": {
+            "afp:visibility": [
+              "public",
+              "hub"
+            ]
+          },
+          "afp:splitRule": {
+            "afp:form": "declared-shares"
+          },
+          "afp:vocabulary": "v3.30"
+        },
+        "afp:denominator": 4,
+        "afp:entries": [
+          {
+            "afp:operator": "http://127.0.0.1:32977/actor",
+            "afp:credited": 1
+          },
+          {
+            "afp:operator": "http://127.0.0.1:36411/actor",
+            "afp:credited": 3
+          },
+          {
+            "afp:operator": "http://127.0.0.1:39145/actor",
+            "afp:credited": 4
+          },
+          {
+            "afp:operator": "http://127.0.0.1:46689/actor",
+            "afp:credited": 4
+          }
+        ],
+        "afp:inputHash": "sha256:03bcbab01653f02f1b5ab5131b79b0f66947cf544b95cccdebf9c0aede59d385",
+        "afp:period": {
+          "start": "2026-07-01T00:00:00.000Z",
+          "end": "2026-10-01T00:00:00.000Z"
+        },
+        "afp:unreadable": [
+          {
+            "afp:operator": "http://127.0.0.1:46689/actor",
+            "afp:count": 1
+          }
+        ],
+        "afp:qualified": [],
+        "afp:membership": [
+          {
+            "agent": "http://127.0.0.1:39145/agents/fixer",
+            "afp:act": "afp:MemberExpel"
+          }
+        ]
+      },
+      "afp:actingAs": "http://127.0.0.1:32977/agents/triage",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-22T14:35:15.000Z",
+        "verificationMethod": "http://127.0.0.1:32977/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z5xBGeCVfskiVca1cLyrf2tWzBTu1vGU6BqifF561M8Q5sXz9esDaGKzwhVLUSC6TFK6Dmn4LHYaGZC57R2uPEpda"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "http://127.0.0.1:32977/agents/triage/activities/0003",
+      "type": "Create",
+      "actor": "http://127.0.0.1:32977/agents/triage",
+      "to": [
+        "http://127.0.0.1:46689/hubs/nightdesk"
+      ],
+      "published": "2026-08-22T14:35:41.000Z",
+      "context": "http://127.0.0.1:46689/threads/nightdesk-q3",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:e5ef9f34a5f5c769fdc215e201897454503fe5dd1b362527cd7b6e7b47ea606f",
+      "object": {
+        "id": "http://127.0.0.1:32977/agents/triage/votes/ratify-q3",
+        "type": "afp:Vote",
+        "afp:hub": "http://127.0.0.1:46689/hubs/nightdesk",
+        "afp:round": "http://127.0.0.1:46689/rounds/ratify-2026-q3",
+        "afp:proposalHash": "sha256:b84452cd172052e0d5974ac008558bc98d6bf2bee84e73e16b4563296eab56a5",
+        "afp:quorumSnapshot": "sha256:5afa74f99b28394923cd3762a81b02fa9a74110bb2b0946bff41c0bffaf2ef05",
+        "value": "http://127.0.0.1:46689/agents/fixer/summaries/2026-q3-corrected"
+      },
+      "afp:actingAs": "http://127.0.0.1:32977/agents/triage",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-22T14:35:41.000Z",
+        "verificationMethod": "http://127.0.0.1:32977/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z56xxukdgRnTYqRDs5ZduzvS41gryBJncwVBSvD3iZCC3y7Vgeypv64aX2a5AWJ9hvF5mEESn9t6yfBWXh1GHxaib"
+      }
+    }
+  ]
+}

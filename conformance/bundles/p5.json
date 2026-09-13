@@ -1,0 +1,10 @@
+{
+  "fixture": "../fixtures/p5",
+  "bundles": [
+    "alpha",
+    "bravo",
+    "gamma"
+  ],
+  "thread": "http://127.0.0.1:36127/threads/incident-9",
+  "verdict": "pass"
+}

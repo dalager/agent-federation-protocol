@@ -135,7 +135,7 @@ choice, recorded as such, and this ledger records it the same way.
 
 | ID | Origin | Parked item | Trigger that reopens it |
 |---|---|---|---|
-| **L22** | [ADR-0001 Decision 5](0001-p1-stack.md#5-the-verifier-is-a-second-implementation-in-go-sharing-no-code), [§ Revised under contact](0001-p1-stack.md#revised-under-contact) | The Go verifier port ("stays open and is a small job" — no longer small at fourteen modules) | An auditor who cannot run Python; airgapped delivery becoming the primary mode |
+| **L22** | [ADR-0001 Decision 5](0001-p1-stack.md#5-the-verifier-is-a-second-implementation-in-go-sharing-no-code), [§ Revised under contact](0001-p1-stack.md#revised-under-contact) | The Go verifier port ("stays open and is a small job" — no longer small at fourteen modules); if the trigger fires, the conformance kit ([ADR-0034](0034-release-conformance-and-disclosure.md) Decision 3) is what proves the port | An auditor who cannot run Python; airgapped delivery becoming the primary mode |
 | **L23** | [ADR-0001 § Consequences](0001-p1-stack.md#consequences) | Single-binary instance (`bun build --compile` or a Go rewrite) | Airgapped deployment becomes the primary delivery mode |
 | **L24** | [ADR-0016 Decision 4](0016-p5-transport.md#4-the-digest-is-the-version-vector-made-answerable-by-provenance) | `afp:merkleRoot` — specified, deferred, emitted by nothing | A hub-scoped store large enough that the version vector is the expensive part of the exchange |
 | **L25** | [ADR-0016 § Consequences](0016-p5-transport.md#consequences) | A windowing rule for a replica behind by more than one exchange can carry, and a way to say "partially converged" on the record | A replica that far behind |

@@ -1,0 +1,35 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "http://127.0.0.1:36453/hubs/bridge",
+  "type": [
+    "Group",
+    "afp:Hub"
+  ],
+  "name": "bridge",
+  "preferredUsername": "bridge",
+  "inbox": "http://127.0.0.1:36453/hubs/bridge/inbox",
+  "outbox": "http://127.0.0.1:36453/hubs/bridge/outbox",
+  "followers": "http://127.0.0.1:36453/hubs/bridge/followers",
+  "afp:visibility": "public",
+  "afp:operatedBy": "http://127.0.0.1:36453/actor",
+  "assertionMethod": [
+    {
+      "id": "http://127.0.0.1:36453/hubs/bridge#ed25519-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:36453/hubs/bridge",
+      "publicKeyMultibase": "z6MkvDGr9VE71vxvWNiQtMMYEhGqsZemEo5JLziYma749qv8"
+    }
+  ],
+  "authentication": [
+    {
+      "id": "http://127.0.0.1:36453/hubs/bridge#transport-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:36453/hubs/bridge",
+      "publicKeyMultibase": "z6MkvKYCtkU1Bcg6tNTv46Lzgszon6xj7HLZkyaPnG9E1dop"
+    }
+  ]
+}

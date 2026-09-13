@@ -158,7 +158,12 @@ built in its ADR.
 | C7 | 0031 | built, less a hub hosted by `serve` itself for the converge loop to advance — the scheduler takes replicas from an embedding program until then |
 | C8 | 0032 | built |
 | C9 | 0033 | built |
-| C10 | 0034 | proposed |
+| C10 | 0034 | built |
+
+Every claim is now built or built-less-a-named-remainder; scenario 15 is not written.
+What stands between the program and "closed" is scenario 15 (ADR-0030 D3) and the four
+named remainders: ADR-0035's remote signer, a hub hosted by `serve` itself, scenario 15
+itself, and the first green CI run and first signed release.
 
 ## References
 

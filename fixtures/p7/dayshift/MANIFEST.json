@@ -1,0 +1,64 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "format": "afp-export/1",
+  "instance": "http://127.0.0.1:32977/actor",
+  "exportedAt": "2026-09-13T19:01:26.769Z",
+  "actors": [
+    "triage"
+  ],
+  "activities": 11,
+  "artifacts": 0,
+  "cryptosuite": "eddsa-jcs-2022",
+  "afp:keyHistory": [
+    {
+      "afp:actor": "http://127.0.0.1:32977/actor",
+      "id": "http://127.0.0.1:32977/actor#ed25519-key",
+      "publicKeyMultibase": "z6Mkup95SkBohKucCPesCEB1dTPeEAomYztr1HTaH2BAhnAj"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:32977/actor",
+      "id": "http://127.0.0.1:32977/actor#transport-key",
+      "publicKeyMultibase": "z6MktzXRbvSpnnSAK1BtTEJGSs4JbVPVjUNHmcinb1fFR6ZT"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:32977/agents/triage",
+      "id": "http://127.0.0.1:32977/agents/triage#ed25519-key",
+      "publicKeyMultibase": "z6MkoQZ8oT9qgc8wjuwBBC1Uut3uxCHo4QE2LUxp2eP5CBN5"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:32977/agents/triage",
+      "id": "http://127.0.0.1:32977/agents/triage#hub-key-nightdesk",
+      "publicKeyMultibase": "z6MkvV68L88VYbgcSJGbFEMYNr9h9YReyYrY5KPorKgEh9vK"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:32977/agents/triage",
+      "id": "http://127.0.0.1:32977/agents/triage#transport-key",
+      "publicKeyMultibase": "z6Mkg2Kc7RFYbbQScJr2Pizy6AYkFC5TaDuoTU4SLDF9m2PY"
+    }
+  ],
+  "afp:members": [
+    "actors/triage.jsonld",
+    "instance.jsonld",
+    "outbox/instance.jsonld",
+    "outbox/triage.jsonld",
+    "policy.jsonld",
+    "received.jsonld",
+    "roster.jsonld"
+  ],
+  "afp:policy": {
+    "id": "http://127.0.0.1:32977/afp/policy",
+    "afp:digest": "sha256:f7ec2cda47499422eaeece42702df63a0657158dd21d999063a79c4c301865a1"
+  },
+  "proof": {
+    "type": "DataIntegrityProof",
+    "cryptosuite": "eddsa-jcs-2022",
+    "created": "2026-09-13T19:01:26.769Z",
+    "verificationMethod": "http://127.0.0.1:32977/actor#ed25519-key",
+    "proofPurpose": "assertionMethod",
+    "proofValue": "z5ozGmkt1ZxJQ7zRRa1BYzaZddvatNP2CqiS3JnTFss7jF1sT8LVYZJ3hHk5eWF5bhyLAHzcfKuPVn6GZhiDhjbeE"
+  }
+}

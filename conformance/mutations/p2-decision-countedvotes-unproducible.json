@@ -1,0 +1,17 @@
+{
+  "bundle": "p2",
+  "domain": "export",
+  "outbox": "hub-policy-hub",
+  "op": "append",
+  "select": {
+    "objectType": "afp:DecisionRecord"
+  },
+  "path": "object.afp:countedVotes",
+  "value": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "expect": {
+    "verdict": "fail",
+    "failing": [
+      "evidence-set completeness"
+    ]
+  }
+}

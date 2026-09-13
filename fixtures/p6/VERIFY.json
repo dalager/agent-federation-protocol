@@ -1,0 +1,10 @@
+{
+  "bundles": [
+    "atlas",
+    "meridian",
+    "pelican",
+    "anchor",
+    "harbor"
+  ],
+  "thread": null
+}

@@ -1,0 +1,8 @@
+{
+  "fixture": "../fixtures/p8",
+  "bundles": [
+    "export"
+  ],
+  "thread": "http://127.0.0.1:35517/threads/bug-99",
+  "verdict": "pass"
+}

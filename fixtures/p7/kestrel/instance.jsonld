@@ -1,0 +1,37 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "http://127.0.0.1:36411/actor",
+  "type": [
+    "Application",
+    "afp:Instance"
+  ],
+  "name": "kestrel instance",
+  "preferredUsername": "instance",
+  "afp:operator": "Kestrel Support",
+  "inbox": "http://127.0.0.1:36411/actor/inbox",
+  "outbox": "http://127.0.0.1:36411/actor/outbox",
+  "following": "http://127.0.0.1:36411/actor/following",
+  "afp:roster": "http://127.0.0.1:36411/roster",
+  "afp:policy": "http://127.0.0.1:36411/afp/policy",
+  "afp:visibility": "public",
+  "assertionMethod": [
+    {
+      "id": "http://127.0.0.1:36411/actor#ed25519-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:36411/actor",
+      "publicKeyMultibase": "z6MkoeVhDd2Z8HqoxXhLDGR23mFC4PZWppYZvdTQ8m2Csdq9"
+    }
+  ],
+  "authentication": [
+    {
+      "id": "http://127.0.0.1:36411/actor#transport-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:36411/actor",
+      "publicKeyMultibase": "z6MkpSH44fVow136j6CGW8j7foWG4p6A8EGMbbzFtJrjBVjY"
+    }
+  ]
+}

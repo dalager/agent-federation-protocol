@@ -1,0 +1,8 @@
+{
+  "bundles": [
+    "alpha",
+    "bravo",
+    "gamma"
+  ],
+  "thread": "http://127.0.0.1:36127/threads/incident-9"
+}

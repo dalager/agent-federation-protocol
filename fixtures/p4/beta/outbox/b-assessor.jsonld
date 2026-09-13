@@ -1,0 +1,79 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "http://127.0.0.1:45089/agents/b-assessor/outbox",
+  "type": "OrderedCollection",
+  "attributedTo": "http://127.0.0.1:45089/agents/b-assessor",
+  "totalItems": 3,
+  "orderedItems": [
+    {
+      "type": "afp:Redacted",
+      "afp:digest": "sha256:39c8810cf8073234ab711adda5042ac67355104fa791d4451ce5e4228a24711c",
+      "afp:visibility": "out-of-scope"
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "http://127.0.0.1:45089/agents/b-assessor/activities/0002",
+      "type": "Accept",
+      "actor": "http://127.0.0.1:45089/agents/b-assessor",
+      "to": [
+        "http://127.0.0.1:40923/agents/a-lead"
+      ],
+      "published": "2026-08-17T09:01:28.000Z",
+      "context": "http://127.0.0.1:40923/threads/sub-1",
+      "afp:visibility": "parties",
+      "afp:prevActivity": "sha256:39c8810cf8073234ab711adda5042ac67355104fa791d4451ce5e4228a24711c",
+      "object": "http://127.0.0.1:40923/agents/a-lead/activities/0001",
+      "afp:correlationId": "sub-1",
+      "afp:actingAs": "http://127.0.0.1:45089/agents/b-assessor",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:01:28.000Z",
+        "verificationMethod": "http://127.0.0.1:45089/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z4EuRkMpeqej7wY7CWJEg7uW34vfjXSprvcMHtCuxawomWBGqcG2dvsdfH4W2caiTqomK6F94VUKJbMDxnDcRSN6r"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "http://127.0.0.1:45089/agents/b-assessor/activities/0003",
+      "type": "Create",
+      "actor": "http://127.0.0.1:45089/agents/b-assessor",
+      "to": [
+        "http://127.0.0.1:40923/agents/a-lead"
+      ],
+      "published": "2026-08-17T09:01:30.000Z",
+      "context": "http://127.0.0.1:40923/threads/sub-1",
+      "afp:visibility": "parties",
+      "afp:prevActivity": "sha256:a6809181d42f58129b59ba50b8212238e24e90b251de6bccfe110f4d29c0aa2e",
+      "object": {
+        "id": "http://127.0.0.1:45089/agents/b-assessor/results/sub-1",
+        "type": "afp:Result",
+        "afp:correlationId": "sub-1",
+        "content": "b-assessor: assessed — integration is sound, two risks noted",
+        "attributedTo": "http://127.0.0.1:45089/agents/b-assessor"
+      },
+      "afp:actingAs": "http://127.0.0.1:45089/agents/b-assessor",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:01:30.000Z",
+        "verificationMethod": "http://127.0.0.1:45089/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z4QvFMQCpKFTy9ayGRQxw9oANpxPFynQ4H8PKoov6aKxnT6M3dU4qbBJ3QqC3PCfbayxRnNnhvTuVGBPX6SXx6Q1J"
+      }
+    }
+  ]
+}

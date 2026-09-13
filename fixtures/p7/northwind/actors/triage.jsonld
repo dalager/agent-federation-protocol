@@ -1,0 +1,35 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "http://127.0.0.1:46689/agents/triage",
+  "type": "Service",
+  "name": "triage",
+  "preferredUsername": "triage",
+  "afp:operatedBy": "http://127.0.0.1:46689/actor",
+  "afp:capabilities": [
+    "afp:cap:support"
+  ],
+  "inbox": "http://127.0.0.1:46689/agents/triage/inbox",
+  "outbox": "http://127.0.0.1:46689/agents/triage/outbox",
+  "afp:visibility": "public",
+  "assertionMethod": [
+    {
+      "id": "http://127.0.0.1:46689/agents/triage#ed25519-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:46689/agents/triage",
+      "publicKeyMultibase": "z6MkphVbqUMf6rAa964wcKLPRW2c1RuCJfwnXim7ybsFubzc"
+    }
+  ],
+  "authentication": [
+    {
+      "id": "http://127.0.0.1:46689/agents/triage#transport-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:46689/agents/triage",
+      "publicKeyMultibase": "z6Mks3C2K7VHpPq3LQQTL4rfktVVy6nmnuibvBjUtAY5xN1r",
+      "afp:custody": "file"
+    }
+  ]
+}

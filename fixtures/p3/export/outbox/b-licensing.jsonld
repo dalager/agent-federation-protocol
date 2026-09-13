@@ -1,0 +1,180 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "https://alpha.operator.local/agents/b-licensing/outbox",
+  "type": "OrderedCollection",
+  "attributedTo": "https://alpha.operator.local/agents/b-licensing",
+  "totalItems": 5,
+  "orderedItems": [
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/agents/b-licensing/activities/0001",
+      "type": "afp:BidCommit",
+      "actor": "https://alpha.operator.local/agents/b-licensing",
+      "to": [
+        "https://alpha.operator.local/hubs/estimation-hub"
+      ],
+      "published": "2026-08-17T09:10:49.000Z",
+      "context": "https://alpha.operator.local/threads/q-88-migration-estimate",
+      "afp:visibility": "hub",
+      "object": "https://alpha.operator.local/hubs/estimation-hub/tasks/q-88",
+      "afp:hub": "https://alpha.operator.local/hubs/estimation-hub",
+      "afp:commitment": "sha256:a6c9654ae7bb940fa13d1cf7dc6438758b7349edbb70e199818471a20cd58ac1",
+      "afp:actingAs": "https://alpha.operator.local/agents/b-licensing",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:10:49.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z3ySUnJTvKC4oSGUaCFWU6k626ZE5f9rgQCcAcwcHSH9dhWGFChkieFvE3WFcgF74MLnsRkyxftsXdr6Zy3iWWxNE"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/agents/b-licensing/activities/0002",
+      "type": "afp:BidReveal",
+      "actor": "https://alpha.operator.local/agents/b-licensing",
+      "to": [
+        "https://alpha.operator.local/hubs/estimation-hub"
+      ],
+      "published": "2026-08-17T09:30:07.000Z",
+      "context": "https://alpha.operator.local/threads/q-88-migration-estimate",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:b61d178fa27e79eb739198af17fe5d0cdbf7262d1054d2ce3fef825300a7d965",
+      "object": {
+        "type": "afp:Bid",
+        "afp:task": "https://alpha.operator.local/hubs/estimation-hub/tasks/q-88",
+        "afp:bidder": "https://alpha.operator.local/agents/b-licensing",
+        "afp:capabilityMatch": 80,
+        "afp:estimatedCost": {
+          "unit": "afp:compute-unit",
+          "value": 35
+        },
+        "afp:estimatedLatency": "PT4H",
+        "nonce": "nonce-b-licensing-q-88",
+        "afp:coverage": {
+          "licensing": 90,
+          "compliance": 65
+        }
+      },
+      "afp:hub": "https://alpha.operator.local/hubs/estimation-hub",
+      "afp:actingAs": "https://alpha.operator.local/agents/b-licensing",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:30:07.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z3q3z5x6XjMWVMbEFJcezpo5kcmb8DaDpGyyJsnmzrxxXzT95579jeixCYPUg65HgbWwVikt21DDWU9hBUaK9MPL5"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/agents/b-licensing/activities/0003",
+      "type": "Accept",
+      "actor": "https://alpha.operator.local/agents/b-licensing",
+      "to": [
+        "https://alpha.operator.local/hubs/estimation-hub"
+      ],
+      "published": "2026-08-17T09:30:28.000Z",
+      "context": "https://alpha.operator.local/threads/q-88-migration-estimate",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:f28849c07b0e741d0c1c93878c1a438660d7c554256c0f64f87b4f93f635bdf1",
+      "object": "https://alpha.operator.local/hubs/estimation-hub/awards/q-88",
+      "afp:correlationId": "q-88--b-licensing",
+      "afp:actingAs": "https://alpha.operator.local/agents/b-licensing",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:30:28.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z4TiTXogL123wrNkcNt4hJrdgmdFeqhFEd7V7zz8Um8AYyxmvZbfiXkABTWpt1Wa2xHqqcS2RCXyqKdUZxE8bwVws"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/agents/b-licensing/activities/0004",
+      "type": "Create",
+      "actor": "https://alpha.operator.local/agents/b-licensing",
+      "to": [
+        "https://alpha.operator.local/hubs/estimation-hub"
+      ],
+      "published": "2026-08-17T09:30:30.000Z",
+      "context": "https://alpha.operator.local/threads/q-88-migration-estimate",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:be9d9c43f2aa955c23f1aeec64925cfdff8fa8728170df94b35ed9094969af9e",
+      "object": {
+        "id": "https://alpha.operator.local/agents/b-licensing/results/q-88",
+        "type": "afp:Result",
+        "afp:correlationId": "q-88--b-licensing",
+        "content": "partial answer from b-licensing for q-88",
+        "attributedTo": "https://alpha.operator.local/agents/b-licensing",
+        "afp:producedBy": "stub"
+      },
+      "afp:actingAs": "https://alpha.operator.local/agents/b-licensing",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:30:30.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z2cSerb3qzjAUpmuxZjpPLFtX9iQgvULjpJh1vwCAWHhefwQ9XjV1CBWcH1K6c1Z3jceHXe1xt4ZFDrCqCvVJHWU8"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/agents/b-licensing/activities/0005",
+      "type": "Create",
+      "actor": "https://alpha.operator.local/agents/b-licensing",
+      "to": [
+        "https://alpha.operator.local/hubs/estimation-hub"
+      ],
+      "published": "2026-08-17T09:31:04.000Z",
+      "context": "https://alpha.operator.local/threads/q-88-migration-estimate",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:5dfe165ada609eeec7470c50a8295c548fb0d6a4831e9adf2347ebb1e49c9c0b",
+      "object": {
+        "id": "https://alpha.operator.local/agents/b-licensing/votes/https://alpha.operator.local/rounds/q-88-ratify",
+        "type": "afp:Vote",
+        "afp:round": "https://alpha.operator.local/rounds/q-88-ratify",
+        "afp:proposalHash": "sha256:3fc98787a4c1c7827bfc639f5541f5555cd86962f4efef42dc77393868d9b3b7",
+        "afp:quorumSnapshot": "sha256:7f2d23bd30572b1e5ec1cab22189a2ab80d4834de9834c99a392c66aff2bed71",
+        "value": "reject"
+      },
+      "afp:actingAs": "https://alpha.operator.local/agents/b-licensing",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:31:04.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z4498cNe4i7SexpJ2xMe6zNPUHW7qtqaTVeNo4tJGv7kvXBE47vqoxNeJuVsateZAohBjVN9SNApGXk4BRr84yabR"
+      }
+    }
+  ]
+}

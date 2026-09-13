@@ -1,0 +1,37 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "http://127.0.0.1:39145/actor",
+  "type": [
+    "Application",
+    "afp:Instance"
+  ],
+  "name": "lantern instance",
+  "preferredUsername": "instance",
+  "afp:operator": "Lantern Support",
+  "inbox": "http://127.0.0.1:39145/actor/inbox",
+  "outbox": "http://127.0.0.1:39145/actor/outbox",
+  "following": "http://127.0.0.1:39145/actor/following",
+  "afp:roster": "http://127.0.0.1:39145/roster",
+  "afp:policy": "http://127.0.0.1:39145/afp/policy",
+  "afp:visibility": "public",
+  "assertionMethod": [
+    {
+      "id": "http://127.0.0.1:39145/actor#ed25519-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:39145/actor",
+      "publicKeyMultibase": "z6MkeXLXoACg5enEswNupNiSp8F5xCmyBs17RpkMBnqPjAhk"
+    }
+  ],
+  "authentication": [
+    {
+      "id": "http://127.0.0.1:39145/actor#transport-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:39145/actor",
+      "publicKeyMultibase": "z6MkfrggmcGEFu1PJ8kmGkHc2wkeZTm6mG1qxPtzH52tErum"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "bundle": "p7",
+  "domain": "northwind",
+  "outbox": "fixer",
+  "op": "delete",
+  "select": {
+    "objectType": "afp:ContributionSummary"
+  },
+  "path": "object.afp:frame",
+  "expect": {
+    "verdict": "fail",
+    "failing": [
+      "summary frame is a known form"
+    ]
+  }
+}

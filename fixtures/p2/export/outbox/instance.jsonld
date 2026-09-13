@@ -1,0 +1,2052 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "https://alpha.operator.local/actor/outbox",
+  "type": "OrderedCollection",
+  "attributedTo": "https://alpha.operator.local/actor",
+  "totalItems": 62,
+  "orderedItems": [
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0001",
+      "type": "afp:Vouch",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [],
+      "published": "2026-08-17T09:00:01.000Z",
+      "context": "https://alpha.operator.local/threads/roster",
+      "afp:visibility": "public",
+      "object": {
+        "type": "afp:RosterEntry",
+        "agent": "https://alpha.operator.local/agents/v0",
+        "status": "active",
+        "afp:keyCustody": "instance",
+        "afp:capabilities": [
+          "afp:cap:vote"
+        ],
+        "since": "2026-08-17T09:00:01.000Z"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:01.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "zSVGLgNkjD7cLvW5V9kB7bmZfTZp5XfxNEZ65HbWZWUtLXRNx3fGMNcSBXnaMc2Nrqjp4nHWA9UwEbQrEqSfE87n"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0002",
+      "type": "afp:Vouch",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [],
+      "published": "2026-08-17T09:00:02.000Z",
+      "context": "https://alpha.operator.local/threads/roster",
+      "afp:visibility": "public",
+      "afp:prevActivity": "sha256:86d99d73f5be2548a7330000670b7793c57ec3c5b50afd58443371158df833db",
+      "object": {
+        "type": "afp:RosterEntry",
+        "agent": "https://alpha.operator.local/agents/v1",
+        "status": "active",
+        "afp:keyCustody": "instance",
+        "afp:capabilities": [
+          "afp:cap:vote"
+        ],
+        "since": "2026-08-17T09:00:02.000Z"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:02.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z469wm61gXbraosEvUkEXBifkUpwUyj4wGhZ6ZHr6RGuJoYNA5rjzQmEKMdM1HF8F5cTQYzPupuM3HytgmZT9PfGX"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0003",
+      "type": "afp:Vouch",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [],
+      "published": "2026-08-17T09:00:03.000Z",
+      "context": "https://alpha.operator.local/threads/roster",
+      "afp:visibility": "public",
+      "afp:prevActivity": "sha256:ba4a2fbd138c156329ff8eeb5d08e9e8fe4ab258ea1f1384bbca7a18bd10bf1b",
+      "object": {
+        "type": "afp:RosterEntry",
+        "agent": "https://alpha.operator.local/agents/v2",
+        "status": "active",
+        "afp:keyCustody": "instance",
+        "afp:capabilities": [
+          "afp:cap:vote"
+        ],
+        "since": "2026-08-17T09:00:03.000Z"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:03.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z3avcf2RRYjwrX7a23SHVVXJgmHuGxYJTwwDJEcgPhQNN9a5LcM5DYTN3cbnjHdvRwahRp6cKzNLsrymDsgbuek5H"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0004",
+      "type": "afp:Vouch",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [],
+      "published": "2026-08-17T09:00:04.000Z",
+      "context": "https://alpha.operator.local/threads/roster",
+      "afp:visibility": "public",
+      "afp:prevActivity": "sha256:80b1bf697337616301a965a608a39b3248fe241da8580f67f38692179574721e",
+      "object": {
+        "type": "afp:RosterEntry",
+        "agent": "https://alpha.operator.local/agents/v3",
+        "status": "active",
+        "afp:keyCustody": "instance",
+        "afp:capabilities": [
+          "afp:cap:vote"
+        ],
+        "since": "2026-08-17T09:00:04.000Z"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:04.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "zgdpfQyoiuaFyuk92tCcqMb4iPpXkedWGYFw2CuNSDd2ZoNZQnNM1w1KthXFF1QV4whEmpoT6nM18iNmQBLkVqs2"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0005",
+      "type": "afp:Vouch",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [],
+      "published": "2026-08-17T09:00:05.000Z",
+      "context": "https://alpha.operator.local/threads/roster",
+      "afp:visibility": "public",
+      "afp:prevActivity": "sha256:14d41394928be259be7ca7f29c98673e4b535671421c22fa2d2eba9c711890cd",
+      "object": {
+        "type": "afp:RosterEntry",
+        "agent": "https://alpha.operator.local/agents/v4",
+        "status": "active",
+        "afp:keyCustody": "instance",
+        "afp:capabilities": [
+          "afp:cap:vote"
+        ],
+        "since": "2026-08-17T09:00:05.000Z"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:05.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "za433i2r4fUVC1xAaYj1avsha5P5SCSE8uuSeXKVnFiD7cHGBRfQJRoL5fGwBEXPFR4Mw3qh9nywpamXdYBw9G2L"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0006",
+      "type": "afp:Vouch",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [],
+      "published": "2026-08-17T09:00:06.000Z",
+      "context": "https://alpha.operator.local/threads/roster",
+      "afp:visibility": "public",
+      "afp:prevActivity": "sha256:25b5de1c6e8b1a82654fe843cfd640661f823fd31f6ea296988b9ae2c5ef37fa",
+      "object": {
+        "type": "afp:RosterEntry",
+        "agent": "https://alpha.operator.local/agents/v5",
+        "status": "active",
+        "afp:keyCustody": "instance",
+        "afp:capabilities": [
+          "afp:cap:vote"
+        ],
+        "since": "2026-08-17T09:00:06.000Z"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:06.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "zXJYaurH8bwNsTRp63mBZgqb3ptVxXA1e1YtNqeeyMb7VeAVms58HYuTjL4j8LhhEHA9NcarARXxXk3a7fgN3VtC"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0007",
+      "type": "afp:Vouch",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [],
+      "published": "2026-08-17T09:00:07.000Z",
+      "context": "https://alpha.operator.local/threads/roster",
+      "afp:visibility": "public",
+      "afp:prevActivity": "sha256:9d584e407b33d1f5c545d65453a8d6167c3f8d7da2704c25abef94fd9f86e9d7",
+      "object": {
+        "type": "afp:RosterEntry",
+        "agent": "https://alpha.operator.local/agents/v6",
+        "status": "active",
+        "afp:keyCustody": "instance",
+        "afp:capabilities": [
+          "afp:cap:vote"
+        ],
+        "since": "2026-08-17T09:00:07.000Z"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:07.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z35qxyF4iU9Fp49L3pvssHYn8fR367fZjh8tsokhqpJZjKa2ZjtQb7V7qaGRv5Ce91ZWdk1JTdBZLCu21RpCRuRe3"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0008",
+      "type": "afp:Vouch",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [],
+      "published": "2026-08-17T09:00:08.000Z",
+      "context": "https://alpha.operator.local/threads/roster",
+      "afp:visibility": "public",
+      "afp:prevActivity": "sha256:6698cfa85fd737903c26b32338f57e67a1614e51751440bf895cf25d921c1a84",
+      "object": {
+        "type": "afp:RosterEntry",
+        "agent": "https://alpha.operator.local/agents/v7",
+        "status": "active",
+        "afp:keyCustody": "instance",
+        "afp:capabilities": [
+          "afp:cap:vote"
+        ],
+        "since": "2026-08-17T09:00:08.000Z"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:08.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z2dA1FcusZgxsLrfXNPLDscGH35bR4kZNCPi7kUiZBB2nq2q6n3bB8TCeKKRAaL4tSw34kwXSJD6JMzAW4gm2fmvN"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0009",
+      "type": "afp:Vouch",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [],
+      "published": "2026-08-17T09:00:09.000Z",
+      "context": "https://alpha.operator.local/threads/roster",
+      "afp:visibility": "public",
+      "afp:prevActivity": "sha256:7d4ba8e3c9f2ff03e1e76f01cef0489d2ab86cbab68a50211f3daf933ae0c1f8",
+      "object": {
+        "type": "afp:RosterEntry",
+        "agent": "https://alpha.operator.local/agents/v8",
+        "status": "active",
+        "afp:keyCustody": "instance",
+        "afp:capabilities": [
+          "afp:cap:vote"
+        ],
+        "since": "2026-08-17T09:00:09.000Z"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:09.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z3Ys56R8fayPptLR9Wp38YrwwPn3CCCuuV5NUB7kdfo9ThkPeuwoKRBdcExd6H4nAUXiVAf6ae5dcgC466MZWmvBa"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0010",
+      "type": "afp:Vouch",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [],
+      "published": "2026-08-17T09:00:10.000Z",
+      "context": "https://alpha.operator.local/threads/roster",
+      "afp:visibility": "public",
+      "afp:prevActivity": "sha256:7d9a29cee1b004c6909a1d7e86744bb9e6df86d09aa8571eb6243d0293b59379",
+      "object": {
+        "type": "afp:RosterEntry",
+        "agent": "https://alpha.operator.local/agents/v9",
+        "status": "active",
+        "afp:keyCustody": "instance",
+        "afp:capabilities": [
+          "afp:cap:vote"
+        ],
+        "since": "2026-08-17T09:00:10.000Z"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:10.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z2TjAuwvtGcBLQSBBy2naBR4XnFRNitMe4wZVBH3EWNohTTHf4NYzy1Mxja2MzFtG2vJ1Pc6NbV5fRxKUmYgv7Cqv"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0011",
+      "type": "afp:Vouch",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [],
+      "published": "2026-08-17T09:00:11.000Z",
+      "context": "https://alpha.operator.local/threads/roster",
+      "afp:visibility": "public",
+      "afp:prevActivity": "sha256:181bc0bfa8024657d45c1b7db1260bc3af39d207cf7af3043ca4799ed0848870",
+      "object": {
+        "type": "afp:RosterEntry",
+        "agent": "https://alpha.operator.local/agents/v10",
+        "status": "active",
+        "afp:keyCustody": "instance",
+        "afp:capabilities": [
+          "afp:cap:vote"
+        ],
+        "since": "2026-08-17T09:00:11.000Z"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:11.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z2SB5aCA9FqmY54rLEgqTvwzc9wBV3o8QhmAEZ3zS39CY6b94rZt1Cqpypa9EpiyL1RYxDDNkebgGnfMtMqKdzZAT"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0012",
+      "type": "afp:Vouch",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [],
+      "published": "2026-08-17T09:00:12.000Z",
+      "context": "https://alpha.operator.local/threads/roster",
+      "afp:visibility": "public",
+      "afp:prevActivity": "sha256:21af0c02f715d09534978d66f01c9b5801b4505c87e8c5e74f5cc475357bfb5f",
+      "object": {
+        "type": "afp:RosterEntry",
+        "agent": "https://alpha.operator.local/agents/v11",
+        "status": "active",
+        "afp:keyCustody": "instance",
+        "afp:capabilities": [
+          "afp:cap:vote"
+        ],
+        "since": "2026-08-17T09:00:12.000Z"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:12.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z2nsg2xYy3uYUpUepEHX6uwC1PSAukMZXuzZLtBAF2Hb2DJrFRak3Ubav4FXSheMa9mMSRdsiZqwZe3GqcM6nvrFy"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0013",
+      "type": "afp:Vouch",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [],
+      "published": "2026-08-17T09:00:13.000Z",
+      "context": "https://alpha.operator.local/threads/roster",
+      "afp:visibility": "public",
+      "afp:prevActivity": "sha256:43749cb1c79c7783b152e2a269caa844beade32708d22c2377adb7521f1354b6",
+      "object": {
+        "type": "afp:RosterEntry",
+        "agent": "https://alpha.operator.local/agents/v12",
+        "status": "active",
+        "afp:keyCustody": "instance",
+        "afp:capabilities": [
+          "afp:cap:vote"
+        ],
+        "since": "2026-08-17T09:00:13.000Z"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:13.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z55ipfT4Rbs6EuMBNSSx6YkCtPM24sQn6Y7onMfWKM9V2pB4TiLC2aLcYjJYbWdCJJ9sR526Q3ZJYjNmHfTvUgfZ6"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0014",
+      "type": "afp:Vouch",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [],
+      "published": "2026-08-17T09:00:14.000Z",
+      "context": "https://alpha.operator.local/threads/roster",
+      "afp:visibility": "public",
+      "afp:prevActivity": "sha256:0fa9116550b55442748dd438f8a7ecd1ccccf6a776cc704cf7caf537e8f2c601",
+      "object": {
+        "type": "afp:RosterEntry",
+        "agent": "https://alpha.operator.local/agents/v13",
+        "status": "active",
+        "afp:keyCustody": "instance",
+        "afp:capabilities": [
+          "afp:cap:vote"
+        ],
+        "since": "2026-08-17T09:00:14.000Z"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:14.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z2ekFCZMdWLR5mjrXJsGhEiWrsTKJtu82uRHYSojFmCoDD57WpaXFc9BFUpu7AwZc3QSXxDT1dMtBrw9YrGoxeYVZ"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0015",
+      "type": "afp:Vouch",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [],
+      "published": "2026-08-17T09:00:15.000Z",
+      "context": "https://alpha.operator.local/threads/roster",
+      "afp:visibility": "public",
+      "afp:prevActivity": "sha256:25642aacc251f3ad154b4d48b4e767f8d9985d351bd6d76d1169554c48188231",
+      "object": {
+        "type": "afp:RosterEntry",
+        "agent": "https://alpha.operator.local/agents/v14",
+        "status": "active",
+        "afp:keyCustody": "instance",
+        "afp:capabilities": [
+          "afp:cap:vote"
+        ],
+        "since": "2026-08-17T09:00:15.000Z"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:15.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z2HKh2HJAdrEAL8QUWBvm3asADJvNiJ6DwtLRGNfmKMnitwoNpjbu5jkWYRrdn1m9CKynDNDSBKtjLaL2SoFVehKK"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0016",
+      "type": "afp:Vouch",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [],
+      "published": "2026-08-17T09:00:16.000Z",
+      "context": "https://alpha.operator.local/threads/roster",
+      "afp:visibility": "public",
+      "afp:prevActivity": "sha256:c495b2528a628581d59775d1d52f968f6bacf501cc44bb242ea4c0fb119d5914",
+      "object": {
+        "type": "afp:RosterEntry",
+        "agent": "https://alpha.operator.local/agents/v15",
+        "status": "active",
+        "afp:keyCustody": "instance",
+        "afp:capabilities": [
+          "afp:cap:vote"
+        ],
+        "since": "2026-08-17T09:00:16.000Z"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:16.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z2mCUHL7uuxAMVuPaLnHkL15gr2f1hWE9P4XFvWqgAKggYVTs3poozt5vcNGn595GtFsDAZFq7LVffSm6RXZbJV8z"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0017",
+      "type": "afp:Vouch",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [],
+      "published": "2026-08-17T09:00:17.000Z",
+      "context": "https://alpha.operator.local/threads/roster",
+      "afp:visibility": "public",
+      "afp:prevActivity": "sha256:46512f1eb4f4f0c9b8a14f22315c1c597755381021cbd2f56bdcfe1109379e33",
+      "object": {
+        "type": "afp:RosterEntry",
+        "agent": "https://alpha.operator.local/agents/v16",
+        "status": "active",
+        "afp:keyCustody": "instance",
+        "afp:capabilities": [
+          "afp:cap:vote"
+        ],
+        "since": "2026-08-17T09:00:17.000Z"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:17.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z37YwDGpUEdCawZky5Gq7tA7LEP9vDTXJFYFFbDRWayBDXuT8s6FpJVR3Z3JHey8r1xZ9AXJH2hiL5ifu3Gb9juai"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0018",
+      "type": "afp:Vouch",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [],
+      "published": "2026-08-17T09:00:18.000Z",
+      "context": "https://alpha.operator.local/threads/roster",
+      "afp:visibility": "public",
+      "afp:prevActivity": "sha256:99c68bbb8a0a65ee1b5def09d56b51cc9394db250f21febd054fe809080c1521",
+      "object": {
+        "type": "afp:RosterEntry",
+        "agent": "https://alpha.operator.local/agents/v17",
+        "status": "active",
+        "afp:keyCustody": "instance",
+        "afp:capabilities": [
+          "afp:cap:vote"
+        ],
+        "since": "2026-08-17T09:00:18.000Z"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:18.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z54LvxDqUjvE8vQFAoQ8NU6uJZMnaJackVmPeSaHP62MC11wYQ9j4Chk1xadgj6PoXWbGZLmeu7cEfLPDvmh1nAKg"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0019",
+      "type": "afp:Vouch",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [],
+      "published": "2026-08-17T09:00:19.000Z",
+      "context": "https://alpha.operator.local/threads/roster",
+      "afp:visibility": "public",
+      "afp:prevActivity": "sha256:cf9ce2086446d60ccdafe728b663e0cee2f8f618e91ee5452f73513b1aa265d0",
+      "object": {
+        "type": "afp:RosterEntry",
+        "agent": "https://alpha.operator.local/agents/v18",
+        "status": "active",
+        "afp:keyCustody": "instance",
+        "afp:capabilities": [
+          "afp:cap:vote"
+        ],
+        "since": "2026-08-17T09:00:19.000Z"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:19.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z2ZiBRhYsa3ZDnGYP3QkDrZ48Rd1vwBGMJ29ek3rq6u4mwY8XUGbZmqFTLtCae5DHkcAzTbTpKRkn3U6oqPckq5Do"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0020",
+      "type": "afp:Vouch",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [],
+      "published": "2026-08-17T09:00:20.000Z",
+      "context": "https://alpha.operator.local/threads/roster",
+      "afp:visibility": "public",
+      "afp:prevActivity": "sha256:add409f09496049c81f5b09f76020e49bf84da80237254c478b92838676efbee",
+      "object": {
+        "type": "afp:RosterEntry",
+        "agent": "https://alpha.operator.local/agents/v19",
+        "status": "active",
+        "afp:keyCustody": "instance",
+        "afp:capabilities": [
+          "afp:cap:vote"
+        ],
+        "since": "2026-08-17T09:00:20.000Z"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:20.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z25SaoKi46TRzHC7QokrnWqqx4yGGzLsnzct6EjzKir7bcPzQiNf9VRsr47e9mGE6C7ZMpwcBRZaQmcbRvVMvonUK"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0021",
+      "type": "afp:Vouch",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [],
+      "published": "2026-08-17T09:00:21.000Z",
+      "context": "https://alpha.operator.local/threads/roster",
+      "afp:visibility": "public",
+      "afp:prevActivity": "sha256:272d37f6d746ebbdf4f9015837acd208eb76058645a3fc4e27fb15e28d466d37",
+      "object": {
+        "type": "afp:RosterEntry",
+        "agent": "https://alpha.operator.local/agents/v20",
+        "status": "active",
+        "afp:keyCustody": "instance",
+        "afp:capabilities": [
+          "afp:cap:vote"
+        ],
+        "since": "2026-08-17T09:00:21.000Z"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:21.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "zW8YkiMXBgqo5JAzmyTLVLQkKS93AujSDHMBE1pX1JDzCzCJhPYXQUwsn6ySX9QbBnMKN7BoeVHsQJZqgTkS1RPx"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0022",
+      "type": "afp:Vouch",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [],
+      "published": "2026-08-17T09:00:22.000Z",
+      "context": "https://alpha.operator.local/threads/roster",
+      "afp:visibility": "public",
+      "afp:prevActivity": "sha256:23f8094fac53105ee6426ef04e606a8cb7cbd697ff2eac3f251f8ffe82d299ae",
+      "object": {
+        "type": "afp:RosterEntry",
+        "agent": "https://alpha.operator.local/agents/v21",
+        "status": "active",
+        "afp:keyCustody": "instance",
+        "afp:capabilities": [
+          "afp:cap:vote"
+        ],
+        "since": "2026-08-17T09:00:22.000Z"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:22.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "zjQmpFDnUdvZRGa65eHA995wmUbhiEEYKxA7dnyT55ozrwsj2K2FxUzcUzUBjLnhUL7XGok4MGkFJsdHDk1kbaxm"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0023",
+      "type": "afp:Vouch",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [],
+      "published": "2026-08-17T09:00:23.000Z",
+      "context": "https://alpha.operator.local/threads/roster",
+      "afp:visibility": "public",
+      "afp:prevActivity": "sha256:f9596702a391224cb3e46e2ceec3030b14c6f6333cd3b3974cc04786121d7c81",
+      "object": {
+        "type": "afp:RosterEntry",
+        "agent": "https://alpha.operator.local/agents/v22",
+        "status": "active",
+        "afp:keyCustody": "instance",
+        "afp:capabilities": [
+          "afp:cap:vote"
+        ],
+        "since": "2026-08-17T09:00:23.000Z"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:23.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z4TPDxFEtpLVw4MpLXtT74Nbr1sn8VqDCLmkFttQMafs2jGRLXi6ek4i5ZEwkvXfS18q9LDQU3pgWxA4YRHcnEobj"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0024",
+      "type": "afp:Vouch",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [],
+      "published": "2026-08-17T09:00:24.000Z",
+      "context": "https://alpha.operator.local/threads/roster",
+      "afp:visibility": "public",
+      "afp:prevActivity": "sha256:bf53015648eaf7c31a6f22a8c6384a4e123e79f7ca4c0265689c249e231356cb",
+      "object": {
+        "type": "afp:RosterEntry",
+        "agent": "https://alpha.operator.local/agents/v23",
+        "status": "active",
+        "afp:keyCustody": "instance",
+        "afp:capabilities": [
+          "afp:cap:vote"
+        ],
+        "since": "2026-08-17T09:00:24.000Z"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:24.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z4RGSFzf6jS7gY1NX3jVZBGFYGyVUKYMdfzkTUWSX5LMo6hssqX2PiwWRcEHRcPMcUzt7TphyKjNXQFiMRbrouYj2"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0025",
+      "type": "afp:Vouch",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [],
+      "published": "2026-08-17T09:00:25.000Z",
+      "context": "https://alpha.operator.local/threads/roster",
+      "afp:visibility": "public",
+      "afp:prevActivity": "sha256:9876225602700a1a95bed95c9cfa906e699f74ff5766cb17f550812a2caab9a0",
+      "object": {
+        "type": "afp:RosterEntry",
+        "agent": "https://alpha.operator.local/agents/v24",
+        "status": "active",
+        "afp:keyCustody": "instance",
+        "afp:capabilities": [
+          "afp:cap:vote"
+        ],
+        "since": "2026-08-17T09:00:25.000Z"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:25.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "zyQEQwrHpC5wgZSXbZg8jk7eCYnzcH8bzWNP2fmAmJuq6FqGtGbrQJNP7NFkRZDutBDWEEwNnBsgT2Qwzq6QdwD4"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0026",
+      "type": "afp:Vouch",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [],
+      "published": "2026-08-17T09:00:26.000Z",
+      "context": "https://alpha.operator.local/threads/roster",
+      "afp:visibility": "public",
+      "afp:prevActivity": "sha256:5531968d88dfc0f415b99c2366d8b6349428ee9320a279512c0c6189bceecb88",
+      "object": {
+        "type": "afp:RosterEntry",
+        "agent": "https://alpha.operator.local/agents/v25",
+        "status": "active",
+        "afp:keyCustody": "instance",
+        "afp:capabilities": [
+          "afp:cap:vote"
+        ],
+        "since": "2026-08-17T09:00:26.000Z"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:26.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "zoAVPCGNvHBGiTuYQASBtyrYMaBg4RPwHjFoAnPxqG9bAvx2BTe5nASCc62DVbMh3ZFDUUSVL94351drhw1Nm4JD"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0027",
+      "type": "afp:Vouch",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [],
+      "published": "2026-08-17T09:00:27.000Z",
+      "context": "https://alpha.operator.local/threads/roster",
+      "afp:visibility": "public",
+      "afp:prevActivity": "sha256:97cfacd952543283bdf8e7914d4842caf2f007354bd1b89c72e2dd25f782b349",
+      "object": {
+        "type": "afp:RosterEntry",
+        "agent": "https://alpha.operator.local/agents/v26",
+        "status": "active",
+        "afp:keyCustody": "instance",
+        "afp:capabilities": [
+          "afp:cap:vote"
+        ],
+        "since": "2026-08-17T09:00:27.000Z"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:27.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z4YByKQ9B1yLrP3Frnj5GYGNv6aS5ywF6L1XWSC68KFNeMiYb6TwVWwZMYz5fqzd4AS6cLbjyMNejSYHV646exRZY"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0028",
+      "type": "afp:Vouch",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [],
+      "published": "2026-08-17T09:00:28.000Z",
+      "context": "https://alpha.operator.local/threads/roster",
+      "afp:visibility": "public",
+      "afp:prevActivity": "sha256:68e6235ed635361f9b88f819c653957a34deeed6e0e1b73ddad514b2c8ff4c87",
+      "object": {
+        "type": "afp:RosterEntry",
+        "agent": "https://alpha.operator.local/agents/v27",
+        "status": "active",
+        "afp:keyCustody": "instance",
+        "afp:capabilities": [
+          "afp:cap:vote"
+        ],
+        "since": "2026-08-17T09:00:28.000Z"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:28.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z5jA1PjmdEo1eJz4sQj2F2nTeauAXWFCT84vQJ79mwy1BebP1Pc7v1fCtSEVAbmm21mTJzU8ZA3xkieY4NnhwxNnr"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0029",
+      "type": "afp:Vouch",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [],
+      "published": "2026-08-17T09:00:29.000Z",
+      "context": "https://alpha.operator.local/threads/roster",
+      "afp:visibility": "public",
+      "afp:prevActivity": "sha256:3d8aec091105145a0f71c8c4489b731d8ec6ddb2b0960a738936f0216134fc5f",
+      "object": {
+        "type": "afp:RosterEntry",
+        "agent": "https://alpha.operator.local/agents/v28",
+        "status": "active",
+        "afp:keyCustody": "instance",
+        "afp:capabilities": [
+          "afp:cap:vote"
+        ],
+        "since": "2026-08-17T09:00:29.000Z"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:29.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z2XtiWjFqDKxWYPKKeqfSUXb4RXerWtkM8QxYToVrJKV4LgG1c1LeGQsrbRNFTGZ2TFGPNzYhQahJP7D1q48u3T8T"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0030",
+      "type": "afp:Vouch",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [],
+      "published": "2026-08-17T09:00:30.000Z",
+      "context": "https://alpha.operator.local/threads/roster",
+      "afp:visibility": "public",
+      "afp:prevActivity": "sha256:591be9e4c30132eda13d5264e7170d4c164fac1e69910835c28ce5cf2821a3bd",
+      "object": {
+        "type": "afp:RosterEntry",
+        "agent": "https://alpha.operator.local/agents/v29",
+        "status": "active",
+        "afp:keyCustody": "instance",
+        "afp:capabilities": [
+          "afp:cap:vote"
+        ],
+        "since": "2026-08-17T09:00:30.000Z"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:30.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "ziBr1tuFbwdLzLQYdsWEqntNcYiZnLvLATqcWKP2EdG1wShArSTTcCG6x3onC7o626aNUTESqiXJGyzCaHhQ2vGS"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0031",
+      "type": "Follow",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [
+        "https://alpha.operator.local/hubs/policy-hub"
+      ],
+      "published": "2026-08-17T09:00:31.000Z",
+      "context": "https://alpha.operator.local/threads/seats",
+      "afp:visibility": "public",
+      "afp:prevActivity": "sha256:6c94c90f85746e1f3a840ddb659ec3e3c60c7d277c97f5821b4f46c5fbcd91ad",
+      "object": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:hub": "https://alpha.operator.local/hubs/policy-hub",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:31.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z3U53VM6fYZ955XSKjWniDNuau6KSBguDcj1ZSfkqcytzvJTjgniroJA2GA4bM3fHHjyFPG5TLXkmQXw4c9eqkFfT"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0032",
+      "type": "afp:Enroll",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [
+        "https://alpha.operator.local/hubs/policy-hub"
+      ],
+      "published": "2026-08-17T09:00:40.000Z",
+      "context": "https://alpha.operator.local/threads/enroll",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:619d158ee814828a09d0fe69a9dd8cac4f6260d45d731f3ea6755e614495f9a2",
+      "object": "https://alpha.operator.local/agents/v0",
+      "target": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:hub": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:capabilities": [
+        "afp:cap:vote"
+      ],
+      "afp:hubKey": "https://alpha.operator.local/agents/v0#hub-key-policy-hub",
+      "afp:role": "member",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:40.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z3vBchiVtjDSLbJJddDiKbqJEF4KXs5sc8CeVCxTVu9wFjZeMvnLczBuT5yDn2ZHPQx8SPBjzA6W5BBjpDMoFsFtQ"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0033",
+      "type": "afp:Enroll",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [
+        "https://alpha.operator.local/hubs/policy-hub"
+      ],
+      "published": "2026-08-17T09:00:42.000Z",
+      "context": "https://alpha.operator.local/threads/enroll",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:e12ef7dee40cf127eb7d40302441738b520b8f08811e23c79fb3bfe192828d38",
+      "object": "https://alpha.operator.local/agents/v1",
+      "target": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:hub": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:capabilities": [
+        "afp:cap:vote"
+      ],
+      "afp:hubKey": "https://alpha.operator.local/agents/v1#hub-key-policy-hub",
+      "afp:role": "member",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:42.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z2rrViHBw6C7cRLdWyAaRiKCXHNY4PHSNsDPQDgVQDKQzeTD42k5q5kuNqgRwxcJJ2RESQwYP6NP1D7tipYdg4Why"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0034",
+      "type": "afp:Enroll",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [
+        "https://alpha.operator.local/hubs/policy-hub"
+      ],
+      "published": "2026-08-17T09:00:44.000Z",
+      "context": "https://alpha.operator.local/threads/enroll",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:7e89a3deafaead482c26f19d90bb720a3930a655e0b4d9ab418c17dbe2533cb4",
+      "object": "https://alpha.operator.local/agents/v2",
+      "target": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:hub": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:capabilities": [
+        "afp:cap:vote"
+      ],
+      "afp:hubKey": "https://alpha.operator.local/agents/v2#hub-key-policy-hub",
+      "afp:role": "member",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:44.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z2veGSQZqaBjyhuYFTDFnGjZSnqWo3VKYhqsMPtndMBNPVyvcqCU9uUQHmJ27oLGwLRF9wrbkegpLxRkmaSUnCDn2"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0035",
+      "type": "afp:Enroll",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [
+        "https://alpha.operator.local/hubs/policy-hub"
+      ],
+      "published": "2026-08-17T09:00:46.000Z",
+      "context": "https://alpha.operator.local/threads/enroll",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:3d3d2d7c0ea4c527c3f3a1030f6fd7624b40747d7ea47d61abc112128e7cd57e",
+      "object": "https://alpha.operator.local/agents/v3",
+      "target": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:hub": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:capabilities": [
+        "afp:cap:vote"
+      ],
+      "afp:hubKey": "https://alpha.operator.local/agents/v3#hub-key-policy-hub",
+      "afp:role": "member",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:46.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z5jc2gnJytGKbMS2ipHNwkNTWUdgLUNnY9AXWVAaKgFmBbWN4SiNrLo3mbHpq24K8Dax3HhQuxJa58baq3f6drGwe"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0036",
+      "type": "afp:Enroll",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [
+        "https://alpha.operator.local/hubs/policy-hub"
+      ],
+      "published": "2026-08-17T09:00:48.000Z",
+      "context": "https://alpha.operator.local/threads/enroll",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:e8851772fb96a0c1a1548798b12cc3336afb1bd18bdaa60de68943f1a49e4139",
+      "object": "https://alpha.operator.local/agents/v4",
+      "target": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:hub": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:capabilities": [
+        "afp:cap:vote"
+      ],
+      "afp:hubKey": "https://alpha.operator.local/agents/v4#hub-key-policy-hub",
+      "afp:role": "member",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:48.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z4siUZNhCeXv9wdLWNugvrSmuUFMW1ui1sd7kVTugzuPHBdqaUGUcXFECvM9r4LZxwPbEF8pLX8awP2RxjMkg6ZeG"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0037",
+      "type": "afp:Enroll",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [
+        "https://alpha.operator.local/hubs/policy-hub"
+      ],
+      "published": "2026-08-17T09:00:50.000Z",
+      "context": "https://alpha.operator.local/threads/enroll",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:87c83afc47e0494c6e378b208f702635755df2941061600d6b99125d32398a4d",
+      "object": "https://alpha.operator.local/agents/v5",
+      "target": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:hub": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:capabilities": [
+        "afp:cap:vote"
+      ],
+      "afp:hubKey": "https://alpha.operator.local/agents/v5#hub-key-policy-hub",
+      "afp:role": "member",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:50.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z2FRLTWQ4LR2pEWMtufDyRJgWwvLmReFUS2HHEYoLr5e4tURn9SFWdz7zbhtdpZjND8P3M3Qdxmx9V6x5YuVjboxn"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0038",
+      "type": "afp:Enroll",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [
+        "https://alpha.operator.local/hubs/policy-hub"
+      ],
+      "published": "2026-08-17T09:00:52.000Z",
+      "context": "https://alpha.operator.local/threads/enroll",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:3d4e235803ae998ae980b182cb94ea340c63d09847600386df1d150e23061ce2",
+      "object": "https://alpha.operator.local/agents/v6",
+      "target": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:hub": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:capabilities": [
+        "afp:cap:vote"
+      ],
+      "afp:hubKey": "https://alpha.operator.local/agents/v6#hub-key-policy-hub",
+      "afp:role": "member",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:52.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "zAL9AvNkb6uxBkeWpt5GNcX7GCaVFKZr2hcTDvwfZqeMaPGPgwXACnVzmDUHKh7WnGd4bNbLUzLF7A1V4xTHW8cK"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0039",
+      "type": "afp:Enroll",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [
+        "https://alpha.operator.local/hubs/policy-hub"
+      ],
+      "published": "2026-08-17T09:00:54.000Z",
+      "context": "https://alpha.operator.local/threads/enroll",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:03c3551c8dba651a14e295d8f31b9634c71e66dcbcd7131170dd36e017db4201",
+      "object": "https://alpha.operator.local/agents/v7",
+      "target": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:hub": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:capabilities": [
+        "afp:cap:vote"
+      ],
+      "afp:hubKey": "https://alpha.operator.local/agents/v7#hub-key-policy-hub",
+      "afp:role": "member",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:54.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z2p8GNCwR5T58zSoMmJVRhbLBzwUDMBfZC64i5AoFE1WM9TtRk9hf2pHUN5koCBUHAXMTVCgYB4nVRr4h38HH7xah"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0040",
+      "type": "afp:Enroll",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [
+        "https://alpha.operator.local/hubs/policy-hub"
+      ],
+      "published": "2026-08-17T09:00:56.000Z",
+      "context": "https://alpha.operator.local/threads/enroll",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:2c82eeebc0606d9f889ee957c4ca78acb4540c6600ef47d538f5b77aab9d59a4",
+      "object": "https://alpha.operator.local/agents/v8",
+      "target": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:hub": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:capabilities": [
+        "afp:cap:vote"
+      ],
+      "afp:hubKey": "https://alpha.operator.local/agents/v8#hub-key-policy-hub",
+      "afp:role": "member",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:56.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z5Qe5DgRUVQg7VE9JorUhNRGBMuP9FKL4z5m515yhsqARbFNuvGV5Awkr33CiZesCUbaMhHNDqLU6tzhmom8Nq7Jn"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0041",
+      "type": "afp:Enroll",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [
+        "https://alpha.operator.local/hubs/policy-hub"
+      ],
+      "published": "2026-08-17T09:00:58.000Z",
+      "context": "https://alpha.operator.local/threads/enroll",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:9e0a6b80c8c1f7c7e8b4fc29818afdb325f1888f2b5c9ca4f033548ca0a6c138",
+      "object": "https://alpha.operator.local/agents/v9",
+      "target": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:hub": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:capabilities": [
+        "afp:cap:vote"
+      ],
+      "afp:hubKey": "https://alpha.operator.local/agents/v9#hub-key-policy-hub",
+      "afp:role": "member",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:58.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z3Z6EHtfa1xLZau4nzGJ3nsV9wzhX9E9ysWD7Ct2rVY4yuWaC88uhLjwRoSsfdZ4RDTu79WxF6XuUhhJ72T56chqz"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0042",
+      "type": "afp:Enroll",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [
+        "https://alpha.operator.local/hubs/policy-hub"
+      ],
+      "published": "2026-08-17T09:01:00.000Z",
+      "context": "https://alpha.operator.local/threads/enroll",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:15004651d143b5976cbca3ef223f7fb62240b5bd46dd7bb3b427df7ce84801b2",
+      "object": "https://alpha.operator.local/agents/v10",
+      "target": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:hub": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:capabilities": [
+        "afp:cap:vote"
+      ],
+      "afp:hubKey": "https://alpha.operator.local/agents/v10#hub-key-policy-hub",
+      "afp:role": "member",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:01:00.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "zNxxaUswMTSbp9nExaudNwnL8XGcd5tHcWhQpm85WWt3iSQwfV5E6jvayjpfYybNSz2DYRjSkQBZy4iooLtfyxxV"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0043",
+      "type": "afp:Enroll",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [
+        "https://alpha.operator.local/hubs/policy-hub"
+      ],
+      "published": "2026-08-17T09:01:02.000Z",
+      "context": "https://alpha.operator.local/threads/enroll",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:8b6535ef84ba050ee0c33568f15da97c2e0071d55bb7f7ca190efcb65c5700f5",
+      "object": "https://alpha.operator.local/agents/v11",
+      "target": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:hub": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:capabilities": [
+        "afp:cap:vote"
+      ],
+      "afp:hubKey": "https://alpha.operator.local/agents/v11#hub-key-policy-hub",
+      "afp:role": "member",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:01:02.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z2BWfuJuCN3i78Ctr4VMKsQnFH2b4XGcQpnoXkNBNc7C4RzisNCTNLoofjvYt9jX45dNhMUKvHZdL6h4E6VR75GVE"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0044",
+      "type": "afp:Enroll",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [
+        "https://alpha.operator.local/hubs/policy-hub"
+      ],
+      "published": "2026-08-17T09:01:04.000Z",
+      "context": "https://alpha.operator.local/threads/enroll",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:52f2819e529066c91bef04a1f2c6acbccb1b96c2380612fa7f44024d85325f94",
+      "object": "https://alpha.operator.local/agents/v12",
+      "target": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:hub": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:capabilities": [
+        "afp:cap:vote"
+      ],
+      "afp:hubKey": "https://alpha.operator.local/agents/v12#hub-key-policy-hub",
+      "afp:role": "member",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:01:04.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z2U746K3aUtFNzZMMFK9Yxbw2JE9vNmtffgG6oZAe7q9TcjDjEavFbAG6LmRiVi6Z5UjrYf8QSmZwbXy1sStUVtWS"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0045",
+      "type": "afp:Enroll",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [
+        "https://alpha.operator.local/hubs/policy-hub"
+      ],
+      "published": "2026-08-17T09:01:06.000Z",
+      "context": "https://alpha.operator.local/threads/enroll",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:60200f9d3a28204966adffaa390f79996faeafd2a8cd1adf4342532e03cf300e",
+      "object": "https://alpha.operator.local/agents/v13",
+      "target": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:hub": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:capabilities": [
+        "afp:cap:vote"
+      ],
+      "afp:hubKey": "https://alpha.operator.local/agents/v13#hub-key-policy-hub",
+      "afp:role": "member",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:01:06.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z2V9mTCgPGncuJG7fmK7TTivf18m6rkL8dTwJfeDzX8kBT9aTmxou2YvYq4DVU5BDqJqM8DuwPHXFBHYK5E7Mjt1K"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0046",
+      "type": "afp:Enroll",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [
+        "https://alpha.operator.local/hubs/policy-hub"
+      ],
+      "published": "2026-08-17T09:01:08.000Z",
+      "context": "https://alpha.operator.local/threads/enroll",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:d5e77c075ac4d8f6646a85bc2185fa7c5a90d87410fa434b5312639c733bc23c",
+      "object": "https://alpha.operator.local/agents/v14",
+      "target": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:hub": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:capabilities": [
+        "afp:cap:vote"
+      ],
+      "afp:hubKey": "https://alpha.operator.local/agents/v14#hub-key-policy-hub",
+      "afp:role": "member",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:01:08.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z2AJ1yAdePvnTjJozgnb8srmntV4UfsWo1DFBWARugf8Jh3J7LjEnLnJyqkmU7VhnZQ1pvX2KuAxGGc55qPuuVRPB"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0047",
+      "type": "afp:Enroll",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [
+        "https://alpha.operator.local/hubs/policy-hub"
+      ],
+      "published": "2026-08-17T09:01:10.000Z",
+      "context": "https://alpha.operator.local/threads/enroll",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:f08536585e35c54ba3422866ffd2934a77dc505005340b098532d8fe155978aa",
+      "object": "https://alpha.operator.local/agents/v15",
+      "target": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:hub": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:capabilities": [
+        "afp:cap:vote"
+      ],
+      "afp:hubKey": "https://alpha.operator.local/agents/v15#hub-key-policy-hub",
+      "afp:role": "member",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:01:10.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z5WfEbT3vRdC1rZn3Twv542QLSL1EWfiNY5CMUbexG5KSHrz5xkiGLsuqcF9Sm97DeY86ik51j8wQRDhkQH9VyGuZ"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0048",
+      "type": "afp:Enroll",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [
+        "https://alpha.operator.local/hubs/policy-hub"
+      ],
+      "published": "2026-08-17T09:01:12.000Z",
+      "context": "https://alpha.operator.local/threads/enroll",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:8064bc44bc23d36c744192c0291c9672013e2894f8774ec8b20ab4283c2db52b",
+      "object": "https://alpha.operator.local/agents/v16",
+      "target": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:hub": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:capabilities": [
+        "afp:cap:vote"
+      ],
+      "afp:hubKey": "https://alpha.operator.local/agents/v16#hub-key-policy-hub",
+      "afp:role": "member",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:01:12.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z3JDVKW4RFHzVrUSvhCjkpUzWCxzAf2218DYk8MnTxnSxgMXD7wiY5ALaVdNuNsciNdkSgr55C8orwCckMeVRM7Ww"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0049",
+      "type": "afp:Enroll",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [
+        "https://alpha.operator.local/hubs/policy-hub"
+      ],
+      "published": "2026-08-17T09:01:14.000Z",
+      "context": "https://alpha.operator.local/threads/enroll",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:54af5c1dddb540669fbc94396d70e23378bf50aabeea039e689689adc8e4ae06",
+      "object": "https://alpha.operator.local/agents/v17",
+      "target": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:hub": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:capabilities": [
+        "afp:cap:vote"
+      ],
+      "afp:hubKey": "https://alpha.operator.local/agents/v17#hub-key-policy-hub",
+      "afp:role": "member",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:01:14.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z3scVZ1L1w2WrBtttReoJPHtQmSPPfxcpsGzTPGPs6QZKEiGWP9PjEtGswZn7VtFd1RirFyyCUotVjBhyYnHspued"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0050",
+      "type": "afp:Enroll",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [
+        "https://alpha.operator.local/hubs/policy-hub"
+      ],
+      "published": "2026-08-17T09:01:16.000Z",
+      "context": "https://alpha.operator.local/threads/enroll",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:9e2552fa0cec93b26f50e85a01a0d1208bf07eb51353200eab8b8fff670c2257",
+      "object": "https://alpha.operator.local/agents/v18",
+      "target": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:hub": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:capabilities": [
+        "afp:cap:vote"
+      ],
+      "afp:hubKey": "https://alpha.operator.local/agents/v18#hub-key-policy-hub",
+      "afp:role": "member",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:01:16.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "zFwrBph8vwwqDRrAhnN3PqYWmu9G6Swmh9gyeWuE4WubroKBgPb4iiAjrHgDueanvVTK1N9m6BuipFbdZFVuK6wD"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0051",
+      "type": "afp:Enroll",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [
+        "https://alpha.operator.local/hubs/policy-hub"
+      ],
+      "published": "2026-08-17T09:01:18.000Z",
+      "context": "https://alpha.operator.local/threads/enroll",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:27553c72fa5083d365fb4fc37178621ce9f77fc031cfa43aa04dee619e4c1a55",
+      "object": "https://alpha.operator.local/agents/v19",
+      "target": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:hub": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:capabilities": [
+        "afp:cap:vote"
+      ],
+      "afp:hubKey": "https://alpha.operator.local/agents/v19#hub-key-policy-hub",
+      "afp:role": "member",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:01:18.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z5BLR9GWhwfoxr7LN9xzGX9F81gM9GVyDNUBvFz9otzQYLaB43Wp6kzv1WDaDJvaJWS4YefUyL49nypPefWnsuw4X"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0052",
+      "type": "afp:Enroll",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [
+        "https://alpha.operator.local/hubs/policy-hub"
+      ],
+      "published": "2026-08-17T09:01:20.000Z",
+      "context": "https://alpha.operator.local/threads/enroll",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:cfb5771db1b1dc9da33b824e1f0badf99ca7e01be47edf243b12a72ed1ecb5a9",
+      "object": "https://alpha.operator.local/agents/v20",
+      "target": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:hub": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:capabilities": [
+        "afp:cap:vote"
+      ],
+      "afp:hubKey": "https://alpha.operator.local/agents/v20#hub-key-policy-hub",
+      "afp:role": "member",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:01:20.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z5u4bKyC4NdhGhU2NNuRLgFSE7zDDCZXKjwbFi3KeJmfAveeawep6rHhXvKvShzj5oCTgsN9KgHEWUPNFVyfLv2xp"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0053",
+      "type": "afp:Enroll",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [
+        "https://alpha.operator.local/hubs/policy-hub"
+      ],
+      "published": "2026-08-17T09:01:22.000Z",
+      "context": "https://alpha.operator.local/threads/enroll",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:3a4ec81c05104894aa4e0532b2d45328fbe831e7139a46eeb862a0ad1c95f104",
+      "object": "https://alpha.operator.local/agents/v21",
+      "target": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:hub": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:capabilities": [
+        "afp:cap:vote"
+      ],
+      "afp:hubKey": "https://alpha.operator.local/agents/v21#hub-key-policy-hub",
+      "afp:role": "member",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:01:22.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z3L6DiLdULc4QmCyVaAMpH3epuVuLABHdr4CWuJrP8n1FJHunBxh647fUNVck4KF4zrqHNNZjmSSrQ1U8JtgQ4zsp"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0054",
+      "type": "afp:Enroll",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [
+        "https://alpha.operator.local/hubs/policy-hub"
+      ],
+      "published": "2026-08-17T09:01:24.000Z",
+      "context": "https://alpha.operator.local/threads/enroll",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:05641658c4701615ca92ec7aa4b0ece8a87bbecf618eeb348da0c00b6e6dcdd7",
+      "object": "https://alpha.operator.local/agents/v22",
+      "target": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:hub": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:capabilities": [
+        "afp:cap:vote"
+      ],
+      "afp:hubKey": "https://alpha.operator.local/agents/v22#hub-key-policy-hub",
+      "afp:role": "member",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:01:24.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z5rGJkX6aS45WRnyaDE6x7iCh4a8RgfekcZ4vzCDpkELz95MwiEGc9X8T2mwyKfmL2u8E1CFgKczfTqeHbjdn9Sx3"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0055",
+      "type": "afp:Enroll",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [
+        "https://alpha.operator.local/hubs/policy-hub"
+      ],
+      "published": "2026-08-17T09:01:26.000Z",
+      "context": "https://alpha.operator.local/threads/enroll",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:b4f4342d6b3cc4300d6e10bb08d15aadea682546ca7ecd4f27d6a6ca88258ff6",
+      "object": "https://alpha.operator.local/agents/v23",
+      "target": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:hub": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:capabilities": [
+        "afp:cap:vote"
+      ],
+      "afp:hubKey": "https://alpha.operator.local/agents/v23#hub-key-policy-hub",
+      "afp:role": "member",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:01:26.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z3BuHmvuenv3ikxL9xASGixd6VPUeCKLhWiNrL7hzrhaprc1FVkMKAdCKkEqkRkwKgStwBWwvNyqiAhrksG9ktHFs"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0056",
+      "type": "afp:Enroll",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [
+        "https://alpha.operator.local/hubs/policy-hub"
+      ],
+      "published": "2026-08-17T09:01:28.000Z",
+      "context": "https://alpha.operator.local/threads/enroll",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:a5720dd57aa7739f025596a34672002a2082f83ad0be46a137876fd368a22081",
+      "object": "https://alpha.operator.local/agents/v24",
+      "target": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:hub": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:capabilities": [
+        "afp:cap:vote"
+      ],
+      "afp:hubKey": "https://alpha.operator.local/agents/v24#hub-key-policy-hub",
+      "afp:role": "member",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:01:28.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z3e67ctraAhEqwPu76fNH7V4aHGNwF7xTYqRu1VM7q5uCCMBCN6Qv3jdSZyiGF1xCyrbDBUPc5SCG1rsALBo1KRU1"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0057",
+      "type": "afp:Enroll",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [
+        "https://alpha.operator.local/hubs/policy-hub"
+      ],
+      "published": "2026-08-17T09:01:30.000Z",
+      "context": "https://alpha.operator.local/threads/enroll",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:e0a3b145cab06e5da37347276491a21940680c242c8bba5f3929715e8ac1abed",
+      "object": "https://alpha.operator.local/agents/v25",
+      "target": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:hub": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:capabilities": [
+        "afp:cap:vote"
+      ],
+      "afp:hubKey": "https://alpha.operator.local/agents/v25#hub-key-policy-hub",
+      "afp:role": "member",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:01:30.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z2D1L58nahMgYLGgFw2hutpR5HPCWdycixUqXc572Sor4TjDBvGrmrKQ5M8jnHJo9TQg4KAApja6ycqzS2Aubf7px"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0058",
+      "type": "afp:Enroll",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [
+        "https://alpha.operator.local/hubs/policy-hub"
+      ],
+      "published": "2026-08-17T09:01:32.000Z",
+      "context": "https://alpha.operator.local/threads/enroll",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:0e27ef8e869f9ed3bcb63576f9a446c5473423f7e1ef4431447ed0aa3ae9fcd9",
+      "object": "https://alpha.operator.local/agents/v26",
+      "target": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:hub": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:capabilities": [
+        "afp:cap:vote"
+      ],
+      "afp:hubKey": "https://alpha.operator.local/agents/v26#hub-key-policy-hub",
+      "afp:role": "member",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:01:32.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z26FHX665rSVcgoU8FSDFwok6ZfNdz1STnwaN5TZqN9HfmBaYbx9KGJyeSMDr2BVmVSSq5xkPRxezPXVjqdwqknKf"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0059",
+      "type": "afp:Enroll",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [
+        "https://alpha.operator.local/hubs/policy-hub"
+      ],
+      "published": "2026-08-17T09:01:34.000Z",
+      "context": "https://alpha.operator.local/threads/enroll",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:031151e3143577879183c6900e59294fa0056c5c2f0fa5b2d15bd1cee99b042b",
+      "object": "https://alpha.operator.local/agents/v27",
+      "target": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:hub": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:capabilities": [
+        "afp:cap:vote"
+      ],
+      "afp:hubKey": "https://alpha.operator.local/agents/v27#hub-key-policy-hub",
+      "afp:role": "member",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:01:34.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "zNKsWZKEvgbhphoC8FE2ia4qwzTiuRFziLiwANwJuvyPhQxujZButkQEh3LbDfkHj5bYCecL1tjQ2GMe6hUDZhKz"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0060",
+      "type": "afp:Enroll",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [
+        "https://alpha.operator.local/hubs/policy-hub"
+      ],
+      "published": "2026-08-17T09:01:36.000Z",
+      "context": "https://alpha.operator.local/threads/enroll",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:9afc98447276d0fc74d26a9acf16eff12d775461aa235acc966213c4a7e517ee",
+      "object": "https://alpha.operator.local/agents/v28",
+      "target": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:hub": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:capabilities": [
+        "afp:cap:vote"
+      ],
+      "afp:hubKey": "https://alpha.operator.local/agents/v28#hub-key-policy-hub",
+      "afp:role": "member",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:01:36.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z4b79BcB6s3TdpNwbyFC5EYVaGLNXgRXP682u4zoBZwAffoc1ULDvnBpioUGCU1BBvJK8W4Tukz4iXrxbJXq1u89a"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0061",
+      "type": "afp:Enroll",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [
+        "https://alpha.operator.local/hubs/policy-hub"
+      ],
+      "published": "2026-08-17T09:01:38.000Z",
+      "context": "https://alpha.operator.local/threads/enroll",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:74b46c2453403262db66ab3960f34f6350719b5fc01197eba69f0ac918633065",
+      "object": "https://alpha.operator.local/agents/v29",
+      "target": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:hub": "https://alpha.operator.local/hubs/policy-hub",
+      "afp:capabilities": [
+        "afp:cap:vote"
+      ],
+      "afp:hubKey": "https://alpha.operator.local/agents/v29#hub-key-policy-hub",
+      "afp:role": "member",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:01:38.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z5bTpeCrrKZNdjLs6zmXdaX1rBZPtEUs7Ys7extx7AMndEp58fzGPtJ7HRJFJV7Nb5WUfKbAiQ72bkMdaHAvKjZsa"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0062",
+      "type": "afp:Vouch",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [],
+      "published": "2026-08-17T09:08:10.000Z",
+      "context": "https://alpha.operator.local/threads/roster",
+      "afp:visibility": "public",
+      "afp:prevActivity": "sha256:e07da6e963932d48143ea74608d5986f483a996a55a6d438201de29aab746bf6",
+      "object": {
+        "type": "afp:RosterEntry",
+        "agent": "https://alpha.operator.local/hubs/policy-hub",
+        "status": "active",
+        "afp:keyCustody": "self",
+        "afp:capabilities": [
+          "afp:cap:hub"
+        ],
+        "since": "2026-08-17T09:08:10.000Z"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:08:10.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z55LAK9YAHRnsEqWXUUTnT6jeJBcdTuK7i8SK1BMnf4rWJYmDPA58XR59c4g9a8ZLScP1UJ8kk2ZZ4YV2CbMJwy5z"
+      }
+    }
+  ]
+}

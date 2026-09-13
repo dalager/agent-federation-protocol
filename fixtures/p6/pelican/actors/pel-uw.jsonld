@@ -1,0 +1,35 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "http://127.0.0.1:40309/agents/pel-uw",
+  "type": "Service",
+  "name": "pel-uw",
+  "preferredUsername": "pel-uw",
+  "afp:operatedBy": "http://127.0.0.1:40309/actor",
+  "afp:capabilities": [
+    "afp:cap:assess"
+  ],
+  "inbox": "http://127.0.0.1:40309/agents/pel-uw/inbox",
+  "outbox": "http://127.0.0.1:40309/agents/pel-uw/outbox",
+  "afp:visibility": "public",
+  "assertionMethod": [
+    {
+      "id": "http://127.0.0.1:40309/agents/pel-uw#ed25519-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:40309/agents/pel-uw",
+      "publicKeyMultibase": "z6Mkg9x4bsFsjUAfnDkcEZaJFrys1KxEEHfoC64xCxmYErcr"
+    }
+  ],
+  "authentication": [
+    {
+      "id": "http://127.0.0.1:40309/agents/pel-uw#transport-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:40309/agents/pel-uw",
+      "publicKeyMultibase": "z6MkgAhdbNRQXZyDRADDm53cRPLJp5mx9C3oNPUwvRbfWc5W",
+      "afp:custody": "file"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "fixture": "../fixtures/p4",
+  "bundles": [
+    "alpha",
+    "beta"
+  ],
+  "thread": null,
+  "verdict": "pass"
+}

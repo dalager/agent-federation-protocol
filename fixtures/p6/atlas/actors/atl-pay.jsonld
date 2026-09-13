@@ -1,0 +1,35 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "http://127.0.0.1:38159/agents/atl-pay",
+  "type": "Service",
+  "name": "atl-pay",
+  "preferredUsername": "atl-pay",
+  "afp:operatedBy": "http://127.0.0.1:38159/actor",
+  "afp:capabilities": [
+    "afp:cap:assess"
+  ],
+  "inbox": "http://127.0.0.1:38159/agents/atl-pay/inbox",
+  "outbox": "http://127.0.0.1:38159/agents/atl-pay/outbox",
+  "afp:visibility": "public",
+  "assertionMethod": [
+    {
+      "id": "http://127.0.0.1:38159/agents/atl-pay#ed25519-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:38159/agents/atl-pay",
+      "publicKeyMultibase": "z6Mkt3GpTihbwoqQZJw6FbJ9QpArJkZkSLLBVN7gS79XcSND"
+    }
+  ],
+  "authentication": [
+    {
+      "id": "http://127.0.0.1:38159/agents/atl-pay#transport-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:38159/agents/atl-pay",
+      "publicKeyMultibase": "z6MkofbBnR2QgXrVRZjFobEP1gTjvhJbXGefQgbxNUWoAiu9",
+      "afp:custody": "file"
+    }
+  ]
+}

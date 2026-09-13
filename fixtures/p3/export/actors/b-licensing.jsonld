@@ -1,0 +1,35 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "https://alpha.operator.local/agents/b-licensing",
+  "type": "Service",
+  "name": "b-licensing",
+  "preferredUsername": "b-licensing",
+  "afp:operatedBy": "https://alpha.operator.local/actor",
+  "afp:capabilities": [
+    "afp:cap:estimate"
+  ],
+  "inbox": "https://alpha.operator.local/agents/b-licensing/inbox",
+  "outbox": "https://alpha.operator.local/agents/b-licensing/outbox",
+  "afp:visibility": "public",
+  "assertionMethod": [
+    {
+      "id": "https://alpha.operator.local/agents/b-licensing#ed25519-key",
+      "type": "Multikey",
+      "controller": "https://alpha.operator.local/agents/b-licensing",
+      "publicKeyMultibase": "z6MkkHJjXH7Hn1WTuf82aaUNzsmCuY9mNHVBXuXgWN5XCGbj"
+    }
+  ],
+  "authentication": [
+    {
+      "id": "https://alpha.operator.local/agents/b-licensing#transport-key",
+      "type": "Multikey",
+      "controller": "https://alpha.operator.local/agents/b-licensing",
+      "publicKeyMultibase": "z6Mkrsuwjy3ofLvPz2YxvCkQFKkcvSNEifRiM7N969o8geLM",
+      "afp:custody": "file"
+    }
+  ]
+}

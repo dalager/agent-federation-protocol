@@ -1,0 +1,37 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "http://127.0.0.1:35437/actor",
+  "type": [
+    "Application",
+    "afp:Instance"
+  ],
+  "name": "anchor instance",
+  "preferredUsername": "instance",
+  "afp:operator": "Anchor Re",
+  "inbox": "http://127.0.0.1:35437/actor/inbox",
+  "outbox": "http://127.0.0.1:35437/actor/outbox",
+  "following": "http://127.0.0.1:35437/actor/following",
+  "afp:roster": "http://127.0.0.1:35437/roster",
+  "afp:policy": "http://127.0.0.1:35437/afp/policy",
+  "afp:visibility": "public",
+  "assertionMethod": [
+    {
+      "id": "http://127.0.0.1:35437/actor#ed25519-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:35437/actor",
+      "publicKeyMultibase": "z6Mkthj5XCT3fgNEqCYeCPXSBv2JS1dns9wHAy14cvYyg2ce"
+    }
+  ],
+  "authentication": [
+    {
+      "id": "http://127.0.0.1:35437/actor#transport-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:35437/actor",
+      "publicKeyMultibase": "z6MkuL3AbN88ZrgpEdjaQe2iT7kcFRrE1RgDTh3yeuLX2LJQ"
+    }
+  ]
+}

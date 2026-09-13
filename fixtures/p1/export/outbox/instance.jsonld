@@ -1,0 +1,78 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "https://alpha.operator.local/actor/outbox",
+  "type": "OrderedCollection",
+  "attributedTo": "https://alpha.operator.local/actor",
+  "totalItems": 2,
+  "orderedItems": [
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0001",
+      "type": "afp:Vouch",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [],
+      "published": "2026-08-17T09:00:01.000Z",
+      "context": "https://alpha.operator.local/threads/roster",
+      "afp:visibility": "public",
+      "object": {
+        "type": "afp:RosterEntry",
+        "agent": "https://alpha.operator.local/agents/writer",
+        "status": "active",
+        "afp:keyCustody": "instance",
+        "afp:capabilities": [
+          "afp:cap:draft"
+        ],
+        "since": "2026-08-17T09:00:01.000Z"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:01.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z59LWmAhpDoUDhWpuRNs2JnJKPMRDDegjuXmRvWpPiB4vPdShGBQQ58Tn9U88VfFH1EqpK3dx42fgbPwKeExgPHHp"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/actor/activities/0002",
+      "type": "afp:Vouch",
+      "actor": "https://alpha.operator.local/actor",
+      "to": [],
+      "published": "2026-08-17T09:00:02.000Z",
+      "context": "https://alpha.operator.local/threads/roster",
+      "afp:visibility": "public",
+      "afp:prevActivity": "sha256:bc89e7414991f174fb9bb5bd8bdf8394d72a15d0b10b773e3446211d1c1147d2",
+      "object": {
+        "type": "afp:RosterEntry",
+        "agent": "https://alpha.operator.local/agents/reviewer",
+        "status": "active",
+        "afp:keyCustody": "instance",
+        "afp:capabilities": [
+          "afp:cap:review"
+        ],
+        "since": "2026-08-17T09:00:02.000Z"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:02.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "zZrbTnSHZiMKzhGyWr24j2fANVpm9RzENLnxR1cVW1PxvMjunTEqk9EPzxRMvw4diqcLMJktgJKChD6B9hmFy6UR"
+      }
+    }
+  ]
+}

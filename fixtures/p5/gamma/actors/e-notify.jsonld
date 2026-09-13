@@ -1,0 +1,35 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "http://127.0.0.1:38229/agents/e-notify",
+  "type": "Service",
+  "name": "e-notify",
+  "preferredUsername": "e-notify",
+  "afp:operatedBy": "http://127.0.0.1:38229/actor",
+  "afp:capabilities": [
+    "afp:cap:assess"
+  ],
+  "inbox": "http://127.0.0.1:38229/agents/e-notify/inbox",
+  "outbox": "http://127.0.0.1:38229/agents/e-notify/outbox",
+  "afp:visibility": "public",
+  "assertionMethod": [
+    {
+      "id": "http://127.0.0.1:38229/agents/e-notify#ed25519-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:38229/agents/e-notify",
+      "publicKeyMultibase": "z6MkooA6k6mr6YtnSazN7sieayehMmi4YrL7PFP5GuRvEYjJ"
+    }
+  ],
+  "authentication": [
+    {
+      "id": "http://127.0.0.1:38229/agents/e-notify#transport-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:38229/agents/e-notify",
+      "publicKeyMultibase": "z6MkoMyMnWLqcmQLzsS2mPBBo3HB2WGqjiQ9xoSas5h94Sae",
+      "afp:custody": "file"
+    }
+  ]
+}

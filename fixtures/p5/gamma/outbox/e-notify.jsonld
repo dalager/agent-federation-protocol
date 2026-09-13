@@ -1,0 +1,77 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "http://127.0.0.1:38229/agents/e-notify/outbox",
+  "type": "OrderedCollection",
+  "attributedTo": "http://127.0.0.1:38229/agents/e-notify",
+  "totalItems": 2,
+  "orderedItems": [
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"
+      ],
+      "id": "http://127.0.0.1:38229/agents/e-notify/activities/0001",
+      "type": "Create",
+      "actor": "http://127.0.0.1:38229/agents/e-notify",
+      "to": [
+        "http://127.0.0.1:36127/hubs/bridge"
+      ],
+      "published": "2026-08-17T09:13:17.000Z",
+      "context": "http://127.0.0.1:36127/threads/incident-9",
+      "afp:visibility": "hub",
+      "object": {
+        "id": "http://127.0.0.1:38229/agents/e-notify/acts/sev",
+        "type": "afp:Act",
+        "afp:hub": "http://127.0.0.1:36127/hubs/bridge",
+        "content": "declare-sev-1: bridge outcome recorded, field notified"
+      },
+      "afp:action": "declare-sev-1",
+      "afp:actsOn": "sha256:349148c4e7ec32dc9990b15a0eaaa3d88cb81104e2fcb1653d6f4926ea66db70",
+      "afp:actingAs": "http://127.0.0.1:38229/agents/e-notify",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:13:17.000Z",
+        "verificationMethod": "http://127.0.0.1:38229/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "zBpiLzXLo9RVzmxSfccHsXbunCJjcfYxi3GgxfDMDVwXczBzCisL2K4kNp4JGtTpVAQaBSkYt4Rd3AyFQ1tabTtQ"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "http://127.0.0.1:38229/agents/e-notify/activities/0002",
+      "type": "Create",
+      "actor": "http://127.0.0.1:38229/agents/e-notify",
+      "to": [],
+      "published": "2026-08-17T09:16:28.000Z",
+      "context": "http://127.0.0.1:36127/threads/incident-9",
+      "afp:visibility": "internal",
+      "afp:prevActivity": "sha256:2c3928366e4a8224576d8c5c22702c1f05f01795db58b59da86980625faec6cd",
+      "object": {
+        "id": "http://127.0.0.1:38229/agents/e-notify/errors/undeliverable-9",
+        "type": "afp:Error",
+        "afp:correlationId": "http://127.0.0.1:38229/agents/e-notify/activities/0001",
+        "afp:errorCode": "afp:err:undeliverable",
+        "content": "delivery to http://127.0.0.1:36127/hubs/bridge failed after 5 attempts: fetch failed",
+        "attributedTo": "http://127.0.0.1:38229/agents/e-notify"
+      },
+      "afp:actingAs": "http://127.0.0.1:38229/agents/e-notify",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:16:28.000Z",
+        "verificationMethod": "http://127.0.0.1:38229/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z4rDreW6EKEwXik9TVFhZCeo7K1SJwZ1SwSHZGekjchhEm7bpmT5yS9prnSFyZKixRASiWv2YeTMyUoy6UoZsbdRU"
+      }
+    }
+  ]
+}

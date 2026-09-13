@@ -1,0 +1,37 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "http://127.0.0.1:46689/actor",
+  "type": [
+    "Application",
+    "afp:Instance"
+  ],
+  "name": "northwind instance",
+  "preferredUsername": "instance",
+  "afp:operator": "Northwind Support",
+  "inbox": "http://127.0.0.1:46689/actor/inbox",
+  "outbox": "http://127.0.0.1:46689/actor/outbox",
+  "following": "http://127.0.0.1:46689/actor/following",
+  "afp:roster": "http://127.0.0.1:46689/roster",
+  "afp:policy": "http://127.0.0.1:46689/afp/policy",
+  "afp:visibility": "public",
+  "assertionMethod": [
+    {
+      "id": "http://127.0.0.1:46689/actor#ed25519-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:46689/actor",
+      "publicKeyMultibase": "z6Mkf9PL38msdXghg9nkLkU7Cj9YQ4RmYoNmY7r59g7GbUss"
+    }
+  ],
+  "authentication": [
+    {
+      "id": "http://127.0.0.1:46689/actor#transport-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:46689/actor",
+      "publicKeyMultibase": "z6MkpaqKKK3cx4zLJmKDKtRZbPiiY5WWFi5vqz678tDkPuCr"
+    }
+  ]
+}

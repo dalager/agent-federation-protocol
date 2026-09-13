@@ -1,0 +1,37 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "http://127.0.0.1:38159/actor",
+  "type": [
+    "Application",
+    "afp:Instance"
+  ],
+  "name": "atlas instance",
+  "preferredUsername": "instance",
+  "afp:operator": "Atlas Re",
+  "inbox": "http://127.0.0.1:38159/actor/inbox",
+  "outbox": "http://127.0.0.1:38159/actor/outbox",
+  "following": "http://127.0.0.1:38159/actor/following",
+  "afp:roster": "http://127.0.0.1:38159/roster",
+  "afp:policy": "http://127.0.0.1:38159/afp/policy",
+  "afp:visibility": "public",
+  "assertionMethod": [
+    {
+      "id": "http://127.0.0.1:38159/actor#ed25519-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:38159/actor",
+      "publicKeyMultibase": "z6Mkiy6bSCy2px6nRVwk7JrHqStER11zA8mmh79r122SSahc"
+    }
+  ],
+  "authentication": [
+    {
+      "id": "http://127.0.0.1:38159/actor#transport-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:38159/actor",
+      "publicKeyMultibase": "z6MktddUjVWeHZhBVgCh6Pmbc3Mm8oM35LaheZhaZfNxQDPt"
+    }
+  ]
+}

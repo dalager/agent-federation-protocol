@@ -1,0 +1,291 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "http://127.0.0.1:36411/agents/fixer/outbox",
+  "type": "OrderedCollection",
+  "attributedTo": "http://127.0.0.1:36411/agents/fixer",
+  "totalItems": 8,
+  "orderedItems": [
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"
+      ],
+      "id": "http://127.0.0.1:36411/agents/fixer/activities/0001",
+      "actor": "http://127.0.0.1:36411/agents/fixer",
+      "to": [
+        "http://127.0.0.1:46689/hubs/nightdesk"
+      ],
+      "published": "2026-08-17T09:07:09.000Z",
+      "context": "http://127.0.0.1:46689/threads/ticket-4390-late-september",
+      "afp:visibility": "hub",
+      "type": "afp:BidCommit",
+      "object": "http://127.0.0.1:46689/hubs/nightdesk/tasks/ticket-4390-late-september",
+      "afp:hub": "http://127.0.0.1:46689/hubs/nightdesk",
+      "afp:commitment": "sha256:109d0e7d78fb5a735d4d2cbfecf27ee7d3a811fa7c08fcd275391bbe1486e747",
+      "afp:actingAs": "http://127.0.0.1:36411/agents/fixer",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:07:09.000Z",
+        "verificationMethod": "http://127.0.0.1:36411/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z61KnJJm6Go8oFPy55GDZNngTry8iaRCSRr8havaAoqAHCdJptJ3cxJ7LKgTM7xVKrK6N3TbjN2839V4tR6FynocR"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"
+      ],
+      "id": "http://127.0.0.1:36411/agents/fixer/activities/0002",
+      "actor": "http://127.0.0.1:36411/agents/fixer",
+      "to": [
+        "http://127.0.0.1:46689/hubs/nightdesk"
+      ],
+      "published": "2026-08-17T10:07:04.000Z",
+      "context": "http://127.0.0.1:46689/threads/ticket-4390-late-september",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:aeaca86a47254c3fda12867b4237f1c93462c64f3d39aa5b71cf483c33a34839",
+      "type": "afp:BidReveal",
+      "object": {
+        "type": "afp:Bid",
+        "afp:task": "http://127.0.0.1:46689/hubs/nightdesk/tasks/ticket-4390-late-september",
+        "afp:bidder": "http://127.0.0.1:36411/agents/fixer",
+        "afp:capabilityMatch": 90,
+        "afp:estimatedCost": {
+          "unit": "EUR",
+          "value": 100
+        },
+        "afp:estimatedLatency": "PT1H",
+        "nonce": "nonce-ticket-4390-late-september"
+      },
+      "afp:hub": "http://127.0.0.1:46689/hubs/nightdesk",
+      "afp:actingAs": "http://127.0.0.1:36411/agents/fixer",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T10:07:04.000Z",
+        "verificationMethod": "http://127.0.0.1:36411/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "zWnBG4RkDAREgvtqddnbEZ6rtJ3VFeFLAmY71wjejGY9uGg8LLh9JTkxLdLPDjFNyvxFwKUVviYUsMp9Mm5uzhyG"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "http://127.0.0.1:36411/agents/fixer/activities/0003",
+      "type": "Create",
+      "actor": "http://127.0.0.1:36411/agents/fixer",
+      "to": [
+        "http://127.0.0.1:46689/actor",
+        "http://127.0.0.1:32977/actor",
+        "http://127.0.0.1:39145/actor"
+      ],
+      "published": "2026-08-17T10:07:24.000Z",
+      "context": "http://127.0.0.1:46689/threads/ticket-4390-late-september",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:880c36b069f49533d9365ae17ead824465b3a6115aa2c07e229c5cf6c407150f",
+      "object": {
+        "id": "http://127.0.0.1:36411/agents/fixer/results/ticket-4390-late-september",
+        "type": "afp:Result",
+        "afp:correlationId": "ticket-4390-late-september",
+        "content": "ticket-4390-late-september: resolved",
+        "attributedTo": "http://127.0.0.1:36411/agents/fixer"
+      },
+      "afp:actingAs": "http://127.0.0.1:36411/agents/fixer",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T10:07:24.000Z",
+        "verificationMethod": "http://127.0.0.1:36411/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z4DzNTKUqXebfjFqtWeFfDDWzpPNWQjfKTtosxPyiU856h5X1tgUbxkZS6weDM7Vge9rGLJaaaaMomV4tASE8HzAn"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"
+      ],
+      "id": "http://127.0.0.1:36411/agents/fixer/activities/0004",
+      "actor": "http://127.0.0.1:36411/agents/fixer",
+      "to": [
+        "http://127.0.0.1:46689/hubs/nightdesk"
+      ],
+      "published": "2026-08-18T10:09:21.000Z",
+      "context": "http://127.0.0.1:46689/threads/ticket-4471-payment-sync",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:5add9048ec37bd31f483705dba4cae2bebe23d81428cffc5015a8e8457318563",
+      "type": "afp:BidCommit",
+      "object": "http://127.0.0.1:46689/hubs/nightdesk/tasks/ticket-4471-payment-sync",
+      "afp:hub": "http://127.0.0.1:46689/hubs/nightdesk",
+      "afp:commitment": "sha256:192078c5f0e2f2e5ca322d4780afc0eac1b10ba1faf204b836faa4c5ab4e11f3",
+      "afp:actingAs": "http://127.0.0.1:36411/agents/fixer",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-18T10:09:21.000Z",
+        "verificationMethod": "http://127.0.0.1:36411/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z5UsGeLzeiotmm6SDaSV6Gpiz2Wio1g7dTERPXzywfCAH2mJigt3KsCWwWBmuqSDqFfVuyxG3s8epV2mYAkhB4YiB"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"
+      ],
+      "id": "http://127.0.0.1:36411/agents/fixer/activities/0005",
+      "actor": "http://127.0.0.1:36411/agents/fixer",
+      "to": [
+        "http://127.0.0.1:46689/hubs/nightdesk"
+      ],
+      "published": "2026-08-18T11:09:16.000Z",
+      "context": "http://127.0.0.1:46689/threads/ticket-4471-payment-sync",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:226ed7db5bba7cbbca742383f1db5eb4b25e8cb452cda70b665983ee69b4e760",
+      "type": "afp:BidReveal",
+      "object": {
+        "type": "afp:Bid",
+        "afp:task": "http://127.0.0.1:46689/hubs/nightdesk/tasks/ticket-4471-payment-sync",
+        "afp:bidder": "http://127.0.0.1:36411/agents/fixer",
+        "afp:capabilityMatch": 90,
+        "afp:estimatedCost": {
+          "unit": "EUR",
+          "value": 100
+        },
+        "afp:estimatedLatency": "PT1H",
+        "nonce": "nonce-ticket-4471-payment-sync"
+      },
+      "afp:hub": "http://127.0.0.1:46689/hubs/nightdesk",
+      "afp:actingAs": "http://127.0.0.1:36411/agents/fixer",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-18T11:09:16.000Z",
+        "verificationMethod": "http://127.0.0.1:36411/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z2d3iSVnxV8YQhR1qhqrLgW3X6M1pFJyBPKpbBQykbT36UGKjHfXhvvo32ddb5bGaDyt9HBtWXXSsNv84JYdF5YZm"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "http://127.0.0.1:36411/agents/fixer/activities/0006",
+      "type": "Create",
+      "actor": "http://127.0.0.1:36411/agents/fixer",
+      "to": [
+        "http://127.0.0.1:46689/actor",
+        "http://127.0.0.1:32977/actor",
+        "http://127.0.0.1:39145/actor"
+      ],
+      "published": "2026-08-18T11:09:36.000Z",
+      "context": "http://127.0.0.1:46689/threads/ticket-4471-payment-sync",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:e33e2e874b041cf36a8577b19647cac1b426f0e2c9c449c39ce764bb6bc75277",
+      "object": {
+        "id": "http://127.0.0.1:36411/agents/fixer/results/ticket-4471-payment-sync",
+        "type": "afp:Result",
+        "afp:correlationId": "ticket-4471-payment-sync",
+        "content": "ticket-4471-payment-sync: resolved",
+        "attributedTo": [
+          "http://127.0.0.1:32977/agents/triage",
+          "http://127.0.0.1:36411/agents/fixer"
+        ],
+        "afp:contributionSplit": {
+          "http://127.0.0.1:32977/agents/triage": 1,
+          "http://127.0.0.1:36411/agents/fixer": 3
+        }
+      },
+      "afp:actingAs": "http://127.0.0.1:36411/agents/fixer",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-18T11:09:36.000Z",
+        "verificationMethod": "http://127.0.0.1:36411/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "zGH1gbvbGmMPY9YnyFLaaw9z7rS1abkj358ExBJyJBe57WsXBmVeFHVzFLhgJa5igWjMmrLS2CdzmkD1WxfZBroe"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "http://127.0.0.1:36411/agents/fixer/activities/0007",
+      "type": "Create",
+      "actor": "http://127.0.0.1:36411/agents/fixer",
+      "to": [
+        "http://127.0.0.1:46689/hubs/nightdesk"
+      ],
+      "published": "2026-08-20T12:13:45.000Z",
+      "context": "http://127.0.0.1:46689/threads/nightdesk-q3",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:af74dfb36459901ad89e7088a06d6091e499da7e3c0067e7a8861e5eb60c40c8",
+      "object": {
+        "id": "http://127.0.0.1:36411/agents/fixer/votes/lantern-seat",
+        "type": "afp:Vote",
+        "afp:hub": "http://127.0.0.1:46689/hubs/nightdesk",
+        "afp:round": "http://127.0.0.1:46689/rounds/lantern-seat",
+        "afp:proposalHash": "sha256:344d3acf27c817681d6ea2733ce17b1b551635402291441343c950e0b977f167",
+        "afp:quorumSnapshot": "sha256:5afa74f99b28394923cd3762a81b02fa9a74110bb2b0946bff41c0bffaf2ef05",
+        "value": "expel"
+      },
+      "afp:actingAs": "http://127.0.0.1:36411/agents/fixer",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-20T12:13:45.000Z",
+        "verificationMethod": "http://127.0.0.1:36411/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z55Be7usiqLLMz7BbnAEDwwu5XhqNZPTC1NWbxyhWh5gvWv9Pxip275XaMupXYp1dfM7EpmCdvncA5tFCfeGtrzsw"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "http://127.0.0.1:36411/agents/fixer/activities/0008",
+      "type": "Create",
+      "actor": "http://127.0.0.1:36411/agents/fixer",
+      "to": [
+        "http://127.0.0.1:46689/hubs/nightdesk"
+      ],
+      "published": "2026-08-22T14:35:56.000Z",
+      "context": "http://127.0.0.1:46689/threads/nightdesk-q3",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:78fe568876cadf47d061f693373e518bb7b62335f30cc4c8905f349695759ca0",
+      "object": {
+        "id": "http://127.0.0.1:36411/agents/fixer/votes/ratify-q3",
+        "type": "afp:Vote",
+        "afp:hub": "http://127.0.0.1:46689/hubs/nightdesk",
+        "afp:round": "http://127.0.0.1:46689/rounds/ratify-2026-q3",
+        "afp:proposalHash": "sha256:b84452cd172052e0d5974ac008558bc98d6bf2bee84e73e16b4563296eab56a5",
+        "afp:quorumSnapshot": "sha256:5afa74f99b28394923cd3762a81b02fa9a74110bb2b0946bff41c0bffaf2ef05",
+        "value": "http://127.0.0.1:46689/agents/fixer/summaries/2026-q3-corrected"
+      },
+      "afp:actingAs": "http://127.0.0.1:36411/agents/fixer",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-22T14:35:56.000Z",
+        "verificationMethod": "http://127.0.0.1:36411/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z3zLqEYPsRA1TPeYqM48P3qREdvuyMxydXzQVwKAKavSSe5JrpP5WmYCTd1u6FJQX89knS5VvUKkYw5cnvtUAGNqs"
+      }
+    }
+  ]
+}

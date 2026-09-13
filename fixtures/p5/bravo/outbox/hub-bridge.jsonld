@@ -1,0 +1,122 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "http://127.0.0.1:36453/hubs/bridge/outbox",
+  "type": "OrderedCollection",
+  "attributedTo": "http://127.0.0.1:36453/hubs/bridge",
+  "totalItems": 2,
+  "orderedItems": [
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "http://127.0.0.1:36453/hubs/bridge/activities/0001",
+      "type": "Offer",
+      "actor": "http://127.0.0.1:36453/hubs/bridge",
+      "to": [
+        "http://127.0.0.1:36127/hubs/bridge"
+      ],
+      "published": "2026-08-17T09:13:44.000Z",
+      "context": "http://127.0.0.1:36453/threads/anti-entropy",
+      "afp:visibility": "hub",
+      "object": {
+        "type": "afp:Digest",
+        "afp:hub": "http://127.0.0.1:36127/hubs/bridge",
+        "afp:versionVector": {}
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:13:44.000Z",
+        "verificationMethod": "http://127.0.0.1:36453/hubs/bridge#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z3JnMoqm9GLKUS834jiy4cXtrJ46M8T3XKm27tjLQzuYwrKUq2q6PtfEMJACqRn292q6kazyN7o4iKWUdACmsrkeH"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "http://127.0.0.1:36453/hubs/bridge/activities/0002",
+      "type": "Offer",
+      "actor": "http://127.0.0.1:36453/hubs/bridge",
+      "to": [
+        "http://127.0.0.1:36127/hubs/bridge"
+      ],
+      "published": "2026-08-17T09:14:48.000Z",
+      "context": "http://127.0.0.1:36453/threads/anti-entropy",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:b9289a04a9a39bf14629982b16f46fb159a1a2d464b4733e7daefa7d31a500fc",
+      "object": {
+        "type": "afp:Digest",
+        "afp:hub": "http://127.0.0.1:36127/hubs/bridge",
+        "afp:versionVector": {
+          "app:backlog": {
+            "http://127.0.0.1:36453/agents/s-noc": 1
+          },
+          "capabilities": {
+            "http://127.0.0.1:36127/actor": 2,
+            "http://127.0.0.1:36453/actor": 1,
+            "http://127.0.0.1:38229/actor": 3
+          },
+          "instance:http://127.0.0.1:36127/agents/n-noc": {
+            "http://127.0.0.1:36127/actor": 1
+          },
+          "instance:http://127.0.0.1:36127/agents/n-telemetry": {
+            "http://127.0.0.1:36127/actor": 1
+          },
+          "instance:http://127.0.0.1:36453/agents/s-noc": {
+            "http://127.0.0.1:36453/actor": 1
+          },
+          "instance:http://127.0.0.1:38229/agents/e-noc": {
+            "http://127.0.0.1:38229/actor": 1
+          },
+          "instance:http://127.0.0.1:38229/agents/e-notify": {
+            "http://127.0.0.1:38229/actor": 1
+          },
+          "instance:http://127.0.0.1:38229/agents/e-watcher": {
+            "http://127.0.0.1:38229/actor": 1
+          },
+          "membership": {
+            "http://127.0.0.1:36127/actor": 2,
+            "http://127.0.0.1:36453/actor": 1,
+            "http://127.0.0.1:38229/actor": 3
+          },
+          "role:http://127.0.0.1:36127/agents/n-noc": {
+            "http://127.0.0.1:36127/actor": 1
+          },
+          "role:http://127.0.0.1:36127/agents/n-telemetry": {
+            "http://127.0.0.1:36127/actor": 1
+          },
+          "role:http://127.0.0.1:36453/agents/s-noc": {
+            "http://127.0.0.1:36453/actor": 1
+          },
+          "role:http://127.0.0.1:38229/agents/e-noc": {
+            "http://127.0.0.1:38229/actor": 1
+          },
+          "role:http://127.0.0.1:38229/agents/e-notify": {
+            "http://127.0.0.1:38229/actor": 1
+          },
+          "role:http://127.0.0.1:38229/agents/e-watcher": {
+            "http://127.0.0.1:38229/actor": 1
+          }
+        }
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:14:48.000Z",
+        "verificationMethod": "http://127.0.0.1:36453/hubs/bridge#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z2erZU2jRN5DypFafiSij8gBqG8jZLyv6rXJaMYTRTf6m8BfhbDgrLTbwNk85eGxkXNaAjoTdia9b8h29E4fyRZFS"
+      }
+    }
+  ]
+}

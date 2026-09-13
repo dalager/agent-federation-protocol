@@ -1,0 +1,18 @@
+{
+  "bundle": "p7",
+  "domain": "northwind",
+  "outbox": "fixer",
+  "op": "set",
+  "select": {
+    "objectType": "afp:ContributionSummary"
+  },
+  "path": "object.afp:membership",
+  "value": [],
+  "expect": {
+    "verdict": "fail",
+    "failing": [
+      "credit is fixed at acceptance",
+      "afp:membership does not match"
+    ]
+  }
+}

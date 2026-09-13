@@ -1,0 +1,77 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "http://127.0.0.1:38159/agents/atl-pay/outbox",
+  "type": "OrderedCollection",
+  "attributedTo": "http://127.0.0.1:38159/agents/atl-pay",
+  "totalItems": 2,
+  "orderedItems": [
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"
+      ],
+      "id": "http://127.0.0.1:38159/agents/atl-pay/activities/0001",
+      "type": "Create",
+      "actor": "http://127.0.0.1:38159/agents/atl-pay",
+      "to": [
+        "http://127.0.0.1:38159/hubs/windward"
+      ],
+      "published": "2026-08-17T09:18:14.000Z",
+      "context": "http://127.0.0.1:38159/threads/dagmar-trigger",
+      "afp:visibility": "hub",
+      "object": {
+        "id": "http://127.0.0.1:38159/agents/atl-pay/acts/dagmar",
+        "type": "afp:Act",
+        "afp:hub": "http://127.0.0.1:38159/hubs/windward",
+        "content": "refer-to-arbitration-panel: determination recorded, pool notified"
+      },
+      "afp:action": "refer-to-arbitration-panel",
+      "afp:actsOn": "sha256:8ccdf5ad488d8e8f37e955df36d20405c28749252885b31d87923771ea9a5a11",
+      "afp:actingAs": "http://127.0.0.1:38159/agents/atl-pay",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:18:14.000Z",
+        "verificationMethod": "http://127.0.0.1:38159/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "zjHvup4unD7bWGv7HoTxgXgpMmFBaUjbGmSc5WDfNWRPQonxp4MQBjjg7JGPR64eCtjVGQf8ugFhHCfzoCvoHuBv"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "http://127.0.0.1:38159/agents/atl-pay/activities/0002",
+      "type": "Create",
+      "actor": "http://127.0.0.1:38159/agents/atl-pay",
+      "to": [],
+      "published": "2026-08-17T09:20:09.000Z",
+      "context": "http://127.0.0.1:38159/threads/dagmar-trigger",
+      "afp:visibility": "internal",
+      "afp:prevActivity": "sha256:6f43732e22c1256a35462c2076fe9a20fe37c7707f3ce16fe3d2f61f5a144e3d",
+      "object": {
+        "id": "http://127.0.0.1:38159/agents/atl-pay/errors/undeliverable-34",
+        "type": "afp:Error",
+        "afp:correlationId": "http://127.0.0.1:38159/agents/atl-pay/activities/0001",
+        "afp:errorCode": "afp:err:undeliverable",
+        "content": "delivery to http://127.0.0.1:38159/hubs/windward failed after 5 attempts: inbox POST to http://127.0.0.1:38159/hubs/windward/inbox refused: 403",
+        "attributedTo": "http://127.0.0.1:38159/agents/atl-pay"
+      },
+      "afp:actingAs": "http://127.0.0.1:38159/agents/atl-pay",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:20:09.000Z",
+        "verificationMethod": "http://127.0.0.1:38159/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z2yPYTEjFwTUJSvKWKxf8iSrsuwvJfyzfkAYZrsum972tdv4enQwquNybNCxPgguRcKHk7MrJFLDcrjRut28huwMc"
+      }
+    }
+  ]
+}

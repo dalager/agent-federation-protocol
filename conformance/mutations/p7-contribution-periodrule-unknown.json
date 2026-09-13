@@ -1,0 +1,18 @@
+{
+  "bundle": "p7",
+  "domain": "northwind",
+  "outbox": "fixer",
+  "op": "set",
+  "select": {
+    "objectType": "afp:ContributionSummary"
+  },
+  "path": "object.afp:frame.afp:periodRule.afp:form",
+  "value": "wall-clock",
+  "expect": {
+    "verdict": "fail",
+    "failing": [
+      "summary frame is a known form",
+      "unknown afp:periodRule form"
+    ]
+  }
+}

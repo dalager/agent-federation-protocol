@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "afp-verify"
+dynamic = ["version"]
+description = "Independent second-implementation verifier for the Agent Federation Protocol (AFP) — replays an export bundle and says whether it holds up."
+readme = "README.md"
+requires-python = ">=3.11"
+# No license field: the repository declares no license anywhere, and package
+# metadata must not claim one the source does not carry. Choosing one is the
+# operator's call (ADR-0034 build notes).
+dependencies = [
+    "cryptography>=41",
+]
+
+[[project.authors]]
+name = "Christian Dalager"
+
+[project.urls]
+Homepage = "https://github.com/dalager/agent-federation-protocol"
+Repository = "https://github.com/dalager/agent-federation-protocol"
+
+# ADR-0034 Decision 4: `afp-verify --version` on the PATH, once installed.
+[project.scripts]
+afp-verify = "afp_verify.afp_verify:main"
+
+[tool.setuptools]
+# The flat modules (`keys.py`, `policy.py`, `action.py`, `decision.py`, …)
+# install under one package, `afp_verify`, rather than as top-level modules —
+# see `__init__.py`'s docstring for why, and the trade-off it accepts.
+packages = ["afp_verify"]
+
+[tool.setuptools.package-dir]
+afp_verify = "."
+
+[tool.setuptools.package-data]
+afp_verify = ["README.md"]
+
+[tool.setuptools.exclude-package-data]
+afp_verify = ["test/*", "test/**/*", "__pycache__/*", "ruvector.db"]
+
+[tool.setuptools.dynamic]
+version = { attr = "version.VERSION" }

@@ -1,0 +1,19 @@
+{
+  "bundle": "p7",
+  "domain": "northwind",
+  "outbox": "fixer",
+  "op": "set",
+  "select": {
+    "objectType": "afp:Result"
+  },
+  "path": "object.afp:contentHash",
+  "value": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "expect": {
+    "verdict": "fail",
+    "failing": [
+      "matches its digest",
+      "links to its predecessor",
+      "signature"
+    ]
+  }
+}

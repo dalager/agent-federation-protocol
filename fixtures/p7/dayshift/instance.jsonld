@@ -1,0 +1,37 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "http://127.0.0.1:32977/actor",
+  "type": [
+    "Application",
+    "afp:Instance"
+  ],
+  "name": "dayshift instance",
+  "preferredUsername": "instance",
+  "afp:operator": "Dayshift Support",
+  "inbox": "http://127.0.0.1:32977/actor/inbox",
+  "outbox": "http://127.0.0.1:32977/actor/outbox",
+  "following": "http://127.0.0.1:32977/actor/following",
+  "afp:roster": "http://127.0.0.1:32977/roster",
+  "afp:policy": "http://127.0.0.1:32977/afp/policy",
+  "afp:visibility": "public",
+  "assertionMethod": [
+    {
+      "id": "http://127.0.0.1:32977/actor#ed25519-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:32977/actor",
+      "publicKeyMultibase": "z6Mkup95SkBohKucCPesCEB1dTPeEAomYztr1HTaH2BAhnAj"
+    }
+  ],
+  "authentication": [
+    {
+      "id": "http://127.0.0.1:32977/actor#transport-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:32977/actor",
+      "publicKeyMultibase": "z6MktzXRbvSpnnSAK1BtTEJGSs4JbVPVjUNHmcinb1fFR6ZT"
+    }
+  ]
+}

@@ -13,6 +13,47 @@ python3 afp_verify.py ../instance/export-p7/* -v # several bundles: one joint re
 Exit status is `0` only if every check passes. Requires Python 3.11+ and
 `cryptography`; everything else is standard library.
 
+Version: `0.9.0`, implementing spec revision `3.34` (`afp_verify.py --version`
+prints both; ADR-0034 Decision 1).
+
+## Installing
+
+Three ways to get this running, in order of how much you trust the network:
+
+**Copy the directory — nothing to install.** The property ADR-0001 asks for:
+copy `src/verifier/` next to an export and run it.
+
+```bash
+python3 afp_verify.py ../instance/export --thread https://alpha.operator.local/threads/doc-1
+```
+
+**`pip install` from a checkout**, for the console script:
+
+```bash
+pip install ./src/verifier
+afp-verify --version
+afp-verify ../instance/export --thread https://alpha.operator.local/threads/doc-1
+```
+
+**`pip install` from the checksummed release archive**, for the auditor who
+wants a pinned artifact rather than a checkout — verify the digest before
+installing:
+
+```bash
+sha256sum -c SHA256SUMS                       # against the archive you downloaded
+tar xzf afp-verify-<version>.tar.gz
+pip install ./afp-verify-<version>
+```
+
+`scripts/release-archive.sh` (run from the repo root) builds that archive —
+`dist/afp-verify-<version>.tar.gz` and `dist/SHA256SUMS` — from `git archive`
+over this directory, `test/` and `ruvector.db` excluded.
+
+The installed package puts these flat modules under one namespace,
+`afp_verify.<module>`, rather than as top-level `keys`, `policy`, `action`, …
+— see `__init__.py`'s docstring for why and the trade-off it accepts. Nothing
+about invoking `afp_verify.py` directly, from a checkout, changes.
+
 ## Why this exists as a separate program
 
 Per [ADR-0001](../../docs/afp/adr/0001-p1-stack.md): if the writer and the

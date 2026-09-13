@@ -1,0 +1,35 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "https://alpha.operator.local/agents/v25",
+  "type": "Service",
+  "name": "v25",
+  "preferredUsername": "v25",
+  "afp:operatedBy": "https://alpha.operator.local/actor",
+  "afp:capabilities": [
+    "afp:cap:vote"
+  ],
+  "inbox": "https://alpha.operator.local/agents/v25/inbox",
+  "outbox": "https://alpha.operator.local/agents/v25/outbox",
+  "afp:visibility": "public",
+  "assertionMethod": [
+    {
+      "id": "https://alpha.operator.local/agents/v25#ed25519-key",
+      "type": "Multikey",
+      "controller": "https://alpha.operator.local/agents/v25",
+      "publicKeyMultibase": "z6MkwDjQ5PMVostzVFHh4JTEin9GdGgyagTj2BKZ4bsT8VtU"
+    }
+  ],
+  "authentication": [
+    {
+      "id": "https://alpha.operator.local/agents/v25#transport-key",
+      "type": "Multikey",
+      "controller": "https://alpha.operator.local/agents/v25",
+      "publicKeyMultibase": "z6MkuNWJb9M7Q6UzMyoxzVgs2nYEFfYKVoixodwkJdLjoCiC",
+      "afp:custody": "file"
+    }
+  ]
+}

@@ -1,0 +1,180 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "http://127.0.0.1:35517/agents/forge-out/outbox",
+  "type": "OrderedCollection",
+  "attributedTo": "http://127.0.0.1:35517/agents/forge-out",
+  "totalItems": 5,
+  "orderedItems": [
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "http://127.0.0.1:35517/agents/forge-out/activities/0001",
+      "type": "Create",
+      "actor": "http://127.0.0.1:35517/agents/forge-out",
+      "to": [],
+      "published": "2026-08-17T09:11:53.000Z",
+      "context": "http://127.0.0.1:35517/threads/bug-99",
+      "afp:visibility": "parties",
+      "object": {
+        "id": "http://127.0.0.1:35517/agents/forge-out/acts/6822c765cc2fd591e4e1b68a97de2cd8cfccbe3e6e474290a365db952875508f",
+        "type": "afp:Act"
+      },
+      "afp:action": "open-pull-request",
+      "afp:actsOn": "sha256:e75532d0aeed9f53a6b4e81e8e283de9134160b32d1db095374743f05b686ea2",
+      "afp:idempotencyKey": "6822c765cc2fd591e4e1b68a97de2cd8cfccbe3e6e474290a365db952875508f",
+      "afp:correlationId": "triage-99",
+      "afp:actingAs": "http://127.0.0.1:35517/agents/forge-out",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:11:53.000Z",
+        "verificationMethod": "http://127.0.0.1:35517/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z1MKonnnYQHa9D6xx7tYT1Ygd4g3oA2qRcquLZDyPwtFb4RVygCDVmdHz9TREVpAuL894paXfiaZzbCZk8EVKFEs"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "http://127.0.0.1:35517/agents/forge-out/activities/0002",
+      "type": "Create",
+      "actor": "http://127.0.0.1:35517/agents/forge-out",
+      "to": [],
+      "published": "2026-08-17T09:11:55.000Z",
+      "context": "http://127.0.0.1:35517/threads/bug-99",
+      "afp:visibility": "parties",
+      "afp:prevActivity": "sha256:950d9349ab87f4b15a98f86a0ef1ad919d6aa26d4f7035767e73dbe80f6c19a1",
+      "object": {
+        "id": "http://127.0.0.1:35517/agents/forge-out/results/reconcile-6822c765cc2fd591e4e1b68a97de2cd8cfccbe3e6e474290a365db952875508f",
+        "type": "afp:Result",
+        "afp:correlationId": "triage-99",
+        "content": "reconciled open-pull-request: https://forge.example/pr/1",
+        "attributedTo": "http://127.0.0.1:35517/agents/forge-out",
+        "afp:externalRef": "https://forge.example/pr/1",
+        "afp:contentHash": "sha256:8a0cd8c86c0f0f3b7ff92f8d04b0db2c2ebcfe4963b236ad4ec712b803f5d026",
+        "afp:observedAt": "2026-08-17T09:11:54.000Z",
+        "afp:idempotencyKey": "6822c765cc2fd591e4e1b68a97de2cd8cfccbe3e6e474290a365db952875508f",
+        "afp:reconciles": "sha256:950d9349ab87f4b15a98f86a0ef1ad919d6aa26d4f7035767e73dbe80f6c19a1"
+      },
+      "afp:actingAs": "http://127.0.0.1:35517/agents/forge-out",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:11:55.000Z",
+        "verificationMethod": "http://127.0.0.1:35517/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z2od1wRDmFV3aecpped8zmTaWsePECRZz6mxBoTNtoHL5w2gsAJQni3dhwMRgKpfdhNzWh2REixrPhyYdZbGzS4rp"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "http://127.0.0.1:35517/agents/forge-out/activities/0003",
+      "type": "Create",
+      "actor": "http://127.0.0.1:35517/agents/forge-out",
+      "to": [],
+      "published": "2026-08-17T09:11:56.000Z",
+      "context": "http://127.0.0.1:35517/threads/bug-99",
+      "afp:visibility": "parties",
+      "afp:prevActivity": "sha256:d4fd77a08839656466693fad145d7da5726dc241f6bed9f30fd3836c11c35c5a",
+      "object": {
+        "id": "http://127.0.0.1:35517/agents/forge-out/acts/29717c596ef66f72111519cb8d93db538798685ae776f5f9239fe4e360db0d0f",
+        "type": "afp:Act"
+      },
+      "afp:action": "open-pull-request",
+      "afp:actsOn": "sha256:e75532d0aeed9f53a6b4e81e8e283de9134160b32d1db095374743f05b686ea2",
+      "afp:idempotencyKey": "29717c596ef66f72111519cb8d93db538798685ae776f5f9239fe4e360db0d0f",
+      "afp:correlationId": "triage-100",
+      "afp:actingAs": "http://127.0.0.1:35517/agents/forge-out",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:11:56.000Z",
+        "verificationMethod": "http://127.0.0.1:35517/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z4G5ApgBYcMkgJu7t3SrGiapkGaQdFXUtk78v6RgG7qBVMANKzRa7F476XPhs9cVTZW4AjUtSfvWfAMzS9EN7HL5x"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "http://127.0.0.1:35517/agents/forge-out/activities/0004",
+      "type": "Create",
+      "actor": "http://127.0.0.1:35517/agents/forge-out",
+      "to": [],
+      "published": "2026-08-17T09:11:58.000Z",
+      "context": "http://127.0.0.1:35517/threads/bug-99",
+      "afp:visibility": "parties",
+      "afp:prevActivity": "sha256:69f0df3483e6502177b880ac87dc817eaac5269e32c80e26859d7d68f63922ab",
+      "object": {
+        "id": "http://127.0.0.1:35517/agents/forge-out/results/reconcile-29717c596ef66f72111519cb8d93db538798685ae776f5f9239fe4e360db0d0f",
+        "type": "afp:Result",
+        "afp:correlationId": "triage-100",
+        "content": "reconciled open-pull-request: https://forge.example/pr/2",
+        "attributedTo": "http://127.0.0.1:35517/agents/forge-out",
+        "afp:externalRef": "https://forge.example/pr/2",
+        "afp:contentHash": "sha256:649eac36fed9cf4480a26a14ddd3140b2b12f046ffc7c558184db532ff86de18",
+        "afp:observedAt": "2026-08-17T09:11:57.000Z",
+        "afp:idempotencyKey": "29717c596ef66f72111519cb8d93db538798685ae776f5f9239fe4e360db0d0f",
+        "afp:reconciles": "sha256:69f0df3483e6502177b880ac87dc817eaac5269e32c80e26859d7d68f63922ab"
+      },
+      "afp:actingAs": "http://127.0.0.1:35517/agents/forge-out",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:11:58.000Z",
+        "verificationMethod": "http://127.0.0.1:35517/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z4BkXkyrXiT7dNDd1veyfsSz25mUL441Q4Q7krth1G34Vy6A2iwf87R9CYwgc9v4GBP9iCTepVFVpXZC2hP6GTCSq"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "http://127.0.0.1:35517/agents/forge-out/activities/0005",
+      "type": "Create",
+      "actor": "http://127.0.0.1:35517/agents/forge-out",
+      "to": [],
+      "published": "2026-08-17T09:11:59.000Z",
+      "context": "http://127.0.0.1:35517/threads/bug-99",
+      "afp:visibility": "parties",
+      "afp:prevActivity": "sha256:3e8edb06685bf6a4f676c2a7f0f76a1e35cf2863828bbfa1b7a854e3cb80ec76",
+      "object": {
+        "id": "http://127.0.0.1:35517/agents/forge-out/errors/refused-184d2a6ca6a86cdad87b717ffcc77cbc8e0f814fc8b1cc38322937254ce79e2d",
+        "type": "afp:Error",
+        "afp:correlationId": "triage-99-merge",
+        "afp:errorCode": "afp:err:refused-by-contract",
+        "content": "merge is refused by contract for actuator forge-out",
+        "attributedTo": "http://127.0.0.1:35517/agents/forge-out"
+      },
+      "afp:actingAs": "http://127.0.0.1:35517/agents/forge-out",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:11:59.000Z",
+        "verificationMethod": "http://127.0.0.1:35517/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "zmbXW1iWwH7Q35FBeT5CtNFMxxUzer7YRN21JCmnSYzREE3ePWa3t4vqNAiUWgxM7JQA87ZhcPPKmCc5A2md6ZnC"
+      }
+    }
+  ]
+}

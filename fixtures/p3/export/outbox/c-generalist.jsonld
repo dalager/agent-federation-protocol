@@ -1,0 +1,304 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "https://alpha.operator.local/agents/c-generalist/outbox",
+  "type": "OrderedCollection",
+  "attributedTo": "https://alpha.operator.local/agents/c-generalist",
+  "totalItems": 8,
+  "orderedItems": [
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/agents/c-generalist/activities/0001",
+      "type": "afp:BidCommit",
+      "actor": "https://alpha.operator.local/agents/c-generalist",
+      "to": [
+        "https://alpha.operator.local/hubs/estimation-hub"
+      ],
+      "published": "2026-08-17T09:01:30.000Z",
+      "context": "https://alpha.operator.local/threads/load-test",
+      "afp:visibility": "hub",
+      "object": "https://alpha.operator.local/hubs/estimation-hub/tasks/load-42",
+      "afp:hub": "https://alpha.operator.local/hubs/estimation-hub",
+      "afp:commitment": "sha256:7372fe0b65198b9ec60f5d930adbe2a4e4e2bdab22cc506405cfe94af61b5799",
+      "afp:actingAs": "https://alpha.operator.local/agents/c-generalist",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:01:30.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z4E4F1bcVpm4H1sUBub8mdvH5hE8LGXHBAzs2FeEkoquhdtnXMQoTLPvvEWKwC3Km4ujg5Rp3X7p8onosGCGpWooD"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/agents/c-generalist/activities/0002",
+      "type": "afp:BidReveal",
+      "actor": "https://alpha.operator.local/agents/c-generalist",
+      "to": [
+        "https://alpha.operator.local/hubs/estimation-hub"
+      ],
+      "published": "2026-08-17T09:10:05.000Z",
+      "context": "https://alpha.operator.local/threads/load-test",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:9780bd4e0427e80c2fb8ce9c9555af709a30ab95e09f4a8bfcd6d06493626d78",
+      "object": {
+        "type": "afp:Bid",
+        "afp:task": "https://alpha.operator.local/hubs/estimation-hub/tasks/load-42",
+        "afp:bidder": "https://alpha.operator.local/agents/c-generalist",
+        "afp:capabilityMatch": 70,
+        "afp:estimatedCost": {
+          "unit": "afp:compute-unit",
+          "value": 90
+        },
+        "afp:estimatedLatency": "PT3M",
+        "nonce": "nonce-c-generalist-load-42"
+      },
+      "afp:hub": "https://alpha.operator.local/hubs/estimation-hub",
+      "afp:actingAs": "https://alpha.operator.local/agents/c-generalist",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:10:05.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z2XBAbrKTFiDs5HwwD1SUHXh5RBKZj2vbRHQAsEx7VkjoDd5tyM3YPwKW7ssV7Zpiu8368p7DKq13JiogmRtkruLk"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/agents/c-generalist/activities/0003",
+      "type": "afp:BidCommit",
+      "actor": "https://alpha.operator.local/agents/c-generalist",
+      "to": [
+        "https://alpha.operator.local/hubs/estimation-hub"
+      ],
+      "published": "2026-08-17T09:10:51.000Z",
+      "context": "https://alpha.operator.local/threads/q-88-migration-estimate",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:6fe2034ce0e1b786d20c42e61d889ed99df432377bbb29d1e804e9f333226c4b",
+      "object": "https://alpha.operator.local/hubs/estimation-hub/tasks/q-88",
+      "afp:hub": "https://alpha.operator.local/hubs/estimation-hub",
+      "afp:commitment": "sha256:3f7b76519ec71b5d46541f0214e4af5e920c989f5c6e9fae6be7c50f4909f5bd",
+      "afp:actingAs": "https://alpha.operator.local/agents/c-generalist",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:10:51.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z3nhQecWSD1jfun4snc7B3L29FYx7wJkxS1bZ1i6QfBzWkjztuNbcnRtLSVBEMx8b4dfLEVJ7rzV6uyUT7ei6Smpa"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/agents/c-generalist/activities/0004",
+      "type": "afp:BidReveal",
+      "actor": "https://alpha.operator.local/agents/c-generalist",
+      "to": [
+        "https://alpha.operator.local/hubs/estimation-hub"
+      ],
+      "published": "2026-08-17T09:30:09.000Z",
+      "context": "https://alpha.operator.local/threads/q-88-migration-estimate",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:23cbef79fbb46f3efcc1e8b57c44266d9a026d843d7e856d8ef449492293575c",
+      "object": {
+        "type": "afp:Bid",
+        "afp:task": "https://alpha.operator.local/hubs/estimation-hub/tasks/q-88",
+        "afp:bidder": "https://alpha.operator.local/agents/c-generalist",
+        "afp:capabilityMatch": 80,
+        "afp:estimatedCost": {
+          "unit": "afp:compute-unit",
+          "value": 60
+        },
+        "afp:estimatedLatency": "PT8H",
+        "nonce": "nonce-c-generalist-q-88",
+        "afp:coverage": {
+          "infra": 65,
+          "data": 60,
+          "compliance": 60,
+          "licensing": 55
+        }
+      },
+      "afp:hub": "https://alpha.operator.local/hubs/estimation-hub",
+      "afp:actingAs": "https://alpha.operator.local/agents/c-generalist",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:30:09.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z5GgcxC4kyAqU11rkCrvGkenS5BWAfA2tYz6pSpR14j8V6eBfKERsyBruptmoAgz295qnUmEprfsBKz31eEvSk9pW"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/agents/c-generalist/activities/0005",
+      "type": "Accept",
+      "actor": "https://alpha.operator.local/agents/c-generalist",
+      "to": [
+        "https://alpha.operator.local/hubs/estimation-hub"
+      ],
+      "published": "2026-08-17T09:30:24.000Z",
+      "context": "https://alpha.operator.local/threads/q-88-migration-estimate",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:cdf6c5fa2e593e65c6d17163a422f44a83a3ddd7b37e122899e015071a1e98c2",
+      "object": "https://alpha.operator.local/hubs/estimation-hub/awards/q-88",
+      "afp:correlationId": "q-88--c-generalist",
+      "afp:actingAs": "https://alpha.operator.local/agents/c-generalist",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:30:24.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z53Y4KGM4ogoJ3Qiu4tDTHAigkaTGwgHFx2U4RjLtwLL42QM5odgfMLTizwPLJtE9AXJjfCmmtMTw7kCnqHhKkEZX"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/agents/c-generalist/activities/0006",
+      "type": "Create",
+      "actor": "https://alpha.operator.local/agents/c-generalist",
+      "to": [
+        "https://alpha.operator.local/hubs/estimation-hub"
+      ],
+      "published": "2026-08-17T09:30:26.000Z",
+      "context": "https://alpha.operator.local/threads/q-88-migration-estimate",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:686547bc2eaf36dd5c24746e932917a3e296e7595e7a18cae9602a6f83fd88cb",
+      "object": {
+        "id": "https://alpha.operator.local/agents/c-generalist/results/q-88",
+        "type": "afp:Result",
+        "afp:correlationId": "q-88--c-generalist",
+        "content": "partial answer from c-generalist for q-88",
+        "attributedTo": "https://alpha.operator.local/agents/c-generalist",
+        "afp:producedBy": "stub"
+      },
+      "afp:actingAs": "https://alpha.operator.local/agents/c-generalist",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:30:26.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z5uGSXfPAAqLuRhnUuZEdmy8vkKFheG4qwp6ibGZSWN6tjb5Ju6FQNwcLG24xg1qRMkXy4UjuohfUAq9gwC7NFBxd"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/agents/c-generalist/activities/0007",
+      "type": "Create",
+      "actor": "https://alpha.operator.local/agents/c-generalist",
+      "to": [
+        "https://alpha.operator.local/hubs/estimation-hub"
+      ],
+      "published": "2026-08-17T09:30:43.000Z",
+      "context": "https://alpha.operator.local/threads/q-88-migration-estimate",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:374204ff338a8719f9fdd20dd54dde905b5cb3c631ce208a4d787a9bb24c13a1",
+      "object": {
+        "id": "https://alpha.operator.local/agents/c-generalist/syntheses/q-88",
+        "type": "afp:Synthesis",
+        "afp:method": "sum-of-disjoint-ranges",
+        "afp:answer": {
+          "unit": "kDKK",
+          "low": 9000,
+          "high": 11700
+        },
+        "afp:confidence": 72,
+        "afp:contributingResults": [
+          "sha256:374204ff338a8719f9fdd20dd54dde905b5cb3c631ce208a4d787a9bb24c13a1",
+          "sha256:5dfe165ada609eeec7470c50a8295c548fb0d6a4831e9adf2347ebb1e49c9c0b"
+        ],
+        "afp:assumptions": [
+          "dual-run parallel period",
+          "network segmentation contains PCI scope"
+        ],
+        "afp:dissent": [
+          {
+            "actor": "https://alpha.operator.local/agents/b-licensing",
+            "summary": "Q3 deadline unachievable at any cost: 14-week licensing lead time",
+            "result": "sha256:5dfe165ada609eeec7470c50a8295c548fb0d6a4831e9adf2347ebb1e49c9c0b"
+          }
+        ],
+        "attributedTo": "https://alpha.operator.local/agents/c-generalist",
+        "afp:award": "https://alpha.operator.local/hubs/estimation-hub/awards/q-88"
+      },
+      "afp:actingAs": "https://alpha.operator.local/agents/c-generalist",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:30:43.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z3KpY8RNZavK8vqaV6mwYh1ahVHSdu4oXRs74XefPv9Mx3D5A5mNQrWDEunuWBv9f56bak8HKZoBc4ZbEBKPsM9VJ"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/agents/c-generalist/activities/0008",
+      "type": "Create",
+      "actor": "https://alpha.operator.local/agents/c-generalist",
+      "to": [
+        "https://alpha.operator.local/hubs/estimation-hub"
+      ],
+      "published": "2026-08-17T09:31:06.000Z",
+      "context": "https://alpha.operator.local/threads/q-88-migration-estimate",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:a1009058459371194fb56c263fd1d8de689060df9d119d888ca8206a095dfabc",
+      "object": {
+        "id": "https://alpha.operator.local/agents/c-generalist/votes/https://alpha.operator.local/rounds/q-88-ratify",
+        "type": "afp:Vote",
+        "afp:round": "https://alpha.operator.local/rounds/q-88-ratify",
+        "afp:proposalHash": "sha256:3fc98787a4c1c7827bfc639f5541f5555cd86962f4efef42dc77393868d9b3b7",
+        "afp:quorumSnapshot": "sha256:7f2d23bd30572b1e5ec1cab22189a2ab80d4834de9834c99a392c66aff2bed71",
+        "value": "https://alpha.operator.local/agents/c-generalist/syntheses/q-88"
+      },
+      "afp:actingAs": "https://alpha.operator.local/agents/c-generalist",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:31:06.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z2ZBVsB4L1MZD5X3veWDrMmCQjJ5A2sVyw135T47T24MJAcC9CarbR19GGr33TgrowprxedgeGwLVnDavMKAiVWgJ"
+      }
+    }
+  ]
+}

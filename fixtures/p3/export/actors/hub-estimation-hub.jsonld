@@ -1,0 +1,35 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "https://alpha.operator.local/hubs/estimation-hub",
+  "type": [
+    "Group",
+    "afp:Hub"
+  ],
+  "name": "estimation-hub",
+  "preferredUsername": "estimation-hub",
+  "inbox": "https://alpha.operator.local/hubs/estimation-hub/inbox",
+  "outbox": "https://alpha.operator.local/hubs/estimation-hub/outbox",
+  "followers": "https://alpha.operator.local/hubs/estimation-hub/followers",
+  "afp:visibility": "public",
+  "afp:operatedBy": "https://alpha.operator.local/actor",
+  "assertionMethod": [
+    {
+      "id": "https://alpha.operator.local/hubs/estimation-hub#ed25519-key",
+      "type": "Multikey",
+      "controller": "https://alpha.operator.local/hubs/estimation-hub",
+      "publicKeyMultibase": "z6MkfwhYCfwQnFthfjx3Wa33APmS7HjkaVLV7kMbpFKpvCAd"
+    }
+  ],
+  "authentication": [
+    {
+      "id": "https://alpha.operator.local/hubs/estimation-hub#transport-key",
+      "type": "Multikey",
+      "controller": "https://alpha.operator.local/hubs/estimation-hub",
+      "publicKeyMultibase": "z6MknzQ4739Jabvq6uWQ76xAuUGcU7fiE8g6Hsax9UajGeaU"
+    }
+  ]
+}

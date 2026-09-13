@@ -1,0 +1,33 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "http://127.0.0.1:35517/agents/forge-out",
+  "type": "Service",
+  "name": "forge-out",
+  "preferredUsername": "forge-out",
+  "afp:operatedBy": "http://127.0.0.1:35517/actor",
+  "afp:capabilities": [],
+  "inbox": "http://127.0.0.1:35517/agents/forge-out/inbox",
+  "outbox": "http://127.0.0.1:35517/agents/forge-out/outbox",
+  "afp:visibility": "public",
+  "assertionMethod": [
+    {
+      "id": "http://127.0.0.1:35517/agents/forge-out#ed25519-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:35517/agents/forge-out",
+      "publicKeyMultibase": "z6MkhaSvtCVuzzizySrt72EtudMkh1GWF6FRmu6CfVzkPz7f"
+    }
+  ],
+  "authentication": [
+    {
+      "id": "http://127.0.0.1:35517/agents/forge-out#transport-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:35517/agents/forge-out",
+      "publicKeyMultibase": "z6Mkpcgfq8UYs93TMjTZUeun9j35FCJa8UV5WhZzNkWgh7sF",
+      "afp:custody": "file"
+    }
+  ]
+}

@@ -1,0 +1,118 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "https://alpha.operator.local/agents/writer/outbox",
+  "type": "OrderedCollection",
+  "attributedTo": "https://alpha.operator.local/agents/writer",
+  "totalItems": 2,
+  "orderedItems": [
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/agents/writer/activities/0001",
+      "type": "Offer",
+      "actor": "https://alpha.operator.local/agents/writer",
+      "to": [
+        "https://alpha.operator.local/agents/reviewer"
+      ],
+      "published": "2026-08-17T09:00:07.000Z",
+      "context": "https://alpha.operator.local/threads/doc-1",
+      "afp:visibility": "parties",
+      "target": "https://alpha.operator.local/agents/reviewer",
+      "object": {
+        "id": "https://alpha.operator.local/agents/writer/tasks/task-1",
+        "type": "afp:Task",
+        "afp:capability": "afp:cap:review",
+        "afp:correlationId": "task-1",
+        "content": "Review the attached draft for unstated assumptions.",
+        "afp:deadline": "2026-08-17T09:10:06.000Z",
+        "attachment": [
+          {
+            "type": "Link",
+            "href": "https://alpha.operator.local/artifacts/sha256-67af861885c785bab4092b5ba57c11711bebee17bd1a41edf771330e7ab0a602",
+            "mediaType": "text/plain",
+            "afp:digest": "sha256:67af861885c785bab4092b5ba57c11711bebee17bd1a41edf771330e7ab0a602",
+            "afp:size": 110,
+            "afp:sourceUrl": "urn:afp:operator-brief:doc-1",
+            "afp:fetchedAt": "2026-08-17T09:00:04.000Z"
+          },
+          {
+            "type": "Link",
+            "href": "https://alpha.operator.local/artifacts/sha256-b38d0cb4889f0c094135e2cea96cb0f3c890cbb7155913ddd2f22cedc9b46653",
+            "mediaType": "text/markdown",
+            "afp:digest": "sha256:b38d0cb4889f0c094135e2cea96cb0f3c890cbb7155913ddd2f22cedc9b46653",
+            "afp:size": 260
+          }
+        ]
+      },
+      "afp:actingAs": "https://alpha.operator.local/agents/writer",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:07.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z2HpymRr9kUgm5X71u25BBtfPbGTZ8mUT5yBWMsKTztkKL9KxNaX8enwEM9GTQdVrTnhtXPCu4yY6mnWKWgBddmLf"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/agents/writer/activities/0002",
+      "type": "Offer",
+      "actor": "https://alpha.operator.local/agents/writer",
+      "to": [
+        "https://alpha.operator.local/agents/reviewer"
+      ],
+      "published": "2026-08-17T09:00:27.000Z",
+      "context": "https://alpha.operator.local/threads/doc-1",
+      "afp:visibility": "parties",
+      "afp:prevActivity": "sha256:191a2c2a49de812bcd2bdc1e29cf5451eb0da4d82559b92934d701061b2fbd3e",
+      "target": "https://alpha.operator.local/agents/reviewer",
+      "object": {
+        "id": "https://alpha.operator.local/agents/writer/tasks/task-2",
+        "type": "afp:Task",
+        "afp:capability": "afp:cap:review",
+        "afp:correlationId": "task-2",
+        "content": "Review the attached revision; the previous critique is addressed.",
+        "afp:deadline": "2026-08-17T09:10:26.000Z",
+        "attachment": [
+          {
+            "type": "Link",
+            "href": "https://alpha.operator.local/artifacts/sha256-67af861885c785bab4092b5ba57c11711bebee17bd1a41edf771330e7ab0a602",
+            "mediaType": "text/plain",
+            "afp:digest": "sha256:67af861885c785bab4092b5ba57c11711bebee17bd1a41edf771330e7ab0a602",
+            "afp:size": 110,
+            "afp:sourceUrl": "urn:afp:operator-brief:doc-1",
+            "afp:fetchedAt": "2026-08-17T09:00:04.000Z"
+          },
+          {
+            "type": "Link",
+            "href": "https://alpha.operator.local/artifacts/sha256-b38d0cb4889f0c094135e2cea96cb0f3c890cbb7155913ddd2f22cedc9b46653",
+            "mediaType": "text/markdown",
+            "afp:digest": "sha256:b38d0cb4889f0c094135e2cea96cb0f3c890cbb7155913ddd2f22cedc9b46653",
+            "afp:size": 260
+          }
+        ]
+      },
+      "afp:actingAs": "https://alpha.operator.local/agents/writer",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:27.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z63vUr8uPr4sryM5p9sMtqp5FCTXwCaMm6ZULAVGDiEJ387ts495oFz7vxipAVhMj79Js6T9bufqmrTWJXSp996qE"
+      }
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "bundle": "p7",
+  "domain": "northwind",
+  "outbox": "triage",
+  "op": "set",
+  "select": {
+    "objectType": "afp:ContributionDispute"
+  },
+  "path": "object.afp:evidence",
+  "value": [
+    "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+  ],
+  "expect": {
+    "verdict": "fail",
+    "failing": [
+      "dispute rests on evidence the record carries",
+      "resolves to no activity in this case file"
+    ]
+  }
+}

@@ -1,0 +1,90 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "format": "afp-export/1",
+  "instance": "http://127.0.0.1:36127/actor",
+  "exportedAt": "2026-09-13T19:01:26.208Z",
+  "actors": [
+    "n-noc",
+    "n-telemetry",
+    "hub-bridge"
+  ],
+  "activities": 18,
+  "artifacts": 0,
+  "cryptosuite": "eddsa-jcs-2022",
+  "afp:keyHistory": [
+    {
+      "afp:actor": "http://127.0.0.1:36127/actor",
+      "id": "http://127.0.0.1:36127/actor#ed25519-key",
+      "publicKeyMultibase": "z6MkeWXbBDes2iKMhHHs8n36qEMgibT5YcnKxNpCxtrtWJ3n"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:36127/actor",
+      "id": "http://127.0.0.1:36127/actor#transport-key",
+      "publicKeyMultibase": "z6MkqTY3nWJY1FgBDWKbCYirgppQTTNALAH6fBgZHNUUe8VR"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:36127/agents/n-noc",
+      "id": "http://127.0.0.1:36127/agents/n-noc#ed25519-key",
+      "publicKeyMultibase": "z6MkpmJH8DaxtR2Vgn62ay1aHiF3A2F2SsZAsyPpJGQzexyc"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:36127/agents/n-noc",
+      "id": "http://127.0.0.1:36127/agents/n-noc#hub-key-bridge",
+      "publicKeyMultibase": "z6MkgVZ4DnDwPj8DmhcC46fKcEYECwqBmULoR4FPCBSuCQdM"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:36127/agents/n-noc",
+      "id": "http://127.0.0.1:36127/agents/n-noc#transport-key",
+      "publicKeyMultibase": "z6Mkkk67oMEPAW5RyrhjaNoiThevbDeZMQthaJoupiVqYvv9"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:36127/agents/n-telemetry",
+      "id": "http://127.0.0.1:36127/agents/n-telemetry#ed25519-key",
+      "publicKeyMultibase": "z6MktvVAAvv2tgSS4s9GqGMGY6RfA58swoAWDHeMuq42RTtY"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:36127/agents/n-telemetry",
+      "id": "http://127.0.0.1:36127/agents/n-telemetry#hub-key-bridge",
+      "publicKeyMultibase": "z6MkvsvNHg83LhbnakjSSnB2EVy4vXAsw536XN15jGK1Aqvv"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:36127/agents/n-telemetry",
+      "id": "http://127.0.0.1:36127/agents/n-telemetry#transport-key",
+      "publicKeyMultibase": "z6MktRe7ZpLX4mwcyUukKYZwpt2bJDWbaqY7VJ6p3J6TgCBW"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:36127/hubs/bridge",
+      "id": "http://127.0.0.1:36127/hubs/bridge#ed25519-key",
+      "publicKeyMultibase": "z6MkqFUce312mYpPfoHuUNX75HjUkniU6wbZoGzPUkCzUsk3"
+    }
+  ],
+  "afp:members": [
+    "actors/hub-bridge.jsonld",
+    "actors/n-noc.jsonld",
+    "actors/n-telemetry.jsonld",
+    "instance.jsonld",
+    "outbox/hub-bridge.jsonld",
+    "outbox/instance.jsonld",
+    "outbox/n-noc.jsonld",
+    "outbox/n-telemetry.jsonld",
+    "policy.jsonld",
+    "received.jsonld",
+    "roster.jsonld"
+  ],
+  "afp:policy": {
+    "id": "http://127.0.0.1:36127/afp/policy",
+    "afp:digest": "sha256:47e2ac0dc3401c59570ae04826ca73775c8097b8f1b1631ed53bec37acfbc812"
+  },
+  "proof": {
+    "type": "DataIntegrityProof",
+    "cryptosuite": "eddsa-jcs-2022",
+    "created": "2026-09-13T19:01:26.208Z",
+    "verificationMethod": "http://127.0.0.1:36127/actor#ed25519-key",
+    "proofPurpose": "assertionMethod",
+    "proofValue": "z5v58uSyCAjdLTJQV1QBHCHtfKjtU6AmKoZJMzwgXqBHmnxS26Xf83gwzA5kMa6oZm2YHpmpNodda5ivWnJu7xmMX"
+  }
+}

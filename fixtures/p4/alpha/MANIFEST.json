@@ -1,0 +1,59 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "format": "afp-export/1",
+  "instance": "http://127.0.0.1:40923/actor",
+  "exportedAt": "2026-09-13T19:01:26.019Z",
+  "actors": [
+    "a-lead"
+  ],
+  "activities": 5,
+  "artifacts": 0,
+  "cryptosuite": "eddsa-jcs-2022",
+  "afp:keyHistory": [
+    {
+      "afp:actor": "http://127.0.0.1:40923/actor",
+      "id": "http://127.0.0.1:40923/actor#ed25519-key",
+      "publicKeyMultibase": "z6Mkw7H3Q1EhiUhGmwyAPgo6VLQYGhdskC9WGLpsGfFJdb1k"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:40923/actor",
+      "id": "http://127.0.0.1:40923/actor#transport-key",
+      "publicKeyMultibase": "z6Mks7ZqHQdZTS8FdBr85DoFLV3dFDCVGYeMQti7UnUvuSw8"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:40923/agents/a-lead",
+      "id": "http://127.0.0.1:40923/agents/a-lead#ed25519-key",
+      "publicKeyMultibase": "z6MkjvPAPEHchPCdW5dJic6mRHPiSWckHcsaNVtAueZUru9k"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:40923/agents/a-lead",
+      "id": "http://127.0.0.1:40923/agents/a-lead#transport-key",
+      "publicKeyMultibase": "z6Mkw4Bmsy8Gx8uneH3Vn2yZmLUdhRDLWV9XoNFdG7tCrqQF"
+    }
+  ],
+  "afp:members": [
+    "actors/a-lead.jsonld",
+    "instance.jsonld",
+    "outbox/a-lead.jsonld",
+    "outbox/instance.jsonld",
+    "policy.jsonld",
+    "received.jsonld",
+    "roster.jsonld"
+  ],
+  "afp:policy": {
+    "id": "http://127.0.0.1:40923/afp/policy",
+    "afp:digest": "sha256:5b7fa27d219b25080925a5e888e906448f08612a55f7061c6855ed46325307b9"
+  },
+  "proof": {
+    "type": "DataIntegrityProof",
+    "cryptosuite": "eddsa-jcs-2022",
+    "created": "2026-09-13T19:01:26.019Z",
+    "verificationMethod": "http://127.0.0.1:40923/actor#ed25519-key",
+    "proofPurpose": "assertionMethod",
+    "proofValue": "z5f4dsvgW8dwsdNPKhoNJT8spMrHExe4YfFxemRUyMFu5Ue6SFSGLDwNJfn44oNuVrGdvCvtReThZgvaK6MeaNtuT"
+  }
+}

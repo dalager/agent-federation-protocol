@@ -1,0 +1,15 @@
+{
+  "bundle": "p1",
+  "domain": "export",
+  "outbox": "reviewer",
+  "op": "filter",
+  "select": {
+    "index": 1
+  },
+  "expect": {
+    "verdict": "fail",
+    "failing": [
+      "links to its predecessor"
+    ]
+  }
+}

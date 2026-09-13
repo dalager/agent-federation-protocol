@@ -17,7 +17,7 @@ holding no keys.
 
 ## The spec
 
-**[docs/afp/](docs/afp/README.md)** — Revision 3.33, in seven parts, with scenario tests
+**[docs/afp/](docs/afp/README.md)** — Revision 3.34, in seven parts, with scenario tests
 and ADRs.
 
 Thirteen **spec-test scenarios** walk real workloads end to end and record what strained;
@@ -143,6 +143,53 @@ four deliberate P1 mutations, P2's three DecisionRecord mutations, and P3's thre
 mutations (a deleted winning reveal, a swapped performer set, mismatched winning-bid
 evidence) — each fails the replay with a specific pointer.
 
+## Continuous integration
+
+[`.github/workflows/gate.yml`](.github/workflows/gate.yml) runs on every push and pull
+request: the TypeScript gate, every demo, the [fixtures](fixtures/) compatibility check,
+the docs link-and-anchor check and the cross-implementation parity suite in one job, the
+Python verifier over the same fixtures and its half of parity in another
+([ADR-0034](docs/afp/adr/0034-release-conformance-and-disclosure.md) Decision 2). Green is
+the merge condition. Enforcing that — requiring the workflow to pass before a branch can
+merge — is a GitHub branch-protection setting on the repository, not something this file
+can do on its own; it has to be turned on separately by whoever administers the repo.
+
+## Releases
+
+Two version lines, one stated relationship ([ADR-0034](docs/afp/adr/0034-release-conformance-and-disclosure.md)
+Decision 1): the spec keeps its own revision (currently `3.34`), and the instance and the
+verifier each carry a semantic version (currently `0.9.0`) that names the spec revision it
+implements — in `src/instance/package.json`'s `afp.specRevision`, in the verifier's
+`--version`, and in NodeInfo's `metadata.specRevision`, which counterparties already
+fetch. A minor implementation release may implement a later spec revision; a spec
+revision that changes a wire shape requires a major implementation release, with the
+compatibility gate ([fixtures/](fixtures/)) proving old bundles still replay.
+
+A release is cut with `scripts/release.sh <version>`: it refuses unless the working tree
+is clean, `npm test`, `scripts/verify-fixtures.sh`, `python3 conformance/run.py` and
+`node scripts/check-links.mjs` are all green, and a git signing key is configured — a
+release is signed or it is not a release. It bumps the version in
+`src/instance/package.json` and `src/verifier/version.py`, builds the release archive
+(`scripts/release-archive.sh`), and tags `v<version>` with signed notes naming the spec
+revision, the conformance-kit version (`conformance/VERSION`), and the SHA256 of every
+fixture bundle's `MANIFEST.json` the release was gated against, plus the verifier
+archive's own digest. It does not push the tag. Run `scripts/release.sh <version>
+--dry-run` to see everything the real run would do and check without bumping or tagging.
+
+Tags are signed with a release key. **No release has been cut yet, so no key exists to
+publish a fingerprint for** — this section gets one the first time `scripts/release.sh`
+actually tags a version; until then, do not trust a signature claiming to be this
+project's release key.
+
+To get the verifier: `pip install` from the checksummed release archive a release
+publishes (`dist/afp-verify-<version>.tar.gz` and `dist/SHA256SUMS`) — verify the
+checksum before installing. See [`src/verifier/README.md` § Installing](src/verifier/README.md#installing)
+for every way to run it, in order of how much you trust the network.
+
+Found a security issue? See [`SECURITY.md`](SECURITY.md) for how to report it, and
+[`docs/afp/threat-model.md`](docs/afp/threat-model.md) for what this protocol defends
+against and what it does not.
+
 ## Where it stands — 2026-09-02
 
 Every phase the roadmap named is built and gated: P1 through P7, 250 cases in the
@@ -178,7 +225,7 @@ Two documents carry the consequence, both proposed:
 | [ADR-0023](docs/afp/adr/0023-loose-ends-triaged.md) | **The loose ends, triaged** — 31 subtasks from an audit of every ADR, each linked to its origin section, with one disposition: build, decide, reconcile, or park behind a named trigger |
 | [ADR-0024](docs/afp/adr/0024-the-road-to-production.md) | **The road to production** — ten claims and the ten ADRs (0025–0034) that make each checkable: transport hardening, key custody and a signer port, the port as a security boundary, port agents, the human window, scenario re-walks, the resident process, the deployment profile, operator obligations, release engineering. Its definition of done is a scenario — the production Tuesday — not a checklist |
 
-The spec is at Revision 3.33. Nothing in the program changes what a replay proves; all of
+The spec is at Revision 3.34. Nothing in the program changes what a replay proves; all of
 it changes whether anyone could run the thing that produces the replay.
 
 ## Why integrity is in phase one

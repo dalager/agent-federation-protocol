@@ -1,0 +1,19 @@
+{
+  "bundle": "p2",
+  "domain": "export",
+  "outbox": "hub-policy-hub",
+  "op": "set",
+  "select": {
+    "objectType": "afp:DecisionRecord"
+  },
+  "path": "object.afp:weightTally",
+  "value": {
+    "__fabricated__": 999
+  },
+  "expect": {
+    "verdict": "fail",
+    "failing": [
+      "weightTally recomputes from countedVotes"
+    ]
+  }
+}

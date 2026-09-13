@@ -1,11 +1,14 @@
 {
   "name": "afp-instance",
-  "version": "0.1.0",
+  "version": "0.9.0",
   "private": true,
   "type": "module",
   "description": "AFP P1 reference instance - one instance, two agents, one verifiable record",
   "engines": {
     "node": ">=24"
+  },
+  "afp": {
+    "specRevision": "3.34"
   },
   "scripts": {
     "demo": "node --disable-warning=ExperimentalWarning src/cli.ts demo",

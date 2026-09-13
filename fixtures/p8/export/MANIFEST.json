@@ -1,0 +1,144 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "format": "afp-export/1",
+  "instance": "http://127.0.0.1:35517/actor",
+  "exportedAt": "2026-09-13T19:01:26.805Z",
+  "actors": [
+    "requester",
+    "triage-north",
+    "triage-south",
+    "triage-east",
+    "forge-out",
+    "hub-triage-hub"
+  ],
+  "activities": 31,
+  "artifacts": 1,
+  "cryptosuite": "eddsa-jcs-2022",
+  "afp:keyHistory": [
+    {
+      "afp:actor": "http://127.0.0.1:35517/actor",
+      "id": "http://127.0.0.1:35517/actor#ed25519-key",
+      "publicKeyMultibase": "z6Mkn3jpErEcRRqRT1k1gYNcNq9To58rqoRVFJUrGbScfrv5"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:35517/actor",
+      "id": "http://127.0.0.1:35517/actor#transport-key",
+      "publicKeyMultibase": "z6MkttNvJUZ6BrqQvVkTFWFiCCCpTW2PiCLbL89KRKEaGWg6"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:35517/agents/requester",
+      "id": "http://127.0.0.1:35517/agents/requester#ed25519-key",
+      "publicKeyMultibase": "z6MkmrCsNxevicZESsHRyQTSt1w1Z2vsQ8WFXgik3oWCjM4D"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:35517/agents/requester",
+      "id": "http://127.0.0.1:35517/agents/requester#hub-key-triage-hub",
+      "publicKeyMultibase": "z6MkhpjuaDASP4Aygq5p9fK7DD1Jj2ocDYH2uAjNqtzcZbcB"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:35517/agents/requester",
+      "id": "http://127.0.0.1:35517/agents/requester#transport-key",
+      "publicKeyMultibase": "z6MktWgsSw75Z8kCZQJy9Wnf2GNPZgZdjpqmSwsBVA12Y9pd"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:35517/agents/triage-north",
+      "id": "http://127.0.0.1:35517/agents/triage-north#ed25519-key",
+      "publicKeyMultibase": "z6MkqQPxCoSWrArTYTgZAv4Z45MaZ3UEbqcJubkVrWCp5A6W"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:35517/agents/triage-north",
+      "id": "http://127.0.0.1:35517/agents/triage-north#hub-key-triage-hub",
+      "publicKeyMultibase": "z6Mkn3SM4yq71QPRcDHX6rBjCtXGK6VvcazzmixjaVRAcpSZ"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:35517/agents/triage-north",
+      "id": "http://127.0.0.1:35517/agents/triage-north#transport-key",
+      "publicKeyMultibase": "z6MkmiaABJpGbnhaUdw2VMHuH9JxdUqSn9vUDFfidQgEKvox"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:35517/agents/triage-south",
+      "id": "http://127.0.0.1:35517/agents/triage-south#ed25519-key",
+      "publicKeyMultibase": "z6MkuFThEuWUEH2qmpBQ5e1XRj8QfKMKvfo8yfmfrh9iKhWf"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:35517/agents/triage-south",
+      "id": "http://127.0.0.1:35517/agents/triage-south#hub-key-triage-hub",
+      "publicKeyMultibase": "z6MkjmWNQHBqYqLtbA2jDGURUqmnPresBt7LeVVAGV9HeWFG"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:35517/agents/triage-south",
+      "id": "http://127.0.0.1:35517/agents/triage-south#transport-key",
+      "publicKeyMultibase": "z6MkgB7R2aQujPe3ByRkDcpsBZmjQrEQg9j4zWjDEKyep3DV"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:35517/agents/triage-east",
+      "id": "http://127.0.0.1:35517/agents/triage-east#ed25519-key",
+      "publicKeyMultibase": "z6Mkm2iNTN45SdERQrApk1MrWfr5eHNXHj79cyejP7wzjm9Q"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:35517/agents/triage-east",
+      "id": "http://127.0.0.1:35517/agents/triage-east#hub-key-triage-hub",
+      "publicKeyMultibase": "z6MkgXoKia1mW27LociZp2aKBqthyjuFNjmegU7X86qSbMjx"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:35517/agents/triage-east",
+      "id": "http://127.0.0.1:35517/agents/triage-east#transport-key",
+      "publicKeyMultibase": "z6MknKTP9sspt4XS9M3116ftn4rrNGLyJTj7bLLag9zGDzXy"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:35517/agents/forge-out",
+      "id": "http://127.0.0.1:35517/agents/forge-out#ed25519-key",
+      "publicKeyMultibase": "z6MkhaSvtCVuzzizySrt72EtudMkh1GWF6FRmu6CfVzkPz7f"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:35517/agents/forge-out",
+      "id": "http://127.0.0.1:35517/agents/forge-out#hub-key-triage-hub",
+      "publicKeyMultibase": "z6Mkg4UXUnt4pYAhJAdZikP5fKKWbHQtmzvMsSqym7US3f3m"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:35517/agents/forge-out",
+      "id": "http://127.0.0.1:35517/agents/forge-out#transport-key",
+      "publicKeyMultibase": "z6Mkpcgfq8UYs93TMjTZUeun9j35FCJa8UV5WhZzNkWgh7sF"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:35517/hubs/triage-hub",
+      "id": "http://127.0.0.1:35517/hubs/triage-hub#ed25519-key",
+      "publicKeyMultibase": "z6MkiB19qMqcv9qfCYtw5XtJw29nVGtbLqbora4kyLpi4Cfu"
+    }
+  ],
+  "afp:members": [
+    "actors/forge-out.jsonld",
+    "actors/hub-triage-hub.jsonld",
+    "actors/requester.jsonld",
+    "actors/triage-east.jsonld",
+    "actors/triage-north.jsonld",
+    "actors/triage-south.jsonld",
+    "artifacts/sha256-8d08ba52daa90895a3e133115f330a36f3756c0b78186546d8a2fa4c30d2c5df",
+    "instance.jsonld",
+    "outbox/forge-out.jsonld",
+    "outbox/hub-triage-hub.jsonld",
+    "outbox/instance.jsonld",
+    "outbox/requester.jsonld",
+    "outbox/triage-east.jsonld",
+    "outbox/triage-north.jsonld",
+    "outbox/triage-south.jsonld",
+    "policy.jsonld",
+    "roster.jsonld"
+  ],
+  "afp:policy": {
+    "id": "http://127.0.0.1:35517/afp/policy",
+    "afp:digest": "sha256:455c748680e681ffe745df28a289483c2ea6b724362f3c14cd005026b0f45144"
+  },
+  "proof": {
+    "type": "DataIntegrityProof",
+    "cryptosuite": "eddsa-jcs-2022",
+    "created": "2026-09-13T19:01:26.805Z",
+    "verificationMethod": "http://127.0.0.1:35517/actor#ed25519-key",
+    "proofPurpose": "assertionMethod",
+    "proofValue": "z2fZAU9og1fy8jX3NE1iKZYk3pmHKEwBSVDYoz9sUcfSXsP2ccKgP9eYJMwthhwLnBppiC1buXR5DJ8Rx2n8RE9dH"
+  }
+}

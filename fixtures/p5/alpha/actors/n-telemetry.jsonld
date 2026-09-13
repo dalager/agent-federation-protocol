@@ -1,0 +1,35 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "http://127.0.0.1:36127/agents/n-telemetry",
+  "type": "Service",
+  "name": "n-telemetry",
+  "preferredUsername": "n-telemetry",
+  "afp:operatedBy": "http://127.0.0.1:36127/actor",
+  "afp:capabilities": [
+    "afp:cap:assess"
+  ],
+  "inbox": "http://127.0.0.1:36127/agents/n-telemetry/inbox",
+  "outbox": "http://127.0.0.1:36127/agents/n-telemetry/outbox",
+  "afp:visibility": "public",
+  "assertionMethod": [
+    {
+      "id": "http://127.0.0.1:36127/agents/n-telemetry#ed25519-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:36127/agents/n-telemetry",
+      "publicKeyMultibase": "z6MktvVAAvv2tgSS4s9GqGMGY6RfA58swoAWDHeMuq42RTtY"
+    }
+  ],
+  "authentication": [
+    {
+      "id": "http://127.0.0.1:36127/agents/n-telemetry#transport-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:36127/agents/n-telemetry",
+      "publicKeyMultibase": "z6MktRe7ZpLX4mwcyUukKYZwpt2bJDWbaqY7VJ6p3J6TgCBW",
+      "afp:custody": "file"
+    }
+  ]
+}

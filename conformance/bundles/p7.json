@@ -1,0 +1,11 @@
+{
+  "fixture": "../fixtures/p7",
+  "bundles": [
+    "northwind",
+    "dayshift",
+    "kestrel",
+    "lantern"
+  ],
+  "thread": null,
+  "verdict": "pass"
+}

@@ -1,0 +1,35 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "http://127.0.0.1:35517/agents/triage-north",
+  "type": "Service",
+  "name": "triage-north",
+  "preferredUsername": "triage-north",
+  "afp:operatedBy": "http://127.0.0.1:35517/actor",
+  "afp:capabilities": [
+    "afp:cap:triage"
+  ],
+  "inbox": "http://127.0.0.1:35517/agents/triage-north/inbox",
+  "outbox": "http://127.0.0.1:35517/agents/triage-north/outbox",
+  "afp:visibility": "public",
+  "assertionMethod": [
+    {
+      "id": "http://127.0.0.1:35517/agents/triage-north#ed25519-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:35517/agents/triage-north",
+      "publicKeyMultibase": "z6MkqQPxCoSWrArTYTgZAv4Z45MaZ3UEbqcJubkVrWCp5A6W"
+    }
+  ],
+  "authentication": [
+    {
+      "id": "http://127.0.0.1:35517/agents/triage-north#transport-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:35517/agents/triage-north",
+      "publicKeyMultibase": "z6MkmiaABJpGbnhaUdw2VMHuH9JxdUqSn9vUDFfidQgEKvox",
+      "afp:custody": "file"
+    }
+  ]
+}

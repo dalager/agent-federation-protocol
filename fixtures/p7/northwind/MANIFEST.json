@@ -1,0 +1,90 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "format": "afp-export/1",
+  "instance": "http://127.0.0.1:46689/actor",
+  "exportedAt": "2026-09-13T19:01:26.767Z",
+  "actors": [
+    "triage",
+    "fixer",
+    "hub-nightdesk"
+  ],
+  "activities": 55,
+  "artifacts": 0,
+  "cryptosuite": "eddsa-jcs-2022",
+  "afp:keyHistory": [
+    {
+      "afp:actor": "http://127.0.0.1:46689/actor",
+      "id": "http://127.0.0.1:46689/actor#ed25519-key",
+      "publicKeyMultibase": "z6Mkf9PL38msdXghg9nkLkU7Cj9YQ4RmYoNmY7r59g7GbUss"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:46689/actor",
+      "id": "http://127.0.0.1:46689/actor#transport-key",
+      "publicKeyMultibase": "z6MkpaqKKK3cx4zLJmKDKtRZbPiiY5WWFi5vqz678tDkPuCr"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:46689/agents/triage",
+      "id": "http://127.0.0.1:46689/agents/triage#ed25519-key",
+      "publicKeyMultibase": "z6MkphVbqUMf6rAa964wcKLPRW2c1RuCJfwnXim7ybsFubzc"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:46689/agents/triage",
+      "id": "http://127.0.0.1:46689/agents/triage#hub-key-nightdesk",
+      "publicKeyMultibase": "z6MkpdfX448rQrXqYPH98fe3xcdbnbDaJdxpKE7Ry4VnVEjG"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:46689/agents/triage",
+      "id": "http://127.0.0.1:46689/agents/triage#transport-key",
+      "publicKeyMultibase": "z6Mks3C2K7VHpPq3LQQTL4rfktVVy6nmnuibvBjUtAY5xN1r"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:46689/agents/fixer",
+      "id": "http://127.0.0.1:46689/agents/fixer#ed25519-key",
+      "publicKeyMultibase": "z6MkjGk43Ftacdqj8anBnn7ch2c8za3TGTFSXDRsfQhw9wPJ"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:46689/agents/fixer",
+      "id": "http://127.0.0.1:46689/agents/fixer#hub-key-nightdesk",
+      "publicKeyMultibase": "z6MkwakufLYQuD392XrF1wcnWTo5DsDDJDtNzTniYTDDPi2R"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:46689/agents/fixer",
+      "id": "http://127.0.0.1:46689/agents/fixer#transport-key",
+      "publicKeyMultibase": "z6Mki4r3qKknw4nMAWHphQmdiDDVfcU54F6XJxj3z1cbhUYS"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:46689/hubs/nightdesk",
+      "id": "http://127.0.0.1:46689/hubs/nightdesk#ed25519-key",
+      "publicKeyMultibase": "z6Mko9rwyh3XNRSgnmwjbF6eTkGZoh6b8baicHFowt5No7d8"
+    }
+  ],
+  "afp:members": [
+    "actors/fixer.jsonld",
+    "actors/hub-nightdesk.jsonld",
+    "actors/triage.jsonld",
+    "instance.jsonld",
+    "outbox/fixer.jsonld",
+    "outbox/hub-nightdesk.jsonld",
+    "outbox/instance.jsonld",
+    "outbox/triage.jsonld",
+    "policy.jsonld",
+    "received.jsonld",
+    "roster.jsonld"
+  ],
+  "afp:policy": {
+    "id": "http://127.0.0.1:46689/afp/policy",
+    "afp:digest": "sha256:4b5cbf255fc0b7f36fc8f2892bb5b0d8a5314b351d88f492863ac5eb43b754bd"
+  },
+  "proof": {
+    "type": "DataIntegrityProof",
+    "cryptosuite": "eddsa-jcs-2022",
+    "created": "2026-09-13T19:01:26.767Z",
+    "verificationMethod": "http://127.0.0.1:46689/actor#ed25519-key",
+    "proofPurpose": "assertionMethod",
+    "proofValue": "zdCHUKAbq2qqH7AJ7m3eczmEU82DKgvgNd8CkyuyMtAXyyWLACqwVqPUvYny25h5K7CynaAZTGK5ipL6aGMzyrAE"
+  }
+}

@@ -33,6 +33,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from allocation import check_announce_role, check_award, check_retired_spellings
+from version import SPEC_REVISION, VERSION
 from asset import check_assets
 from action import check_actions, check_supersession
 from decision import (
@@ -1475,12 +1476,21 @@ class PrefixedReport:
         return self._report.record(f"[{self._prefix}] {name}", ok, detail)
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
+    # ADR-0034 Decision 4: accepting an explicit argv (default: read sys.argv,
+    # argparse's own default) is what lets the installed console script
+    # (`afp-verify = "afp_verify.afp_verify:main"`) and a test call this the
+    # same way a package entry point does, without going through a subprocess.
     parser = argparse.ArgumentParser(description="Verify one AFP export bundle, or replay several jointly (ADR-0009).")
     parser.add_argument("exports", type=Path, nargs="+", help="export director(y|ies) — several run the federated joint replay")
     parser.add_argument("--thread", help="only replay this context (default: every thread found)")
     parser.add_argument("-v", "--verbose", action="store_true", help="show passing checks too")
-    args = parser.parse_args()
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"afp-verify {VERSION} (spec revision {SPEC_REVISION})",
+    )
+    args = parser.parse_args(argv)
 
     for export in args.exports:
         if not export.is_dir():

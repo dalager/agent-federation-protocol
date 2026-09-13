@@ -1,0 +1,179 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "format": "afp-export/1",
+  "instance": "https://alpha.operator.local/actor",
+  "exportedAt": "2026-09-13T19:01:25.961Z",
+  "actors": [
+    "a-infra",
+    "a-data",
+    "b-compliance",
+    "b-licensing",
+    "c-generalist",
+    "d-secops",
+    "e-estimator",
+    "hub-estimation-hub"
+  ],
+  "activities": 58,
+  "artifacts": 0,
+  "cryptosuite": "eddsa-jcs-2022",
+  "afp:keyHistory": [
+    {
+      "afp:actor": "https://alpha.operator.local/actor",
+      "id": "https://alpha.operator.local/actor#ed25519-key",
+      "publicKeyMultibase": "z6Mkp1sQ77N84GiSnSoVwg2XdTmCdA2R8gxnosEUpPhLcMb3"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/actor",
+      "id": "https://alpha.operator.local/actor#transport-key",
+      "publicKeyMultibase": "z6MkrCj6XBwFgT2pqzYoDSeKSns3WqscW1BNHEzFUUTVayqG"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/a-infra",
+      "id": "https://alpha.operator.local/agents/a-infra#ed25519-key",
+      "publicKeyMultibase": "z6MkwQ1acvv4g47SeGwuvbatXx3hZrrU5NfLzYbrvDtiavyC"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/a-infra",
+      "id": "https://alpha.operator.local/agents/a-infra#hub-key-estimation-hub",
+      "publicKeyMultibase": "z6Mkj7VZCfSpwhntNHJTikno3ure7ZdqC9Qz9JZvyyjZsLgH"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/a-infra",
+      "id": "https://alpha.operator.local/agents/a-infra#transport-key",
+      "publicKeyMultibase": "z6Mkeg7ztmSwNA53CiwwHerPHvtsSzYv8uTRD1qx1jPptpxt"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/a-data",
+      "id": "https://alpha.operator.local/agents/a-data#ed25519-key",
+      "publicKeyMultibase": "z6MksKUPCc2hRLkUd4bfiBpabbmK3Q1SeoVsCBNrtj2f1B4u"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/a-data",
+      "id": "https://alpha.operator.local/agents/a-data#hub-key-estimation-hub",
+      "publicKeyMultibase": "z6Mkp5VTYJ4XSSUmpnn7crbkZFZEFrnHg9rz8X6tzL6Mt7jy"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/a-data",
+      "id": "https://alpha.operator.local/agents/a-data#transport-key",
+      "publicKeyMultibase": "z6MkiztswLMgsRNqFs94HCnGAuJgV11thaRbnJdYCPq7NVB6"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/b-compliance",
+      "id": "https://alpha.operator.local/agents/b-compliance#ed25519-key",
+      "publicKeyMultibase": "z6Mks6dJUKRoNrz1pXkNhWzBaABXwPUBU8Ff12gi5VdcSDmL"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/b-compliance",
+      "id": "https://alpha.operator.local/agents/b-compliance#hub-key-estimation-hub",
+      "publicKeyMultibase": "z6Mkk7Dwn9dmVBMtN5ofSPsLaJPgD5b4EPn6JU53ATheGb7G"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/b-compliance",
+      "id": "https://alpha.operator.local/agents/b-compliance#transport-key",
+      "publicKeyMultibase": "z6MkqgAMZeCWF4amVPfFQiPgvqipDPCR5fRBgd3CiMA21eRE"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/b-licensing",
+      "id": "https://alpha.operator.local/agents/b-licensing#ed25519-key",
+      "publicKeyMultibase": "z6MkkHJjXH7Hn1WTuf82aaUNzsmCuY9mNHVBXuXgWN5XCGbj"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/b-licensing",
+      "id": "https://alpha.operator.local/agents/b-licensing#hub-key-estimation-hub",
+      "publicKeyMultibase": "z6MkpSfuuDhYh78PU4beTK6NtMpdbguEovwmdgV49ZfyByHK"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/b-licensing",
+      "id": "https://alpha.operator.local/agents/b-licensing#transport-key",
+      "publicKeyMultibase": "z6Mkrsuwjy3ofLvPz2YxvCkQFKkcvSNEifRiM7N969o8geLM"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/c-generalist",
+      "id": "https://alpha.operator.local/agents/c-generalist#ed25519-key",
+      "publicKeyMultibase": "z6Mkm11hy1zvpaHG712gb78Rp8kRZMQtLMagzS8gTKgYQeqk"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/c-generalist",
+      "id": "https://alpha.operator.local/agents/c-generalist#hub-key-estimation-hub",
+      "publicKeyMultibase": "z6MkuCJerBMUNLV3nazfDysGcQ9PrDaARj9obSRAqHG3FLJX"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/c-generalist",
+      "id": "https://alpha.operator.local/agents/c-generalist#transport-key",
+      "publicKeyMultibase": "z6Mkmd562Aio4FKsgEP5ZNpUTGyVK2BwspnFcPkovaV8eLDx"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/d-secops",
+      "id": "https://alpha.operator.local/agents/d-secops#ed25519-key",
+      "publicKeyMultibase": "z6MkvW7Ka5xVMMJen9ipbYrMQ9KYGH6NMzKRsqjhtqsfTywA"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/d-secops",
+      "id": "https://alpha.operator.local/agents/d-secops#hub-key-estimation-hub",
+      "publicKeyMultibase": "z6MkteWSA4Theq4DFxdNADmPwquw1R4feCCv2bwsRpMK1XHx"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/d-secops",
+      "id": "https://alpha.operator.local/agents/d-secops#transport-key",
+      "publicKeyMultibase": "z6MkqqYzaL7vmNSwoKCENWjaxfMSRGL21D4kN1TiNZyWRgj6"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/e-estimator",
+      "id": "https://alpha.operator.local/agents/e-estimator#ed25519-key",
+      "publicKeyMultibase": "z6MkfQJqSBjZ4ASQaoyR5UfwN6mbELR2S812EBakk3uLq1d7"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/e-estimator",
+      "id": "https://alpha.operator.local/agents/e-estimator#hub-key-estimation-hub",
+      "publicKeyMultibase": "z6MkqsE6tVvBwkDhisTQwWApDPQitzkhBSTyuB5MHWXhKg6P"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/e-estimator",
+      "id": "https://alpha.operator.local/agents/e-estimator#transport-key",
+      "publicKeyMultibase": "z6MkvrXeCnAd1VUGVVETdM4pb5muEjbrqWV3ykf6JTR8paid"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/hubs/estimation-hub",
+      "id": "https://alpha.operator.local/hubs/estimation-hub#ed25519-key",
+      "publicKeyMultibase": "z6MkfwhYCfwQnFthfjx3Wa33APmS7HjkaVLV7kMbpFKpvCAd"
+    }
+  ],
+  "afp:members": [
+    "actors/a-data.jsonld",
+    "actors/a-infra.jsonld",
+    "actors/b-compliance.jsonld",
+    "actors/b-licensing.jsonld",
+    "actors/c-generalist.jsonld",
+    "actors/d-secops.jsonld",
+    "actors/e-estimator.jsonld",
+    "actors/hub-estimation-hub.jsonld",
+    "instance.jsonld",
+    "outbox/a-data.jsonld",
+    "outbox/a-infra.jsonld",
+    "outbox/b-compliance.jsonld",
+    "outbox/b-licensing.jsonld",
+    "outbox/c-generalist.jsonld",
+    "outbox/d-secops.jsonld",
+    "outbox/e-estimator.jsonld",
+    "outbox/hub-estimation-hub.jsonld",
+    "outbox/instance.jsonld",
+    "policy.jsonld",
+    "roster.jsonld"
+  ],
+  "afp:policy": {
+    "id": "https://alpha.operator.local/afp/policy",
+    "afp:digest": "sha256:e5967de6a456f2a04181145058299fdcd762c9a28cd1bf734ffa17f27d7d1c1d"
+  },
+  "proof": {
+    "type": "DataIntegrityProof",
+    "cryptosuite": "eddsa-jcs-2022",
+    "created": "2026-09-13T19:01:25.961Z",
+    "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+    "proofPurpose": "assertionMethod",
+    "proofValue": "z3pmU3B6aakoPb7zJWY3pyKqR4LTb4VHBJi9EeRz4hFQ1uU3qkvHgFXFzWjqNx6P7xU7mqWQcASwGvJvV1c8XohKe"
+  }
+}

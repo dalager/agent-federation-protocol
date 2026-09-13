@@ -1,0 +1,35 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "http://127.0.0.1:35437/agents/anc-uw",
+  "type": "Service",
+  "name": "anc-uw",
+  "preferredUsername": "anc-uw",
+  "afp:operatedBy": "http://127.0.0.1:35437/actor",
+  "afp:capabilities": [
+    "afp:cap:assess"
+  ],
+  "inbox": "http://127.0.0.1:35437/agents/anc-uw/inbox",
+  "outbox": "http://127.0.0.1:35437/agents/anc-uw/outbox",
+  "afp:visibility": "public",
+  "assertionMethod": [
+    {
+      "id": "http://127.0.0.1:35437/agents/anc-uw#ed25519-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:35437/agents/anc-uw",
+      "publicKeyMultibase": "z6MkopYFM5MsRfUNHXtQbCGBrgi7zVH3iL48dSCBDtAKokhM"
+    }
+  ],
+  "authentication": [
+    {
+      "id": "http://127.0.0.1:35437/agents/anc-uw#transport-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:35437/agents/anc-uw",
+      "publicKeyMultibase": "z6Mku8peQgJiMfNXFh3BjVTAaQDnD5v3JcvcZLRsMBKCWPGF",
+      "afp:custody": "file"
+    }
+  ]
+}

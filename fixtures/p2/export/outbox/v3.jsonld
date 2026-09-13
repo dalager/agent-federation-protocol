@@ -1,0 +1,46 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "https://alpha.operator.local/agents/v3/outbox",
+  "type": "OrderedCollection",
+  "attributedTo": "https://alpha.operator.local/agents/v3",
+  "totalItems": 1,
+  "orderedItems": [
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/agents/v3/activities/0001",
+      "type": "Create",
+      "actor": "https://alpha.operator.local/agents/v3",
+      "to": [
+        "https://alpha.operator.local/hubs/policy-hub"
+      ],
+      "published": "2026-08-17T09:05:22.000Z",
+      "context": "https://alpha.operator.local/threads/codebase-integrity",
+      "afp:visibility": "hub",
+      "object": {
+        "id": "https://alpha.operator.local/agents/v3/votes/https://alpha.operator.local/rounds/codebase-integrity",
+        "type": "afp:Vote",
+        "afp:round": "https://alpha.operator.local/rounds/codebase-integrity",
+        "afp:proposalHash": "sha256:3846989497b0340f5caa543f25462afd503943d118efa38b0aedee8522860a7e",
+        "afp:quorumSnapshot": "sha256:fb0e6af55d6fc2146ea8e292f05c9e6fca7455ac5dcf52750289ac8917af15a1",
+        "value": "signed-commits"
+      },
+      "afp:actingAs": "https://alpha.operator.local/agents/v3",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:05:22.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z2ehy7JfF9K7YQhDxkhC87Y6jwAW7UzPFGrTDvJazPxGriaXSGu6m59YWuzqRRxE5r7tBxsTxcc9FowgUAL9Kxqru"
+      }
+    }
+  ]
+}

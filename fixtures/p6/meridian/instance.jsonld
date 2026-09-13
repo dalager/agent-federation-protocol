@@ -1,0 +1,37 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "http://127.0.0.1:36727/actor",
+  "type": [
+    "Application",
+    "afp:Instance"
+  ],
+  "name": "meridian instance",
+  "preferredUsername": "instance",
+  "afp:operator": "Meridian Re",
+  "inbox": "http://127.0.0.1:36727/actor/inbox",
+  "outbox": "http://127.0.0.1:36727/actor/outbox",
+  "following": "http://127.0.0.1:36727/actor/following",
+  "afp:roster": "http://127.0.0.1:36727/roster",
+  "afp:policy": "http://127.0.0.1:36727/afp/policy",
+  "afp:visibility": "public",
+  "assertionMethod": [
+    {
+      "id": "http://127.0.0.1:36727/actor#ed25519-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:36727/actor",
+      "publicKeyMultibase": "z6MkhXdY3vaYWsqorHjyEBPH1t196oseMwZTwNyNtX43aUnh"
+    }
+  ],
+  "authentication": [
+    {
+      "id": "http://127.0.0.1:36727/actor#transport-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:36727/actor",
+      "publicKeyMultibase": "z6MkvFvipSwm9TLP4GQ6vJcTUUDJRkxmH7UfuqfL6VvmZjCi"
+    }
+  ]
+}

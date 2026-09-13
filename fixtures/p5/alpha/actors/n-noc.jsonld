@@ -1,0 +1,35 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "http://127.0.0.1:36127/agents/n-noc",
+  "type": "Service",
+  "name": "n-noc",
+  "preferredUsername": "n-noc",
+  "afp:operatedBy": "http://127.0.0.1:36127/actor",
+  "afp:capabilities": [
+    "afp:cap:assess"
+  ],
+  "inbox": "http://127.0.0.1:36127/agents/n-noc/inbox",
+  "outbox": "http://127.0.0.1:36127/agents/n-noc/outbox",
+  "afp:visibility": "public",
+  "assertionMethod": [
+    {
+      "id": "http://127.0.0.1:36127/agents/n-noc#ed25519-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:36127/agents/n-noc",
+      "publicKeyMultibase": "z6MkpmJH8DaxtR2Vgn62ay1aHiF3A2F2SsZAsyPpJGQzexyc"
+    }
+  ],
+  "authentication": [
+    {
+      "id": "http://127.0.0.1:36127/agents/n-noc#transport-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:36127/agents/n-noc",
+      "publicKeyMultibase": "z6Mkkk67oMEPAW5RyrhjaNoiThevbDeZMQthaJoupiVqYvv9",
+      "afp:custody": "file"
+    }
+  ]
+}

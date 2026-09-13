@@ -1,0 +1,19 @@
+{
+  "bundle": "p5",
+  "domain": "alpha",
+  "outbox": "hub-bridge",
+  "op": "filter",
+  "select": {
+    "objectType": "afp:DecisionRecord"
+  },
+  "path": "object.afp:uncounted",
+  "match": {
+    "afp:status": "silent"
+  },
+  "expect": {
+    "verdict": "fail",
+    "failing": [
+      "afp:uncounted partitions the pinned electorate"
+    ]
+  }
+}

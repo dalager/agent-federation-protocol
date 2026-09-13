@@ -1,0 +1,593 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "format": "afp-export/1",
+  "instance": "https://alpha.operator.local/actor",
+  "exportedAt": "2026-09-13T19:01:25.928Z",
+  "actors": [
+    "v0",
+    "v1",
+    "v2",
+    "v3",
+    "v4",
+    "v5",
+    "v6",
+    "v7",
+    "v8",
+    "v9",
+    "v10",
+    "v11",
+    "v12",
+    "v13",
+    "v14",
+    "v15",
+    "v16",
+    "v17",
+    "v18",
+    "v19",
+    "v20",
+    "v21",
+    "v22",
+    "v23",
+    "v24",
+    "v25",
+    "v26",
+    "v27",
+    "v28",
+    "v29",
+    "hub-policy-hub"
+  ],
+  "activities": 92,
+  "artifacts": 0,
+  "cryptosuite": "eddsa-jcs-2022",
+  "afp:keyHistory": [
+    {
+      "afp:actor": "https://alpha.operator.local/actor",
+      "id": "https://alpha.operator.local/actor#ed25519-key",
+      "publicKeyMultibase": "z6Mku78NcJ26YPFHoB6A9mswLn2RrTjqrupqrT7G3EvQ41xU"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/actor",
+      "id": "https://alpha.operator.local/actor#transport-key",
+      "publicKeyMultibase": "z6MkoLyvbXbaUqbNFhXwj8nxsUeAq9BMLMfLPGbSLoNTVdcb"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v0",
+      "id": "https://alpha.operator.local/agents/v0#ed25519-key",
+      "publicKeyMultibase": "z6MkgfWwHKp2wTeoStXttEmXhPELzemijMPvVvPGc3XrUKV1"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v0",
+      "id": "https://alpha.operator.local/agents/v0#hub-key-policy-hub",
+      "publicKeyMultibase": "z6MkvVux6HYf9Wo2sBkd8hr8ddz8KdJTYV4ALUVtbtDc9L9y"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v0",
+      "id": "https://alpha.operator.local/agents/v0#transport-key",
+      "publicKeyMultibase": "z6Mkn3R3jYr89SAgCvXj6QmzUwn3dF4Jyata2z5AVDsa6jKf"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v1",
+      "id": "https://alpha.operator.local/agents/v1#ed25519-key",
+      "publicKeyMultibase": "z6MktCBSaxKKXTvYJDFDnSnreLuc8T94BMVe43gX4Y6YgUnG"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v1",
+      "id": "https://alpha.operator.local/agents/v1#hub-key-policy-hub",
+      "publicKeyMultibase": "z6MkscHctAJLoinQHQJP6Nup9o6Bj8JATTnwfevoVQxuBXDK"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v1",
+      "id": "https://alpha.operator.local/agents/v1#transport-key",
+      "publicKeyMultibase": "z6MkiX5pXCoAPJHi1dELY6UCZaZyfXwCK8NE7tPb4jnr5RGn"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v2",
+      "id": "https://alpha.operator.local/agents/v2#ed25519-key",
+      "publicKeyMultibase": "z6MkkgpP5CTFbR4urXBLwKPJ7e9QFUq7hNDjgkzeRwnfwBdc"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v2",
+      "id": "https://alpha.operator.local/agents/v2#hub-key-policy-hub",
+      "publicKeyMultibase": "z6MkvU3KFhXmYmGQm6Xkg9H5vY4J9DSW3EBrwiX73XzcEZLx"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v2",
+      "id": "https://alpha.operator.local/agents/v2#transport-key",
+      "publicKeyMultibase": "z6Mkj4ERg9PP774eNj1DkAa8Bkrkx7AwX217VbBxjr79S4Lv"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v3",
+      "id": "https://alpha.operator.local/agents/v3#ed25519-key",
+      "publicKeyMultibase": "z6MkuWuyrv4Yv1WFfvLE89HsS3gBVc6KhAfXNRBSJK2jdCiP"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v3",
+      "id": "https://alpha.operator.local/agents/v3#hub-key-policy-hub",
+      "publicKeyMultibase": "z6MkmcXFhPN8PD6Ypc11HdfQ4QhLFynTPsEWKAX6A513FpAZ"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v3",
+      "id": "https://alpha.operator.local/agents/v3#transport-key",
+      "publicKeyMultibase": "z6MkegQ8KTXiq4F9opyxw2rYwmJt9wchFU4Z4WMkLb2weNM8"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v4",
+      "id": "https://alpha.operator.local/agents/v4#ed25519-key",
+      "publicKeyMultibase": "z6MkrsfgGfKx54UrMehW2kDarzr5EdqTSysAwboo6VpXtHQW"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v4",
+      "id": "https://alpha.operator.local/agents/v4#hub-key-policy-hub",
+      "publicKeyMultibase": "z6MkjNS47LcCm2QBzRqC32bu19cgB4ZzCyhaB1BTrk2SAyKo"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v4",
+      "id": "https://alpha.operator.local/agents/v4#transport-key",
+      "publicKeyMultibase": "z6MkvVHraRJgtgTTgyuCxR3k6GszBfPakFkshCkRuFcz24vX"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v5",
+      "id": "https://alpha.operator.local/agents/v5#ed25519-key",
+      "publicKeyMultibase": "z6MkwFWM1RVH65iJxNp4tKXh7cvjmWJoJ9EnjbqDvSF86EvN"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v5",
+      "id": "https://alpha.operator.local/agents/v5#hub-key-policy-hub",
+      "publicKeyMultibase": "z6MknGvkbM4rpoXSHCqhHB14hN4i2Za4KLqxSrPzCgDKsWYD"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v5",
+      "id": "https://alpha.operator.local/agents/v5#transport-key",
+      "publicKeyMultibase": "z6MkmXcWzFD7SBdE9p5qshSowLqB4mFc4qkg26BzvwTZ6KcH"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v6",
+      "id": "https://alpha.operator.local/agents/v6#ed25519-key",
+      "publicKeyMultibase": "z6Mkjo6fRQkaBJPT7VutnRn6TjMGpJpD953NevSt5oNuPjdu"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v6",
+      "id": "https://alpha.operator.local/agents/v6#hub-key-policy-hub",
+      "publicKeyMultibase": "z6MkpByqzjMJ9jYd1TKFdVHM9k3bT3ZuXNh9B7RwnoSwczp7"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v6",
+      "id": "https://alpha.operator.local/agents/v6#transport-key",
+      "publicKeyMultibase": "z6MksderWV6UxgYJnwz2ynGx63FzB2utaCNnX6XYu8Eprugc"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v7",
+      "id": "https://alpha.operator.local/agents/v7#ed25519-key",
+      "publicKeyMultibase": "z6MkhWg3QQUo2xusYEqXwsB1zocCjutEhCq9hCwRmT1psKt3"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v7",
+      "id": "https://alpha.operator.local/agents/v7#hub-key-policy-hub",
+      "publicKeyMultibase": "z6Mkhdin2aB9SRXSfJ31BJZ5nJAoeCLxpmhF6aJYaboE6FNf"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v7",
+      "id": "https://alpha.operator.local/agents/v7#transport-key",
+      "publicKeyMultibase": "z6MknFfAvBbwXdFLGHvAin9o6ZFpidS66SsG9Sb8gtQwcP2t"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v8",
+      "id": "https://alpha.operator.local/agents/v8#ed25519-key",
+      "publicKeyMultibase": "z6MkuXSH6nfBVgKTdwTvYUwdJ9hHtKy2cLxGjma3dxmxhxh3"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v8",
+      "id": "https://alpha.operator.local/agents/v8#hub-key-policy-hub",
+      "publicKeyMultibase": "z6Mkoj9PTxW3nomfcnEFXdLFy7Z75F7UwGSPbDh3kLi1CQ3K"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v8",
+      "id": "https://alpha.operator.local/agents/v8#transport-key",
+      "publicKeyMultibase": "z6MkqrBJmgii6xFbXJF55fkx4o7ku9mCPpRxCqsydU6HTTj2"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v9",
+      "id": "https://alpha.operator.local/agents/v9#ed25519-key",
+      "publicKeyMultibase": "z6MkfLGJK8YMdkyZPBeGoVASUJo1fgLrWjDY9gnxYENpFq2u"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v9",
+      "id": "https://alpha.operator.local/agents/v9#hub-key-policy-hub",
+      "publicKeyMultibase": "z6MkiYuTw1PNp21US5oatLDomHNCemdCssXQhyJkcnuj2Ajr"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v9",
+      "id": "https://alpha.operator.local/agents/v9#transport-key",
+      "publicKeyMultibase": "z6MkqBvRq2jf71RcrKFtaHFiVj1VSbJvHvp84s35MchYWrGt"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v10",
+      "id": "https://alpha.operator.local/agents/v10#ed25519-key",
+      "publicKeyMultibase": "z6Mks8Gj61v6wdqGoCiXdnczmdzB5v2faP6DCnjNmUGD6K2s"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v10",
+      "id": "https://alpha.operator.local/agents/v10#hub-key-policy-hub",
+      "publicKeyMultibase": "z6MkkyN5dk1ccb5hbcogUYbDYy7uR9bcg7duYfhXZ8cHdSLj"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v10",
+      "id": "https://alpha.operator.local/agents/v10#transport-key",
+      "publicKeyMultibase": "z6MkrM9VY8pdWhY8tNDzsSBb3KWcoxDRG8TcpTV2LaWM7CJT"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v11",
+      "id": "https://alpha.operator.local/agents/v11#ed25519-key",
+      "publicKeyMultibase": "z6MkqDhh45P8Ry5NCVXX3xboVDnTsvoTSZQYkPdfq2J6an13"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v11",
+      "id": "https://alpha.operator.local/agents/v11#hub-key-policy-hub",
+      "publicKeyMultibase": "z6MkqVUbpqwwJHcycKtTqDYDjdTqA5Yiap44e6EeZV23kQWX"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v11",
+      "id": "https://alpha.operator.local/agents/v11#transport-key",
+      "publicKeyMultibase": "z6MkpAmp7BtWrG5AchXWxox31kZcAMQDbnJh5YAMMmjttGSJ"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v12",
+      "id": "https://alpha.operator.local/agents/v12#ed25519-key",
+      "publicKeyMultibase": "z6MkjY1ba8yC9Cj39jaAq8XEtmaZ3utfQUGjv5atiCHqtcaa"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v12",
+      "id": "https://alpha.operator.local/agents/v12#hub-key-policy-hub",
+      "publicKeyMultibase": "z6MkvvD3AuzhVXnYvzRasgW548yVv3YoT1pedV8UMdt4Uicy"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v12",
+      "id": "https://alpha.operator.local/agents/v12#transport-key",
+      "publicKeyMultibase": "z6MkhYnjuVcPR7bk2YD93dVsCpgMLeVrMFMS8KxK3W3jZTcY"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v13",
+      "id": "https://alpha.operator.local/agents/v13#ed25519-key",
+      "publicKeyMultibase": "z6MkqyrivgozhL554ucuLCpGqHQ7cTWUEi5nUFxQnGfUisMx"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v13",
+      "id": "https://alpha.operator.local/agents/v13#hub-key-policy-hub",
+      "publicKeyMultibase": "z6Mkpm5btVjttRJm3san74pHqB1HBQEKfadff6FiWhhBJfzs"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v13",
+      "id": "https://alpha.operator.local/agents/v13#transport-key",
+      "publicKeyMultibase": "z6MkmCYtcvxEBuvpTqAtZ468YfVPdHtvoH65knNK3Pso64mp"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v14",
+      "id": "https://alpha.operator.local/agents/v14#ed25519-key",
+      "publicKeyMultibase": "z6MkgJ6MQsMVnH4b8SiSGHoMGymfefDbue9sHLcL75bvbieb"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v14",
+      "id": "https://alpha.operator.local/agents/v14#hub-key-policy-hub",
+      "publicKeyMultibase": "z6MksATb6mo8PKU9TvR4voQSxrMTuYrUafLZt97yuaAkK2cT"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v14",
+      "id": "https://alpha.operator.local/agents/v14#transport-key",
+      "publicKeyMultibase": "z6Mkn6qFEMeHpp6obTz2ZiNerKgiGqvyZecqPetys3Sv7uHM"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v15",
+      "id": "https://alpha.operator.local/agents/v15#ed25519-key",
+      "publicKeyMultibase": "z6Mkj6S8NUWRBBbpzPf4Ntg4MttEUbbspabGpHktB2DfooW3"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v15",
+      "id": "https://alpha.operator.local/agents/v15#hub-key-policy-hub",
+      "publicKeyMultibase": "z6MksMteXcYWnVEXaDbAqLbm9PfR7ch41CV3VKWBBUC1abMv"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v15",
+      "id": "https://alpha.operator.local/agents/v15#transport-key",
+      "publicKeyMultibase": "z6MkwRffxpACSrmYyGRZ2MhYnS9wpszGByLeSxC2GLswsLZj"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v16",
+      "id": "https://alpha.operator.local/agents/v16#ed25519-key",
+      "publicKeyMultibase": "z6MkfsQXTsZjocgXrX2gGxrt1rvsk9DaYY4ZjEz4jiwL29Dm"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v16",
+      "id": "https://alpha.operator.local/agents/v16#hub-key-policy-hub",
+      "publicKeyMultibase": "z6MkqtY9dJoQcYWRsL62EYmFDFDEcjQsmdkBwF9rpkf8oyJj"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v16",
+      "id": "https://alpha.operator.local/agents/v16#transport-key",
+      "publicKeyMultibase": "z6MknCh659HLrRXbiUy74LGkWHAagacN5JCUpeRvxFgfQUYT"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v17",
+      "id": "https://alpha.operator.local/agents/v17#ed25519-key",
+      "publicKeyMultibase": "z6MkpPsCaHgTeCXWNL9eEgwvFnWdsMfHa2DQ9rSX1bKbHED8"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v17",
+      "id": "https://alpha.operator.local/agents/v17#hub-key-policy-hub",
+      "publicKeyMultibase": "z6Mkpi7484CQcjVZ1pZ39KG2eFLNBsHRCTSbx1oeshfzMm6R"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v17",
+      "id": "https://alpha.operator.local/agents/v17#transport-key",
+      "publicKeyMultibase": "z6MkkgQq2ZiYABv9h6qa15cShKHC7rTWshUm5i1nCWXoqYcb"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v18",
+      "id": "https://alpha.operator.local/agents/v18#ed25519-key",
+      "publicKeyMultibase": "z6MkgWngSjE9ijuNS6mNujX5UiWmCFqrcneFoAR82fCQvCjp"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v18",
+      "id": "https://alpha.operator.local/agents/v18#hub-key-policy-hub",
+      "publicKeyMultibase": "z6MkqGEvH6PRZGE18mdoa8YuFFh9D47Nr5jWeVoABYGNGUjQ"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v18",
+      "id": "https://alpha.operator.local/agents/v18#transport-key",
+      "publicKeyMultibase": "z6MkeuaWcyk4f2fFQpfjWkLMbdVBa7MgbDTxztXpoM6weuCb"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v19",
+      "id": "https://alpha.operator.local/agents/v19#ed25519-key",
+      "publicKeyMultibase": "z6MknLD2c1LoGcMy5cjM5dkX2mattWAtpkYWARDX16yYmqWh"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v19",
+      "id": "https://alpha.operator.local/agents/v19#hub-key-policy-hub",
+      "publicKeyMultibase": "z6MkiTyArggM9sk7mVioMWSY7jdkqgETqhXYk3iZemQoB34o"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v19",
+      "id": "https://alpha.operator.local/agents/v19#transport-key",
+      "publicKeyMultibase": "z6MknkjFJN18BtndEnmUkgS9psHearHVwUFfcUDXJSGYwcxJ"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v20",
+      "id": "https://alpha.operator.local/agents/v20#ed25519-key",
+      "publicKeyMultibase": "z6MkvU59sQtzi1iUdmkGhgFLx1YJTnrD5hPU6FBbffTnb5E4"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v20",
+      "id": "https://alpha.operator.local/agents/v20#hub-key-policy-hub",
+      "publicKeyMultibase": "z6Mkk7uJWT7SjHoCk2yFEYSvA5oY5aQ8EU8ustrxmFcd1zAz"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v20",
+      "id": "https://alpha.operator.local/agents/v20#transport-key",
+      "publicKeyMultibase": "z6MkhpA33qAmSt9JPKXLGFKjEwQBc3E9c4uiQrHeJ82bvChE"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v21",
+      "id": "https://alpha.operator.local/agents/v21#ed25519-key",
+      "publicKeyMultibase": "z6MkgioRL4D2cZkMjHgtVaZ9xWGwbFCjUSNuTKDJqen6KF7P"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v21",
+      "id": "https://alpha.operator.local/agents/v21#hub-key-policy-hub",
+      "publicKeyMultibase": "z6Mkotx4fBqtB3ZYZPA4UyUdNxbrBp98cZwWCz8C3awfKGj5"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v21",
+      "id": "https://alpha.operator.local/agents/v21#transport-key",
+      "publicKeyMultibase": "z6MkerbazvKraMZw7oJXyeewTET2hzPpay25V2QbnApJXoS8"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v22",
+      "id": "https://alpha.operator.local/agents/v22#ed25519-key",
+      "publicKeyMultibase": "z6MktQRRdNjA38ruvyLVziyPADKZpoQ4Wd3UU9KxKSeHaGif"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v22",
+      "id": "https://alpha.operator.local/agents/v22#hub-key-policy-hub",
+      "publicKeyMultibase": "z6MkhDoDqaTg9W2qvF66bSLt4PhqcN86L163vG4QawZNhuWs"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v22",
+      "id": "https://alpha.operator.local/agents/v22#transport-key",
+      "publicKeyMultibase": "z6MknyYPbLJ99XrcmG8cd8JzogJNe1TBYQASQc8i5zzEJSTy"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v23",
+      "id": "https://alpha.operator.local/agents/v23#ed25519-key",
+      "publicKeyMultibase": "z6MkevojeLL87aYECasGR5ELZjRha5jmeSrPssVsVcrYj99Y"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v23",
+      "id": "https://alpha.operator.local/agents/v23#hub-key-policy-hub",
+      "publicKeyMultibase": "z6MkmKwi18Gz2GABidAkBsQc9XdekXyw48fLKwY2UGaE1FBH"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v23",
+      "id": "https://alpha.operator.local/agents/v23#transport-key",
+      "publicKeyMultibase": "z6Mku5aY5FhkJa3ed3LFpEaSbLUGNHZTEotJXco6aDCXmZ4r"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v24",
+      "id": "https://alpha.operator.local/agents/v24#ed25519-key",
+      "publicKeyMultibase": "z6MkvaB2RBQcaUYtNZoCL4YmWw4NYhBSpgVcH4EoRGhmdzTB"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v24",
+      "id": "https://alpha.operator.local/agents/v24#hub-key-policy-hub",
+      "publicKeyMultibase": "z6MkjUWCSeyXKKUbxy2DG8da2vJTNwqXTL2pY8bad1btGF6c"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v24",
+      "id": "https://alpha.operator.local/agents/v24#transport-key",
+      "publicKeyMultibase": "z6MkregWyXS7NGwrp1Bci6ojwVr8haXkcFeeNHAZX1i9pKKD"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v25",
+      "id": "https://alpha.operator.local/agents/v25#ed25519-key",
+      "publicKeyMultibase": "z6MkwDjQ5PMVostzVFHh4JTEin9GdGgyagTj2BKZ4bsT8VtU"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v25",
+      "id": "https://alpha.operator.local/agents/v25#hub-key-policy-hub",
+      "publicKeyMultibase": "z6Mks89vvRZA7bDPGZenZzB2QNR4Z9rDNVopmKxsAzL8v9D1"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v25",
+      "id": "https://alpha.operator.local/agents/v25#transport-key",
+      "publicKeyMultibase": "z6MkuNWJb9M7Q6UzMyoxzVgs2nYEFfYKVoixodwkJdLjoCiC"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v26",
+      "id": "https://alpha.operator.local/agents/v26#ed25519-key",
+      "publicKeyMultibase": "z6MkfavEvewzi9jTThJSpUMW2sYjAHbrcVG9xpLUU8MTToP1"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v26",
+      "id": "https://alpha.operator.local/agents/v26#hub-key-policy-hub",
+      "publicKeyMultibase": "z6MkvaxZCJuB2WLugPWSNmGDMbjyPMQCPB6XS7MxiZ2mWe3Z"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v26",
+      "id": "https://alpha.operator.local/agents/v26#transport-key",
+      "publicKeyMultibase": "z6MkphrMafL8azayTvA2dXB3bTLwHCKRHnePx3cJpXRd5AzR"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v27",
+      "id": "https://alpha.operator.local/agents/v27#ed25519-key",
+      "publicKeyMultibase": "z6MkpMN4SaCMUaUMTCUKwp78LZmtr5iSWzMEbQFNRtPQFeu3"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v27",
+      "id": "https://alpha.operator.local/agents/v27#hub-key-policy-hub",
+      "publicKeyMultibase": "z6MkqdZXwtCJAsz6fMa9Ma8Ei2EvXFbZEVBtXDgmup1A5RaC"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v27",
+      "id": "https://alpha.operator.local/agents/v27#transport-key",
+      "publicKeyMultibase": "z6Mkfo5KPbiT2jyzBLTJutQiJzFm7oZU9cgki89KUL3mNN6p"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v28",
+      "id": "https://alpha.operator.local/agents/v28#ed25519-key",
+      "publicKeyMultibase": "z6MkgkFtuazKD4kg1YNnG2naHWZ7vtWs563K8FYVzBngQXSj"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v28",
+      "id": "https://alpha.operator.local/agents/v28#hub-key-policy-hub",
+      "publicKeyMultibase": "z6Mkm4QKvtZ8sAUamddQNq7vRcsmbevec91qMTRnNy3xuUQe"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v28",
+      "id": "https://alpha.operator.local/agents/v28#transport-key",
+      "publicKeyMultibase": "z6Mkho2m9gMFS3RQpzARP4gBDpTqUmvQRhoyTzognaHpvbTU"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v29",
+      "id": "https://alpha.operator.local/agents/v29#ed25519-key",
+      "publicKeyMultibase": "z6MksEXyxFfcsD43ewyUGATDE7JBAEyw9xWToPmmeAr4KcT7"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v29",
+      "id": "https://alpha.operator.local/agents/v29#hub-key-policy-hub",
+      "publicKeyMultibase": "z6MkfhgFsE9CSGtbT1fVNjeAGCHmXTwynsRKeTYsji7wnY9f"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/agents/v29",
+      "id": "https://alpha.operator.local/agents/v29#transport-key",
+      "publicKeyMultibase": "z6MkvvDTG63XnK9YQvwpwRpfdC4ZoqiusUh1a48Rvkbt9UHv"
+    },
+    {
+      "afp:actor": "https://alpha.operator.local/hubs/policy-hub",
+      "id": "https://alpha.operator.local/hubs/policy-hub#ed25519-key",
+      "publicKeyMultibase": "z6MkoJGFzRjHpgsBLAUGjoJ4cgSbtABU2yUD47GJmrjuEqSC"
+    }
+  ],
+  "afp:members": [
+    "actors/hub-policy-hub.jsonld",
+    "actors/v0.jsonld",
+    "actors/v1.jsonld",
+    "actors/v10.jsonld",
+    "actors/v11.jsonld",
+    "actors/v12.jsonld",
+    "actors/v13.jsonld",
+    "actors/v14.jsonld",
+    "actors/v15.jsonld",
+    "actors/v16.jsonld",
+    "actors/v17.jsonld",
+    "actors/v18.jsonld",
+    "actors/v19.jsonld",
+    "actors/v2.jsonld",
+    "actors/v20.jsonld",
+    "actors/v21.jsonld",
+    "actors/v22.jsonld",
+    "actors/v23.jsonld",
+    "actors/v24.jsonld",
+    "actors/v25.jsonld",
+    "actors/v26.jsonld",
+    "actors/v27.jsonld",
+    "actors/v28.jsonld",
+    "actors/v29.jsonld",
+    "actors/v3.jsonld",
+    "actors/v4.jsonld",
+    "actors/v5.jsonld",
+    "actors/v6.jsonld",
+    "actors/v7.jsonld",
+    "actors/v8.jsonld",
+    "actors/v9.jsonld",
+    "instance.jsonld",
+    "outbox/hub-policy-hub.jsonld",
+    "outbox/instance.jsonld",
+    "outbox/v0.jsonld",
+    "outbox/v1.jsonld",
+    "outbox/v10.jsonld",
+    "outbox/v11.jsonld",
+    "outbox/v12.jsonld",
+    "outbox/v13.jsonld",
+    "outbox/v14.jsonld",
+    "outbox/v15.jsonld",
+    "outbox/v16.jsonld",
+    "outbox/v17.jsonld",
+    "outbox/v18.jsonld",
+    "outbox/v19.jsonld",
+    "outbox/v2.jsonld",
+    "outbox/v20.jsonld",
+    "outbox/v21.jsonld",
+    "outbox/v22.jsonld",
+    "outbox/v23.jsonld",
+    "outbox/v24.jsonld",
+    "outbox/v25.jsonld",
+    "outbox/v26.jsonld",
+    "outbox/v27.jsonld",
+    "outbox/v28.jsonld",
+    "outbox/v29.jsonld",
+    "outbox/v3.jsonld",
+    "outbox/v4.jsonld",
+    "outbox/v5.jsonld",
+    "outbox/v6.jsonld",
+    "outbox/v7.jsonld",
+    "outbox/v8.jsonld",
+    "outbox/v9.jsonld",
+    "policy.jsonld",
+    "roster.jsonld"
+  ],
+  "afp:policy": {
+    "id": "https://alpha.operator.local/afp/policy",
+    "afp:digest": "sha256:265a9c543b79546504edba182d855edb2c0633fb4a345694174854182065240e"
+  },
+  "proof": {
+    "type": "DataIntegrityProof",
+    "cryptosuite": "eddsa-jcs-2022",
+    "created": "2026-09-13T19:01:25.928Z",
+    "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+    "proofPurpose": "assertionMethod",
+    "proofValue": "zoceShGrVFSA1Nzad7GjGgC819rJ5fsbzynqbJ9MWmJfnJS8o543WZByz2VWZf1bz2v4CqpVXSFctFWComuTPrCU"
+  }
+}

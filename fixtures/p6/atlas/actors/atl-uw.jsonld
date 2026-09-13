@@ -1,0 +1,35 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "http://127.0.0.1:38159/agents/atl-uw",
+  "type": "Service",
+  "name": "atl-uw",
+  "preferredUsername": "atl-uw",
+  "afp:operatedBy": "http://127.0.0.1:38159/actor",
+  "afp:capabilities": [
+    "afp:cap:assess"
+  ],
+  "inbox": "http://127.0.0.1:38159/agents/atl-uw/inbox",
+  "outbox": "http://127.0.0.1:38159/agents/atl-uw/outbox",
+  "afp:visibility": "public",
+  "assertionMethod": [
+    {
+      "id": "http://127.0.0.1:38159/agents/atl-uw#ed25519-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:38159/agents/atl-uw",
+      "publicKeyMultibase": "z6MktpPTNW6fpVxJob68o2UPs9f4ciLVXdLob5Jsx2hH6mmX"
+    }
+  ],
+  "authentication": [
+    {
+      "id": "http://127.0.0.1:38159/agents/atl-uw#transport-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:38159/agents/atl-uw",
+      "publicKeyMultibase": "z6MkhvZJYp8wE7DmKbpuYKNZFt6t65izbSzLbfEAo1UqmBDX",
+      "afp:custody": "file"
+    }
+  ]
+}

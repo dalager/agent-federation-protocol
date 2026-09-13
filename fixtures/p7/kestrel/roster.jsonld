@@ -1,0 +1,30 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "http://127.0.0.1:36411/roster",
+  "type": "OrderedCollection",
+  "attributedTo": "http://127.0.0.1:36411/actor",
+  "totalItems": 1,
+  "afp:visibility": "public",
+  "orderedItems": [
+    {
+      "id": "http://127.0.0.1:36411/roster#fixer",
+      "type": "afp:RosterEntry",
+      "agent": "http://127.0.0.1:36411/agents/fixer",
+      "status": "active",
+      "afp:keyCustody": "instance",
+      "since": "2026-08-17T09:00:07.000Z"
+    }
+  ],
+  "proof": {
+    "type": "DataIntegrityProof",
+    "cryptosuite": "eddsa-jcs-2022",
+    "created": "2026-08-17T09:00:07.000Z",
+    "verificationMethod": "http://127.0.0.1:36411/actor#ed25519-key",
+    "proofPurpose": "assertionMethod",
+    "proofValue": "z2YDP9zp3rzWHqyZ4F85jL5Nm8BMpi8UdYZrd11hM7H5fReTGw92xbXqV2YV6u4iceaW4XmvWNVGQRKWSXdRukoMB"
+  }
+}

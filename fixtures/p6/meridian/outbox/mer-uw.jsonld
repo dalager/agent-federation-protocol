@@ -1,0 +1,93 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "http://127.0.0.1:36727/agents/mer-uw/outbox",
+  "type": "OrderedCollection",
+  "attributedTo": "http://127.0.0.1:36727/agents/mer-uw",
+  "totalItems": 2,
+  "orderedItems": [
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "http://127.0.0.1:36727/agents/mer-uw/activities/0001",
+      "type": "Create",
+      "actor": "http://127.0.0.1:36727/agents/mer-uw",
+      "to": [
+        "http://127.0.0.1:38159/hubs/windward"
+      ],
+      "published": "2026-08-17T09:06:57.000Z",
+      "context": "http://127.0.0.1:38159/threads/dagmar-trigger",
+      "afp:visibility": "hub",
+      "object": {
+        "id": "http://127.0.0.1:36727/agents/mer-uw/votes/dagmar/prepare/1-a",
+        "type": "afp:Vote",
+        "afp:hub": "http://127.0.0.1:38159/hubs/windward",
+        "afp:round": "http://127.0.0.1:38159/rounds/dagmar",
+        "afp:proposalHash": "sha256:4468affa50b1661dc6566a682569c115c997ccd5b8cb8011d5c78918b5c83f63",
+        "afp:quorumSnapshot": "sha256:e4c85cb33596ee0f65f2b0eb4259783786b418dbe1929d1376a9e65bb5a00a51",
+        "value": "yes",
+        "afp:phase": "prepare",
+        "afp:seqNo": 1,
+        "afp:observedVotes": [
+          "sha256:d8bcd5974baecef06986c476e7bfff9312910e2f483d0264f45a3b9af519306f",
+          "sha256:1eec5671355b9b98bdadf0d0f04dad0ac6202606c6eb093222fc42004db51525"
+        ]
+      },
+      "afp:actingAs": "http://127.0.0.1:36727/agents/mer-uw",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:06:57.000Z",
+        "verificationMethod": "http://127.0.0.1:36727/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z5CE1JSyKob27CkdCsaPixiomJmwgeez1uN3gtLPEELEJDuGwkXamMAJ8Vj7asP3x8s13McfYugVfp4ohnyb8Yy1b"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "http://127.0.0.1:36727/agents/mer-uw/activities/0002",
+      "type": "Create",
+      "actor": "http://127.0.0.1:36727/agents/mer-uw",
+      "to": [
+        "http://127.0.0.1:38159/hubs/windward"
+      ],
+      "published": "2026-08-17T09:06:59.000Z",
+      "context": "http://127.0.0.1:38159/threads/dagmar-trigger",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:6cfa2b54fcb5c1d67af046ecc7363ed696e64eb772ef53d0a736f0b567514d6c",
+      "object": {
+        "id": "http://127.0.0.1:36727/agents/mer-uw/votes/dagmar/prepare/1-b",
+        "type": "afp:Vote",
+        "afp:hub": "http://127.0.0.1:38159/hubs/windward",
+        "afp:round": "http://127.0.0.1:38159/rounds/dagmar",
+        "afp:proposalHash": "sha256:4468affa50b1661dc6566a682569c115c997ccd5b8cb8011d5c78918b5c83f63",
+        "afp:quorumSnapshot": "sha256:e4c85cb33596ee0f65f2b0eb4259783786b418dbe1929d1376a9e65bb5a00a51",
+        "value": "no",
+        "afp:phase": "prepare",
+        "afp:seqNo": 1,
+        "afp:observedVotes": [
+          "sha256:4a6943e57e7399f84c889e433681a4f60d32207a55dad6e85ed6226645bc1912"
+        ]
+      },
+      "afp:actingAs": "http://127.0.0.1:36727/agents/mer-uw",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:06:59.000Z",
+        "verificationMethod": "http://127.0.0.1:36727/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "zZqJ1udv4eJcJHAZrxuFKxP6bbCjsqgxgYkBo5dUTG2jVBmTqJMooNZDAN2jg1CxEyH33FdcYtF9993NMV7QcL46"
+      }
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "bundle": "p7",
+  "domain": "northwind",
+  "outbox": "fixer",
+  "op": "set",
+  "select": {
+    "objectType": "afp:ContributionSummary"
+  },
+  "path": "object.afp:entries",
+  "value": [],
+  "expect": {
+    "verdict": "fail",
+    "failing": [
+      "entries recompute from the frame"
+    ]
+  }
+}

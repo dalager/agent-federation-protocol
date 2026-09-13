@@ -1,0 +1,35 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "http://127.0.0.1:35517/hubs/triage-hub",
+  "type": [
+    "Group",
+    "afp:Hub"
+  ],
+  "name": "triage-hub",
+  "preferredUsername": "triage-hub",
+  "inbox": "http://127.0.0.1:35517/hubs/triage-hub/inbox",
+  "outbox": "http://127.0.0.1:35517/hubs/triage-hub/outbox",
+  "followers": "http://127.0.0.1:35517/hubs/triage-hub/followers",
+  "afp:visibility": "public",
+  "afp:operatedBy": "http://127.0.0.1:35517/actor",
+  "assertionMethod": [
+    {
+      "id": "http://127.0.0.1:35517/hubs/triage-hub#ed25519-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:35517/hubs/triage-hub",
+      "publicKeyMultibase": "z6MkiB19qMqcv9qfCYtw5XtJw29nVGtbLqbora4kyLpi4Cfu"
+    }
+  ],
+  "authentication": [
+    {
+      "id": "http://127.0.0.1:35517/hubs/triage-hub#transport-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:35517/hubs/triage-hub",
+      "publicKeyMultibase": "z6MkegyuPDQea5Snjzh31zS1tU2X29Rtyosi2Ux6eN8kaHyo"
+    }
+  ]
+}

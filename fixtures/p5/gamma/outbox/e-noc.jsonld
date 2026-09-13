@@ -1,0 +1,143 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "http://127.0.0.1:38229/agents/e-noc/outbox",
+  "type": "OrderedCollection",
+  "attributedTo": "http://127.0.0.1:38229/agents/e-noc",
+  "totalItems": 4,
+  "orderedItems": [
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "http://127.0.0.1:38229/agents/e-noc/activities/0001",
+      "type": "Create",
+      "actor": "http://127.0.0.1:38229/agents/e-noc",
+      "to": [
+        "http://127.0.0.1:36127/hubs/bridge"
+      ],
+      "published": "2026-08-17T09:05:46.000Z",
+      "context": "http://127.0.0.1:36127/threads/incident-9",
+      "afp:visibility": "hub",
+      "object": {
+        "id": "http://127.0.0.1:38229/agents/e-noc/votes/sev",
+        "type": "afp:Vote",
+        "afp:hub": "http://127.0.0.1:36127/hubs/bridge",
+        "afp:round": "http://127.0.0.1:36127/rounds/sev",
+        "afp:proposalHash": "sha256:2abcfa17e21111e12a0dadf25b1d7725b079e38ba79ab1dfee3e0c1170f98793",
+        "afp:quorumSnapshot": "sha256:00005d4eb5a60dedd7361916aafb775b5bb27b23a41dd2ed563beecf7fa6fed0",
+        "value": "yes"
+      },
+      "afp:actingAs": "http://127.0.0.1:38229/agents/e-noc",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:05:46.000Z",
+        "verificationMethod": "http://127.0.0.1:38229/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z27JkauHA1jVwu4SADH1hmiXQFz6yZKVkPbBiC3reCkqFdr6Xw79yU3sZtQHn8XQoc1BTt7Tc21nR7VYPtNPQJ3KJ"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "http://127.0.0.1:38229/agents/e-noc/activities/0002",
+      "type": "Accept",
+      "actor": "http://127.0.0.1:38229/agents/e-noc",
+      "to": [
+        "http://127.0.0.1:36453/agents/s-noc"
+      ],
+      "published": "2026-08-17T09:15:33.000Z",
+      "context": "http://127.0.0.1:36453/threads/mesh-9",
+      "afp:visibility": "parties",
+      "afp:prevActivity": "sha256:386fec44e2f0ecb70d3f3549dcc5a326d5a4c766210f0aa199606751fd4ee1e0",
+      "object": "http://127.0.0.1:36453/agents/s-noc/activities/0003",
+      "afp:correlationId": "m9",
+      "afp:actingAs": "http://127.0.0.1:38229/agents/e-noc",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:15:33.000Z",
+        "verificationMethod": "http://127.0.0.1:38229/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z4LiJBK8ueHST6hR3qmc4nA1EahJ7fYZdCj3fSNwtzA9sEceCwnx1RTBsBjTQKCe6XbnH79hwAFDedcsaGpMbYRNh"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "http://127.0.0.1:38229/agents/e-noc/activities/0003",
+      "type": "Create",
+      "actor": "http://127.0.0.1:38229/agents/e-noc",
+      "to": [
+        "http://127.0.0.1:36453/agents/s-noc"
+      ],
+      "published": "2026-08-17T09:15:35.000Z",
+      "context": "http://127.0.0.1:36453/threads/mesh-9",
+      "afp:visibility": "parties",
+      "afp:prevActivity": "sha256:9d4f8946939f761cbf85ba4d39c86ebdd2f54b4e4d64accf21940d72ebc37ec2",
+      "object": {
+        "id": "http://127.0.0.1:38229/agents/e-noc/results/m9",
+        "type": "afp:Result",
+        "afp:correlationId": "m9",
+        "content": "gamma: assessed, two risks noted",
+        "attributedTo": "http://127.0.0.1:38229/agents/e-noc"
+      },
+      "afp:actingAs": "http://127.0.0.1:38229/agents/e-noc",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:15:35.000Z",
+        "verificationMethod": "http://127.0.0.1:38229/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z2k6KcP4s8rm5BubQRYvvRs45ovRbHCVZVzTEdzczmXbWWvMiTrrbe3WW3LXBmanuSzmxu94Z7m1izDmyeVmygP2Q"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "http://127.0.0.1:38229/agents/e-noc/activities/0004",
+      "type": "Create",
+      "actor": "http://127.0.0.1:38229/agents/e-noc",
+      "to": [
+        "http://127.0.0.1:36127/hubs/bridge"
+      ],
+      "published": "2026-08-17T09:16:34.000Z",
+      "context": "http://127.0.0.1:36127/threads/incident-9",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:dc142fef81a75ebf652ff246e24897c43d77fbb3b458ab02c31f461067ced2e4",
+      "object": {
+        "id": "http://127.0.0.1:38229/agents/e-noc/votes/sev",
+        "type": "afp:Vote",
+        "afp:hub": "http://127.0.0.1:36127/hubs/bridge",
+        "afp:round": "http://127.0.0.1:36127/rounds/sev",
+        "afp:proposalHash": "sha256:2abcfa17e21111e12a0dadf25b1d7725b079e38ba79ab1dfee3e0c1170f98793",
+        "afp:quorumSnapshot": "sha256:00005d4eb5a60dedd7361916aafb775b5bb27b23a41dd2ed563beecf7fa6fed0",
+        "value": "yes"
+      },
+      "afp:actingAs": "http://127.0.0.1:38229/agents/e-noc",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:16:34.000Z",
+        "verificationMethod": "http://127.0.0.1:38229/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z56vYqsxU1sF1ENU5UDp6pWGw4Xpkv7TKc5BAW3hreAYekJ1Rzt86N5C85oVefQWWku2HE5EMrsLhq4H1qT8bv8jy"
+      }
+    }
+  ]
+}

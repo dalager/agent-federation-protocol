@@ -1,0 +1,18 @@
+{
+  "bundle": "p7",
+  "domain": "northwind",
+  "outbox": "fixer",
+  "op": "set",
+  "select": {
+    "objectType": "afp:ContributionSummary"
+  },
+  "path": "object.afp:entries.0.afp:credited",
+  "value": 999999,
+  "expect": {
+    "verdict": "fail",
+    "failing": [
+      "entries recompute from the frame",
+      "credit disagrees for"
+    ]
+  }
+}

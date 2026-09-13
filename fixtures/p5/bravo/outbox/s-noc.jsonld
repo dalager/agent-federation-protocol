@@ -1,0 +1,153 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "http://127.0.0.1:36453/agents/s-noc/outbox",
+  "type": "OrderedCollection",
+  "attributedTo": "http://127.0.0.1:36453/agents/s-noc",
+  "totalItems": 4,
+  "orderedItems": [
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "http://127.0.0.1:36453/agents/s-noc/activities/0001",
+      "type": "Create",
+      "actor": "http://127.0.0.1:36453/agents/s-noc",
+      "to": [
+        "http://127.0.0.1:36127/hubs/bridge"
+      ],
+      "published": "2026-08-17T09:05:31.000Z",
+      "context": "http://127.0.0.1:36127/threads/incident-9",
+      "afp:visibility": "hub",
+      "object": {
+        "id": "http://127.0.0.1:36453/agents/s-noc/votes/sev",
+        "type": "afp:Vote",
+        "afp:hub": "http://127.0.0.1:36127/hubs/bridge",
+        "afp:round": "http://127.0.0.1:36127/rounds/sev",
+        "afp:proposalHash": "sha256:2abcfa17e21111e12a0dadf25b1d7725b079e38ba79ab1dfee3e0c1170f98793",
+        "afp:quorumSnapshot": "sha256:00005d4eb5a60dedd7361916aafb775b5bb27b23a41dd2ed563beecf7fa6fed0",
+        "value": "yes"
+      },
+      "afp:actingAs": "http://127.0.0.1:36453/agents/s-noc",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:05:31.000Z",
+        "verificationMethod": "http://127.0.0.1:36453/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z5MN3fvjWhZYf5NV2hjaAW7yC3G6bWZSGtoSjAWTYDNsAH76t3EYg9DSJzFLQ1o2gkeH9bRYbVEayL5vfVmRh2uzn"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"
+      ],
+      "id": "http://127.0.0.1:36453/agents/s-noc/activities/0002",
+      "type": "Update",
+      "actor": "http://127.0.0.1:36453/agents/s-noc",
+      "to": [
+        "http://127.0.0.1:36127/hubs/bridge"
+      ],
+      "published": "2026-08-17T09:13:30.000Z",
+      "context": "http://127.0.0.1:36127/threads/incident-9",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:548f26904f5fd227af1f102d9aa5b72acb21e6df85fc4eea4f9e37bd3d225532",
+      "object": {
+        "type": "afp:CRDTDelta",
+        "afp:hub": "http://127.0.0.1:36127/hubs/bridge",
+        "afp:crdtId": "app:backlog",
+        "afp:crdtType": "OR_SET",
+        "afp:delta": {
+          "adds": [
+            {
+              "element": "triage-9",
+              "tag": "s-noc-1"
+            }
+          ],
+          "removes": []
+        }
+      },
+      "afp:actingAs": "http://127.0.0.1:36453/agents/s-noc",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:13:30.000Z",
+        "verificationMethod": "http://127.0.0.1:36453/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z65SbACCJ5P7vxg3Cem7vHqZYVBSzDxJKLn62B3VLVXAmskV3zbYAJGKYBYAn2S7QMV2BrvsTnLvWhXzLywcQLj2S"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "http://127.0.0.1:36453/agents/s-noc/activities/0003",
+      "type": "Offer",
+      "actor": "http://127.0.0.1:36453/agents/s-noc",
+      "to": [
+        "http://127.0.0.1:38229/agents/e-noc"
+      ],
+      "published": "2026-08-17T09:15:14.000Z",
+      "context": "http://127.0.0.1:36453/threads/mesh-9",
+      "afp:visibility": "parties",
+      "afp:prevActivity": "sha256:33706cb7545e74df5d15d86d5e2fbb2bbe5a1af432a89ee1bfa96effc4b1dc61",
+      "target": "http://127.0.0.1:38229/agents/e-noc",
+      "object": {
+        "id": "http://127.0.0.1:36453/agents/s-noc/tasks/m9",
+        "type": "afp:Task",
+        "afp:capability": "afp:cap:assess",
+        "afp:correlationId": "m9",
+        "content": "correlate our two views"
+      },
+      "afp:actingAs": "http://127.0.0.1:36453/agents/s-noc",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:15:14.000Z",
+        "verificationMethod": "http://127.0.0.1:36453/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z4aMvAe8fQqK8qnCpuYwDjEK1ySLoEDWsLBmbZViNeYdg6zGzMSRaszy7kqbXmaU5SrNVYeKT1FLZzu85muMQESsy"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "http://127.0.0.1:36453/agents/s-noc/activities/0004",
+      "type": "Create",
+      "actor": "http://127.0.0.1:36453/agents/s-noc",
+      "to": [],
+      "published": "2026-08-17T09:15:51.000Z",
+      "context": "http://127.0.0.1:36127/threads/incident-9",
+      "afp:visibility": "internal",
+      "afp:prevActivity": "sha256:c4ac80aff2f65a8780fc299d4ab8213e10902acd7f012936f4358f26727df9e9",
+      "object": {
+        "id": "http://127.0.0.1:36453/agents/s-noc/errors/undeliverable-8",
+        "type": "afp:Error",
+        "afp:correlationId": "http://127.0.0.1:36453/agents/s-noc/activities/0002",
+        "afp:errorCode": "afp:err:undeliverable",
+        "content": "delivery to http://127.0.0.1:36127/hubs/bridge failed after 5 attempts: fetch failed",
+        "attributedTo": "http://127.0.0.1:36453/agents/s-noc"
+      },
+      "afp:actingAs": "http://127.0.0.1:36453/agents/s-noc",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:15:51.000Z",
+        "verificationMethod": "http://127.0.0.1:36453/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z4CXinZHK76o35Qci1j8zxmQUF61jqETrWSynPapmXWxWzdT3exZ8GjMTYA54ndT2A85XNR4srmtZdTaKGNRGN99R"
+      }
+    }
+  ]
+}

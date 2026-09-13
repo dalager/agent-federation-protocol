@@ -67,7 +67,9 @@ function slugOf(heading: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9 \-]/g, "")
     .trim()
-    .replace(/\s+/g, "-");
+    // GitHub hyphenates each space separately — "Foo & Bar" is "foo--bar",
+    // not "foo-bar" — the same rule scripts/check-links.mjs applies.
+    .replace(/ /g, "-");
 }
 
 function scenarioFiles(): string[] {

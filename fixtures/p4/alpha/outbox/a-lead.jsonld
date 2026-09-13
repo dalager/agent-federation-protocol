@@ -1,0 +1,46 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "http://127.0.0.1:40923/agents/a-lead/outbox",
+  "type": "OrderedCollection",
+  "attributedTo": "http://127.0.0.1:40923/agents/a-lead",
+  "totalItems": 1,
+  "orderedItems": [
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "http://127.0.0.1:40923/agents/a-lead/activities/0001",
+      "type": "Offer",
+      "actor": "http://127.0.0.1:40923/agents/a-lead",
+      "to": [
+        "http://127.0.0.1:45089/agents/b-assessor"
+      ],
+      "published": "2026-08-17T09:01:12.000Z",
+      "context": "http://127.0.0.1:40923/threads/sub-1",
+      "afp:visibility": "parties",
+      "target": "http://127.0.0.1:45089/agents/b-assessor",
+      "object": {
+        "id": "http://127.0.0.1:40923/tasks/sub-1",
+        "type": "afp:Task",
+        "afp:capability": "afp:cap:assess",
+        "afp:correlationId": "sub-1",
+        "content": "assess the identity integration"
+      },
+      "afp:actingAs": "http://127.0.0.1:40923/agents/a-lead",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:01:12.000Z",
+        "verificationMethod": "http://127.0.0.1:40923/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "zZGPnkkQoQLDVMqFbS9znHV3LPt9MGr2pGG4pL1BRNDtgXw6P9nHJFsPcw9iE5ALT6qcFpvfcsNTU9Dz2JSezpuB"
+      }
+    }
+  ]
+}

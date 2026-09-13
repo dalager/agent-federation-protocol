@@ -1,0 +1,35 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "http://127.0.0.1:38229/agents/e-watcher",
+  "type": "Service",
+  "name": "e-watcher",
+  "preferredUsername": "e-watcher",
+  "afp:operatedBy": "http://127.0.0.1:38229/actor",
+  "afp:capabilities": [
+    "afp:cap:assess"
+  ],
+  "inbox": "http://127.0.0.1:38229/agents/e-watcher/inbox",
+  "outbox": "http://127.0.0.1:38229/agents/e-watcher/outbox",
+  "afp:visibility": "public",
+  "assertionMethod": [
+    {
+      "id": "http://127.0.0.1:38229/agents/e-watcher#ed25519-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:38229/agents/e-watcher",
+      "publicKeyMultibase": "z6MkpNFGDuWZa5ELf5kxuPGz6uy6Gb2uyGjyZHfPYGAwU6SR"
+    }
+  ],
+  "authentication": [
+    {
+      "id": "http://127.0.0.1:38229/agents/e-watcher#transport-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:38229/agents/e-watcher",
+      "publicKeyMultibase": "z6MkkkWqJGiobTTatE1gsANji7xyEgvid5ZywhikhTjtWCNj",
+      "afp:custody": "file"
+    }
+  ]
+}

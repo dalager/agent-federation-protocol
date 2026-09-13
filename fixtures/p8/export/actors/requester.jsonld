@@ -1,0 +1,35 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "http://127.0.0.1:35517/agents/requester",
+  "type": "Service",
+  "name": "requester",
+  "preferredUsername": "requester",
+  "afp:operatedBy": "http://127.0.0.1:35517/actor",
+  "afp:capabilities": [
+    "afp:cap:triage"
+  ],
+  "inbox": "http://127.0.0.1:35517/agents/requester/inbox",
+  "outbox": "http://127.0.0.1:35517/agents/requester/outbox",
+  "afp:visibility": "public",
+  "assertionMethod": [
+    {
+      "id": "http://127.0.0.1:35517/agents/requester#ed25519-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:35517/agents/requester",
+      "publicKeyMultibase": "z6MkmrCsNxevicZESsHRyQTSt1w1Z2vsQ8WFXgik3oWCjM4D"
+    }
+  ],
+  "authentication": [
+    {
+      "id": "http://127.0.0.1:35517/agents/requester#transport-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:35517/agents/requester",
+      "publicKeyMultibase": "z6MktWgsSw75Z8kCZQJy9Wnf2GNPZgZdjpqmSwsBVA12Y9pd",
+      "afp:custody": "file"
+    }
+  ]
+}

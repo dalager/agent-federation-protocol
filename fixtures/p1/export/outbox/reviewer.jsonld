@@ -1,0 +1,154 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "https://alpha.operator.local/agents/reviewer/outbox",
+  "type": "OrderedCollection",
+  "attributedTo": "https://alpha.operator.local/agents/reviewer",
+  "totalItems": 4,
+  "orderedItems": [
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/agents/reviewer/activities/0001",
+      "type": "Accept",
+      "actor": "https://alpha.operator.local/agents/reviewer",
+      "to": [
+        "https://alpha.operator.local/agents/writer"
+      ],
+      "published": "2026-08-17T09:00:13.000Z",
+      "context": "https://alpha.operator.local/threads/doc-1",
+      "afp:visibility": "parties",
+      "object": "https://alpha.operator.local/agents/writer/activities/0001",
+      "afp:correlationId": "task-1",
+      "afp:actingAs": "https://alpha.operator.local/agents/reviewer",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:13.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "zSe5eohRb4vhLyAb1RFEoND1d1L6ZQf9VZEtsfAphgve5UkmRmrGSVtLKcWjaxKgyDSoF1QvDn6nPzVjAuWZXZAh"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/agents/reviewer/activities/0002",
+      "type": "Create",
+      "actor": "https://alpha.operator.local/agents/reviewer",
+      "to": [
+        "https://alpha.operator.local/agents/writer"
+      ],
+      "published": "2026-08-17T09:00:16.000Z",
+      "context": "https://alpha.operator.local/threads/doc-1",
+      "afp:visibility": "parties",
+      "afp:prevActivity": "sha256:4bf5c43f8a5ae12a716f0b33ab24836acf69e6eb9550b942c9f6817e1c1306c8",
+      "object": {
+        "id": "https://alpha.operator.local/agents/reviewer/results/task-1",
+        "type": "afp:Result",
+        "afp:correlationId": "task-1",
+        "content": "Rejected: the parallel-run assumption is missing and the cutover claim rests on it.",
+        "attributedTo": "https://alpha.operator.local/agents/reviewer",
+        "summary": "changes requested",
+        "attachment": [
+          {
+            "type": "Link",
+            "href": "https://alpha.operator.local/artifacts/sha256-4714bfa7b1b4e0b303bf8c4eaf770b1432bab48c7b971f26a23d7a0756e88058",
+            "mediaType": "text/markdown",
+            "afp:digest": "sha256:4714bfa7b1b4e0b303bf8c4eaf770b1432bab48c7b971f26a23d7a0756e88058",
+            "afp:size": 94
+          }
+        ]
+      },
+      "afp:actingAs": "https://alpha.operator.local/agents/reviewer",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:16.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z5RrtXjNBrHM3ED3gUQeL2cV4NFj1YwJ7ym63ci57AnSWrowZZcvRznrJfGf9wQYjjqGcci6CrDHDnj6L8eCJ6aDo"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/agents/reviewer/activities/0003",
+      "type": "Accept",
+      "actor": "https://alpha.operator.local/agents/reviewer",
+      "to": [
+        "https://alpha.operator.local/agents/writer"
+      ],
+      "published": "2026-08-17T09:00:33.000Z",
+      "context": "https://alpha.operator.local/threads/doc-1",
+      "afp:visibility": "parties",
+      "afp:prevActivity": "sha256:b68155e797ba5a47baeaeea0ec0e542126e39ca38171830b3cc912ebbb4e8062",
+      "object": "https://alpha.operator.local/agents/writer/activities/0002",
+      "afp:correlationId": "task-2",
+      "afp:actingAs": "https://alpha.operator.local/agents/reviewer",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:33.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z5sfst41zDorCxQbubB9299UXJoQY2Sk8WGtK4AyCB3kQwC5qRVBnryYdDSCnPJPkAATM1yiHLAD1b9oQ6jSs5jWf"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/agents/reviewer/activities/0004",
+      "type": "Create",
+      "actor": "https://alpha.operator.local/agents/reviewer",
+      "to": [
+        "https://alpha.operator.local/agents/writer"
+      ],
+      "published": "2026-08-17T09:00:36.000Z",
+      "context": "https://alpha.operator.local/threads/doc-1",
+      "afp:visibility": "parties",
+      "afp:prevActivity": "sha256:43898f1d6e82af5de58bdd52650b3e0da1b34dfe42101c599cb9bed729b53696",
+      "object": {
+        "id": "https://alpha.operator.local/agents/reviewer/results/task-2",
+        "type": "afp:Result",
+        "afp:correlationId": "task-2",
+        "content": "Rejected: the parallel-run assumption is missing and the cutover claim rests on it.",
+        "attributedTo": "https://alpha.operator.local/agents/reviewer",
+        "summary": "changes requested",
+        "attachment": [
+          {
+            "type": "Link",
+            "href": "https://alpha.operator.local/artifacts/sha256-4714bfa7b1b4e0b303bf8c4eaf770b1432bab48c7b971f26a23d7a0756e88058",
+            "mediaType": "text/markdown",
+            "afp:digest": "sha256:4714bfa7b1b4e0b303bf8c4eaf770b1432bab48c7b971f26a23d7a0756e88058",
+            "afp:size": 94
+          }
+        ]
+      },
+      "afp:actingAs": "https://alpha.operator.local/agents/reviewer",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:36.000Z",
+        "verificationMethod": "https://alpha.operator.local/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "zFcncQgJp1XeVUPW6LFtWPdryvmo4yRAgsptwFyBNcReLfp3HK796y4w7LamX24NshauBQxoHxapSq2phjD438MC"
+      }
+    }
+  ]
+}

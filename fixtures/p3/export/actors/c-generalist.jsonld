@@ -1,0 +1,35 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "https://alpha.operator.local/agents/c-generalist",
+  "type": "Service",
+  "name": "c-generalist",
+  "preferredUsername": "c-generalist",
+  "afp:operatedBy": "https://alpha.operator.local/actor",
+  "afp:capabilities": [
+    "afp:cap:estimate"
+  ],
+  "inbox": "https://alpha.operator.local/agents/c-generalist/inbox",
+  "outbox": "https://alpha.operator.local/agents/c-generalist/outbox",
+  "afp:visibility": "public",
+  "assertionMethod": [
+    {
+      "id": "https://alpha.operator.local/agents/c-generalist#ed25519-key",
+      "type": "Multikey",
+      "controller": "https://alpha.operator.local/agents/c-generalist",
+      "publicKeyMultibase": "z6Mkm11hy1zvpaHG712gb78Rp8kRZMQtLMagzS8gTKgYQeqk"
+    }
+  ],
+  "authentication": [
+    {
+      "id": "https://alpha.operator.local/agents/c-generalist#transport-key",
+      "type": "Multikey",
+      "controller": "https://alpha.operator.local/agents/c-generalist",
+      "publicKeyMultibase": "z6Mkmd562Aio4FKsgEP5ZNpUTGyVK2BwspnFcPkovaV8eLDx",
+      "afp:custody": "file"
+    }
+  ]
+}

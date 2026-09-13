@@ -888,6 +888,21 @@ test/adr0008.test.ts P4: two instances over real HTTP — handshake, probe,
                      delegation, expiry, deny-list, boundary-log chain
 test/adr0009.test.ts P4: the federated joint replay, plus four named breakages
                      (silent deletion, divergence, two-story agreement, blank stub)
+test/adr0034.test.ts ADR-0034's own gate paragraph (G1–G4) plus the WP-1–4
+                     primitives — versions, fixtures, the conformance kit,
+                     the installable verifier
+
+../../scripts/        ADR-0034: refresh-fixtures.mjs, verify-fixtures.sh,
+                     check-links.mjs, release-archive.sh, release.sh — repo-
+                     root, not instance-scoped, because they gate the
+                     fixtures/ and conformance/ directories beside them
+../../fixtures/       ADR-0034 Decision 2: the shipped bundles (p1–p8), one
+                     directory per demo, each with a VERIFY.json naming the
+                     verifier invocation that replays it — frozen artifacts,
+                     not reproducible builds (fixtures/README.md)
+../../conformance/    ADR-0034 Decision 3: the conformance kit a third
+                     implementation runs — cases/, bundles/, mutations/,
+                     VERSION, run.py
 ```
 
 ## The boundary
@@ -1102,6 +1117,11 @@ is a command or a file, and the list is this README's, not the ADR's, so it can 
   npm run config:check                      # a bad enum is named under policy.<field>
   curl https://your.origin.example/afp/policy | jq .afp:seatPolicy
   ```
+- [ ] **The deployed version is a real release**, not a checkout of a branch tip: cut
+  with `scripts/release.sh <version>` (repo root — [ADR-0034](../../docs/afp/adr/0034-release-conformance-and-disclosure.md)
+  Decision 6), which refuses unless every gate is green and a signing key is configured,
+  and tags the spec revision, the conformance-kit version, and the fixture-bundle digests
+  it was gated against.
 
 A systemd unit, `AFP_*_FILE` secrets named as `Environment=` lines rather than values,
 and a drain timeout matching `serve`'s own SIGTERM handling:

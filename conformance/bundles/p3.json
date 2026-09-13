@@ -1,0 +1,8 @@
+{
+  "fixture": "../fixtures/p3",
+  "bundles": [
+    "export"
+  ],
+  "thread": "https://alpha.operator.local/threads/q-88-migration-estimate",
+  "verdict": "pass"
+}

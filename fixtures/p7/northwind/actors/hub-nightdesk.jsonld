@@ -1,0 +1,35 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "http://127.0.0.1:46689/hubs/nightdesk",
+  "type": [
+    "Group",
+    "afp:Hub"
+  ],
+  "name": "nightdesk",
+  "preferredUsername": "nightdesk",
+  "inbox": "http://127.0.0.1:46689/hubs/nightdesk/inbox",
+  "outbox": "http://127.0.0.1:46689/hubs/nightdesk/outbox",
+  "followers": "http://127.0.0.1:46689/hubs/nightdesk/followers",
+  "afp:visibility": "public",
+  "afp:operatedBy": "http://127.0.0.1:46689/actor",
+  "assertionMethod": [
+    {
+      "id": "http://127.0.0.1:46689/hubs/nightdesk#ed25519-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:46689/hubs/nightdesk",
+      "publicKeyMultibase": "z6Mko9rwyh3XNRSgnmwjbF6eTkGZoh6b8baicHFowt5No7d8"
+    }
+  ],
+  "authentication": [
+    {
+      "id": "http://127.0.0.1:46689/hubs/nightdesk#transport-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:46689/hubs/nightdesk",
+      "publicKeyMultibase": "z6Mkkx276NBJ6Q4r1S3XXbzQz75PU4YoktPUXVHdSQM6VBjU"
+    }
+  ]
+}

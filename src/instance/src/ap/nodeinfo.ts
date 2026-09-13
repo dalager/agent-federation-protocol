@@ -4,10 +4,7 @@
  * its line ceiling — these are pure builders, not a second HTTP surface.
  */
 
-// Kept in sync with instance/package.json "version" by hand; there is no
-// runtime package read here to avoid a filesystem dependency in the request
-// path.
-const INSTANCE_VERSION = "0.1.0";
+import { INSTANCE_VERSION, SPEC_REVISION } from "../version.ts";
 
 export function nodeinfoDiscovery(origin: string): { [key: string]: unknown } {
   return {
@@ -23,11 +20,20 @@ export function nodeinfoDiscovery(origin: string): { [key: string]: unknown } {
 export function nodeinfoDocument(agentCount: number): { [key: string]: unknown } {
   return {
     version: "2.1",
-    software: { name: "afp-instance", version: INSTANCE_VERSION },
+    software: {
+      name: "afp-instance",
+      version: INSTANCE_VERSION,
+      repository: "https://github.com/dalager/agent-federation-protocol",
+      homepage: "https://dalager.github.io/agent-federation-protocol",
+    },
     protocols: ["activitypub"],
     services: { inbound: [], outbound: [] },
     openRegistrations: false,
     usage: { users: { total: 0 } },
-    metadata: { agents: agentCount, afp: { cryptosuite: "eddsa-jcs-2022" } },
+    metadata: {
+      agents: agentCount,
+      afp: { cryptosuite: "eddsa-jcs-2022" },
+      "afp:specRevision": SPEC_REVISION,
+    },
   };
 }

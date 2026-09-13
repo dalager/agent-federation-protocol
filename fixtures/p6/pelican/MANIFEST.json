@@ -1,0 +1,64 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "format": "afp-export/1",
+  "instance": "http://127.0.0.1:40309/actor",
+  "exportedAt": "2026-09-13T19:01:26.447Z",
+  "actors": [
+    "pel-uw"
+  ],
+  "activities": 6,
+  "artifacts": 0,
+  "cryptosuite": "eddsa-jcs-2022",
+  "afp:keyHistory": [
+    {
+      "afp:actor": "http://127.0.0.1:40309/actor",
+      "id": "http://127.0.0.1:40309/actor#ed25519-key",
+      "publicKeyMultibase": "z6MkrsgsSZAbiD9LYmbFx1q8QQxAJSSMkmzFADZqnUzjYP32"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:40309/actor",
+      "id": "http://127.0.0.1:40309/actor#transport-key",
+      "publicKeyMultibase": "z6MkrMTKLyALRhq1uh6viw8QFycbauozS5YyeHiQKgKxpxuZ"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:40309/agents/pel-uw",
+      "id": "http://127.0.0.1:40309/agents/pel-uw#ed25519-key",
+      "publicKeyMultibase": "z6Mkg9x4bsFsjUAfnDkcEZaJFrys1KxEEHfoC64xCxmYErcr"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:40309/agents/pel-uw",
+      "id": "http://127.0.0.1:40309/agents/pel-uw#hub-key-windward",
+      "publicKeyMultibase": "z6MkuFhjjbeRR15abTb1SQJosXyeGSmhroaU7Kwtk7qNcqxe"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:40309/agents/pel-uw",
+      "id": "http://127.0.0.1:40309/agents/pel-uw#transport-key",
+      "publicKeyMultibase": "z6MkgAhdbNRQXZyDRADDm53cRPLJp5mx9C3oNPUwvRbfWc5W"
+    }
+  ],
+  "afp:members": [
+    "actors/pel-uw.jsonld",
+    "instance.jsonld",
+    "outbox/instance.jsonld",
+    "outbox/pel-uw.jsonld",
+    "policy.jsonld",
+    "received.jsonld",
+    "roster.jsonld"
+  ],
+  "afp:policy": {
+    "id": "http://127.0.0.1:40309/afp/policy",
+    "afp:digest": "sha256:3c0108759f8168ec43e2a81d9a72056c104a28cb170ad3fd0b152d75addf405a"
+  },
+  "proof": {
+    "type": "DataIntegrityProof",
+    "cryptosuite": "eddsa-jcs-2022",
+    "created": "2026-09-13T19:01:26.447Z",
+    "verificationMethod": "http://127.0.0.1:40309/actor#ed25519-key",
+    "proofPurpose": "assertionMethod",
+    "proofValue": "z3Gp5PfzVFY8fszGTwf4mgX948TfChAVN7rVrgevK1bdxavj1kGF4BYcTptX1d6yPfBcayrJomCiWUrRqMTQX7emt"
+  }
+}

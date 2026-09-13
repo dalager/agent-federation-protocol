@@ -1,0 +1,37 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "http://127.0.0.1:36453/actor",
+  "type": [
+    "Application",
+    "afp:Instance"
+  ],
+  "name": "bravo instance",
+  "preferredUsername": "instance",
+  "afp:operator": "Bravo Operator",
+  "inbox": "http://127.0.0.1:36453/actor/inbox",
+  "outbox": "http://127.0.0.1:36453/actor/outbox",
+  "following": "http://127.0.0.1:36453/actor/following",
+  "afp:roster": "http://127.0.0.1:36453/roster",
+  "afp:policy": "http://127.0.0.1:36453/afp/policy",
+  "afp:visibility": "public",
+  "assertionMethod": [
+    {
+      "id": "http://127.0.0.1:36453/actor#ed25519-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:36453/actor",
+      "publicKeyMultibase": "z6Mkjbk7wed5s9Ngsa8uWfyoJB4d4dSEmKTbq6isbBwMMGCB"
+    }
+  ],
+  "authentication": [
+    {
+      "id": "http://127.0.0.1:36453/actor#transport-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:36453/actor",
+      "publicKeyMultibase": "z6MkpCjLkjR2jgVPdwirtCq5ZqReLzUkvDv6oAPKgSFUqGZc"
+    }
+  ]
+}

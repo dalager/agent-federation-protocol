@@ -1,0 +1,82 @@
+# ADR-0034 Decision 2 — "CI runs on every commit, and a demo that stops
+# producing a passing bundle fails it." This is "the forge's equivalent" the
+# ADR names: the repo's remote is github.com/dalager/agent-federation-protocol,
+# so GitHub Actions is that forge.
+#
+# `gate` runs `npm test` in src/instance, which already is: the gate proper
+# (test/*.test.ts), every demo (test/demos.test.ts, ADR-0030 Decision 4),
+# the fixtures compatibility gate (test/fixtures.test.ts, ADR-0034 Decision 2),
+# the docs link-and-anchor check (test/links.test.ts), and the parity test
+# (test/parity.test.ts, the TypeScript side of ADR-0004 H7). `verifier` runs
+# the second implementation over the same fixtures and the Python side of
+# parity. None of the LLM-brain demo variants run anywhere in this file —
+# those are judgement checks, not gates (see test/demos.test.ts's header).
+#
+# Green here is the merge condition (ADR-0034 Decision 2). Making that
+# enforced — branch protection requiring this workflow — is a GitHub repo
+# setting, not something this file can do; see README § Continuous
+# integration for the note.
+
+name: gate
+
+"on":
+  push:
+  pull_request:
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: npm test (gate + demos + fixtures + links + parity)
+        working-directory: src/instance
+        run: npm test
+
+  verifier:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: install verifier dependency
+        run: python3 -m pip install cryptography
+      - name: verify every shipped fixture
+        run: scripts/verify-fixtures.sh
+      - name: parity (Python side)
+        run: python3 src/verifier/test/parity/run_parity.py src/verifier/test/parity/cases.json
+
+  conformance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: install verifier dependency
+        run: python3 -m pip install cryptography
+      - name: run the conformance kit against afp_verify.py
+        run: python3 conformance/run.py
+
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: build the release archive
+        run: scripts/release-archive.sh
+      - name: install from the archive into a clean venv, and verify a fixture with the installed script
+        # One step, one fresh directory: a stale extraction from an earlier run
+        # would otherwise be what the glob picks up.
+        run: |
+          work="$(mktemp -d)"
+          python3 -m venv "$work/venv"
+          tar -xzf dist/afp-verify-*.tar.gz -C "$work"
+          "$work"/venv/bin/pip install "$work"/afp-verify-*/
+          "$work"/venv/bin/afp-verify --version
+          "$work"/venv/bin/afp-verify fixtures/p1/export --thread https://alpha.operator.local/threads/doc-1

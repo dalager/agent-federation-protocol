@@ -1,0 +1,35 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "http://127.0.0.1:40923/agents/a-lead",
+  "type": "Service",
+  "name": "a-lead",
+  "preferredUsername": "a-lead",
+  "afp:operatedBy": "http://127.0.0.1:40923/actor",
+  "afp:capabilities": [
+    "afp:cap:assess"
+  ],
+  "inbox": "http://127.0.0.1:40923/agents/a-lead/inbox",
+  "outbox": "http://127.0.0.1:40923/agents/a-lead/outbox",
+  "afp:visibility": "public",
+  "assertionMethod": [
+    {
+      "id": "http://127.0.0.1:40923/agents/a-lead#ed25519-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:40923/agents/a-lead",
+      "publicKeyMultibase": "z6MkjvPAPEHchPCdW5dJic6mRHPiSWckHcsaNVtAueZUru9k"
+    }
+  ],
+  "authentication": [
+    {
+      "id": "http://127.0.0.1:40923/agents/a-lead#transport-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:40923/agents/a-lead",
+      "publicKeyMultibase": "z6Mkw4Bmsy8Gx8uneH3Vn2yZmLUdhRDLWV9XoNFdG7tCrqQF",
+      "afp:custody": "file"
+    }
+  ]
+}

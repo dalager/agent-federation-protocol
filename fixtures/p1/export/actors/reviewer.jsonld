@@ -1,0 +1,38 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "https://alpha.operator.local/agents/reviewer",
+  "type": "Service",
+  "name": "reviewer",
+  "preferredUsername": "reviewer",
+  "afp:operatedBy": "https://alpha.operator.local/actor",
+  "afp:capabilities": [
+    "afp:cap:review"
+  ],
+  "afp:consumes": [
+    "text/markdown"
+  ],
+  "inbox": "https://alpha.operator.local/agents/reviewer/inbox",
+  "outbox": "https://alpha.operator.local/agents/reviewer/outbox",
+  "afp:visibility": "public",
+  "assertionMethod": [
+    {
+      "id": "https://alpha.operator.local/agents/reviewer#ed25519-key",
+      "type": "Multikey",
+      "controller": "https://alpha.operator.local/agents/reviewer",
+      "publicKeyMultibase": "z6MkqVq2bFmf7gcfYQ62xjPt4AQLrzvhTNwFvXpu1BSgSj2D"
+    }
+  ],
+  "authentication": [
+    {
+      "id": "https://alpha.operator.local/agents/reviewer#transport-key",
+      "type": "Multikey",
+      "controller": "https://alpha.operator.local/agents/reviewer",
+      "publicKeyMultibase": "z6MkkYMcPgqwToRebRemtpkJeYqWJF39p24f7UeJLYM61uti",
+      "afp:custody": "file"
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "fixture": "../fixtures/p1",
+  "bundles": [
+    "export"
+  ],
+  "thread": "https://alpha.operator.local/threads/doc-1",
+  "verdict": "pass"
+}

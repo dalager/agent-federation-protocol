@@ -1,0 +1,367 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "http://127.0.0.1:35517/actor/outbox",
+  "type": "OrderedCollection",
+  "attributedTo": "http://127.0.0.1:35517/actor",
+  "totalItems": 11,
+  "orderedItems": [
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "http://127.0.0.1:35517/actor/activities/0001",
+      "type": "afp:Vouch",
+      "actor": "http://127.0.0.1:35517/actor",
+      "to": [],
+      "published": "2026-08-17T09:00:02.000Z",
+      "context": "http://127.0.0.1:35517/threads/roster",
+      "afp:visibility": "public",
+      "object": {
+        "type": "afp:RosterEntry",
+        "agent": "http://127.0.0.1:35517/agents/requester",
+        "status": "active",
+        "afp:keyCustody": "instance",
+        "afp:capabilities": [
+          "afp:cap:triage"
+        ],
+        "since": "2026-08-17T09:00:02.000Z"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:02.000Z",
+        "verificationMethod": "http://127.0.0.1:35517/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z5jbhk5JiSVBQD3W23yF2gKY9wNxKxiXa8cC3DiK7zydrz6EwvNAJdSa2FRQXaz8uT9p45nsndZ9kwkGZ86HbTq71"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "http://127.0.0.1:35517/actor/activities/0002",
+      "type": "afp:Vouch",
+      "actor": "http://127.0.0.1:35517/actor",
+      "to": [],
+      "published": "2026-08-17T09:00:03.000Z",
+      "context": "http://127.0.0.1:35517/threads/roster",
+      "afp:visibility": "public",
+      "afp:prevActivity": "sha256:7afe002ed7850f4cf18a62209c08fc10d94e06b69b35a5927cc52e9c50783a78",
+      "object": {
+        "type": "afp:RosterEntry",
+        "agent": "http://127.0.0.1:35517/agents/triage-north",
+        "status": "active",
+        "afp:keyCustody": "instance",
+        "afp:capabilities": [
+          "afp:cap:triage"
+        ],
+        "since": "2026-08-17T09:00:03.000Z"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:03.000Z",
+        "verificationMethod": "http://127.0.0.1:35517/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z2kE7qKuphMkkgQmDDxUds3epCoXN2zxu3KwUqjugCy9bggeo7frzZRpNk5FkdenWJvu4cP8Xn1nFeZeq5vM8EMcE"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "http://127.0.0.1:35517/actor/activities/0003",
+      "type": "afp:Vouch",
+      "actor": "http://127.0.0.1:35517/actor",
+      "to": [],
+      "published": "2026-08-17T09:00:04.000Z",
+      "context": "http://127.0.0.1:35517/threads/roster",
+      "afp:visibility": "public",
+      "afp:prevActivity": "sha256:f1d4b346e6e24f30dcc72904269d06aa51b9dbeab819f186af40a0d45ba66b9a",
+      "object": {
+        "type": "afp:RosterEntry",
+        "agent": "http://127.0.0.1:35517/agents/triage-south",
+        "status": "active",
+        "afp:keyCustody": "instance",
+        "afp:capabilities": [
+          "afp:cap:triage"
+        ],
+        "since": "2026-08-17T09:00:04.000Z"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:04.000Z",
+        "verificationMethod": "http://127.0.0.1:35517/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z33bGibbHExPto6Woap96T4UwBVMsNGfyKSgeKJk7ud6RWeoeUvETgSDZtgY66smVt21Y5TxRt6VqeZfJWbTkjytY"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "http://127.0.0.1:35517/actor/activities/0004",
+      "type": "afp:Vouch",
+      "actor": "http://127.0.0.1:35517/actor",
+      "to": [],
+      "published": "2026-08-17T09:00:05.000Z",
+      "context": "http://127.0.0.1:35517/threads/roster",
+      "afp:visibility": "public",
+      "afp:prevActivity": "sha256:a2d7cbd88329bfc1eb99a98f854f0ceb1b7f4bf200ba64a211288f9df726fc2c",
+      "object": {
+        "type": "afp:RosterEntry",
+        "agent": "http://127.0.0.1:35517/agents/triage-east",
+        "status": "active",
+        "afp:keyCustody": "instance",
+        "afp:capabilities": [
+          "afp:cap:triage"
+        ],
+        "since": "2026-08-17T09:00:05.000Z"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:05.000Z",
+        "verificationMethod": "http://127.0.0.1:35517/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z3TpHB11zY8YVTgJQbzpXy7PNLMUo2KgKMonef8SdMy1EHaYMpT7xn9yBfZZTnR4nyhFHWY6k38NgudFKTnDxNjCg"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "http://127.0.0.1:35517/actor/activities/0005",
+      "type": "afp:Vouch",
+      "actor": "http://127.0.0.1:35517/actor",
+      "to": [],
+      "published": "2026-08-17T09:00:06.000Z",
+      "context": "http://127.0.0.1:35517/threads/roster",
+      "afp:visibility": "public",
+      "afp:prevActivity": "sha256:e4e287b91c94ecb2a9b86a39378a0fd6f07a41416e2963188a56ff605d7e2361",
+      "object": {
+        "type": "afp:RosterEntry",
+        "agent": "http://127.0.0.1:35517/agents/forge-out",
+        "status": "active",
+        "afp:keyCustody": "instance",
+        "afp:capabilities": [],
+        "since": "2026-08-17T09:00:06.000Z"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:06.000Z",
+        "verificationMethod": "http://127.0.0.1:35517/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z5GhpyiWRmeD7z89WRiZrMuaQnJeWfWL4djPpJFt6pVbGK8pzdUJ6DMCumgUk3NP6Zc8nSzZyQJgrmnyQ2My2ianv"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "http://127.0.0.1:35517/actor/activities/0006",
+      "type": "Follow",
+      "actor": "http://127.0.0.1:35517/actor",
+      "to": [
+        "http://127.0.0.1:35517/hubs/triage-hub"
+      ],
+      "published": "2026-08-17T09:00:14.000Z",
+      "context": "http://127.0.0.1:35517/threads/seats",
+      "afp:visibility": "public",
+      "afp:prevActivity": "sha256:87922ec94a3efb26aebc07a336b60bfc0d23820fd5007d84d502678c5048f638",
+      "object": "http://127.0.0.1:35517/hubs/triage-hub",
+      "afp:hub": "http://127.0.0.1:35517/hubs/triage-hub",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:14.000Z",
+        "verificationMethod": "http://127.0.0.1:35517/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z49Pt61szr2uBQ2uqxWZaY586DXjX8WhUTipyjzBh53Afenmh3zK3yviA3pUys3Z7qA18xgorFnpMnbqVnRM27jEm"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "http://127.0.0.1:35517/actor/activities/0007",
+      "type": "afp:Enroll",
+      "actor": "http://127.0.0.1:35517/actor",
+      "to": [
+        "http://127.0.0.1:35517/hubs/triage-hub"
+      ],
+      "published": "2026-08-17T09:00:34.000Z",
+      "context": "http://127.0.0.1:35517/threads/enroll",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:9b3305a7525907411b2a8b529c21762252b3482853af6d72d6162ee0fbc58b9c",
+      "object": "http://127.0.0.1:35517/agents/requester",
+      "target": "http://127.0.0.1:35517/hubs/triage-hub",
+      "afp:hub": "http://127.0.0.1:35517/hubs/triage-hub",
+      "afp:capabilities": [
+        "afp:cap:triage"
+      ],
+      "afp:hubKey": "http://127.0.0.1:35517/agents/requester#hub-key-triage-hub",
+      "afp:role": "requester",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:34.000Z",
+        "verificationMethod": "http://127.0.0.1:35517/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z62UZV3A4fhrkn3kjcgPW4bj26Yo3HYtMxdjrKTZRSePBoCL4iYKvqHSBdnHByaRcxX4k6MnN1gk9eJwkTM7WeTP7"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "http://127.0.0.1:35517/actor/activities/0008",
+      "type": "afp:Enroll",
+      "actor": "http://127.0.0.1:35517/actor",
+      "to": [
+        "http://127.0.0.1:35517/hubs/triage-hub"
+      ],
+      "published": "2026-08-17T09:00:36.000Z",
+      "context": "http://127.0.0.1:35517/threads/enroll",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:dee72002455d90832fc093fd86ae1e0c72e189c8635480a2e2d704b437e2f9fb",
+      "object": "http://127.0.0.1:35517/agents/triage-north",
+      "target": "http://127.0.0.1:35517/hubs/triage-hub",
+      "afp:hub": "http://127.0.0.1:35517/hubs/triage-hub",
+      "afp:capabilities": [
+        "afp:cap:triage"
+      ],
+      "afp:hubKey": "http://127.0.0.1:35517/agents/triage-north#hub-key-triage-hub",
+      "afp:role": "member",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:36.000Z",
+        "verificationMethod": "http://127.0.0.1:35517/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z3ZtXLjpvLUJCGygeSKZZfVfiz5ijVdoLQJ1VJQmUnz1kwfHCRof3VjgkwXUzgWNmdsZ8Sq74dNbu8EvukTY4J7Jc"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "http://127.0.0.1:35517/actor/activities/0009",
+      "type": "afp:Enroll",
+      "actor": "http://127.0.0.1:35517/actor",
+      "to": [
+        "http://127.0.0.1:35517/hubs/triage-hub"
+      ],
+      "published": "2026-08-17T09:00:38.000Z",
+      "context": "http://127.0.0.1:35517/threads/enroll",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:9e51c89153c296f04d875a880e8aeb337c2f5e227ea6895247ab407035546960",
+      "object": "http://127.0.0.1:35517/agents/triage-south",
+      "target": "http://127.0.0.1:35517/hubs/triage-hub",
+      "afp:hub": "http://127.0.0.1:35517/hubs/triage-hub",
+      "afp:capabilities": [
+        "afp:cap:triage"
+      ],
+      "afp:hubKey": "http://127.0.0.1:35517/agents/triage-south#hub-key-triage-hub",
+      "afp:role": "member",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:38.000Z",
+        "verificationMethod": "http://127.0.0.1:35517/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z338V5C96rmHBBWJ43yygyPxthKcfZz3ZUqNt1Roes43EDniXqJQbAEbEKN1vKxpuYNtAnwbMB4moPkzzY1Ka4gB8"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "http://127.0.0.1:35517/actor/activities/0010",
+      "type": "afp:Enroll",
+      "actor": "http://127.0.0.1:35517/actor",
+      "to": [
+        "http://127.0.0.1:35517/hubs/triage-hub"
+      ],
+      "published": "2026-08-17T09:00:40.000Z",
+      "context": "http://127.0.0.1:35517/threads/enroll",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:7472902fc18022e7a5f902feb9a93d442fb93379bf0705a4c225efcd6eee354b",
+      "object": "http://127.0.0.1:35517/agents/triage-east",
+      "target": "http://127.0.0.1:35517/hubs/triage-hub",
+      "afp:hub": "http://127.0.0.1:35517/hubs/triage-hub",
+      "afp:capabilities": [
+        "afp:cap:triage"
+      ],
+      "afp:hubKey": "http://127.0.0.1:35517/agents/triage-east#hub-key-triage-hub",
+      "afp:role": "member",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:40.000Z",
+        "verificationMethod": "http://127.0.0.1:35517/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "zrfGRRByMhXjKZhdG2hHqiWRoANVvqWj9DEjda2PXQB3oVgs3fSe1XaaBPThUoaF9XjRLJ1MgcLmPgEUX4bEamJD"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "http://127.0.0.1:35517/actor/activities/0011",
+      "type": "afp:Enroll",
+      "actor": "http://127.0.0.1:35517/actor",
+      "to": [
+        "http://127.0.0.1:35517/hubs/triage-hub"
+      ],
+      "published": "2026-08-17T09:00:42.000Z",
+      "context": "http://127.0.0.1:35517/threads/enroll",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:cad3a7b3fdb2370c34cf0a698e6e4d02dc1cbf2de5466e46981e7fd087de669c",
+      "object": "http://127.0.0.1:35517/agents/forge-out",
+      "target": "http://127.0.0.1:35517/hubs/triage-hub",
+      "afp:hub": "http://127.0.0.1:35517/hubs/triage-hub",
+      "afp:capabilities": [
+        "afp:cap:triage"
+      ],
+      "afp:hubKey": "http://127.0.0.1:35517/agents/forge-out#hub-key-triage-hub",
+      "afp:role": "actuator",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:42.000Z",
+        "verificationMethod": "http://127.0.0.1:35517/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z5bczeGSfmnf6kiDsVq84eN8rg69tTY5cyHpR6Kdh2hjVAFpX1j546c8hoLsEJPAdJzDM8YfqVUBm3683WeteRHAM"
+      }
+    }
+  ]
+}

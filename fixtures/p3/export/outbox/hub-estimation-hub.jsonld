@@ -1,0 +1,477 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "https://alpha.operator.local/hubs/estimation-hub/outbox",
+  "type": "OrderedCollection",
+  "attributedTo": "https://alpha.operator.local/hubs/estimation-hub",
+  "totalItems": 8,
+  "orderedItems": [
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/hubs/estimation-hub/activities/0001",
+      "type": "Accept",
+      "actor": "https://alpha.operator.local/hubs/estimation-hub",
+      "to": [
+        "https://alpha.operator.local/actor"
+      ],
+      "published": "2026-08-17T09:00:14.000Z",
+      "context": "https://alpha.operator.local/threads/seats",
+      "afp:visibility": "public",
+      "object": "https://alpha.operator.local/actor/activities/0008",
+      "afp:hub": "https://alpha.operator.local/hubs/estimation-hub",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:00:14.000Z",
+        "verificationMethod": "https://alpha.operator.local/hubs/estimation-hub#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "zF5hvQLWoEpwhqUPVcsvcSXUQHBv8N6ys8aRSS4YBwsvfFQA39tMmwj4dFYdEewW5ruaRsQVQ8UfsDHyKVgQXWVZ"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/hubs/estimation-hub/activities/0002",
+      "type": "Announce",
+      "actor": "https://alpha.operator.local/hubs/estimation-hub",
+      "to": [
+        "https://alpha.operator.local/agents/a-data",
+        "https://alpha.operator.local/agents/a-infra",
+        "https://alpha.operator.local/agents/b-compliance",
+        "https://alpha.operator.local/agents/b-licensing",
+        "https://alpha.operator.local/agents/c-generalist",
+        "https://alpha.operator.local/agents/d-secops",
+        "https://alpha.operator.local/agents/e-estimator"
+      ],
+      "published": "2026-08-17T09:01:18.000Z",
+      "context": "https://alpha.operator.local/threads/load-test",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:cee0ec4b09ac66ed6934ccfee9ca62cd2b73364ecf96dee6d620b5fccc62a3ce",
+      "object": {
+        "id": "https://alpha.operator.local/hubs/estimation-hub/tasks/load-42",
+        "type": "afp:Task",
+        "afp:hub": "https://alpha.operator.local/hubs/estimation-hub",
+        "afp:capability": "afp:cap:load-test",
+        "afp:correlationId": "load-42",
+        "content": "Run the checkout load test against staging",
+        "afp:bidWindow": {
+          "opens": "2026-08-17T09:00:00.000Z",
+          "closes": "2026-08-17T09:10:00.000Z"
+        },
+        "afp:selectionRule": {
+          "name": "ranking",
+          "params": {
+            "weights": {
+              "capabilityMatch": 10,
+              "cost": -1,
+              "latencySeconds": -1
+            }
+          }
+        },
+        "afp:answerSufficiency": {
+          "count": 1
+        },
+        "afp:estimatorPolicy": "exclude",
+        "afp:estimators": [
+          "https://alpha.operator.local/agents/e-estimator"
+        ]
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:01:18.000Z",
+        "verificationMethod": "https://alpha.operator.local/hubs/estimation-hub#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z5ivC7F7F6kJXCsDxdgXZySBr5zKcWEMRDKFR48GZCbfEiDfGkSMB6z8LiMSDCtWkMmpi1768YHFkWdaVRiX9gXvv"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/hubs/estimation-hub/activities/0003",
+      "type": "afp:Award",
+      "actor": "https://alpha.operator.local/hubs/estimation-hub",
+      "to": [
+        "https://alpha.operator.local/agents/a-data",
+        "https://alpha.operator.local/agents/a-infra",
+        "https://alpha.operator.local/agents/b-compliance",
+        "https://alpha.operator.local/agents/b-licensing",
+        "https://alpha.operator.local/agents/c-generalist",
+        "https://alpha.operator.local/agents/d-secops",
+        "https://alpha.operator.local/agents/e-estimator"
+      ],
+      "published": "2026-08-17T09:10:12.000Z",
+      "context": "https://alpha.operator.local/threads/load-test",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:c1b5abb2969eae76583097cc6ee587afbebbf4a1ba79c57c35cc7921bbe91fff",
+      "object": {
+        "id": "https://alpha.operator.local/hubs/estimation-hub/awards/load-42",
+        "type": "afp:Award",
+        "afp:task": "https://alpha.operator.local/hubs/estimation-hub/tasks/load-42",
+        "afp:hub": "https://alpha.operator.local/hubs/estimation-hub",
+        "afp:correlationId": "load-42",
+        "afp:selectionRule": {
+          "name": "ranking",
+          "params": {
+            "weights": {
+              "capabilityMatch": 10,
+              "cost": -1,
+              "latencySeconds": -1
+            }
+          }
+        },
+        "afp:winningBids": [
+          "sha256:c3ef1d7fe7356c2d30af4ba34842735973f752eb77b886bde2fe7d1dc7262ec4"
+        ],
+        "afp:performers": [
+          "https://alpha.operator.local/agents/a-data"
+        ],
+        "afp:acceptBy": "2026-08-17T09:20:11.000Z"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:10:12.000Z",
+        "verificationMethod": "https://alpha.operator.local/hubs/estimation-hub#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z4esvLSHsxUju5PKHG1pcbyXs7suTbjULocbN7FZ4tGhgj15sYcyVoAGVpRSXPsz8RQVnsztKNJMTc2SHyk3omshp"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/hubs/estimation-hub/activities/0004",
+      "type": "Announce",
+      "actor": "https://alpha.operator.local/hubs/estimation-hub",
+      "to": [
+        "https://alpha.operator.local/agents/a-data",
+        "https://alpha.operator.local/agents/a-infra",
+        "https://alpha.operator.local/agents/b-compliance",
+        "https://alpha.operator.local/agents/b-licensing",
+        "https://alpha.operator.local/agents/c-generalist",
+        "https://alpha.operator.local/agents/d-secops",
+        "https://alpha.operator.local/agents/e-estimator"
+      ],
+      "published": "2026-08-17T09:10:35.000Z",
+      "context": "https://alpha.operator.local/threads/q-88-migration-estimate",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:3d31673037182840d2fceba753a6b98b29beabdd2aba767ac7ff015bb0a34d00",
+      "object": {
+        "id": "https://alpha.operator.local/hubs/estimation-hub/tasks/q-88",
+        "type": "afp:Task",
+        "afp:hub": "https://alpha.operator.local/hubs/estimation-hub",
+        "afp:capability": "afp:cap:estimate",
+        "afp:correlationId": "q-88",
+        "content": "Estimate the total cost of the payments-platform migration",
+        "afp:bidWindow": {
+          "opens": "2026-08-17T09:00:00.000Z",
+          "closes": "2026-08-17T09:30:00.000Z"
+        },
+        "afp:selectionRule": {
+          "name": "coverage",
+          "params": {
+            "domains": [
+              "infra",
+              "data",
+              "compliance",
+              "licensing"
+            ],
+            "minConfidence": 60
+          }
+        },
+        "afp:answerSufficiency": {
+          "coverage": [
+            "infra",
+            "data",
+            "compliance",
+            "licensing"
+          ],
+          "count": 2
+        },
+        "afp:estimatorPolicy": "exclude",
+        "afp:estimators": [
+          "https://alpha.operator.local/agents/e-estimator"
+        ]
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:10:35.000Z",
+        "verificationMethod": "https://alpha.operator.local/hubs/estimation-hub#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z4rvkK5tFQFDS8bKvy9Rp3ttpcHYxoz31hjg7qnT5Vmpq8hi8V3dXwhb6EET6AzNdvVzWPJRy9skexLwMVq8cXg6o"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/hubs/estimation-hub/activities/0005",
+      "type": "afp:Award",
+      "actor": "https://alpha.operator.local/hubs/estimation-hub",
+      "to": [
+        "https://alpha.operator.local/agents/a-data",
+        "https://alpha.operator.local/agents/a-infra",
+        "https://alpha.operator.local/agents/b-compliance",
+        "https://alpha.operator.local/agents/b-licensing",
+        "https://alpha.operator.local/agents/c-generalist",
+        "https://alpha.operator.local/agents/d-secops",
+        "https://alpha.operator.local/agents/e-estimator"
+      ],
+      "published": "2026-08-17T09:30:16.000Z",
+      "context": "https://alpha.operator.local/threads/q-88-migration-estimate",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:d81d98d50de5355a2dd716223cfabd3ee60c36671ecb79f719a7cdc5e62ea716",
+      "object": {
+        "id": "https://alpha.operator.local/hubs/estimation-hub/awards/q-88",
+        "type": "afp:Award",
+        "afp:task": "https://alpha.operator.local/hubs/estimation-hub/tasks/q-88",
+        "afp:hub": "https://alpha.operator.local/hubs/estimation-hub",
+        "afp:correlationId": "q-88",
+        "afp:selectionRule": {
+          "name": "coverage",
+          "params": {
+            "domains": [
+              "infra",
+              "data",
+              "compliance",
+              "licensing"
+            ],
+            "minConfidence": 60
+          }
+        },
+        "afp:winningBids": [
+          "sha256:3f7b76519ec71b5d46541f0214e4af5e920c989f5c6e9fae6be7c50f4909f5bd",
+          "sha256:a6c9654ae7bb940fa13d1cf7dc6438758b7349edbb70e199818471a20cd58ac1"
+        ],
+        "afp:performers": [
+          "https://alpha.operator.local/agents/c-generalist",
+          "https://alpha.operator.local/agents/b-licensing"
+        ],
+        "afp:acceptBy": "2026-08-17T09:40:15.000Z",
+        "afp:synthesizer": "https://alpha.operator.local/agents/c-generalist"
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:30:16.000Z",
+        "verificationMethod": "https://alpha.operator.local/hubs/estimation-hub#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z3bDFarrRNqWLMEzV4w8cijLP9oaYpfomk1JnbSZN42Xa7gWZHjnREfC1mmchi86YwhAf3MZV8K3kxjKsUSbxXSs9"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/hubs/estimation-hub/activities/0006",
+      "type": "Offer",
+      "actor": "https://alpha.operator.local/hubs/estimation-hub",
+      "to": [
+        "https://alpha.operator.local/agents/a-data",
+        "https://alpha.operator.local/agents/a-infra",
+        "https://alpha.operator.local/agents/b-compliance",
+        "https://alpha.operator.local/agents/b-licensing",
+        "https://alpha.operator.local/agents/c-generalist",
+        "https://alpha.operator.local/agents/d-secops",
+        "https://alpha.operator.local/agents/e-estimator"
+      ],
+      "published": "2026-08-17T09:30:49.000Z",
+      "context": "https://alpha.operator.local/threads/q-88-migration-estimate",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:28bff8c895b7bcd1c3ef3623dcf2e5915ba5b1d735f2489f54e8ae54b53eb5ab",
+      "object": {
+        "id": "https://alpha.operator.local/hubs/estimation-hub/proposals/https://alpha.operator.local/rounds/q-88-ratify",
+        "type": "afp:Proposal",
+        "afp:hub": "https://alpha.operator.local/hubs/estimation-hub",
+        "afp:round": "https://alpha.operator.local/rounds/q-88-ratify",
+        "content": "Ratify the synthesis https://alpha.operator.local/agents/c-generalist/syntheses/q-88?",
+        "afp:options": [
+          "https://alpha.operator.local/agents/c-generalist/syntheses/q-88",
+          "reject"
+        ],
+        "afp:quorumSnapshot": "sha256:7f2d23bd30572b1e5ec1cab22189a2ab80d4834de9834c99a392c66aff2bed71",
+        "afp:voters": [
+          "https://alpha.operator.local/agents/a-data",
+          "https://alpha.operator.local/agents/a-infra",
+          "https://alpha.operator.local/agents/b-compliance",
+          "https://alpha.operator.local/agents/b-licensing",
+          "https://alpha.operator.local/agents/c-generalist",
+          "https://alpha.operator.local/agents/d-secops",
+          "https://alpha.operator.local/agents/e-estimator"
+        ],
+        "afp:voterWeights": {
+          "https://alpha.operator.local/agents/a-data": 1,
+          "https://alpha.operator.local/agents/a-infra": 1,
+          "https://alpha.operator.local/agents/b-compliance": 1,
+          "https://alpha.operator.local/agents/b-licensing": 1,
+          "https://alpha.operator.local/agents/c-generalist": 1,
+          "https://alpha.operator.local/agents/d-secops": 1,
+          "https://alpha.operator.local/agents/e-estimator": 1
+        }
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:30:49.000Z",
+        "verificationMethod": "https://alpha.operator.local/hubs/estimation-hub#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z36177D5rrrLqTGthCjNScMnNJ9czzzr6grwcdJRCpkfHQKGFmCnH7XTwySbocAjtMtHnoJUxk8V48us444zKwZEm"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/hubs/estimation-hub/activities/0007",
+      "type": "Create",
+      "actor": "https://alpha.operator.local/hubs/estimation-hub",
+      "to": [
+        "https://alpha.operator.local/agents/a-data",
+        "https://alpha.operator.local/agents/a-infra",
+        "https://alpha.operator.local/agents/b-compliance",
+        "https://alpha.operator.local/agents/b-licensing",
+        "https://alpha.operator.local/agents/c-generalist",
+        "https://alpha.operator.local/agents/d-secops",
+        "https://alpha.operator.local/agents/e-estimator"
+      ],
+      "published": "2026-08-17T09:31:37.000Z",
+      "context": "https://alpha.operator.local/threads/q-88-migration-estimate",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:3fc98787a4c1c7827bfc639f5541f5555cd86962f4efef42dc77393868d9b3b7",
+      "object": {
+        "id": "https://alpha.operator.local/hubs/estimation-hub/rounds/https://alpha.operator.local/rounds/q-88-ratify/decision",
+        "type": "afp:DecisionRecord",
+        "afp:hub": "https://alpha.operator.local/hubs/estimation-hub",
+        "afp:round": "https://alpha.operator.local/rounds/q-88-ratify",
+        "afp:outcome": "https://alpha.operator.local/agents/c-generalist/syntheses/q-88",
+        "afp:quorumSnapshot": "sha256:7f2d23bd30572b1e5ec1cab22189a2ab80d4834de9834c99a392c66aff2bed71",
+        "afp:countedVotes": [
+          "sha256:aaadd78d791610958b47c955e89201742c8cad00e9883e83d635c8f13de2bfae",
+          "sha256:9af1e4860371bafafefc550d50dd5579099a42824c5abd304afc669d927fedeb",
+          "sha256:810ebba260ac13e2af230b9adad27b945acfee6063827cadeaabbddadbdd8565",
+          "sha256:ed62f926f0b731e589364294c7b7b60f64cb563187356d5d8e7ec11b03c2e500",
+          "sha256:548a2c393cc87c9f79dd8b9f2ec48e8ec884d84f136c3ea8d68f97c92027bbbd",
+          "sha256:1b54e4c956c4595d46ada4a6db70a8407511548583e2de757d2a14d181a3a616",
+          "sha256:9f656eb0834df344871ff16693a85d0f66fa2e77d1c6a58a549c089713d616f1"
+        ],
+        "afp:weightTally": {
+          "https://alpha.operator.local/agents/c-generalist/syntheses/q-88": 6,
+          "reject": 1,
+          "abstain": 0
+        },
+        "attributedTo": "https://alpha.operator.local/hubs/estimation-hub",
+        "afp:uncounted": []
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:31:37.000Z",
+        "verificationMethod": "https://alpha.operator.local/hubs/estimation-hub#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z4TkNU3Ytn18C9KVAQ5X2VRg8xbgCMi7NMkFktJ9enHrGPHYsPtPT4ucB4Kk1fdBo4enis83YxtevycusENjrqG6t"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "https://alpha.operator.local/hubs/estimation-hub/activities/0008",
+      "type": "afp:Settlement",
+      "actor": "https://alpha.operator.local/hubs/estimation-hub",
+      "to": [
+        "https://alpha.operator.local/agents/a-data",
+        "https://alpha.operator.local/agents/a-infra",
+        "https://alpha.operator.local/agents/b-compliance",
+        "https://alpha.operator.local/agents/b-licensing",
+        "https://alpha.operator.local/agents/c-generalist",
+        "https://alpha.operator.local/agents/d-secops",
+        "https://alpha.operator.local/agents/e-estimator"
+      ],
+      "published": "2026-08-17T09:31:47.000Z",
+      "context": "https://alpha.operator.local/threads/q-88-migration-estimate",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:26973d8b78a60aa63a52620dfeceff1522a3d212ba2adf831ac0372d0e176ecc",
+      "object": {
+        "id": "https://alpha.operator.local/hubs/estimation-hub/settlements/q-88",
+        "type": "afp:Settlement",
+        "afp:task": "https://alpha.operator.local/hubs/estimation-hub/tasks/q-88",
+        "afp:hub": "https://alpha.operator.local/hubs/estimation-hub",
+        "afp:synthesis": "https://alpha.operator.local/agents/c-generalist/syntheses/q-88",
+        "afp:settles": [
+          {
+            "actor": "https://alpha.operator.local/agents/b-licensing",
+            "afp:bid": "sha256:a6c9654ae7bb940fa13d1cf7dc6438758b7349edbb70e199818471a20cd58ac1",
+            "afp:estimated": {
+              "afp:estimatedCost": {
+                "unit": "afp:compute-unit",
+                "value": 35
+              },
+              "afp:estimatedLatency": "PT4H"
+            },
+            "afp:actual": {
+              "afp:actualCost": {
+                "unit": "afp:compute-unit",
+                "value": 40
+              },
+              "afp:actualLatency": "PT6H"
+            }
+          },
+          {
+            "actor": "https://alpha.operator.local/agents/c-generalist",
+            "afp:bid": "sha256:3f7b76519ec71b5d46541f0214e4af5e920c989f5c6e9fae6be7c50f4909f5bd",
+            "afp:estimated": {
+              "afp:estimatedCost": {
+                "unit": "afp:compute-unit",
+                "value": 60
+              },
+              "afp:estimatedLatency": "PT8H"
+            },
+            "afp:actual": {
+              "afp:actualCost": {
+                "unit": "afp:compute-unit",
+                "value": 65
+              },
+              "afp:actualLatency": "PT6H"
+            }
+          }
+        ],
+        "afp:dissentVindicated": [
+          "https://alpha.operator.local/agents/b-licensing"
+        ]
+      },
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:31:47.000Z",
+        "verificationMethod": "https://alpha.operator.local/hubs/estimation-hub#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z2yamMejXoVnfdTvJHo5K6op3yDpxxvuYjV3xs9fCyugLqqc2SAdJLqJMSxkucqR5HzAh4ssjZTdYHJHfHngaeiDN"
+      }
+    }
+  ]
+}

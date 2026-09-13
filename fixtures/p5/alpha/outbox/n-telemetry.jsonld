@@ -1,0 +1,12 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "http://127.0.0.1:36127/agents/n-telemetry/outbox",
+  "type": "OrderedCollection",
+  "attributedTo": "http://127.0.0.1:36127/agents/n-telemetry",
+  "totalItems": 0,
+  "orderedItems": []
+}

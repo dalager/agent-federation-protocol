@@ -1,0 +1,80 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "http://127.0.0.1:35517/agents/triage-south/outbox",
+  "type": "OrderedCollection",
+  "attributedTo": "http://127.0.0.1:35517/agents/triage-south",
+  "totalItems": 2,
+  "orderedItems": [
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "http://127.0.0.1:35517/agents/triage-south/activities/0001",
+      "type": "afp:BidCommit",
+      "actor": "http://127.0.0.1:35517/agents/triage-south",
+      "to": [
+        "http://127.0.0.1:35517/hubs/triage-hub"
+      ],
+      "published": "2026-08-17T09:01:27.000Z",
+      "context": "http://127.0.0.1:35517/threads/bug-99",
+      "afp:visibility": "hub",
+      "object": "http://127.0.0.1:35517/hubs/triage-hub/tasks/bug-99",
+      "afp:hub": "http://127.0.0.1:35517/hubs/triage-hub",
+      "afp:commitment": "sha256:c315bdf2153459e7b01a47f2baef14b4ca05c8115f477d50d121f2718cf786b8",
+      "afp:actingAs": "http://127.0.0.1:35517/agents/triage-south",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:01:27.000Z",
+        "verificationMethod": "http://127.0.0.1:35517/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z2j1CgqpkDhWWbJQh1a9SW9rki6dUTbxTWqsJwBRNxv14jZXkKHXa6tk667TRHCfyTCyaMQ996HvX4eYcQRaeei17"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "http://127.0.0.1:35517/agents/triage-south/activities/0002",
+      "type": "afp:BidReveal",
+      "actor": "http://127.0.0.1:35517/agents/triage-south",
+      "to": [
+        "http://127.0.0.1:35517/hubs/triage-hub"
+      ],
+      "published": "2026-08-17T09:11:21.000Z",
+      "context": "http://127.0.0.1:35517/threads/bug-99",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:f33007e8d7e66e004da495dce961c97fded7a2465263ea6f5ca0485fd25b02b9",
+      "object": {
+        "type": "afp:Bid",
+        "afp:task": "http://127.0.0.1:35517/hubs/triage-hub/tasks/bug-99",
+        "afp:bidder": "http://127.0.0.1:35517/agents/triage-south",
+        "afp:capabilityMatch": 70,
+        "afp:estimatedCost": {
+          "unit": "afp:compute-unit",
+          "value": 10
+        },
+        "afp:estimatedLatency": "PT10M",
+        "nonce": "nonce-triage-south-triage-99"
+      },
+      "afp:hub": "http://127.0.0.1:35517/hubs/triage-hub",
+      "afp:actingAs": "http://127.0.0.1:35517/agents/triage-south",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-17T09:11:21.000Z",
+        "verificationMethod": "http://127.0.0.1:35517/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z4jQvPQRn4fPZ3V4LTrPQbUkNFM1ygqwSYPurvgsoPhQ3q125gAPYczC2UrwBVeFVPaD5dSWSiDz3HynXmjXujup8"
+      }
+    }
+  ]
+}

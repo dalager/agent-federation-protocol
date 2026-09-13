@@ -1,0 +1,90 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "format": "afp-export/1",
+  "instance": "http://127.0.0.1:38159/actor",
+  "exportedAt": "2026-09-13T19:01:26.444Z",
+  "actors": [
+    "atl-uw",
+    "atl-pay",
+    "hub-windward"
+  ],
+  "activities": 31,
+  "artifacts": 0,
+  "cryptosuite": "eddsa-jcs-2022",
+  "afp:keyHistory": [
+    {
+      "afp:actor": "http://127.0.0.1:38159/actor",
+      "id": "http://127.0.0.1:38159/actor#ed25519-key",
+      "publicKeyMultibase": "z6Mkiy6bSCy2px6nRVwk7JrHqStER11zA8mmh79r122SSahc"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:38159/actor",
+      "id": "http://127.0.0.1:38159/actor#transport-key",
+      "publicKeyMultibase": "z6MktddUjVWeHZhBVgCh6Pmbc3Mm8oM35LaheZhaZfNxQDPt"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:38159/agents/atl-uw",
+      "id": "http://127.0.0.1:38159/agents/atl-uw#ed25519-key",
+      "publicKeyMultibase": "z6MktpPTNW6fpVxJob68o2UPs9f4ciLVXdLob5Jsx2hH6mmX"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:38159/agents/atl-uw",
+      "id": "http://127.0.0.1:38159/agents/atl-uw#hub-key-windward",
+      "publicKeyMultibase": "z6MkgwdhCAWUKXZASuQa9aZb7wY5tpj7u4KrenGFhdWvHsmf"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:38159/agents/atl-uw",
+      "id": "http://127.0.0.1:38159/agents/atl-uw#transport-key",
+      "publicKeyMultibase": "z6MkhvZJYp8wE7DmKbpuYKNZFt6t65izbSzLbfEAo1UqmBDX"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:38159/agents/atl-pay",
+      "id": "http://127.0.0.1:38159/agents/atl-pay#ed25519-key",
+      "publicKeyMultibase": "z6Mkt3GpTihbwoqQZJw6FbJ9QpArJkZkSLLBVN7gS79XcSND"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:38159/agents/atl-pay",
+      "id": "http://127.0.0.1:38159/agents/atl-pay#hub-key-windward",
+      "publicKeyMultibase": "z6MkmgDdooG89TK4yZJWyn56NDbvJLkgU5mjj7K35XNFRCPF"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:38159/agents/atl-pay",
+      "id": "http://127.0.0.1:38159/agents/atl-pay#transport-key",
+      "publicKeyMultibase": "z6MkofbBnR2QgXrVRZjFobEP1gTjvhJbXGefQgbxNUWoAiu9"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:38159/hubs/windward",
+      "id": "http://127.0.0.1:38159/hubs/windward#ed25519-key",
+      "publicKeyMultibase": "z6MkqypUEsGf9rTv7kjF2f5ZdwGXPy2c8Mo8BRnQKHzJwjRP"
+    }
+  ],
+  "afp:members": [
+    "actors/atl-pay.jsonld",
+    "actors/atl-uw.jsonld",
+    "actors/hub-windward.jsonld",
+    "instance.jsonld",
+    "outbox/atl-pay.jsonld",
+    "outbox/atl-uw.jsonld",
+    "outbox/hub-windward.jsonld",
+    "outbox/instance.jsonld",
+    "policy.jsonld",
+    "received.jsonld",
+    "roster.jsonld"
+  ],
+  "afp:policy": {
+    "id": "http://127.0.0.1:38159/afp/policy",
+    "afp:digest": "sha256:73b1a265a35f9ca29ebc738774d424096ad501b61a2be20208b29856d1a42bc7"
+  },
+  "proof": {
+    "type": "DataIntegrityProof",
+    "cryptosuite": "eddsa-jcs-2022",
+    "created": "2026-09-13T19:01:26.444Z",
+    "verificationMethod": "http://127.0.0.1:38159/actor#ed25519-key",
+    "proofPurpose": "assertionMethod",
+    "proofValue": "z29m49vjdrNbskGzXCAHsA5thjFCoSVvQPGaagWtTnrTQBn7tMHVSHA4UmC8DvmUeydV92sW2RpQvL617SvoY5rEi"
+  }
+}

@@ -1,0 +1,100 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "format": "afp-export/1",
+  "instance": "http://127.0.0.1:38229/actor",
+  "exportedAt": "2026-09-13T19:01:26.212Z",
+  "actors": [
+    "e-noc",
+    "e-watcher",
+    "e-notify"
+  ],
+  "activities": 16,
+  "artifacts": 0,
+  "cryptosuite": "eddsa-jcs-2022",
+  "afp:keyHistory": [
+    {
+      "afp:actor": "http://127.0.0.1:38229/actor",
+      "id": "http://127.0.0.1:38229/actor#ed25519-key",
+      "publicKeyMultibase": "z6MknW6Q84WEyq5A568ZdVQrg1L3mjipxKgGbQc3zU7p3wq1"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:38229/actor",
+      "id": "http://127.0.0.1:38229/actor#transport-key",
+      "publicKeyMultibase": "z6MkwPsBrKHrmYkdRd6iVDzxwfqR12TUwT14MVycyoBEiTBm"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:38229/agents/e-noc",
+      "id": "http://127.0.0.1:38229/agents/e-noc#ed25519-key",
+      "publicKeyMultibase": "z6MkqGuxuUD7MVMHaNoET4Y4BvAFD6R8u9x8tdE7Hp2zFLZX"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:38229/agents/e-noc",
+      "id": "http://127.0.0.1:38229/agents/e-noc#hub-key-bridge",
+      "publicKeyMultibase": "z6Mku612W6i5ZLD71hjPdsC3CEFYbPjQwZZEeUySCfaiFFrK"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:38229/agents/e-noc",
+      "id": "http://127.0.0.1:38229/agents/e-noc#transport-key",
+      "publicKeyMultibase": "z6MkpfYtZHNCJTt1GQpmaLaL9kHbWdzyeAPLRhbDE4kcwSri"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:38229/agents/e-watcher",
+      "id": "http://127.0.0.1:38229/agents/e-watcher#ed25519-key",
+      "publicKeyMultibase": "z6MkpNFGDuWZa5ELf5kxuPGz6uy6Gb2uyGjyZHfPYGAwU6SR"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:38229/agents/e-watcher",
+      "id": "http://127.0.0.1:38229/agents/e-watcher#hub-key-bridge",
+      "publicKeyMultibase": "z6Mkmk6XXGQTL6g5qz4VokvrhpXE9caBgZuy3wDV7tuTzyXQ"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:38229/agents/e-watcher",
+      "id": "http://127.0.0.1:38229/agents/e-watcher#transport-key",
+      "publicKeyMultibase": "z6MkkkWqJGiobTTatE1gsANji7xyEgvid5ZywhikhTjtWCNj"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:38229/agents/e-notify",
+      "id": "http://127.0.0.1:38229/agents/e-notify#ed25519-key",
+      "publicKeyMultibase": "z6MkooA6k6mr6YtnSazN7sieayehMmi4YrL7PFP5GuRvEYjJ"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:38229/agents/e-notify",
+      "id": "http://127.0.0.1:38229/agents/e-notify#hub-key-bridge",
+      "publicKeyMultibase": "z6MkfvkDak5PzHx6WejTwe4RWLA9K4JN8nvEmx9nP5EGBK7H"
+    },
+    {
+      "afp:actor": "http://127.0.0.1:38229/agents/e-notify",
+      "id": "http://127.0.0.1:38229/agents/e-notify#transport-key",
+      "publicKeyMultibase": "z6MkoMyMnWLqcmQLzsS2mPBBo3HB2WGqjiQ9xoSas5h94Sae"
+    }
+  ],
+  "afp:members": [
+    "actors/e-noc.jsonld",
+    "actors/e-notify.jsonld",
+    "actors/e-watcher.jsonld",
+    "instance.jsonld",
+    "outbox/e-noc.jsonld",
+    "outbox/e-notify.jsonld",
+    "outbox/e-watcher.jsonld",
+    "outbox/instance.jsonld",
+    "policy.jsonld",
+    "received.jsonld",
+    "roster.jsonld"
+  ],
+  "afp:policy": {
+    "id": "http://127.0.0.1:38229/afp/policy",
+    "afp:digest": "sha256:033d4d401526f037ff2b12c229c3a8c7aa3465117daf5e99b551dbb65f66053f"
+  },
+  "proof": {
+    "type": "DataIntegrityProof",
+    "cryptosuite": "eddsa-jcs-2022",
+    "created": "2026-09-13T19:01:26.212Z",
+    "verificationMethod": "http://127.0.0.1:38229/actor#ed25519-key",
+    "proofPurpose": "assertionMethod",
+    "proofValue": "z3h5gd1bRfvQP1DnfTHc6WVhfiqRhk7va5hd9y4W3JRVKQdMTbDBBQiBx8Rd9dJuQxq7XG8g6Vjsh6pQovUtExJvL"
+  }
+}

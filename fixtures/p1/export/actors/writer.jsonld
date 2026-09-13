@@ -1,0 +1,35 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "https://alpha.operator.local/agents/writer",
+  "type": "Service",
+  "name": "writer",
+  "preferredUsername": "writer",
+  "afp:operatedBy": "https://alpha.operator.local/actor",
+  "afp:capabilities": [
+    "afp:cap:draft"
+  ],
+  "inbox": "https://alpha.operator.local/agents/writer/inbox",
+  "outbox": "https://alpha.operator.local/agents/writer/outbox",
+  "afp:visibility": "public",
+  "assertionMethod": [
+    {
+      "id": "https://alpha.operator.local/agents/writer#ed25519-key",
+      "type": "Multikey",
+      "controller": "https://alpha.operator.local/agents/writer",
+      "publicKeyMultibase": "z6MkgGffuB7p6QszGMBnCZc9tY74xEr129thdm1arjaSdKaA"
+    }
+  ],
+  "authentication": [
+    {
+      "id": "https://alpha.operator.local/agents/writer#transport-key",
+      "type": "Multikey",
+      "controller": "https://alpha.operator.local/agents/writer",
+      "publicKeyMultibase": "z6MkhzVVDjKG3htgabQuTHXX1s4ifK8u1ySyYuPTSoRymeq8",
+      "afp:custody": "file"
+    }
+  ]
+}

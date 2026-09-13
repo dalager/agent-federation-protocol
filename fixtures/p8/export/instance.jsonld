@@ -1,0 +1,37 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "http://127.0.0.1:35517/actor",
+  "type": [
+    "Application",
+    "afp:Instance"
+  ],
+  "name": "Alpha Operator Instance",
+  "preferredUsername": "instance",
+  "afp:operator": "Alpha Operator",
+  "inbox": "http://127.0.0.1:35517/actor/inbox",
+  "outbox": "http://127.0.0.1:35517/actor/outbox",
+  "following": "http://127.0.0.1:35517/actor/following",
+  "afp:roster": "http://127.0.0.1:35517/roster",
+  "afp:policy": "http://127.0.0.1:35517/afp/policy",
+  "afp:visibility": "public",
+  "assertionMethod": [
+    {
+      "id": "http://127.0.0.1:35517/actor#ed25519-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:35517/actor",
+      "publicKeyMultibase": "z6Mkn3jpErEcRRqRT1k1gYNcNq9To58rqoRVFJUrGbScfrv5"
+    }
+  ],
+  "authentication": [
+    {
+      "id": "http://127.0.0.1:35517/actor#transport-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:35517/actor",
+      "publicKeyMultibase": "z6MkttNvJUZ6BrqQvVkTFWFiCCCpTW2PiCLbL89KRKEaGWg6"
+    }
+  ]
+}

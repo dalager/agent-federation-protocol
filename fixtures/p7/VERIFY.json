@@ -1,0 +1,9 @@
+{
+  "bundles": [
+    "northwind",
+    "dayshift",
+    "kestrel",
+    "lantern"
+  ],
+  "thread": null
+}

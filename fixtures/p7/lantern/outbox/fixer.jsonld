@@ -1,0 +1,113 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "http://127.0.0.1:39145/agents/fixer/outbox",
+  "type": "OrderedCollection",
+  "attributedTo": "http://127.0.0.1:39145/agents/fixer",
+  "totalItems": 3,
+  "orderedItems": [
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"
+      ],
+      "id": "http://127.0.0.1:39145/agents/fixer/activities/0001",
+      "actor": "http://127.0.0.1:39145/agents/fixer",
+      "to": [
+        "http://127.0.0.1:46689/hubs/nightdesk"
+      ],
+      "published": "2026-08-19T11:11:12.000Z",
+      "context": "http://127.0.0.1:46689/threads/ticket-4517-webhook-retries",
+      "afp:visibility": "hub",
+      "type": "afp:BidCommit",
+      "object": "http://127.0.0.1:46689/hubs/nightdesk/tasks/ticket-4517-webhook-retries",
+      "afp:hub": "http://127.0.0.1:46689/hubs/nightdesk",
+      "afp:commitment": "sha256:12e22c7bf752fd3a979845b7c41eded8026b6cc9bff186086efab544e96c4954",
+      "afp:actingAs": "http://127.0.0.1:39145/agents/fixer",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-19T11:11:12.000Z",
+        "verificationMethod": "http://127.0.0.1:39145/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z4ko2Dz6d2kVpG9ouBLXeiPxcuQhxmtNNVfNrw3Wrq3LQ9gkfnf6vd1yyFNeAD8LWYVAVYpxvjKk6VcKaFqE3CY8Z"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"
+      ],
+      "id": "http://127.0.0.1:39145/agents/fixer/activities/0002",
+      "actor": "http://127.0.0.1:39145/agents/fixer",
+      "to": [
+        "http://127.0.0.1:46689/hubs/nightdesk"
+      ],
+      "published": "2026-08-19T12:11:07.000Z",
+      "context": "http://127.0.0.1:46689/threads/ticket-4517-webhook-retries",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:e690cd2cc97bfc038e9601513645050b4800fa3bdddaf7086295f42d35d0cef0",
+      "type": "afp:BidReveal",
+      "object": {
+        "type": "afp:Bid",
+        "afp:task": "http://127.0.0.1:46689/hubs/nightdesk/tasks/ticket-4517-webhook-retries",
+        "afp:bidder": "http://127.0.0.1:39145/agents/fixer",
+        "afp:capabilityMatch": 90,
+        "afp:estimatedCost": {
+          "unit": "EUR",
+          "value": 100
+        },
+        "afp:estimatedLatency": "PT1H",
+        "nonce": "nonce-ticket-4517-webhook-retries"
+      },
+      "afp:hub": "http://127.0.0.1:46689/hubs/nightdesk",
+      "afp:actingAs": "http://127.0.0.1:39145/agents/fixer",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-19T12:11:07.000Z",
+        "verificationMethod": "http://127.0.0.1:39145/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z2UKLkZvR9Qrktj8SkkrHkHcazYVTrsoiKB5UnyNS79bJj4Aikbotzw5kRr2JjcMAmiwqGUPvvu4iYb38JRqdpBGe"
+      }
+    },
+    {
+      "@context": [
+        "https://www.w3.org/ns/activitystreams",
+        "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+        "https://w3id.org/security/data-integrity/v1"
+      ],
+      "id": "http://127.0.0.1:39145/agents/fixer/activities/0003",
+      "type": "Create",
+      "actor": "http://127.0.0.1:39145/agents/fixer",
+      "to": [
+        "http://127.0.0.1:46689/actor",
+        "http://127.0.0.1:32977/actor",
+        "http://127.0.0.1:36411/actor"
+      ],
+      "published": "2026-08-19T12:11:27.000Z",
+      "context": "http://127.0.0.1:46689/threads/ticket-4517-webhook-retries",
+      "afp:visibility": "hub",
+      "afp:prevActivity": "sha256:abd175aa2dc667d718da15d1546ec54c4c4907c7fdcb370793b075012f157a13",
+      "object": {
+        "id": "http://127.0.0.1:39145/agents/fixer/results/ticket-4517-webhook-retries",
+        "type": "afp:Result",
+        "afp:correlationId": "ticket-4517-webhook-retries",
+        "content": "ticket-4517-webhook-retries: resolved",
+        "attributedTo": "http://127.0.0.1:39145/agents/fixer"
+      },
+      "afp:actingAs": "http://127.0.0.1:39145/agents/fixer",
+      "proof": {
+        "type": "DataIntegrityProof",
+        "cryptosuite": "eddsa-jcs-2022",
+        "created": "2026-08-19T12:11:27.000Z",
+        "verificationMethod": "http://127.0.0.1:39145/actor#ed25519-key",
+        "proofPurpose": "assertionMethod",
+        "proofValue": "z4LDsKWErAQHU8UbdnKqptsJ8JotABGAKCom7Vh8ebvBJL7ohsKy787b6tzT1NoTWE9kUrwdQyZiUTGc5FKD3RYWv"
+      }
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "@context": [
+    "https://www.w3.org/ns/activitystreams",
+    "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld",
+    "https://w3id.org/security/data-integrity/v1"
+  ],
+  "id": "http://127.0.0.1:40309/actor",
+  "type": [
+    "Application",
+    "afp:Instance"
+  ],
+  "name": "pelican instance",
+  "preferredUsername": "instance",
+  "afp:operator": "Pelican Re",
+  "inbox": "http://127.0.0.1:40309/actor/inbox",
+  "outbox": "http://127.0.0.1:40309/actor/outbox",
+  "following": "http://127.0.0.1:40309/actor/following",
+  "afp:roster": "http://127.0.0.1:40309/roster",
+  "afp:policy": "http://127.0.0.1:40309/afp/policy",
+  "afp:visibility": "public",
+  "assertionMethod": [
+    {
+      "id": "http://127.0.0.1:40309/actor#ed25519-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:40309/actor",
+      "publicKeyMultibase": "z6MkrsgsSZAbiD9LYmbFx1q8QQxAJSSMkmzFADZqnUzjYP32"
+    }
+  ],
+  "authentication": [
+    {
+      "id": "http://127.0.0.1:40309/actor#transport-key",
+      "type": "Multikey",
+      "controller": "http://127.0.0.1:40309/actor",
+      "publicKeyMultibase": "z6MkrMTKLyALRhq1uh6viw8QFycbauozS5YyeHiQKgKxpxuZ"
+    }
+  ]
+}
