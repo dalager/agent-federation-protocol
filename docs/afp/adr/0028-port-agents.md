@@ -1,6 +1,6 @@
 # ADR-0028 — Port agents: the external edge becomes code
 
-- **Status:** Proposed (2026-09-02) — program claim **C4** of
+- **Status:** Accepted (2026-09-02), **built** (2026-09-13) — program claim **C4** of
   [ADR-0024](0024-the-road-to-production.md); group: **Scenario coverage**. Depends on
   [ADR-0027](0027-the-port-is-a-security-boundary.md)
 - **Date:** 2026-09-02
@@ -152,7 +152,51 @@ inconvenience.
 
 ## Build status
 
-Not built.
+**Built (2026-09-13).** All five work packages, and the gate matrix passes G1–G9
+(`test/adr0028.test.ts`, 12 cases — G1–G9 plus three primitive checks carried over from
+the WP-1 unit gate). The full suite is 306 tests green, `npm run demo:p8` runs offline
+and deterministic, and its export is 243 checks PASSED against the independent Python
+verifier.
+
+Notes on what was built versus what the ADR wrote:
+
+- **The `0x00` separator is spelled out, not left to the `‖` glyph.** `idempotencyKeyOf`
+  computes `sha256(utf8(correlationId) ‖ 0x00 ‖ utf8(action))` as three explicit
+  `hash.update` calls, so a verifier recomputing the same bytes from the spec's own prose
+  has a concrete byte sequence to match rather than an ambiguous concatenation operator.
+- **Intent before act, from the store, not memory.** `instance/external.ts`'s `actuate`
+  publishes the `Create{afp:Act}` intent and looks up any prior one via
+  `instance.outbox.byThread(...).find(...)` before ever calling `act()` — the lookup that
+  makes a crash-then-retry a store read, never a guess, and G4 proves it against a fresh
+  `AfpInstance` over the same `dataDir`.
+- **`Forge`/`FakeForge` is one more port-and-fake pair,** in `brains/port.ts`'s own style:
+  `tools/fake-forge/forge.ts` owns nothing `gitForgeActuator` doesn't need, and is
+  idempotent by construction — `openPullRequest` keyed on the idempotency key, never a
+  second object for the same key.
+- **`AFP_CONTROLLERS` stands in for ADR-0029's signed policy document,** exactly as
+  Decision 4 anticipated: a plain comma-separated list of authorized actor URLs on
+  `Config`, read by `approveThroughPort` before anything is published. When ADR-0029
+  lands its own controller-binding document, this list is the migration's starting set,
+  not a competing mechanism.
+- **`afp:err:refused-by-contract` is a code the ADR's prose never named** (Decision 3 says
+  "refuses by contract"; the vocabulary had no error code for it). `instance/external.ts`
+  mints it alongside the ADR's own `afp:err:unreconciled`.
+- **The demo restructures nothing the roles forced, in the end.** `allocation/allocator.ts`
+  checks the `member`/`requester` role split only on an `Announce{afp:Task}` *received*
+  over the wire; `hub.allocation.announce` — what `demoP8.ts` calls — is the hub signing
+  its own broadcast, so the webhook's `requester`-enrolled initiator needed no promotion to
+  run the triage auction. The one real accommodation: `instance.actuate` never consults the
+  hub's role registry (it is a P1-level call, not a hub-mediated one), so `forge-out`'s
+  `actuator` enrollment in the demo's hub carries the record's own account of who acted,
+  but does not admit the act — the demo says so where it happens.
+- **G2 is narrower than the matrix wording** in the same way ADR-0027's G2 was: it drives
+  one payload through `instance.initiate` and the real inbox dispatch and asserts the
+  brain's own `TaskRequest` carries `external` provenance and the port's summary as
+  `content`, rather than composing a `TaskRequest` by hand.
+- **G7 uses WP-3's unit shape for `decisionRecordDigest`** (a bare `sha256:` digest), not a
+  digest drawn from a real hub round — `demoP8.ts`'s own record does not run a
+  human-approval round, so G3/G4/G8 are what exercise a real Synthesis digest as an
+  `actsOn` target instead.
 
 ## References
 

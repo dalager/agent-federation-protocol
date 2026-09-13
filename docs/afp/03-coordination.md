@@ -65,7 +65,11 @@ thread closes rather than parking forever on a reply that may never come. The re
 procedure demands a terminal outcome per delegated thread (04); a suspended state would
 cost that check its teeth, while this code states the truth: not failure, not success —
 unanswerable as asked. If the missing information arrives, that is a new ask with the
-closed thread as its recorded prehistory.
+closed thread as its recorded prehistory. Two more belong to the external edge
+(ADR-0028): **`afp:err:unreconciled`** — an `ExternalActuator` returned without a usable
+external reference or content hash, never a silent success — and
+**`afp:err:refused-by-contract`** — the action asked of an actuator was one it refuses
+before ever calling the external system, such as the git-forge adapter's `merge`.
 
 Everything above is available to a single operator with two agents and no network — it is
 the whole of roadmap P1. Note what is already mandatory at that scale: the attachment is
@@ -185,6 +189,17 @@ same reason an unreconciled external write is a claim rather than an outcome: ot
 the record shows what was recommended and is silent on what was decided (scenario 09,
 finding 41).
 
+ADR-0028 mechanizes the two reconciliation duties above rather than leaving them as
+prose an implementer might forget. The idempotency key is `sha256(correlationId ‖ 0x00 ‖
+action)`, computed the same way whether the external system is a forge or a human
+approver; the actuation intent — the `Create{afp:Act}` carrying `afp:action`/
+`afp:actsOn`/`afp:idempotencyKey` — is recorded **before** the external write, from the
+outbox store rather than memory, so a crash between acting and reconciling recovers by
+looking the key up again rather than guessing whether the write happened. The adapter,
+never the port, publishes the reconciliation `Result` from the actuator's own return
+value — an actuator that answers without a usable external reference and content hash
+gets a recorded `afp:err:unreconciled` in its place, never a silent success.
+
 ### v2 terms (consensus, state, ordering)
 
 | Term | Attached to | Purpose |
@@ -278,6 +293,9 @@ finding 41).
 | `afp:inputHash` | Property (ContributionSummary) | `digest_of(sorted(digests of every activity the frame selects))`, unreadable ones excluded and counted separately — recomputed at replay from the frame, which is what makes it a check rather than a field that reads like one (ADR-0022 Decision 3) |
 | `afp:entries`, `afp:credited`, `afp:denominator` | Properties (ContributionSummary) | Per-operator credit as integers over one common denominator, so a co-authored Result's shares and a sole author's whole add in the same arithmetic and two parties match to the integer (ADR-0022 Decision 2) |
 | `afp:unreadable`, `afp:qualified`, `afp:membership` | Properties (ContributionSummary) | Three censuses of what the arithmetic did not fold in: per operator, the activities in the period whose existence the computer could see and whose content it could not; per operator, the work settled or superseded inside the period — recorded as a fact, never deducted; and the membership acts inside it, as `{agent, afp:act}` over `afp:Enroll`/`afp:Unenroll`/`afp:MemberExpel`/`afp:MemberAdmit`. Credit is fixed at acceptance and accounting is forward-scoped: work accepted before an expulsion counts (ADR-0022 Decisions 1 and 4) |
+| `afp:idempotencyKey` | Property (an acting activity) | `sha256(correlationId ‖ 0x00 ‖ action)`, hex — the `‖` is byte concatenation with a single `0x00` between the two UTF-8 strings — presented to the external system in whatever form it honours — the crash-recovery key: on retry the actuator presents the same key and the reconciliation names the object the external system already holds, rather than a second one (ADR-0028 Decision 2) |
+| `afp:externalRef`, `afp:contentHash`, `afp:observedAt` | Properties (Result reconciling an external action) | The reconciliation duty itself: the reference the external system will answer to, the content hash of what was created, and when the actuator observed it. Absent or malformed and the record carries `afp:err:unreconciled` instead of a Result (ADR-0028 Decision 2) |
+| `afp:reconciles` | Property (Result reconciling an external action) | The digest of the acting activity this Result closes out — the same binding `afp:actsOn`/`afp:disposes` use elsewhere, so a reconciliation resolves to its intent in one hop (ADR-0028 Decision 2) |
 
 The dual-typing above and every other extension-vs-core-type call for this vocabulary is
 decided normatively in [01 — Deviations from ActivityPub](01-foundations.md#deviations-from-activitypub).

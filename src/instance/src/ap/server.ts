@@ -26,6 +26,7 @@ import { nodeinfoDiscovery, nodeinfoDocument } from "./nodeinfo.ts";
 import type { OutboxEntry } from "../store/outbox.ts";
 import type { JsonValue } from "../crypto/jcs.ts";
 import { RateLimiter } from "../federation/rateLimit.ts";
+import { handleWebhook, matchWebhookRoute, type WebhookRoute } from "../ports/webhook.ts";
 
 const AP_CONTENT_TYPE = "application/activity+json";
 
@@ -49,6 +50,8 @@ export interface ServerOptions {
    * presented membership proof resolves the hub's key from this document, so
    * it is public for the same bootstrap reason every actor document is.
    */
+  /** ADR-0028 Decision 3: webhook initiators mounted at `POST /ports/:name/webhook`. */
+  webhooks?: readonly WebhookRoute[];
   hubs?: readonly {
     hubId: string;
     actorDocument(): { [key: string]: JsonValue };
@@ -161,6 +164,15 @@ export function createHttpServer(instance: AfpInstance, options: ServerOptions =
       res.setHeader("Cache-Control", "private, no-store");
       res.setHeader("Vary", "Signature");
     };
+
+    // ADR-0028 Decision 3: a webhook initiator's own door, capped and
+    // signature-checked the same way the inbox is, ahead of it so it never
+    // falls through to the inbox's activity-shaped parsing.
+    const webhookRoute = matchWebhookRoute(options.webhooks ?? [], req.method ?? "", path);
+    if (webhookRoute) {
+      handleWebhook(instance, webhookRoute, req, res);
+      return;
+    }
 
     // ADR-0016 Decision 1: the hub's inbox is this same receiving
     // implementation with `receive` bound to the hub — not a second front

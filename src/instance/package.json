@@ -24,6 +24,8 @@
     "demo:p6": "node --experimental-sqlite src/cli.ts p6",
     "demo:p7": "node --experimental-sqlite src/cli.ts p7",
     "demo:p7:llm": "node --experimental-sqlite src/cli.ts p7:llm",
+    "demo:p8": "node --experimental-sqlite src/cli.ts p8",
+    "demo:p8:llm": "node --experimental-sqlite src/cli.ts p8:llm",
     "demo:p6:llm": "node --experimental-sqlite src/cli.ts p6:llm"
   }
 }

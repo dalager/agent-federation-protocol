@@ -79,6 +79,18 @@ export interface Config {
    * — this names the file, not the secret.
    */
   readonly keyPassphraseFile?: string;
+
+  // ---------------------------------------------------------- ADR-0028
+
+  /**
+   * ADR-0028 Decision 4: actor URLs of human controllers authorized to
+   * approve through an `ApprovalPort`. Stands in for ADR-0033's signed policy
+   * document until it exists — ADR-0029 Decision 2 says the controller list
+   * belongs there; until it does, this is where the instance's own policy
+   * names who may approve. Empty by default: no controller is authorized
+   * until an operator configures one.
+   */
+  readonly controllers: readonly string[];
 }
 
 /**
@@ -174,6 +186,10 @@ export function loadConfig(overrides: Partial<Config> = {}): Config {
     rateLimitPerActorWindowMs: envInt("AFP_RATE_LIMIT_PER_ACTOR_WINDOW_MS", 60 * 1000),
     replayCacheTtlMs: envInt("AFP_REPLAY_CACHE_TTL_MS", 5 * 60 * 1000),
     ...(env("AFP_KEY_PASSPHRASE_FILE", "") ? { keyPassphraseFile: env("AFP_KEY_PASSPHRASE_FILE", "") } : {}),
+    controllers: env("AFP_CONTROLLERS", "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0),
   };
 
   return { ...base, ...overrides };

@@ -902,6 +902,30 @@ async function main(): Promise<void> {
       break;
     }
 
+    case "p8": {
+      const { runP8Demo } = await import("./demoP8.ts");
+      console.log("\na tracker's webhook, a sealed triage panel, a pull request, a crash that");
+      console.log("opens no second one, and a merge that stays a human's act (ADR-0028):\n");
+      const demo = await runP8Demo({ fresh: true, config: { dataDir: "./data-p8", exportDir: "./export-p8" } });
+      for (const line of demo.narration) console.log(line);
+      console.log(`\nverify it:  python3 ../verifier/afp_verify.py ${demo.exported.dir} --thread ${demo.thread} --verbose\n`);
+      demo.instance.close();
+      break;
+    }
+
+    case "p8:llm": {
+      const config = loadConfig();
+      const { runP8Experiment } = await import("./experimentP8.ts");
+      console.log(`brains: ${config.llmModel} @ ${config.llmBaseUrl}\n`);
+      console.log("the same tracker webhook and forced crash — this time the triage panel's");
+      console.log("verdict comes from a real model reading the report itself.\n");
+      const demo = await runP8Experiment({ endpoint: endpointOf(config) });
+      for (const line of demo.narration) console.log(line);
+      console.log(`\nverify it:  python3 ../verifier/afp_verify.py ${demo.exported.dir} --thread ${demo.thread} --verbose\n`);
+      demo.instance.close();
+      break;
+    }
+
     case "export": {
       const config = loadConfig();
       const instance = new AfpInstance(config, agentRegistrations(config));
@@ -1062,7 +1086,7 @@ async function main(): Promise<void> {
     }
 
     default:
-      console.error(`unknown command: ${command}\nusage: cli.ts [demo|p2|p3|p3:llm|p4|p5|p5:llm|p6|p6:llm|p7|p7:llm|export|keys|serve]`);
+      console.error(`unknown command: ${command}\nusage: cli.ts [demo|p2|p3|p3:llm|p4|p5|p5:llm|p6|p6:llm|p7|p7:llm|p8|p8:llm|export|keys|serve]`);
       process.exit(1);
   }
 }

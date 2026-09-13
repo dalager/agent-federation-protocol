@@ -43,6 +43,15 @@ import { validateActionPolicy, validateIrrevocableActions, type TaskPins } from 
 import type { Brain } from "./brains/port.ts";
 import { Inbox } from "./inbox.ts";
 import { followHub as followHubImpl, followingIds as followingIdsImpl, unfollowHub as unfollowHubImpl } from "./instance/following.ts";
+import {
+  actuate as actuateImpl,
+  initiate as initiateImpl,
+  type ActuateOptions,
+  type ActuateResult,
+  type InitiateOptions,
+  type InitiateResult,
+} from "./instance/external.ts";
+import type { ExternalActuator, ExternalEvent, ExternalInitiator } from "./ports/external.ts";
 
 export interface AgentRegistration {
   spec: AgentSpec;
@@ -466,6 +475,18 @@ export class AfpInstance {
 
   followingIds(): string[] {
     return followingIdsImpl(this);
+  }
+
+  // ---------------------------------------------------------------- external
+  // ADR-0028: the port-agent adapter, in `instance/external.ts` to stay under
+  // this file's line ceiling.
+
+  initiate(initiator: ExternalInitiator, event: ExternalEvent, options: InitiateOptions): InitiateResult {
+    return initiateImpl(this, initiator, event, options);
+  }
+
+  actuate(actuator: ExternalActuator, options: ActuateOptions): Promise<ActuateResult> {
+    return actuateImpl(this, actuator, options);
   }
 
   // ------------------------------------------------------------------ running

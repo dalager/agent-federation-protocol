@@ -150,6 +150,21 @@ export interface ResultSpec {
    * taken a wrong turn.
    */
   contributionSplit?: Readonly<Record<string, number>>;
+  /**
+   * ADR-0028 Decision 2: the reconciliation a port agent's adapter owes for an
+   * external side effect — the external reference, the content hash of what
+   * was created, when it was observed, the idempotency key it was presented
+   * under, and the digest of the actuation activity this Result reconciles.
+   * A Result built without it is byte-identical to one from before this
+   * decision existed.
+   */
+  reconciliation?: {
+    externalRef: string;
+    contentHash: string;
+    observedAt: string;
+    idempotencyKey: string;
+    reconciles: string;
+  };
 }
 
 export function createResult(envelope: Envelope, result: ResultSpec): { [key: string]: JsonValue } {
@@ -206,6 +221,13 @@ export function createResult(envelope: Envelope, result: ResultSpec): { [key: st
   if (result.attachments?.length) object.attachment = result.attachments;
   if (result.reused) {
     object["afp:reused"] = { asset: result.reused.asset, version: result.reused.version, digest: result.reused.digest };
+  }
+  if (result.reconciliation) {
+    object["afp:externalRef"] = result.reconciliation.externalRef;
+    object["afp:contentHash"] = result.reconciliation.contentHash;
+    object["afp:observedAt"] = result.reconciliation.observedAt;
+    object["afp:idempotencyKey"] = result.reconciliation.idempotencyKey;
+    object["afp:reconciles"] = result.reconciliation.reconciles;
   }
 
   return { ...base(envelope, "Create"), object };
@@ -358,6 +380,31 @@ export function undoFollow(envelope: Envelope, followActivityId: string, target:
 }
 
 /** Read `afp:correlationId` from an activity or its object. */
+/**
+ * ADR-0028: the acting activity a port agent's adapter records *before* the
+ * external write — `Create{afp:Act}` with the ADR-0006 stamp and the
+ * idempotency key at the top level, where `afp:action`/`afp:actsOn` already
+ * live, so the retry lookup and the verifier read one shape.
+ */
+export function createAct(
+  envelope: Envelope,
+  spec: {
+    actId: string;
+    /** `afp:action` and `afp:actsOn`, from `allocation/actions.ts`'s stamps. */
+    stamp: { [key: string]: JsonValue };
+    correlationId: string;
+    idempotencyKey: string;
+  },
+): { [key: string]: JsonValue } {
+  return {
+    ...base(envelope, "Create"),
+    object: { id: spec.actId, type: "afp:Act" },
+    ...spec.stamp,
+    "afp:idempotencyKey": spec.idempotencyKey,
+    "afp:correlationId": spec.correlationId,
+  };
+}
+
 export function correlationIdOf(activity: { [key: string]: JsonValue }): string | null {
   const direct = activity["afp:correlationId"];
   if (typeof direct === "string") return direct;

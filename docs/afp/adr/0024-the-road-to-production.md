@@ -152,7 +152,8 @@ built in its ADR.
 | C1 | 0025 | built |
 | C2 | 0026, 0035 | built, less the `remote` signer adapter — costed and designed in [ADR-0035](0035-remote-custody-and-the-asynchronous-port.md), whose `remote-issued` mode is the buildable half |
 | C3 | 0027 | built, less the scenario re-walks — those are C6's job in [ADR-0030](0030-scenario-re-walks-and-the-coverage-index.md) |
-| C4–C6 | 0028, 0029, 0030 | proposed |
+| C4 | 0028 | built, less the human-approval port's own scenario re-walk — that is C6's job in [ADR-0030](0030-scenario-re-walks-and-the-coverage-index.md) |
+| C5–C6 | 0029, 0030 | proposed |
 | C7–C8 | 0031, 0032 | proposed |
 | C9–C10 | 0033, 0034 | proposed |
 
