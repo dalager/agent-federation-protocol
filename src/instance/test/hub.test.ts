@@ -82,7 +82,10 @@ function makeHub(instance: AfpInstance, config: ReturnType<typeof loadConfig>, h
     now: () => instance.clock.now(),
   });
   // ADR-0032 Decision 6: the hub's default seatPolicy is now "follow-required".
-  instance.followHub(hub.actorId);
+  // ADR-0033 WP-3's seat-policy check reads the hub's own Accept{Follow}
+  // trail, so the Follow must actually reach the hub, the way `testHub`
+  // (helpers.ts) already does — not merely leave the instance's outbox.
+  hub.receive(instance.followHub(hub.actorId).activity);
   return hub;
 }
 

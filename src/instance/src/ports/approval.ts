@@ -74,7 +74,7 @@ export async function approveThroughPort(
 
   // Unauthorized: refused before anything is published — a forgery-shaped
   // event is not the record's business (ADR-0029's premise).
-  if (!instance.config.controllers.includes(answer.by)) {
+  if (!(instance.policy.controllers ?? []).includes(answer.by)) {
     throw new ApprovalRefused(`${answer.by} is not an authorized controller`, answer.by);
   }
 

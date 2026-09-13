@@ -84,6 +84,59 @@ def threshold_of(rule: dict, weights: dict[str, float]) -> int | None:
     return None
 
 
+def quorum_reachable(voters: list, weights: dict, quorum_rule: dict | None) -> bool:
+    """ADR-0033 Decision 4's arithmetic — mirrors TypeScript `electorateExhausted`
+    (`src/hub/governance.ts`) byte for byte, and is what parity pins: a round
+    with no quorum rule is exhausted only when it has zero voters (the same
+    "doom is meaningless without a bar" reading `doomed` uses); otherwise the
+    pinned total (every seat in the weights, zeroed weight included, per
+    `threshold_of`'s own convention) is compared against the bar. Named for
+    what it returns — `True` means the electorate CAN still reach the bar —
+    so `electorate_exhausted` below reads as its negation, not a double
+    negative.
+    """
+    if not isinstance(quorum_rule, dict):
+        return bool(voters)
+    bar = threshold_of(quorum_rule, weights)
+    if bar is None:
+        return True  # an unresolvable rule fails its own named check elsewhere
+    total = sum(weights.values())
+    return total >= bar
+
+
+def electorate_exhausted_of(voters: list, weights: dict, quorum_rule: dict | None) -> bool:
+    """`electorate_exhausted`'s arithmetic leg alone, at the exact TypeScript
+    `electorateExhausted(voters, weights, quorumRule)` call shape — kept
+    separate so the parity harness (`run_parity.py`) can pin the arithmetic
+    against `src/hub/governance.ts`'s function of the same name without also
+    supplying a whole proposal shape on the TypeScript side, which that
+    function never takes."""
+    return not quorum_reachable(voters, weights, quorum_rule)
+
+
+def electorate_exhausted(proposal: dict) -> bool:
+    """ADR-0033 Decision 4's floor, recomputed from the pinned proposal alone:
+    can the electorate, after *recusal*, still satisfy its pinned quorum
+    rule at all?
+
+    Two legs, both required — the same pair `Hub.proposeRound` gates
+    `no-decision:electorate-exhausted` on (`hub/hub.ts`: `recused.size > 0 &&
+    electorateExhausted(...)`): the proposal names at least one exclusion
+    whose `afp:status` is `"recused"` (shrinkage by recusal, not by mere
+    absence — a round nobody joined is `quorum-impossible` territory, not
+    this), AND the pinned electorate cannot reach the pinned bar
+    (`quorum_reachable` above, integers only per `threshold_of`).
+    """
+    excluded = [e for e in (proposal.get("afp:excluded") or []) if isinstance(e, dict)]
+    recused = any(e.get("afp:status") == "recused" for e in excluded)
+    if not recused:
+        return False
+    voters = proposal.get("afp:voters") or []
+    weights = proposal.get("afp:voterWeights") or {}
+    quorum_rule = proposal.get("afp:quorumRule")
+    return electorate_exhausted_of(voters, weights, quorum_rule)
+
+
 def find_proposal_for_round(round_id, all_activities: list[dict]) -> dict | None:
     """The `afp:Proposal` payload for a round id, or `None`.
 
@@ -762,13 +815,17 @@ def check_decision_record(
         reason = decision.get("afp:noDecisionReason")
         # ADR-0020 Decision 4 adds the third reason: a round closed early
         # because the arithmetic already proved no option can reach the bar.
-        reason_known = reason in ("expired", "threshold-not-met", "quorum-impossible")
+        # ADR-0033 Decision 4 adds the fourth reason: a round opened and
+        # immediately closed because recusal left its pinned electorate
+        # unable to satisfy its pinned quorum rule at all.
+        reason_known = reason in ("expired", "threshold-not-met", "quorum-impossible", "electorate-exhausted")
         report.record(
             f"decision: {label} no-decision carries a reason",
             reason_known,
             "" if reason_known else
             f"afp:outcome is afp:no-decision but afp:noDecisionReason is {reason!r}, not "
-            f"'expired', 'threshold-not-met' or 'quorum-impossible' (ADR-0018/ADR-0020)",
+            f"'expired', 'threshold-not-met', 'quorum-impossible' or 'electorate-exhausted' "
+            f"(ADR-0018/ADR-0020/ADR-0033)",
         )
         # V4 — the reason is recomputable, not asserted: `threshold-not-met`
         # requires the actual winner to have missed the bar, `expired`
@@ -788,11 +845,13 @@ def check_decision_record(
             elif reason == "expired":
                 deadline = proposal.get("afp:deadline")
                 justified = isinstance(deadline, str) and instant_millis(decision_activity.get("published")) > instant_millis(deadline)
-            else:  # "quorum-impossible" — ADR-0020 W3 V5
+            elif reason == "quorum-impossible":  # ADR-0020 W3 V5
                 from equivocation import convicted_actors_in_round, doomed
 
                 convicted = convicted_actors_in_round(round_id, all_activities)
                 justified = doomed(proposal, tally, counted_voters, convicted)
+            else:  # "electorate-exhausted" — ADR-0033 Decision 4
+                justified = electorate_exhausted(proposal)
             report.record(
                 f"decision: {label} no-decision reason is justified",
                 justified,
@@ -804,7 +863,11 @@ def check_decision_record(
                  f"at or before afp:deadline {proposal.get('afp:deadline')!r} (ADR-0018)"
                  if reason == "expired" else
                  f"reason is 'quorum-impossible' but the recomputed doomed predicate does not "
-                 f"hold — some option remains attainable (ADR-0020)"),
+                 f"hold — some option remains attainable (ADR-0020)"
+                 if reason == "quorum-impossible" else
+                 f"reason is 'electorate-exhausted' but the pinned electorate, after its recused "
+                 f"exclusions, can still satisfy the pinned quorum rule — or no exclusion is "
+                 f"recorded as recused at all (ADR-0033)"),
             )
 
     if isinstance(proposal_deadline, str):

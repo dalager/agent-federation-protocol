@@ -204,7 +204,7 @@ export async function commandRoute(instance: AfpInstance, read: ReadOptions, ctx
     refuse("", "no verifying signature — anonymous");
     return true;
   }
-  if (!isAuthorizedController(requester.agent, { controllers: instance.config.controllers })) {
+  if (!isAuthorizedController(requester.agent, { controllers: instance.policy.controllers ?? [] })) {
     refuse(requester.agent, `${requester.agent} is not an authorized controller`);
     return true;
   }

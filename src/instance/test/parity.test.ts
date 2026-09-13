@@ -28,6 +28,8 @@ import { runReputationRule, type PinnedSettlement } from "../src/allocation/repu
 import { instantMillis } from "../src/crypto/time.ts";
 import { voterWeights } from "../src/hub/weights.ts";
 import { admittingGrant } from "../src/federation/grants.ts";
+import { electorateExhausted } from "../src/hub/governance.ts";
+import type { QuorumRule } from "../src/hub/quorum.ts";
 
 const PARITY_DIR = join(import.meta.dirname, "..", "..", "verifier", "test", "parity");
 const CASES_PATH = join(PARITY_DIR, "cases.json");
@@ -37,6 +39,7 @@ interface Cases {
   instants: string[];
   weights: { name: string; voters: [string, string][] }[];
   grants: { name: string; agreement: never; summary: never; admits: string | null }[];
+  governance: { name: string; voters: string[]; weights: Record<string, number>; quorumRule: QuorumRule | null }[];
 }
 
 /** The TypeScript side's answers, keyed exactly as the Python runner keys its own. */
@@ -67,6 +70,14 @@ function typescriptResults(cases: Cases): Record<string, unknown> {
     try {
       const grant = admittingGrant(testCase.agreement, testCase.summary);
       results[key] = grant ? ((grant as Record<string, unknown>)["afp:grantType"] as string) : null;
+    } catch (error) {
+      results[key] = `THREW: ${(error as Error).constructor.name}`;
+    }
+  }
+  for (const testCase of cases.governance) {
+    const key = `governance:${testCase.name}`;
+    try {
+      results[key] = electorateExhausted(testCase.voters, testCase.weights, testCase.quorumRule ?? undefined);
     } catch (error) {
       results[key] = `THREW: ${(error as Error).constructor.name}`;
     }
@@ -111,7 +122,10 @@ describe("cross-implementation parity (writer vs verifier)", () => {
       0,
       `the two implementations disagree on ${divergent.length} case(s):\n${divergent.join("\n")}`,
     );
-    assert.ok(keys.length >= cases.reputation.length + cases.instants.length + cases.weights.length + cases.grants.length);
+    assert.ok(
+      keys.length >=
+        cases.reputation.length + cases.instants.length + cases.weights.length + cases.grants.length + cases.governance.length,
+    );
   });
 
   // A parity harness that silently compares nothing would be worse than none:

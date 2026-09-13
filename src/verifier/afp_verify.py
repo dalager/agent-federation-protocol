@@ -74,6 +74,7 @@ from pins import (
     check_prior_thread,
     check_proposal_action_policy,
 )
+from policy import check_policy
 from proof import CRYPTOSUITE, decode_multikey, digest_of, verify_proof
 from summary import check_disputes, check_summary_arithmetic, check_summary_frame, check_summary_terminal
 
@@ -142,6 +143,11 @@ class Report:
             # `contribution:0` on a bundle full of single-author Results is the
             # honest reading; `vocabulary:0` says nothing here was retired.
             "contribution", "vocabulary",
+            # ADR-0033 Decision 3: no bundle before this ADR carries a
+            # signed policy at all, so `policy:0` is the honest reading of
+            # every one of them — and the question worth asking on any
+            # export written after.
+            "policy",
         )
         print("census — checks run per domain (a zero you expected to be nonzero is a question):")
         for domain in sorted(domains):
@@ -719,6 +725,11 @@ def verify_export(export: Path, thread: str | None, report: Report) -> dict:
     # ADR-0012 Decision 3: the declared-duty obligations — a no-op when this
     # manifest carries no afp:retentionDuty (Compatibility).
     check_retention(report, export, manifest, all_activities, chain_heads)
+
+    # ADR-0033 Decision 3: what a policy makes checkable — a no-op when this
+    # manifest carries no afp:policy (Compatibility; no bundle before this
+    # ADR ever did).
+    check_policy(report, export, manifest, all_activities, keys, authority.instance_actor)
 
     # Evidence in the bundle that no activity points at is unbound: it proves
     # nothing and cannot be checked, so it should not be travelling with the

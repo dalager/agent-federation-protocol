@@ -189,7 +189,7 @@ export class Inbox {
       return;
     }
 
-    if (!isAuthorizedController(sender, { controllers: this.instance.config.controllers })) {
+    if (!isAuthorizedController(sender, { controllers: this.instance.policy.controllers ?? [] })) {
       this.dropDelivery("polite-reply", activityId, sender, politeReply(content));
       return;
     }

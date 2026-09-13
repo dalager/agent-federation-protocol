@@ -145,8 +145,14 @@ export async function runP3Demo(
   const transport: Transport = hubTransport(hub, instance.localTransport(), (t) => instance.nameOf(t) !== null);
 
   // ADR-0032 Decision 6: the hub's default seatPolicy is now
-  // "follow-required" — the instance Follows before it Enrolls.
+  // "follow-required" — the instance Follows before it Enrolls. Flushed on
+  // its own, before any Enroll is even published (see demoP2.ts's identical
+  // comment): otherwise the Accept{Follow}'s `published` — timestamped when
+  // the hub actually processes it, later in the same batched `run()` — can
+  // land after the Enrolls' own `published`, even though it preceded them in
+  // processing order.
   instance.followHub(hub.actorId);
+  await instance.run(transport);
 
   for (const name of names) {
     instance.publishAsInstance([hub.actorId], `${config.origin}/threads/enroll`, "hub", (envelope) =>
@@ -234,7 +240,11 @@ export async function runP3Demo(
       );
       const produced = auction.resultOf
         ? await auction.resultOf(name)
-        : { content: `partial answer from ${name} for ${auction.slug}`, producedBy: "stub-brain/1" };
+        // ADR-0033: matches the config's default `afp:policy.afp:brains`
+        // (`config.ts`: `brain === "stub"` -> `[{ model: "stub" }]`) — a
+        // narrative producedBy the policy does not list would fail WP-3's
+        // `check_policy` brains check on every bundle this fallback touches.
+        : { content: `partial answer from ${name} for ${auction.slug}`, producedBy: "stub" };
       results.set(
         name,
         instance.publish(name, [hub.actorId], auction.thread, "hub", (envelope) =>

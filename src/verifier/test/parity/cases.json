@@ -70,7 +70,7 @@
       ]
     },
     {
-      "name": "float estimate, wildly over — must not collapse to the neutral prior",
+      "name": "float estimate, wildly over \u2014 must not collapse to the neutral prior",
       "why": "est 10.0 / act 1000 scores 0 when usable and 50 when skipped; picking values whose two answers differ is what makes the case able to fail.",
       "bidder": "X",
       "settlements": [
@@ -189,7 +189,7 @@
     },
     {
       "name": "recency ordering: negative UTC offset is chronologically later than Z",
-      "why": "String-sorted, '-01:00' precedes 'Z' — but the instant it denotes follows. The decay weights differ, so a wrong order is a wrong score.",
+      "why": "String-sorted, '-01:00' precedes 'Z' \u2014 but the instant it denotes follows. The decay weights differ, so a wrong order is a wrong score.",
       "bidder": "X",
       "settlements": [
         {
@@ -528,7 +528,7 @@
       ]
     },
     {
-      "name": "one against many — the attack this exists to stop",
+      "name": "one against many \u2014 the attack this exists to stop",
       "why": "B running five agents must not outvote A running one; both totals are L.",
       "voters": [
         [
@@ -845,6 +845,76 @@
         "hub": null
       },
       "admits": null
+    }
+  ],
+  "governance": [
+    {
+      "name": "electorate_exhausted: zero voters, no quorumRule",
+      "why": "ADR-0033 Decision 4 / hub/governance.ts electorateExhausted: a round with no quorum rule at all is exhausted only when it has zero voters.",
+      "voters": [],
+      "weights": {},
+      "quorumRule": null
+    },
+    {
+      "name": "electorate_exhausted: bar above total with one recusal",
+      "voters": [
+        "a",
+        "b"
+      ],
+      "weights": {
+        "a": 1,
+        "b": 1
+      },
+      "quorumRule": {
+        "afp:form": "explicit",
+        "afp:threshold": 3
+      }
+    },
+    {
+      "name": "electorate_exhausted: bar reachable \u2014 not exhausted",
+      "voters": [
+        "a",
+        "b",
+        "c"
+      ],
+      "weights": {
+        "a": 1,
+        "b": 1,
+        "c": 1
+      },
+      "quorumRule": {
+        "afp:form": "majority-of-total"
+      }
+    },
+    {
+      "name": "electorate_exhausted: bar above total but no recusal \u2014 not exhausted",
+      "why": "the arithmetic function alone never consults recusal (that gate is the caller's, hub.ts's `recused.size > 0 && ...`); it reports only whether the pinned bar is reachable from the pinned weights.",
+      "voters": [
+        "a"
+      ],
+      "weights": {
+        "a": 1
+      },
+      "quorumRule": {
+        "afp:form": "explicit",
+        "afp:threshold": 3
+      }
+    },
+    {
+      "name": "electorate_exhausted: float weight 2.0 alongside 2",
+      "why": "JSON draws no int/float line and the JCS profile forbids only non-integer numbers, so 2.0 is legal and must total identically to 2 on both sides.",
+      "voters": [
+        "a",
+        "b"
+      ],
+      "weights": {
+        "a": 2.0,
+        "b": 2
+      },
+      "quorumRule": {
+        "afp:form": "explicit",
+        "afp:threshold": 5
+      }
     }
   ]
 }

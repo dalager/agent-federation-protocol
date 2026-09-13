@@ -203,4 +203,6 @@ Neither rule is machinery, and neither is enforced — a protocol cannot inspect
 deployment means by a thread. What the protocol does guarantee is that the choice is
 visible: the content inventory says what a bundle contains, and the thread structure is
 plain in the record. State the layout you chose, and why, next to your retention duty
-(ADR-0012) — a deployment that never wrote it down has usually not made the choice.
+(ADR-0012) — a deployment that never wrote it down has usually not made the choice. That
+place is now `afp:threadLayout` on the signed policy document
+([ADR-0033](adr/0033-operator-obligations.md) Decision 1).

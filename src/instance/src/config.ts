@@ -20,6 +20,7 @@ import { resolve } from "node:path";
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { CONFIG_SCHEMA, readEntry, type ConfigEntry } from "./configSchema.ts";
+import { validatePolicySpec, type PolicySpec } from "./policySpec.ts";
 
 export interface Config {
   /** Public origin the instance publishes itself under. */
@@ -150,6 +151,16 @@ export interface Config {
   };
   /** ADR-0031 Decision 6: the exponential backoff schedule's cap in ms. */
   readonly backoffCeilingMs: number;
+
+  // ---------------------------------------------------------- ADR-0033
+
+  /**
+   * ADR-0033 Decision 1: the operator's stated obligations, merged from
+   * `AFP_POLICY_FILE` (when set) over the instance-derived defaults
+   * `loadConfig` assembles below. `AfpInstance.policy` is this same value;
+   * `AfpInstance.policyDocument()` is its signed form.
+   */
+  readonly policy: PolicySpec;
 }
 
 /**
@@ -217,6 +228,8 @@ export function loadConfig(overrides: Partial<Config> = {}): Config {
   const keyPassphraseFile = String(readEntry(entry("AFP_KEY_PASSPHRASE_FILE")));
   const webhookSecretFile = String(readEntry(entry("AFP_WEBHOOK_SECRET_FILE")));
   const signerClientCertFile = String(readEntry(entry("AFP_SIGNER_CLIENT_CERT_FILE")));
+  const policyFile = String(readEntry(entry("AFP_POLICY_FILE")));
+  const controllersFromEnv = readEntry(entry("AFP_CONTROLLERS")) as string[];
 
   const base: Config = {
     origin,
@@ -248,7 +261,7 @@ export function loadConfig(overrides: Partial<Config> = {}): Config {
     ...(keyPassphraseFile ? { keyPassphraseFile } : {}),
     ...(webhookSecretFile ? { webhookSecretFile } : {}),
     ...(signerClientCertFile ? { signerClientCertFile } : {}),
-    controllers: readEntry(entry("AFP_CONTROLLERS")) as string[],
+    controllers: controllersFromEnv,
     fediverseWindow: readEntry(entry("AFP_FEDIVERSE_WINDOW")) as boolean,
     scheduler: {
       sweepMs: readEntry(entry("AFP_SWEEP_MS")) as number,
@@ -258,9 +271,83 @@ export function loadConfig(overrides: Partial<Config> = {}): Config {
       jitterMs: readEntry(entry("AFP_JITTER_MS")) as number,
     },
     backoffCeilingMs: readEntry(entry("AFP_BACKOFF_CEILING_MS")) as number,
+    // Placeholder — recomputed below from the *merged* config, so an
+    // `overrides.controllers`/`overrides.brain` (every test's own way of
+    // setting these, `loadConfig({ ...paths, controllers })`) feeds the
+    // policy default exactly as the corresponding environment variable
+    // would. `overrides.policy` bypasses this entirely, unchanged.
+    policy: {},
   };
 
-  return { ...base, ...overrides };
+  const merged: Config = { ...base, ...overrides };
+  if (overrides.policy !== undefined) return merged;
+  return {
+    ...merged,
+    policy: assemblePolicy(policyFile, {
+      brain: merged.brain,
+      llmModel: merged.llmModel,
+      llmBaseUrl: merged.llmBaseUrl,
+      controllers: merged.controllers,
+    }),
+  };
+}
+
+/**
+ * ADR-0033 Decision 1: the operator's `AFP_POLICY_FILE` (a JSON file in the
+ * `PolicySpec` shape) merged over instance-derived defaults. A property the
+ * file states wins; a property it omits falls back to the default named
+ * here. `AFP_CONTROLLERS` populates `afp:controllers` only when the file
+ * names none — the policy file is the source of record, the env var the
+ * convenience that predates it (ADR-0028 Decision 4).
+ */
+function assemblePolicy(
+  policyFile: string,
+  derived: { brain: "stub" | "llm"; llmModel: string; llmBaseUrl: string; controllers: readonly string[] },
+): PolicySpec {
+  const fromFile = readPolicyFile(policyFile);
+  const defaults: PolicySpec = {
+    // ADR-0032 Decision 6's flipped default.
+    seatPolicy: "follow-required",
+    controllers: [...derived.controllers],
+    // What the old ad-hoc `/afp/policy` body said (ap/server.ts, pre-ADR-0033).
+    defaultVisibility: "internal",
+    custody: { instance: "file" },
+    // Must match what Results actually carry: the stub brain writes
+    // `afp:producedBy: "stub"`; the llm brain writes `producedByLine(model,
+    // endpoint)` = "<model> @ <endpoint> ; template sha256:…" — the verifier
+    // matches a Result's producedBy against `afp:model` alone or against the
+    // "<model> @ <endpoint>" prefix, so both forms are represented here.
+    brains: derived.brain === "stub" ? [{ model: "stub" }] : [{ model: derived.llmModel, endpoint: derived.llmBaseUrl }],
+    // Today's behaviour for Q2 (ADR-0021 open question 2): any member may
+    // pin a governanceSubject. Q3's floor names a close rather than leaving
+    // an exhausted electorate to throw uncaught — `no-decision:electorate-exhausted`
+    // is the operator-neutral default; `refuse` is available for a policy that
+    // would rather never open such a round.
+    governance: { subjectPrecondition: "any-member", electorateFloor: "no-decision:electorate-exhausted" },
+  };
+  if (!fromFile) return defaults;
+  return {
+    ...defaults,
+    ...fromFile,
+    controllers: fromFile.controllers && fromFile.controllers.length > 0 ? fromFile.controllers : defaults.controllers,
+    custody: fromFile.custody ? { ...defaults.custody, ...fromFile.custody } : defaults.custody,
+    brains: fromFile.brains ?? defaults.brains,
+    governance: fromFile.governance ?? defaults.governance,
+  };
+}
+
+/** Read and parse `AFP_POLICY_FILE`, or `undefined` if unset/empty/absent. */
+function readPolicyFile(path: string): PolicySpec | undefined {
+  if (!path || !existsSync(path)) return undefined;
+  const raw = readFileSync(path, "utf8").trim();
+  if (raw.length === 0) return undefined;
+  try {
+    return JSON.parse(raw) as PolicySpec;
+  } catch (error) {
+    // A named error, not a bare JSON.parse message: the operator wrote this
+    // file by hand, and "Unexpected token" says nothing about which file.
+    throw new Error(`AFP_POLICY_FILE ${path} is not valid JSON: ${(error as Error).message}`);
+  }
 }
 
 // ------------------------------------------------------------- validate()
@@ -376,6 +463,15 @@ export function validate(config: Config, options: ValidateOptions = {}): ConfigP
   if (!options.skipDataDirProbe) {
     const dirProblem = probeDataDirWritable(config.dataDir);
     if (dirProblem) push("dataDir", "AFP_DATA_DIR", dirProblem);
+  }
+
+  for (const problem of validatePolicySpec(config.policy)) {
+    // `problem` reads "<field> <message>" (e.g. `governance.electorateFloor must be…`) —
+    // split once so the field lands in ConfigProblem.field the way every other row does.
+    const spaceAt = problem.indexOf(" ");
+    const field = spaceAt === -1 ? problem : problem.slice(0, spaceAt);
+    const message = spaceAt === -1 ? problem : problem.slice(spaceAt + 1);
+    push(`policy.${field}`, "AFP_POLICY_FILE", message);
   }
 
   return problems;

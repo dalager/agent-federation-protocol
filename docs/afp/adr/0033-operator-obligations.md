@@ -1,6 +1,6 @@
 # ADR-0033 — Operator obligations: the policy set a production deployment publishes, signed
 
-- **Status:** Proposed (2026-09-02) — program claim **C9** of
+- **Status:** Accepted (2026-09-02), **built** (2026-09-13) — program claim **C9** of
   [ADR-0024](0024-the-road-to-production.md); group: **Operator obligations**
 - **Date:** 2026-09-02
 - **Applies to:** the instance's policy document (`/afp/policy`, ADR-0017 Decision 5),
@@ -61,6 +61,12 @@ under `policy.jsonld`, declared in `afp:members`. A stranger replaying the bundl
 operator's stated obligations beside the record; a regulator asking "under what retention
 duty, what thread layout, which models" reads one file.
 
+On `afp:controllers`: the record shows that an authorized controller decided, not who the
+controller was as a protocol-level identity — an approval's actor on the record is a
+generic port agent (`actuatorName`), and the approving human is carried only as
+`by`/`afp:externalRef` on the reconciliation Result, deliberately never as their own
+rostered actor (scenario 01, finding 76).
+
 ### 3. The verifier checks what a policy makes checkable
 
 `check_policy`, conditional on `afp:policy` being present: the carried document verifies
@@ -119,7 +125,93 @@ every shipped bundle — none carries a policy — replays unchanged.
 
 ## Build status
 
-Not built.
+Built, all four decisions. `npm test` (`src/instance`): 496 passing, including this ADR's
+own gate (`test/adr0033.test.ts`, 23 cases: G1–G6 plus the primitives block folding in
+every WP's assertion). `python3 src/verifier/test/parity/run_parity.py cases.json` is
+clean, including a five-case `governance` key pinning `electorate_exhausted`'s arithmetic
+against `hub/governance.ts`'s `electorateExhausted` byte for byte.
+
+**G1–G6**, the gate paragraph, each a case in `test/adr0033.test.ts`:
+
+- **G1** — a bundle with a policy replays clean and `policy:` runs (census > 0).
+- **G2** — a Result whose `afp:producedBy` names an unlisted brain fails by name.
+- **G3** — an approval by an unlisted controller fails by name (the mutated
+  `afp:externalRef`).
+- **G4** — a governance round about an agent with nothing on record is refused at the hub
+  (`GovernanceRefused`), and fails at replay when spliced in with its supporting dispute
+  removed.
+- **G5** — an electorate emptied by recusal closes `electorate-exhausted` and the reason
+  recomputes; a genuinely `quorum-impossible` close relabeled `electorate-exhausted` fails
+  by name.
+- **G6** — every shipped bundle replays unchanged: `freshDemo()` and `runP8Demo()` PASSED —
+  every export now carries a policy, so "unchanged" means the verifier still passes, not
+  that the bytes are identical to before this ADR.
+
+**What was built versus what the ADR wrote**, worth a reader's attention:
+
+- **`policySpec.ts` is a dependency-free leaf**, apart from `ap/policy.ts`. `config.ts`
+  needs the `PolicySpec` shape and `validatePolicySpec` to assemble and validate
+  `Config.policy`, and `config.ts` sits underneath `crypto/keys.ts`
+  (`keyPassphraseFromEnv`), which `crypto/proof.ts` depends on — so a policy-spec file
+  that imports nothing from `ap/documents.ts` or `crypto/proof.ts` is what keeps
+  `config.ts` from closing an import cycle. `ap/policy.ts` re-exports everything from it,
+  so every other caller reaches both from one place.
+- **Config precedence, and `AFP_CONTROLLERS` demoted to a convenience.** `assemblePolicy`
+  merges `AFP_POLICY_FILE` over instance-derived defaults, property by property — a
+  property the file states wins, one it omits falls back to the default. `AFP_CONTROLLERS`
+  populates `afp:controllers` only when the file names none: the policy file is the source
+  of record now, the env var the pre-ADR-0033 convenience it always was (ADR-0028
+  Decision 4).
+- **The three controller readers switched** — `ApprovalPort`, the command grammar
+  (`POST /agents/:name/command`), and the inbox's mention handler — all now read
+  `instance.policy.controllers` rather than `config.controllers` directly.
+- **`afp:custody.instance` is pinned from config** (`{ instance: "file" }`, today's only
+  signer adapter), never left to the policy file to restate, because agent custody is a
+  per-registration fact config cannot see — a policy claiming otherwise would be asserting
+  something it has no way to check.
+- **The electorate floor is gated on recusal**, not on unreachability alone: `Hub
+  .proposeRound` only considers `electorate-exhausted` when `recused.size > 0` — a bar that
+  was unreachable from the start, with nobody excluded, is deliberately left as
+  ADR-0018/ADR-0020's ordinary `quorum-impossible`/`threshold-not-met` (the same
+  deliberately-unreachable-bar case ADR-0020's own gate G7/G8 already covers). Mirrored
+  exactly in `decision.py`'s `electorate_exhausted`, which requires at least one
+  `afp:excluded` entry with `afp:status: "recused"` before it even looks at the arithmetic.
+- **The verifier's `afp:producedBy` matching rule** accepts either an exact `afp:model`
+  match (the stub brain's own `afp:producedBy`) or a `"<model> @ <endpoint>"` prefix match
+  (the llm brain's `producedByLine`, whose `"; template sha256:…"` suffix is not itself
+  matched against the policy).
+- **The controllers check's shape** follows finding 76's reading, stated in this ADR's
+  Decisions above: an approval's actor on the record is a generic port agent
+  (`actuatorName`), so the check resolves the reconciliation Result's `afp:externalRef` —
+  the human as carried, never as their own rostered actor — against `afp:controllers`.
+- **The seat-policy check skipping replicas** — an actor document carrying
+  `afp:replicaOf` is never examined, because a replica's bundle only relays Enrolls it
+  never itself admitted. Live-fire in the demos: this check caught two `demoP2`/`demoP3`/
+  `demoP8` bugs the seat-policy default flip (ADR-0032 Decision 6) had left latent — an
+  Enroll's `published` instant could land before its own preceding `Accept{Follow}` purely
+  from clock-tick timing (`instance.followHub` queued, but not flushed, before the first
+  Enroll), fixed at the root by flushing the Follow's own `run()` before any Enroll
+  publishes; and `demoP3`'s no-Result fallback narrative wrote
+  `producedBy: "stub-brain/1"`, which the config's default `afp:brains` (`[{ model: "stub"
+  }]`) does not list — changed to `"stub"`, matching what the stub brain actually writes
+  everywhere else.
+- **The subject-precondition check lives in `policy.py`**, not beside
+  `check_proposal_electorate` in `decision.py` — its trigger,
+  `afp:governance.afp:subjectPrecondition`, is a field on the policy document
+  `check_policy` already loaded, so a reader asking "what does the policy make checkable"
+  finds both governance answers (this one, and `electorate_exhausted`, wired into
+  `decision.py` where the no-decision reason it justifies already lives) from one entry
+  point, one hop each.
+- **`readPolicyFile` names its error.** A malformed `AFP_POLICY_FILE` first surfaced as
+  a bare `SyntaxError` — "Unexpected token", naming no file; the review made it
+  `AFP_POLICY_FILE <path> is not valid JSON: …`, since the operator wrote that file by
+  hand and the error is the only thing that will tell them which one.
+- **Every export now carries a policy.** "Every shipped bundle replays unchanged" (the
+  ADR's gate, G6) means what it can mean once every export gains `policy.jsonld`:
+  previously exported bundles (none of which carry `afp:policy`) still replay exactly as
+  before — `check_policy` is a no-op, recorded as `policy:0` rather than silently skipped —
+  and every bundle exported from here on carries the signed document and the twelve checks
+  that go with it.
 
 ## References
 

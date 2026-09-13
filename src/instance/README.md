@@ -492,7 +492,9 @@ curl -H "Signature: ..." -H "Signature-Input: ..." -H "Date: ..." -H "Host: ..."
 (`visibility.ts`'s `parseCommand`) the inbox's `Create{Note}` mentions use — `@name pause`,
 `@name status`, and a bare `approve` (with `thread`/`actsOn` in the body) that goes through
 [ADR-0028](../../docs/afp/adr/0028-port-agents.md)'s `approveThroughPort`. The requester is
-the HTTP-signature's actor, checked against `AFP_CONTROLLERS`. Every refusal — unlisted,
+the HTTP-signature's actor, checked against the policy's `afp:controllers`
+([ADR-0033](../../docs/afp/adr/0033-operator-obligations.md) Decision 1 — see "The policy
+document" below; `AFP_CONTROLLERS` populates it when the policy file names none). Every refusal — unlisted,
 anonymous, unparseable — answers the identical `200 { reply: "…" }` polite reply, never on
 the chain; a verified signer's refusal lands on the operator's audit log, an anonymous one
 is not recorded at all (ADR-0013 Decision 5 — a free refusal logged is a stranger's pen):
@@ -508,6 +510,64 @@ curl -X POST http://localhost:8787/agents/<name>/command \
 operator-visible event, `to: []` — followable by AFP-aware software and by anything that
 can read a public outbox. Off by default; every shipped bundle is byte-identical either
 way.
+
+## The policy document
+
+`GET /afp/policy` (and its `/.well-known/afp-policy` alias) serves the signed `afp:Policy`
+object ([ADR-0033](../../docs/afp/adr/0033-operator-obligations.md)) — the place an operator
+states what the protocol correctly leaves to them: the seat policy, the authorized
+controllers, the default visibility, the retention duty and its anchors, the thread layout,
+key custody, the brains in use, the governance answers, the consortium terms, accepted
+deviations, and a disclosure contact. Every property is optional; a solo operator's policy
+may be three lines.
+
+`AFP_POLICY_FILE` names a JSON file in the `PolicySpec` shape (`src/policySpec.ts`), one
+property per row of the ADR's table:
+
+```json
+{
+  "seatPolicy": "follow-required",
+  "controllers": ["https://alpha.operator.example/controllers/ops"],
+  "defaultVisibility": "internal",
+  "retentionDuty": { "horizon": "P5Y", "basis": "EU AI Act Art. 12" },
+  "anchors": [
+    { "actor": "https://alpha.operator.example/actor", "head": "sha256:...", "instant": "2026-09-01T00:00:00Z", "anchorRef": "https://anchors.example/2026-09-01" }
+  ],
+  "threadLayout": { "form": "per-subject", "note": "one thread per data subject, never merged" },
+  "custody": { "instance": "file", "agents": "instance", "hub": "self" },
+  "brains": [{ "model": "some-model", "endpoint": "http://127.0.0.1:13305/api/v1" }],
+  "governance": { "subjectPrecondition": "proof-or-dispute-on-record", "electorateFloor": "no-decision:electorate-exhausted" },
+  "terms": { "url": "https://consortium.example/terms", "digest": "sha256:..." },
+  "deviations": [{ "section": "07 § Audience & visibility", "statement": "..." }],
+  "disclosure": { "contact": "security@alpha.operator.example" }
+}
+```
+
+**Precedence**: the policy file wins over everything else — a property it states is the
+final answer; one it omits falls back to an instance-derived default (`config.ts`'s
+`assemblePolicy`). `AFP_CONTROLLERS` populates `afp:controllers` only when the file names
+none — the policy file is the source of record, the env var the convenience that predates
+it (ADR-0028 Decision 4). `custody.instance` is pinned from config (`"file"`, today's only
+signer adapter) because agent custody is a per-registration fact config cannot see. The
+three controller readers — `ApprovalPort`, the command grammar
+(`POST /agents/:name/command` and the inbox's mention handler) — all read
+`instance.policy.controllers`, not `config.controllers` directly.
+
+Every export carries `policy.jsonld` and names it in the manifest's `afp:policy` field
+(`{id, afp:digest}`, ADR-0033 Decision 2). The verifier's `check_policy`
+(`src/verifier/policy.py`, ADR-0033 Decision 3) holds the record to what the policy says,
+conditional on `afp:policy` being present at all — twelve checks in total: the carried
+document is present and declared in `afp:members`; its `id` and digest match the manifest;
+its signature verifies under the instance key; it is attributed to the bundle's instance
+actor and typed `afp:Policy`; the manifest's `afp:retentionDuty` and `afp:anchors` agree
+with the policy's (when both declare one); every `afp:producedBy` on a Result names a
+listed brain; every approval or command actuation's actor is a listed controller; the
+hub's seat policy matches the Enroll/Accept{Follow} trail; and the governance subject
+precondition recomputes against the disputes and convictions on record. The governance
+answers themselves — who may pin `afp:governanceSubject`, and what happens when recusal
+empties an electorate — are `afp:governance.afp:subjectPrecondition` and
+`afp:governance.afp:electorateFloor`, enforced at `Hub.proposeRound` and recomputed at
+replay ([ADR-0033](../../docs/afp/adr/0033-operator-obligations.md) Decision 4).
 
 ## Using a running instance
 
@@ -725,7 +785,14 @@ src/
   ap/
     documents.ts     instance actor, agent actors, signed roster
     activities.ts    Offer{Task} / Accept / Reject / Create{Result} / Create{Error}
+    policy.ts        ADR-0033: the signed afp:Policy object served at /afp/policy;
+                     re-exports policySpec.ts so every caller reaches both from
+                     one place
     server.ts        public HTTP surface; everything above `public` returns 404
+  policySpec.ts      ADR-0033: the PolicySpec shape + validatePolicySpec, a
+                     dependency-free leaf — config.ts needs it and sits
+                     underneath crypto/proof.ts, which ap/documents.ts (and so
+                     ap/policy.ts) depends on
   brains/
     port.ts          the entire agent contract — mentions no protocol at all
     stub.ts          deterministic brains, so the gate is reproducible offline
@@ -739,6 +806,9 @@ src/
     crdtAdapter.ts   class-shaped view over crdt/ for the hub's call sites
     store.ts         rounds + vote receipts (CRDT state lives in crdt/)
     transport.ts     the shared delivery port routing by URL alone
+    governance.ts    ADR-0033 Decision 4: the hub-policy answers to ADR-0021's
+                     open questions — subjectPreconditionResolves,
+                     electorateExhausted, GovernanceRefused
   allocation/        P3: allocation beside the hub (ADR-0003)
     rules.ts         the selection-rule registry — ranking + coverage, pure,
                      tie-broken by the protocol constant
@@ -802,6 +872,9 @@ src/
   export.ts          the bundle you hand to a third party — hub outboxes included
   demo.ts, demoP2.ts, demoP3.ts, demoP4.ts, demoP5.ts, demoP6.ts, demoP7.ts,
   demoP8.ts, experimentP3.ts, experimentP7.ts, experimentP8.ts, cli.ts
+../verifier/policy.py  ADR-0033 Decision 3: check_policy, the Python-side
+                     counterpart to ap/policy.ts and hub/governance.ts above —
+                     runs only when a manifest carries afp:policy
 Containerfile        ADR-0032 Decision 1: a reference container image — a
                      convenience, not a supported artifact (no dependencies,
                      no build step; `COPY . .` and `node ... cli.ts serve`)
@@ -865,7 +938,8 @@ Environment variables, all optional (see `src/config.ts`, `src/configSchema.ts`)
 | `AFP_KEY_PASSPHRASE_FILE` | *(none)* | File holding the passphrase the `file` signer adapter encrypts PEMs with at rest ([ADR-0026](../../docs/afp/adr/0026-key-custody-and-the-signer-port.md)). Unset, PEMs are unencrypted — as before. Protects a stolen backup, not a compromised host |
 | `AFP_WEBHOOK_SECRET_FILE` | *(none)* | File holding the [ADR-0028](../../docs/afp/adr/0028-port-agents.md) webhook initiator's shared secret ([ADR-0032](../../docs/afp/adr/0032-deployment-profile.md) Decision 3) |
 | `AFP_SIGNER_CLIENT_CERT_FILE` | *(none)* | File holding the [ADR-0035](../../docs/afp/adr/0035-remote-custody-and-the-asynchronous-port.md) remote signer's client certificate. Validated as readable by `afp config check`; nothing in this codebase reads it yet |
-| `AFP_CONTROLLERS` | *(none)* | Comma-separated actor URLs authorized to answer through `ApprovalPort` ([ADR-0028](../../docs/afp/adr/0028-port-agents.md) Decision 4) and the command grammar at `POST /agents/:name/command` ([ADR-0029](../../docs/afp/adr/0029-the-human-window-and-the-activitypub-premise.md) Decision 2) — configuration standing in for [ADR-0033](../../docs/afp/adr/0033-operator-obligations.md)'s signed policy document until it exists |
+| `AFP_POLICY_FILE` | *(none)* | JSON file in the `PolicySpec` shape ([ADR-0033](../../docs/afp/adr/0033-operator-obligations.md); see "The policy document" above) — the operator's stated obligations, signed and served at `/afp/policy`, carried in every export |
+| `AFP_CONTROLLERS` | *(none)* | Comma-separated actor URLs authorized to answer through `ApprovalPort` ([ADR-0028](../../docs/afp/adr/0028-port-agents.md) Decision 4) and the command grammar at `POST /agents/:name/command` ([ADR-0029](../../docs/afp/adr/0029-the-human-window-and-the-activitypub-premise.md) Decision 2) — populates the policy's `afp:controllers` only when `AFP_POLICY_FILE` names none ([ADR-0033](../../docs/afp/adr/0033-operator-obligations.md) Decision 1) |
 | `AFP_FEDIVERSE_WINDOW` | `0` | `1` dual-publishes a `public` shadow Note alongside every operator-visible event ([ADR-0029](../../docs/afp/adr/0029-the-human-window-and-the-activitypub-premise.md) Decision 3). Off by default; every shipped bundle is byte-identical either way |
 | `AFP_SWEEP_MS` | `30000` | The resident scheduler's sweep-loop interval ([ADR-0031](../../docs/afp/adr/0031-the-resident-process.md) Decision 1) |
 | `AFP_FLUSH_MS` | `10000` | The resident scheduler's flush-loop (delivery-queue retry) interval |
@@ -1021,8 +1095,13 @@ is a command or a file, and the list is this README's, not the ADR's, so it can 
   acted on — it names the failing line (`store`/`signer`/`self-check`/`scheduler`), not
   just "unhealthy".
 - [ ] **[ADR-0033](../../docs/afp/adr/0033-operator-obligations.md)'s policy document is
-  published** — when ADR-0033 lands; until then, `AFP_CONTROLLERS` stands in for the
-  controller half of it.
+  published:**
+  ```bash
+  $EDITOR policy.json                       # see "The policy document" above
+  export AFP_POLICY_FILE=/opt/afp/policy.json
+  npm run config:check                      # a bad enum is named under policy.<field>
+  curl https://your.origin.example/afp/policy | jq .afp:seatPolicy
+  ```
 
 A systemd unit, `AFP_*_FILE` secrets named as `Environment=` lines rather than values,
 and a drain timeout matching `serve`'s own SIGTERM handling:

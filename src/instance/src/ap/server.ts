@@ -457,18 +457,12 @@ export function createHttpServer(instance: AfpInstance, options: ServerOptions =
 
         // ADR-0017 Decision 5: the canonical path lives at an unreserved
         // location; the old `/.well-known/` path keeps serving the same body
-        // as a transition alias.
+        // as a transition alias. ADR-0033 Decision 1: the body is now the
+        // signed `afp:Policy` document — unauthenticated bootstrap, like
+        // every other actor/roster fetch, since verifying anything against
+        // it starts with reading it.
         if (path === "/afp/policy" || path === "/.well-known/afp-policy") {
-          return send(
-            200,
-            {
-              "afp:cryptosuite": "eddsa-jcs-2022",
-              "afp:phase": "P1",
-              "afp:federation": "none",
-              "afp:defaultVisibility": "internal",
-            },
-            "application/json",
-          );
+          return send(200, instance.policyDocument() as unknown as JsonValue);
         }
 
         // ADR-0017 Decision 5: FEP-f1d5 NodeInfo — the discovery link and the

@@ -65,6 +65,10 @@
     "afp:summary": { "@type": "@id" },
     "afp:hubs": { "@type": "@id" },
     "afp:since": { "@type": "xsd:dateTime" },
-    "afp:observedAt": { "@type": "xsd:dateTime" }
+    "afp:observedAt": { "@type": "xsd:dateTime" },
+
+    "afp:controllers": { "@type": "@id" },
+    "afp:actor": { "@type": "@id" },
+    "afp:instant": { "@type": "xsd:dateTime" }
   }
 }

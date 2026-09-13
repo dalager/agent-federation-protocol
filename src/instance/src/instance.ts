@@ -30,6 +30,8 @@ import {
   signedRoster,
   type AgentSpec,
 } from "./ap/documents.ts";
+import { policyDocument as buildPolicyDocument } from "./ap/policy.ts";
+import type { SignedDocument } from "./crypto/proof.ts";
 import {
   correlationIdOf,
   createError,
@@ -100,6 +102,10 @@ export class AfpInstance {
   private pipeline: Inbox | null = null;
   /** ADR-0029 Decision 2 ("Command"): the `pause` verb's in-memory state. */
   private readonly pausedAgents = new PausedAgents();
+  /** ADR-0033 Decision 1: cached so its digest is stable for the process — see `policyDocument()`. */
+  private cachedPolicyDocument: SignedDocument | null = null;
+  /** The instant `policyDocument()` is `published` at — the instance's clock at construction. */
+  private readonly policyPublishedAt: string;
 
   constructor(
     config: Config,
@@ -138,6 +144,7 @@ export class AfpInstance {
       this.keys.set(`${agent.spec.name}:transport`, loadOrCreateTransportKeyPair(config.keyDir, agent.spec.name, agentId));
     }
 
+    this.policyPublishedAt = clock.now().toISOString();
     this.provision();
   }
 
@@ -204,6 +211,27 @@ export class AfpInstance {
   rosterDocument() {
     const { members, lastChange } = deriveRoster(this.outbox.byActor(instanceActorId(this.config.origin)));
     return signedRoster(this.config.origin, members, this.signer("@instance"), lastChange || undefined);
+  }
+
+  /** ADR-0033 Decision 1: the operator's stated obligations, as `Config` assembled them. */
+  get policy() {
+    return this.config.policy;
+  }
+
+  /**
+   * The signed `afp:Policy` document at `${origin}/afp/policy` (ADR-0017
+   * Decision 5) — cached so its digest is stable for the life of the process:
+   * two fetches, and every copy `exportBundle` writes, must be byte-identical
+   * (the same discipline `rosterDocument`'s `created` pinning follows).
+   */
+  policyDocument(): SignedDocument {
+    this.cachedPolicyDocument ??= buildPolicyDocument(
+      this.config.origin,
+      this.config.policy,
+      this.signer("@instance"),
+      this.policyPublishedAt,
+    );
+    return this.cachedPolicyDocument;
   }
 
   /**

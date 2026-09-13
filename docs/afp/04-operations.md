@@ -368,7 +368,10 @@ convention, not machinery:
   is actually asking. The field remains non-normative for replay: a verifier can fetch the
   template and read the framing, but never re-runs a brain to check it. Note also that the
   value is a **string**, not an IRI — it always was, and the `@context` no longer says
-  otherwise.
+  otherwise. A policy's `afp:brains` is the list a Result's `afp:producedBy` is held to
+  ([ADR-0033](adr/0033-operator-obligations.md) Decision 3) — the operator declares which
+  configurations produce Results, and the verifier checks every value on record against
+  that declared list, exact model or the `<model> @ <endpoint>` prefix.
 
 ### What closes the trail at the edges
 
@@ -471,9 +474,12 @@ one part of a bundle that used to be freely editable no longer is.
   coherence — every anchored digest must be a chain head the bundle contains — and are
   never dereferenced: the verifier reaches no network by design, so confirming the
   timestamp itself is the auditor's step, not the replay's.
+- **`afp:policy`** — the signed `afp:Policy` document this bundle was produced under, by
+  `id` and digest ([ADR-0033](adr/0033-operator-obligations.md) Decision 2); the document
+  itself travels alongside as `policy.jsonld`.
 
 What a bundle contains is now exhaustive: instance document, roster, per-actor outboxes
-(stubs included), hub outboxes, artifacts, received activities, manifest. **Hub CRDT state
+(stubs included), hub outboxes, artifacts, received activities, manifest, policy. **Hub CRDT state
 is a projection and is not exported** — which makes a design rule out of what 02 already
 implies: anything that must ever be disclosed, redacted, retained or replayed has to live
 in activities, because activities are the only thing the export, the stub machinery and
@@ -591,9 +597,13 @@ governance outcomes — so following the hub is following the *problem*.
 Mentions and replies from a Mastodon account arrive in the agent's AFP inbox as ordinary
 `Create{Note}` — which the instance *can* parse. Map a small command grammar onto it:
 `@agent-a1 pause`, `@agent-a1 status`, a reply of "approve" on a governance Note.
-Authorization is explicit, not inferred: the instance's `afp:policy` document lists which
-Mastodon accounts are authorized controllers (verified via the Note's HTTP-Signed origin,
-optionally bound bidirectionally with `alsoKnownAs` links). Unauthorized mentions get at
+Authorization is explicit, not inferred: `afp:controllers` on the signed `afp:policy`
+document names the actor URLs authorized to approve and command (verified via the Note's
+HTTP-Signed origin, optionally bound bidirectionally with `alsoKnownAs` links) — the same
+list the approval port and this command grammar both read
+([ADR-0028](adr/0028-port-agents.md), [ADR-0029](adr/0029-the-human-window-and-the-activitypub-premise.md)),
+and the one the verifier holds an approval or command actuation to at replay
+([ADR-0033](adr/0033-operator-obligations.md) Decision 3). Unauthorized mentions get at
 most a polite read-only reply — command parsing from arbitrary fediverse strangers is an
 injection surface, treated as such.
 

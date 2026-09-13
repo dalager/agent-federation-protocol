@@ -23,7 +23,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))  # -> src/verifier
 
-from decision import instant_millis, voter_weights
+from decision import electorate_exhausted_of, instant_millis, voter_weights
 from reputation import REPUTATION_RULES
 from federation import admitting_grant
 
@@ -52,6 +52,13 @@ def main() -> int:
         try:
             grant = admitting_grant(case["agreement"], case["summary"])
             results[key] = grant.get("afp:grantType") if grant else None
+        except Exception as error:
+            results[key] = f"THREW: {type(error).__name__}"
+
+    for case in cases.get("governance", []):
+        key = f"governance:{case['name']}"
+        try:
+            results[key] = electorate_exhausted_of(case["voters"], case["weights"], case.get("quorumRule"))
         except Exception as error:
             results[key] = f"THREW: {type(error).__name__}"
 

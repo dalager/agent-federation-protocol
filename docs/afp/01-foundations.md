@@ -61,6 +61,11 @@ agreement with.
 }
 ```
 
+`afp:policy` is a signed `afp:Policy` object ([ADR-0033](adr/0033-operator-obligations.md)
+Decision 1): the operator's stated obligations — seat policy, authorized controllers,
+retention duty, thread layout, key custody, brains in use, the governance answers, and
+more — carried in every export and held to at replay.
+
 The policy document has moved off the reserved `.well-known` space it occupied in earlier
 revisions (`/.well-known/afp-policy` → `/afp/policy`). Registering a name under
 `.well-known` is RFC 8615 territory — the FEP's job once one exists, not something an

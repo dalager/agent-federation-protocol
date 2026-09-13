@@ -87,8 +87,15 @@ export async function runP2Demo(options: { fresh?: boolean; config?: Partial<Con
   const transport = hubTransport(hub, instance.localTransport(), (target) => instance.nameOf(target) !== null);
 
   // ADR-0032 Decision 6: the hub's default seatPolicy is now
-  // "follow-required" — the instance Follows before it Enrolls.
+  // "follow-required" — the instance Follows before it Enrolls. Flushed on
+  // its own, before any Enroll is even published: the demo's clock ticks on
+  // every `now()` read, so an Enroll queued first and delivered second would
+  // carry an earlier `published` than the Accept{Follow} that in fact
+  // preceded it in hub processing order — ADR-0033 WP-3's seat-policy check
+  // reads `published` order, so the record's instants must match causal
+  // order, not merely the hub's internal admission order.
   instance.followHub(hub.actorId);
+  await instance.run(transport);
 
   // Enroll all thirty, then open the round over the pinned membership.
   for (const { spec } of agents) {

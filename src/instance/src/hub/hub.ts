@@ -44,6 +44,8 @@ import { validateIrrevocableActions, validateProposalActionPolicy, type TaskPins
 import { LWWRegister, ORMap, ORMapLWW, ORSet } from "./crdtAdapter.ts";
 import { thresholdOf, type QuorumRule } from "./quorum.ts";
 import { voterWeights } from "./weights.ts";
+import { DEFAULT_GOVERNANCE, electorateExhausted, GovernanceRefused, subjectPreconditionResolves } from "./governance.ts";
+import type { GovernanceSpec } from "../ap/policy.ts";
 import { CRDTStore, type LWWState, type ORMapState, type ORSetState } from "../crdt/index.ts";
 import {
   convictionByProof,
@@ -118,6 +120,13 @@ export interface HubDeps {
    * which remains available as an explicit setting for a transition.
    */
   seatPolicy?: "follow-required" | "enroll-implies-seat";
+  /**
+   * ADR-0033 Decision 4: the hub-policy answers to ADR-0021's open
+   * questions. Absent means `DEFAULT_GOVERNANCE` (`hub/governance.ts`) —
+   * today's `any-member` precondition and `no-decision:electorate-exhausted`
+   * floor, byte-identical to pre-ADR-0033 behaviour.
+   */
+  governance?: GovernanceSpec;
 }
 
 interface LivenessValue {
@@ -198,6 +207,7 @@ export class Hub {
   /** The hub actor sync traffic names: `replicaOf` when set, else self. */
   private readonly hubIdentity: string;
   private readonly seatPolicy: "follow-required" | "enroll-implies-seat";
+  private readonly governance: GovernanceSpec;
 
   /**
    * The persisted CRDT store (ADR-0002 Decision 5): every delta the hub folds
@@ -277,6 +287,7 @@ export class Hub {
     this.hubIdentity = deps.replicaOf ?? this.actorId;
     // ADR-0032 Decision 6: the default flips to "follow-required".
     this.seatPolicy = deps.seatPolicy ?? "follow-required";
+    this.governance = deps.governance ?? DEFAULT_GOVERNANCE;
 
     // ADR-0032 Decision 4: hub_* tables come from openDb's migration now —
     // see store/migrations/001-baseline.ts.
@@ -1652,6 +1663,19 @@ export class Hub {
       recused.set(entry.agent, entry.cause);
     }
 
+    // ADR-0033 Decision 4: `proof-or-dispute-on-record` gates who a round may
+    // be *about* — checked against the hub's own record, never the caller's
+    // word, the same discipline `recusalResolves` applies to a declared cause.
+    if (options.governanceSubject && this.governance.subjectPrecondition === "proof-or-dispute-on-record") {
+      const pool = this.outbox.actors().flatMap((actor) => this.outbox.byActor(actor).map((e) => e.activity));
+      if (!subjectPreconditionResolves(options.governanceSubject, pool, digestOf)) {
+        throw new GovernanceRefused(
+          `round ${options.round} names afp:governanceSubject ${options.governanceSubject}, which has neither a ` +
+            `conviction nor a dispute on record — refused under this hub's proof-or-dispute-on-record policy (ADR-0033 Decision 4)`,
+        );
+      }
+    }
+
     const voters = [...(options.voters ?? this.members())].filter(
       (agent) => this.isLive(agent) && this.roleOf(agent) === "member" && !recused.has(agent),
     );
@@ -1740,6 +1764,25 @@ export class Hub {
       supersedesRound = stalledRow.proposalHash;
     }
 
+    // ADR-0033 Decision 4's electorate floor: can the pinned electorate, after
+    // *recusal*, satisfy the pinned quorum rule at all? Gated on `recused`
+    // being non-empty — a round whose bar was simply unattainable from the
+    // start (nobody excluded, the quorum rule itself demands more than the
+    // whole membership could ever supply) is untouched: that is ADR-0018's
+    // ordinary `quorum-impossible`/`threshold-not-met` territory, resolved at
+    // close (or by `demandClose`), the same as before this decision. Checked
+    // before anything is signed under `refuse` — the round is never opened.
+    // Under `no-decision:electorate-exhausted` the round opens as pinned
+    // (below) and is immediately closed with that reason, once the caller
+    // holds a proposal digest to recompute it from.
+    const exhausted = recused.size > 0 && electorateExhausted(voters, weights, options.quorumRule);
+    if (exhausted && this.governance.electorateFloor === "refuse") {
+      throw new GovernanceRefused(
+        `round ${options.round}'s electorate cannot satisfy its pinned quorum rule after exclusions — ` +
+          `refused under this hub's electorateFloor: "refuse" policy (ADR-0033 Decision 4)`,
+      );
+    }
+
     const quorumSnapshot = digestOf([...voters].sort());
     const proposalId = `${this.actorId}/proposals/${options.round}`;
 
@@ -1804,6 +1847,15 @@ export class Hub {
       );
     }
 
+    // ADR-0033 Decision 4: the round opens and closes in the same call under
+    // `no-decision:electorate-exhausted` — the DecisionRecord is recomputable
+    // from this proposal alone (the voters/weights it just pinned vs. the
+    // rule it just pinned), the same recomputation `demandClose`'s
+    // `quorum-impossible` path already relies on.
+    if (exhausted) {
+      this.finishClose(options.round, { forcedNoDecisionReason: "electorate-exhausted" });
+    }
+
     return entry;
   }
 
@@ -1850,7 +1902,7 @@ export class Hub {
   /** The shared close body behind `closeRound` and `demandClose`. */
   private finishClose(
     round: string,
-    options: { priorQuorumSnapshot?: string; forcedNoDecisionReason?: "quorum-impossible" },
+    options: { priorQuorumSnapshot?: string; forcedNoDecisionReason?: "quorum-impossible" | "electorate-exhausted" },
   ): OutboxEntry {
     if (this.status === "archived") throw new Error("hub is archived — terminal, read-only (afp:Archive)");
     const row = loadRound(this.db, round);
@@ -1867,7 +1919,7 @@ export class Hub {
     let outcome = Object.entries(tally).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "abstain";
     const countedVotes = votes.map((vote) => vote.digest);
 
-    let noDecisionReason: "expired" | "threshold-not-met" | "quorum-impossible" | undefined;
+    let noDecisionReason: "expired" | "threshold-not-met" | "quorum-impossible" | "electorate-exhausted" | undefined;
     if (options.forcedNoDecisionReason) {
       // ADR-0020 Decision 4: `demandClose` already recomputed `doomed` before
       // calling this — trusted here, not re-derived, so the check lives in

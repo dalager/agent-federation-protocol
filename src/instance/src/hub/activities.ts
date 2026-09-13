@@ -402,7 +402,7 @@ export interface DecisionRecordSpec {
    * `"threshold-not-met"`. Emitted only when supplied, so a pre-ADR-0018
    * record is byte-identical.
    */
-  noDecisionReason?: "expired" | "threshold-not-met" | "quorum-impossible";
+  noDecisionReason?: "expired" | "threshold-not-met" | "quorum-impossible" | "electorate-exhausted";
 }
 
 /** ADR-0018 W1: the reserved `afp:outcome` value a pinned quorum rule can produce. */

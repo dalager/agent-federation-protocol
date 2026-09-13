@@ -113,7 +113,11 @@ export function testHub(
   instance: AfpInstance,
   agentNames: readonly string[],
   hubId: string,
-  options: { seatPolicy?: "follow-required" | "enroll-implies-seat" } = {},
+  options: {
+    seatPolicy?: "follow-required" | "enroll-implies-seat";
+    /** ADR-0033 Decision 4: the hub-policy answers to ADR-0021's open questions. Absent means `DEFAULT_GOVERNANCE`. */
+    governance?: import("../src/ap/policy.ts").GovernanceSpec;
+  } = {},
 ) {
   const hubKeys = new Map<string, KeyPair>(
     agentNames.map((name) => [
@@ -142,6 +146,7 @@ export function testHub(
     fetchActor,
     now: () => instance.clock.now(),
     seatPolicy: options.seatPolicy,
+    governance: options.governance,
   });
   if (options.seatPolicy !== "enroll-implies-seat") {
     void hub.receive(instance.followHub(hub.actorId).activity);

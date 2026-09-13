@@ -138,6 +138,12 @@ export function exportBundle(
   members.push("instance.jsonld");
   writeJson(join(dir, "roster.jsonld"), instance.rosterDocument() as unknown as JsonValue);
   members.push("roster.jsonld");
+  // ADR-0033 Decision 2: the policy travels with the record it governs — a
+  // regulator asking "under what retention duty, what thread layout, which
+  // models" reads one file.
+  const policyDoc = instance.policyDocument();
+  writeJson(join(dir, "policy.jsonld"), policyDoc as unknown as JsonValue);
+  members.push("policy.jsonld");
 
   let activities = 0;
   const actorNames: string[] = [];
@@ -342,6 +348,36 @@ export function exportBundle(
     for (const entry of hub.keyHistory?.() ?? []) pushHistoryEntry(hub.actorId, entry);
   }
 
+  // ADR-0033 Decision 2: when the policy declares a retention duty or anchors
+  // and the caller passes none in `extras`, the manifest's take comes from
+  // the policy — "stated here at the source". When both exist they must
+  // agree, or this throws: a bundle that says two things about the same
+  // obligation is the two-story failure this repo refuses everywhere.
+  const policyRetentionDuty = instance.policy.retentionDuty;
+  if (extras?.retentionDuty && policyRetentionDuty) {
+    if (
+      extras.retentionDuty.horizon !== policyRetentionDuty.horizon ||
+      extras.retentionDuty.basis !== policyRetentionDuty.basis
+    ) {
+      throw new Error(
+        `export: afp:retentionDuty disagrees between extras (${JSON.stringify(extras.retentionDuty)}) and ` +
+          `the policy (${JSON.stringify(policyRetentionDuty)}) — a bundle must not say two things about its own retention duty`,
+      );
+    }
+  }
+  const resolvedRetentionDuty = extras?.retentionDuty ?? policyRetentionDuty;
+
+  const sortAnchors = (anchors: readonly Anchor[]): Anchor[] => [...anchors].sort((a, b) => a.actor.localeCompare(b.actor));
+  const policyAnchors = instance.policy.anchors;
+  if (extras?.anchors && extras.anchors.length > 0 && policyAnchors && policyAnchors.length > 0) {
+    if (JSON.stringify(sortAnchors(extras.anchors)) !== JSON.stringify(sortAnchors(policyAnchors))) {
+      throw new Error(
+        `export: afp:anchors disagrees between extras and the policy — a bundle must not say two things about its own anchors`,
+      );
+    }
+  }
+  const resolvedAnchors = extras?.anchors && extras.anchors.length > 0 ? extras.anchors : policyAnchors;
+
   const manifest: { [key: string]: JsonValue } = {
     "@context": AFP_CONTEXTS,
     format: "afp-export/1",
@@ -353,6 +389,8 @@ export function exportBundle(
     cryptosuite: "eddsa-jcs-2022",
     "afp:keyHistory": keyHistoryEntries,
     "afp:members": [...members].sort(),
+    // ADR-0033 Decision 2: the policy document this bundle was produced under.
+    "afp:policy": { id: String(policyDoc.id), "afp:digest": digestOf(policyDoc as unknown as JsonValue) },
     ...(scope
       ? {
           // The manifest declares which scope produced this bundle, so a
@@ -368,17 +406,17 @@ export function exportBundle(
           },
         }
       : {}),
-    ...(extras?.retentionDuty
+    ...(resolvedRetentionDuty
       ? {
           "afp:retentionDuty": {
-            "afp:horizon": extras.retentionDuty.horizon,
-            "afp:basis": extras.retentionDuty.basis,
+            "afp:horizon": resolvedRetentionDuty.horizon,
+            "afp:basis": resolvedRetentionDuty.basis,
           },
         }
       : {}),
-    ...(extras?.anchors && extras.anchors.length > 0
+    ...(resolvedAnchors && resolvedAnchors.length > 0
       ? {
-          "afp:anchors": extras.anchors.map((anchor) => ({
+          "afp:anchors": resolvedAnchors.map((anchor) => ({
             "afp:actor": anchor.actor,
             "afp:head": anchor.head,
             "afp:instant": anchor.instant,

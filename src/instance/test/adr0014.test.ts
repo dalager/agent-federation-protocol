@@ -310,6 +310,12 @@ describe("ADR-0014 Decisions 2-4: the mesh edge, the hub's head, and the two sil
     // checked — set explicitly here since this test's subject is the
     // chain-head/anchor invariant, not the seat-default flip.
     const t = await threeParty({ seatPolicy: "enroll-implies-seat" });
+    // ADR-0033 WP-3's seat-policy check reads the *declared* afp:policy, not
+    // this Hub instance's own constructor option — match them so this test's
+    // subject stays the chain-head/anchor invariant, not a policy/runtime
+    // mismatch the seat-policy check would otherwise (correctly) name.
+    (t.instance as unknown as { config: { policy: { seatPolicy?: string } } }).config.policy.seatPolicy =
+      "enroll-implies-seat";
     assert.equal(t.hub.chainHead(), null, "a hub that never emitted has no head — receiving is not emitting");
     // The head exists once the hub authors something of its own.
     const config = (t.instance as unknown as { config: { origin: string; exportDir: string } }).config;

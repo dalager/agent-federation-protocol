@@ -809,12 +809,21 @@ a hurried implementer should decide alone.
    satisfies the partition with an empty exclusion list. Kept here rather than deleted,
    per the standing rule that a question which quietly disappears teaches a later reader
    nothing.
-2. **Who may pin `afp:governanceSubject`?** Today any proposer can. Should a governance
+2. ~~**Who may pin `afp:governanceSubject`?** Today any proposer can. Should a governance
    round require the subject to already have a proof or a dispute on record, so that
-   "convene a round about you" is not itself a harassment primitive?
-3. **What happens when recusal empties the electorate**, or drops it below the point where
+   "convene a round about you" is not itself a harassment primitive?~~ **Resolved by
+   ADR-0033 Decision 4:** per deployment, from `afp:governance.afp:subjectPrecondition` on
+   the signed policy — `any-member` (today's behaviour, the default) or
+   `proof-or-dispute-on-record`, checked at `proposeRound` and recomputed at replay against
+   the same record.
+3. ~~**What happens when recusal empties the electorate**, or drops it below the point where
    the pinned quorum form is meaningful? A floor rule, a named `no-decision` reason, or
-   nothing?
+   nothing?~~ **Resolved by ADR-0033 Decision 4:** per deployment, from
+   `afp:governance.afp:electorateFloor` — `refuse` (the round never opens) or
+   `no-decision:electorate-exhausted` (it opens and immediately closes with that reason).
+   Gated on recusal specifically: a bar that was unreachable from the start, with nobody
+   recused, is still ADR-0018/ADR-0020's `quorum-impossible`/`threshold-not-met` — this
+   reason names shrinkage *by recusal*, not a bar that was never reachable.
 4. **Does V14 belong in ADR-0012 rather than here?** It is a key-history rule, and
    `keys.py` is ADR-0012's file. It is placed here because the hazard is only visible
    from the conviction side, but an implementer may reasonably conclude the check should

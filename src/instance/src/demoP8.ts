@@ -215,8 +215,14 @@ export async function runP8Demo(
   const transport: Transport = hubTransport(hub, instance.localTransport(), (t) => instance.nameOf(t) !== null);
 
   // ADR-0032 Decision 6: the hub's default seatPolicy is now
-  // "follow-required" — the instance Follows before it Enrolls.
+  // "follow-required" — the instance Follows before it Enrolls. Flushed on
+  // its own, before any Enroll is even published (see demoP2.ts's identical
+  // comment): otherwise the Accept{Follow}'s `published` — timestamped when
+  // the hub actually processes it, later in the same batched `run()` — can
+  // land after the Enrolls' own `published`, even though it preceded them in
+  // processing order.
   instance.followHub(hub.actorId);
+  await instance.run(transport);
 
   // Every seat in its role (ADR-0004, ADR-0019): the initiator may ask and
   // never bid; the actuator may act and never vote.

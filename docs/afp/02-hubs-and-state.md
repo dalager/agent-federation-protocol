@@ -109,6 +109,19 @@ denominator, because the snapshot moved rather than because a proof lowered a ba
 snapshot is pinned after that decision, and never re-tallies a closed round. Neither
 conviction nor forgiveness reaches backwards into a signed record.
 
+ADR-0021 left two questions about a governance round to the operator: who may pin
+`afp:governanceSubject` in the first place, and what happens when recusal leaves the round's
+electorate unable to reach any quorum. [ADR-0033](adr/0033-operator-obligations.md) Decision
+4 answers both per deployment, from the signed policy's `afp:governance` object —
+`afp:subjectPrecondition` (`any-member` or `proof-or-dispute-on-record`, checked by the hub
+at `proposeRound` and recomputed by the verifier against the same record) and
+`afp:electorateFloor` (`refuse`, which never opens the round, or
+`no-decision:electorate-exhausted`, which opens and immediately closes it with that reason).
+`electorate-exhausted` joins the closed set of `afp:noDecisionReason` values (03 § the
+grammar table) alongside `expired`, `threshold-not-met` and `quorum-impossible` — but names
+shrinkage specifically *by recusal*: a bar that was unreachable from the start, with nobody
+recused, stays ordinary `quorum-impossible`/`threshold-not-met` territory.
+
 ## Shared state as CRDTs
 
 Explicit state types with defined merge rules. In v3 **every store is keyed
