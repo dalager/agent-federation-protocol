@@ -13,6 +13,7 @@
     "serve": "node --experimental-sqlite src/cli.ts serve",
     "keys": "node --experimental-sqlite src/cli.ts keys",
     "gate": "node --experimental-sqlite --test \"test/*.test.ts\"",
+    "gate:demos": "node --experimental-sqlite --test test/demos.test.ts",
     "test": "npm run gate",
     "demo:offline": "AFP_BRAIN=stub node --experimental-sqlite src/cli.ts demo",
     "demo:p2": "node --experimental-sqlite src/cli.ts p2",

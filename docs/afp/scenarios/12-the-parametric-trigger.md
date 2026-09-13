@@ -426,3 +426,31 @@ contract's clause 7(c) — and the pool divides on the evidence rather than on t
 say-so. The equivocation and the disk failure stay scripted for the obvious reason: a
 model cannot be asked to defect, and the point is that the record does not need to know
 which is which.
+
+## Coverage as of 2026-09-13
+
+Per ADR-0030 Decision 1, this section classes each acceptance criterion by how it is
+covered rather than only whether its finding closed. This scenario is one of the ADR-0030
+"P6/P7 shakedown" pair written after the discipline matured: the strong majority of its
+fourteen criteria run as workload in `npm run demo:p6` (a real five-instance HTTP pool)
+with a gate over the resulting bundles, and the rest are gated mechanism checks the demo
+does not script.
+
+| Criterion | Class | Evidence |
+|---|---|---|
+| A member who tells two camps two stories is caught | workload demonstrated | `npm run demo:p6` · `test/adr0020.test.ts` G1 — scripted equivocator convicted |
+| The proof convinces a stranger, not just the victims | workload demonstrated | `npm run demo:p6` · `test/adr0020.test.ts` G14 — verifies from case file's keys |
+| Weight-zeroing needs no coordination round | workload demonstrated | `npm run demo:p6` · `test/adr0020.test.ts` G1 — zeroed on proof, no round |
+| Instance-level punishment is governed, not automatic | workload demonstrated | `npm run demo:p6` · `test/adr0021.test.ts` G9 — expulsion via ratified round |
+| The trigger round has a clock, a bar, a binding, a policy, an actuator | workload demonstrated | `npm run demo:p6` · `test/adr0020.test.ts` G1 — full pinned round, regression |
+| A round that cannot close says so honestly | workload demonstrated | `npm run demo:p6` · `test/adr0020.test.ts` G5 — demandClose on impossibility |
+| Losing your state is not the same as lying | workload demonstrated | `npm run demo:p6` · `test/adr0020.test.ts` G2 — backup-restore acquitted |
+| The sanction lands on the culprit, not merely the key | workload demonstrated | `npm run demo:p6` · `test/adr0021.test.ts` G11 — capture claim changes nothing |
+| A doomed round is distinguishable from a pending one | workload demonstrated | `npm run demo:p6` · `test/adr0020.test.ts` G5 — early close from arithmetic alone |
+| Concealing a known equivocation is detectable from the record | mechanism gated | `test/adr0020.test.ts` G9/G13 — concealment fails joint replay by name |
+| The right to open a round is as governed as the round | workload demonstrated | `npm run demo:p6` · `test/adr0020.test.ts` G7/G8 — successor recomputed, entitlement checked |
+| Five seats and four owners are different electorates | mechanism gated | `test/adr0005.test.ts` — declared merger folds two seats into one weight |
+| The accused does not vote on its own expulsion | workload demonstrated | `npm run demo:p6` · `test/adr0021.test.ts` G9 — subject recused from own sanction |
+| A proof of misbehaviour outlives the hub it was born in | mechanism gated | `test/adr0021.test.ts` G14 — Enroll citing genuine proof against the agent |
+
+**Counts:** 11 demonstrated · 3 gated · 0 narrowed · 0 not built.

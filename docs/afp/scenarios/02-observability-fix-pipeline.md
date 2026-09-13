@@ -6,12 +6,12 @@
 > incident. Provider-agnostic throughout — no tracker or repo-host product named, by
 > design. Verdict at the end.
 
-| **Support status** | **Supported — all findings closed** |
+| **Support status** | **Supported — 2 findings open (campaign 11, the re-walk)** |
 |---|---|
-| Findings raised | 3 |
+| Findings raised | 3 · closed + 2 · open |
 | Resolved by | spec v3.4 — the `correlationId`/`context` split and the port boundary ([03](../03-coordination.md)) |
-| See it run | `npm run demo:offline` |
-| Gated by | `gate.test.ts` |
+| See it run | `npm run demo:offline` · `npm run demo:p8` |
+| Gated by | `gate.test.ts`, `adr0028.test.ts`, `adr0029.test.ts` |
 
 **Read the walkthrough below as history.** It records what strained when this workload was
 first walked, and is deliberately left as written — that is what makes a scenario evidence
@@ -172,3 +172,54 @@ as ops report: all existing machinery.
    thread/incident id. No new vocabulary needed — but the spec must say it, because
    scenario 01 informally used `correlationId` per workstream while this scenario needed
    a thread id spanning seven tasks.
+
+## Coverage as of 2026-09-13
+
+This is ADR-0030 Decision 1's coverage section. ADR-0028's `demo:p8` runs this scenario's pipeline shape almost directly — webhook ingestion, sealed bidding for the specialist, pinned action policy, PR opened on a fake forge, reconciliation, crash/retry idempotence, and merge refused by contract — so five of eight criteria are workload-demonstrated; the risk-gate vote and the "only significant signals" filter are judgement the port/brain makes with no protocol check on it, and ContributionSummary is gated but not exercised by `p8`.
+
+| Criterion | Class | Evidence |
+|---|---|---|
+| Only significant signals become protocol traffic | edge not built | the aggregation/anomaly threshold lives in the signal agent's own adapter logic, with no AFP mechanism checking what counts as "significant" |
+| Provider-agnostic tracker/repo integration | workload demonstrated | `npm run demo:p8` · `test/adr0028.test.ts` G3 — actuation completes against the fake forge behind the port, adapter swappable |
+| Right specialist per fix, no static routing | workload demonstrated | `npm run demo:p8` · `test/adr0028.test.ts` G1/G8 — sealed bid, award, exported and replayed |
+| Risky changes gated by a recorded decision | narrowed | `test/adr0028.test.ts` demo:p8 pins an `afp:actionPolicy`, not a voted `DecisionRecord` risk gate for risky paths |
+| No unreviewed code lands | workload demonstrated | `npm run demo:p8` · `test/adr0028.test.ts` G6 — merge refused by contract, recorded, never reaches the forge |
+| External outcomes appear in the trail | workload demonstrated | `npm run demo:p8` · `test/adr0028.test.ts` G3/G4 — reconciliation Result, crash-then-retry stays idempotent |
+| Incident fully replayable end to end | workload demonstrated | `npm run demo:p8` · `test/adr0028.test.ts` G8/G9 — exported bundle replays clean, mutation fails by name |
+| Ongoing ops reporting without extra work | mechanism gated | `test/adr0022.test.ts` — ContributionSummary built and gated, not produced by `demo:p8` |
+
+**Counts:** 5 demonstrated · 1 gated · 1 narrowed · 1 not built.
+
+## Coverage as of 2026-09-13 (re-walk)
+
+ADR-0030 Decision 2's re-walk. `npm run demo:p8` still carries five of eight criteria
+end to end — its header runs this scenario's pipeline shape directly: `ports/webhook.ts`'s
+initiator for the anomaly/tracker step, sealed bidding for `analysis-backend`, the pinned
+action policy opening a pull request on the fake forge, and `repo-agent`'s reconciliation
+Result. Two things the re-walk surfaces that the first pass did not reach because it
+predates the port build. First: `instance.actuate` is a P1-level call that never consults
+the hub's role registry — `forge-out`'s `actuator` enrollment in `demoP8.ts` is the
+record's own account of who acted, not what admitted the act, exactly as ADR-0028's own
+build notes say; the risk-gate vote this scenario wanted (step 7, a 3-voter L0 round) would
+close through `test/hub.test.ts`'s machinery, but nothing ties the round's outcome to
+`instance.actuate`'s admission the way the pinned `afp:actionPolicy` does. Second: step 9's
+`@signal-agent mute checkout-latency 2h` assumed a timed, reversible mute — the built
+`pause` verb (`ports/command.ts`, ADR-0029 Decision 2) takes no duration and the grammar
+has no `resume`; `AfpInstance.resumeAgent` exists only for the operator's own program, not
+for a command a mention or a signed POST can reach, so the two-hour mute Christian sends in
+the walkthrough has nowhere to land as written.
+
+| Criterion | Class | Evidence |
+|---|---|---|
+| Only significant signals become protocol traffic | edge not built | the aggregation/anomaly threshold lives in the signal agent's own adapter logic (unchanged) |
+| Provider-agnostic tracker/repo integration | workload demonstrated | `npm run demo:p8` · `test/adr0028.test.ts` G3 (unchanged) |
+| Right specialist per fix, no static routing | workload demonstrated | `npm run demo:p8` · `test/adr0028.test.ts` G1/G8 (unchanged) |
+| Risky changes gated by a recorded decision | narrowed | `test/adr0028.test.ts` demo:p8 pins an `afp:actionPolicy`, not a voted `DecisionRecord`; and `instance.actuate` admits by policy alone, never by consulting the hub role that recorded who actuated (was: narrowed — sharper now) |
+| No unreviewed code lands | workload demonstrated | `npm run demo:p8` · `test/adr0028.test.ts` G6 (unchanged) |
+| External outcomes appear in the trail | workload demonstrated | `npm run demo:p8` · `test/adr0028.test.ts` G3/G4 (unchanged) |
+| Incident fully replayable end to end | workload demonstrated | `npm run demo:p8` · `test/adr0028.test.ts` G8/G9 (unchanged) |
+| Ongoing ops reporting without extra work | mechanism gated | `test/adr0022.test.ts` — ContributionSummary built and gated, not produced by `demo:p8` (unchanged) |
+
+**Findings raised:** 78, 79 ([ledger](README.md#campaign-11--open-the-re-walk-of-01-02-06-and-09-under-adr-002700280029)).
+
+**Counts:** 5 demonstrated · 1 gated · 1 narrowed · 1 not built.

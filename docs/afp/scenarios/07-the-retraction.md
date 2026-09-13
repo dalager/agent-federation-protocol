@@ -115,3 +115,22 @@ are new Results on the thread, and dressing them as supersession would make ever
 governance event. `afp:supersedes` is for the case where the *conclusion* was wrong and
 things were done about it: the answer flips, not merely improves. A deployment that
 cannot tell the difference should ask whether the original needed ratifying at all.
+
+## Coverage as of 2026-09-13
+
+This is ADR-0030 Decision 1's coverage section. Scenario 07 has no standalone demo — it is
+a deliberately narrow mechanism scenario, and the README's support index says its gate
+exercises the real supersession machinery rather than a walked workload — so every row is
+mechanism gated, all against one replay-and-mutate gate that exercises the three edges
+this scenario asked for in a single flow.
+
+| Criterion | Class | Evidence |
+|---|---|---|
+| The revision names exactly what it withdraws | mechanism gated | `test/adr0007.test.ts` "the retraction passes clean; each mutation fails its named check" — `afp:supersedes` distinct from `afp:supersededInputs` |
+| A quorum's answer is not un-decided by one signature | mechanism gated | `test/adr0007.test.ts` "the retraction passes clean; each mutation fails its named check" — ratification-parity mutation named `supersession: … ratified, as the answer it retracts was` |
+| Actions on a withdrawn justification are visibly dealt with | mechanism gated | `test/adr0007.test.ts` "the retraction passes clean; each mutation fails its named check" — `afp:disposes` + `afp:actsOn` on the correction notice |
+| The advisory itself was admissible, both times | mechanism gated | `test/adr0007.test.ts` "the retraction passes clean; each mutation fails its named check" — `afp:actionPolicy` admits `publish-advisory` and `publish-warning` |
+| The correction did not post twice | mechanism gated | `test/adr0007.test.ts` "the retraction passes clean; each mutation fails its named check" — idempotency key on the external write |
+| The superseded answer stays in the record | mechanism gated | `test/adr0007.test.ts` "the retraction passes clean; each mutation fails its named check" — append-only outbox, supersession as an edge |
+
+**Counts:** 0 demonstrated · 6 gated · 0 narrowed · 0 not built.

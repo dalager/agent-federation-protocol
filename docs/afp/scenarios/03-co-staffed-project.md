@@ -190,3 +190,29 @@ exactly as designed.
 - **Hub lifecycle** (scenario 01, finding 2): contract end forces the question the spec
   doesn't answer — what formally freezes `proj-nordbook`, and what is the canonical
   archive both firms can rely on?
+
+## Coverage as of 2026-09-13
+
+This is ADR-0030 Decision 1's coverage section: it classifies each acceptance criterion
+above against what actually runs, distinct from what the findings ledger marks closed.
+`demo:p2` runs a single-instance, thirty-voter L0 round — it enrolls one flat set of
+agents and closes a weighted-quorum round with a `DecisionRecord`, but it never
+constructs the two firms/two-operator structure scenario 03's criteria are about, so no
+row here reaches workload demonstrated. Federation, quorum weighting and misbehavior are
+instead exercised end to end by the per-operator unit gates, and the joint-work
+convention is narrower than the ping-pong pattern the walkthrough describes.
+
+| Criterion | Class | Evidence |
+|---|---|---|
+| Trust bounded by the commercial contract | mechanism gated | `test/adr0005.test.ts` "a declared merger folds two seats into one operator's weight" — FederationAgreement scope, expiry |
+| Neither firm can dominate shared governance | mechanism gated | `test/hub.test.ts` "enrolls agents, tallies a round" — weighted quorum round closes; `demo:p2` runs the round over one flat instance, not two firms, so the cross-firm dominance claim itself is not run |
+| Responsibility split is explicit and auditable | mechanism gated | `test/hub.test.ts` "enforces roles: requester/observer never pinned or bidding" — capability-scoped enrollment |
+| One backlog, two firewalled firms | mechanism gated | `test/crdt.test.ts` — generic OR-Map/CRDT delta merge, application-defined store |
+| Shared knowledge base, attributable and immutable | mechanism gated | `test/crdt.test.ts` — same CRDT index machinery, no dedicated knowledge-repo demo |
+| Contested tasks allocated fairly between rivals | mechanism gated | `test/allocation.test.ts` "rejects tampered reveals, out-of-window commits, strangers" — commit-reveal, verifiable Award |
+| Joint work with exact attribution | narrowed | `test/adr0022.test.ts` "a co-authored Result with integer shares replays clean" — narrowed to: ordinary Offer/Result on one shared `context` carries the split, but no dedicated ping-pong or joint-assignee primitive |
+| Cross-firm decisions accountable | mechanism gated | `test/adr0005.test.ts` "one agent weighs as much as three, when the three share an operator" — L1 round + DecisionRecord |
+| Contribution == billing evidence | mechanism gated | `test/adr0022.test.ts` "a summary over a hub-observed period replays clean" — ContributionSummary + dispute flow |
+| Misbehavior handled without ending the partnership | mechanism gated | `test/adr0021.test.ts` "an equivocator recused with its own proof as cause replays clean" — automatic weight-zeroing, governed recusal |
+
+**Counts:** 0 demonstrated · 9 gated · 1 narrowed · 0 not built.

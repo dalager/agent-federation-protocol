@@ -8,12 +8,12 @@
 > scenario where the swarm changes the outside world on the strength of a conclusion it
 > reached itself. Runs on the P1–P3 stack plus ADR-0004/0005. Verdict at the end.
 
-| **Support status** | **Supported — all findings closed** |
+| **Support status** | **Supported — 2 findings open (campaign 11, the re-walk)** |
 |---|---|
-| Findings raised | 6 |
+| Findings raised | 6 · closed + 2 · open |
 | Resolved by | [ADR-0006](../adr/0006-checkable-actuation.md), [ADR-0007](../adr/0007-supersession.md), spec v3.13–v3.14 |
-| See it run | no standalone demo — covered by the gate(s) below ([why](README.md#is-this-workload-supported)) |
-| Gated by | `adr0006.test.ts`, `adr0007.test.ts` |
+| See it run | `npm run demo:p8` |
+| Gated by | `adr0006.test.ts`, `adr0007.test.ts`, `adr0028.test.ts`, `adr0029.test.ts` |
 
 **Read the walkthrough below as history.** It records what strained when this workload was
 first walked, and is deliberately left as written — that is what makes a scenario evidence
@@ -245,3 +245,65 @@ ask in six months why this PR landed. A sensible deployment triages the triage �
 path for the obvious, this loop for issues whose category is genuinely in question — and
 the hub policy's real job, as in scenario 05, is knowing which one an issue is. Running
 every reported typo through a coalition is how a good mechanism acquires a bad reputation.
+
+## Coverage as of 2026-09-13
+
+This is ADR-0030 Decision 1's coverage section. `demo:p8`'s triage loop closes most of the findings this scenario raised — dedupe, port-summarized untrusted text, pinned action policy, idempotent crash retry, and full replay are now workload-demonstrated — but the panel `p8` runs is a single-capability sealed bid rather than three independent coverage domains, the reviewer/author separation has no generalized mechanism (finding 23 is still open; `p8` sidesteps it by never merging at all), and the literal `afp:err:insufficient-information` terminal class is not built, only its `afp:no-verdict` cousin.
+
+| Criterion | Class | Evidence |
+|---|---|---|
+| A duplicate webhook does not open two investigations | workload demonstrated | `npm run demo:p8` · `test/demos.test.ts` (bundle replays) · `test/adr0028.test.ts` G1 — second delivery dropped at dedupe |
+| Reporter-authored text never becomes an instruction | workload demonstrated | `npm run demo:p8` · `test/demos.test.ts` (bundle replays) · `test/adr0028.test.ts` G2 — payload enters as an artifact, Task content is the port's summary |
+| Three perspectives, independently formed | narrowed | `test/adr0028.test.ts` G1 — sealed bid/award over one triage capability, not three coverage domains |
+| A minority objection survives to the decision-maker | mechanism gated | `test/allocation.test.ts` — dissent is a first-class Synthesis field; `demo:p8` pins an empty dissent list, unexercised |
+| The action taken follows from the classification | workload demonstrated | `npm run demo:p8` · `test/demos.test.ts` (bundle replays) · `test/adr0027.test.ts` G6 — pinned policy, not brain-named text, determines the action |
+| A crash mid-write does not open two pull requests | workload demonstrated | `npm run demo:p8` · `test/demos.test.ts` (bundle replays) · `test/adr0028.test.ts` G4 — retry over a fresh instance holds exactly one object |
+| An unanswerable ask reaches a terminal outcome | narrowed | `test/adr0010.test.ts` "a partial panel closes afp:no-verdict" — generalized non-answer terminal, not the literal insufficient-information class |
+| The author of a fix does not review it | edge not built | no code generalizes estimator exclusion to reviewers; `demo:p8` substitutes contractual merge-refusal for reviewer separation |
+| A revised answer supersedes the original, visibly | mechanism gated | `test/adr0007.test.ts` "the retraction passes clean; each mutation fails its named check" |
+| Triage accuracy improves on evidence | mechanism gated | `test/adr0004.test.ts` — requester-reported actuals into Settlement |
+| Being right does not buy governance power | mechanism gated | `test/adr0005.test.ts` — vote weight independent of reputation |
+| "Why did this PR land?" answerable months later | workload demonstrated | `npm run demo:p8` · `test/demos.test.ts` (bundle replays) · `test/adr0028.test.ts` G8/G9 — export replays clean, mutation fails by name |
+
+**Counts:** 5 demonstrated · 4 gated · 2 narrowed · 1 not built.
+
+## Coverage as of 2026-09-13 (re-walk)
+
+ADR-0030 Decision 2's re-walk, against `demo:p8` — the demo whose header names this
+scenario by name. Beat 1's untrusted-content duty holds exactly as built: the tracker
+payload enters `webhookInitiator`'s port as `ports/webhook.ts` describes, and the Task
+`content` the triagers see is the port's own summary sentence, never the reporter's prose
+(`test/adr0028.test.ts` G2). But that summary is free text in the port's own words with no
+declared schema for what a tracker payload "means" — two webhook adapters watching two
+different trackers could describe the same anomaly in incompatible shapes, and nothing
+checks that a summary is even about the fields it claims to summarize. Beat 4's action
+policy and beat 5's idempotent PR-open are unchanged and workload-demonstrated. Beat 9's
+branch — the one nobody enjoys — is still not the literal `afp:err:insufficient-information`
+terminal; `p8`'s policy only ever reaches `fix`, `wontfix`, or `afp:no-verdict`, so that row
+stays narrowed exactly as the first walk found. The re-walk's one new strain is in beat 6:
+`test/adr0029.test.ts` G3(b) shows a paused agent offered a task emits a `Reject` with the
+brain never invoked — and that `Reject` is, on the record, indistinguishable from
+`analyst-code` genuinely declining the same task on its own judgement. A replay asking
+"did this triager look at the report and decline, or was its operator not letting it work
+today" cannot tell the two apart, which is exactly the ambiguity finding 14 (campaign 2)
+closed for silence on an announce, now reopened one layer up for a different kind of
+non-participation.
+
+| Criterion | Class | Evidence |
+|---|---|---|
+| A duplicate webhook does not open two investigations | workload demonstrated | `npm run demo:p8` · `test/adr0028.test.ts` G1 (unchanged) |
+| Reporter-authored text never becomes an instruction | narrowed | `test/adr0028.test.ts` G2 — narrowed to: the port's summary is a free-text precis with no schema for what a tracker payload "means" (was: workload demonstrated) |
+| Three perspectives, independently formed | narrowed | `test/adr0028.test.ts` G1 — sealed bid/award over one triage capability, not three coverage domains (unchanged) |
+| A minority objection survives to the decision-maker | mechanism gated | `test/allocation.test.ts` — dissent is a first-class Synthesis field; `demo:p8` pins an empty dissent list, unexercised (unchanged) |
+| The action taken follows from the classification | workload demonstrated | `npm run demo:p8` · `test/adr0027.test.ts` G6 (unchanged) |
+| A crash mid-write does not open two pull requests | workload demonstrated | `npm run demo:p8` · `test/adr0028.test.ts` G4 (unchanged) |
+| An unanswerable ask reaches a terminal outcome | narrowed | `test/adr0010.test.ts` "a partial panel closes afp:no-verdict" — generalized non-answer terminal, not the literal insufficient-information class (unchanged) |
+| The author of a fix does not review it | edge not built | no code generalizes estimator exclusion to reviewers (unchanged) |
+| A revised answer supersedes the original, visibly | mechanism gated | `test/adr0007.test.ts` "the retraction passes clean; each mutation fails its named check" (unchanged) |
+| Triage accuracy improves on evidence | mechanism gated | `test/adr0004.test.ts` — requester-reported actuals into Settlement (unchanged) |
+| Being right does not buy governance power | mechanism gated | `test/adr0005.test.ts` — vote weight independent of reputation (unchanged) |
+| "Why did this PR land?" answerable months later | workload demonstrated | `npm run demo:p8` · `test/adr0028.test.ts` G8/G9 (unchanged) |
+
+**Findings raised:** 80, 81 ([ledger](README.md#campaign-11--open-the-re-walk-of-01-02-06-and-09-under-adr-002700280029)).
+
+**Counts:** 4 demonstrated · 4 gated · 3 narrowed · 1 not built.

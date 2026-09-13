@@ -232,3 +232,25 @@ right for a client quote.
 **Minor precision:** `afp:Bid.estimatedCost` means *what performing this task costs me* —
 which in an estimation task collides conceptually with the cost figure being asked about.
 The two must not be confused; worth a note in the vocabulary.
+
+## Coverage as of 2026-09-13
+
+This is ADR-0030 Decision 1's coverage section. Scenario 04 is one of the review's
+close-behind scenarios: `demo:p3` runs almost the entire walkthrough end to end — coverage
+award, decline, the estimator wall, dissent, ratification and settlement — so most rows
+are workload demonstrated rather than only mechanism gated.
+
+| Criterion | Class | Evidence |
+|---|---|---|
+| A question can be pushed to a hub like any task | workload demonstrated | `npm run demo:p3` · `test/demos.test.ts` (bundle replays) · `test/allocation.test.ts` "the panel covers every announced domain, and a gap fails at build time" — Announce over the estimation panel |
+| Agents decide among themselves who answers | workload demonstrated | `npm run demo:p3` · `test/demos.test.ts` (bundle replays) · `test/allocation.test.ts` "coverage picks the minimal covering set and names the broadest awardee synthesizer" |
+| One answerer or several, depending on the question | workload demonstrated | `npm run demo:p3` · `test/demos.test.ts` (bundle replays) · `test/allocation.test.ts` "coverage picks the minimal covering set and names the broadest awardee synthesizer" — arity 4 emergent |
+| Non-answerers are on the record as having declined | workload demonstrated | `npm run demo:p3` · `test/demos.test.ts` (bundle replays) · `test/allocation.test.ts` "the demo export passes the independent verifier, and targeted mutations fail it" — declines recorded, not inferred |
+| Divergent partial answers get reconciled openly | mechanism gated | `test/hub.test.ts` "enrolls agents, tallies a round, and rejects an out-of-snapshot vote" — shared-`context` threading, no dedicated ping-pong reconciliation demo step |
+| One agreed answer reaches the hub | workload demonstrated | `npm run demo:p3` · `test/demos.test.ts` (bundle replays) · `test/allocation.test.ts` "the demo export passes the independent verifier, and targeted mutations fail it" — Synthesis + closing Result |
+| Uncertainty and dissent survive to the human | workload demonstrated | `npm run demo:p3` · `test/demos.test.ts` (bundle replays) · `test/allocation.test.ts` "credits vindicated dissent with full accuracy" — dissent as a first-class Synthesis field |
+| The synthesizer's discretion is checked | workload demonstrated | `npm run demo:p3` · `test/demos.test.ts` (bundle replays) · `test/allocation.test.ts` "the demo export passes the independent verifier, and targeted mutations fail it" — L0 ratification, DecisionRecord |
+| Answer confidentiality respected | mechanism gated | `test/hub.test.ts` "enforces roles: requester/observer never pinned or bidding; requester announces and settles" — `afp:visibility` scoping, not scenario-specific |
+| Estimators are eventually scored on accuracy | workload demonstrated | `npm run demo:p3` · `test/demos.test.ts` (bundle replays) · `test/allocation.test.ts` "gives a neutral prior of exactly 50 to a bidder with no history" — `afp:Settlement` against actuals |
+
+**Counts:** 8 demonstrated · 2 gated · 0 narrowed · 0 not built.

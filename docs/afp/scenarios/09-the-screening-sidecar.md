@@ -12,12 +12,12 @@
 > raised the count to twelve — the corrections are folded into the beats they touch.
 > Verdict at the end.
 
-| **Support status** | **Supported — all findings closed** |
+| **Support status** | **Supported — 2 findings open (campaign 11, the re-walk)** |
 |---|---|
-| Findings raised | 12 · finding 32's remainder closed last, 2026-08-22 ([06 — per-subject disclosure](../06-deployment-profiles.md#designing-for-per-subject-disclosure)) |
+| Findings raised | 12 · closed + 2 · open — finding 32's remainder closed last, 2026-08-22 ([06 — per-subject disclosure](../06-deployment-profiles.md#designing-for-per-subject-disclosure)) |
 | Resolved by | [ADR-0010](../adr/0010-pinning-without-an-auction.md), [ADR-0011](../adr/0011-supersession-meets-the-irreversible-world.md), [ADR-0012](../adr/0012-the-long-horizon.md), spec v3.22 and v3.28 |
 | See it run | no standalone demo — covered by the gate(s) below ([why](README.md#is-this-workload-supported)) |
-| Gated by | `adr0010.test.ts`, `adr0010-parity.test.ts`, `adr0011.test.ts`, `adr0012.test.ts` |
+| Gated by | `adr0010.test.ts`, `adr0010-parity.test.ts`, `adr0011.test.ts`, `adr0012.test.ts`, `adr0027.test.ts`, `adr0028.test.ts`, `adr0029.test.ts` |
 
 **Read the walkthrough below as history.** It records what strained when this workload was
 first walked, and is deliberately left as written — that is what makes a scenario evidence
@@ -365,3 +365,58 @@ this one found twelve.
     only as a duplicate-execution control. Candidate: one paragraph in 04's replay
     procedure stating the guarantee's boundary, and the dedupe rule cross-referenced
     as what makes a non-deterministic brain's verdict single-valued.
+
+## Coverage as of 2026-09-13
+
+This is ADR-0030 Decision 1's coverage section. No demo runs this scenario's own AMQP/OIDC sidecar shape, so nothing here is workload-demonstrated; ADR-0010/11/12 gate the generic mechanisms this deployment leans on (the DecisionRecord actuation hop, dissent, scoped export), while the sidecar's specific actuation boundary and the pydantic-ai cross-language brain are outside what this repository builds or tests.
+
+| Criterion | Class | Evidence |
+|---|---|---|
+| Screening decisions documented per the EU AI Act, replayable by a third party | mechanism gated | `test/adr0012.test.ts` "a rotation strands nothing: bundles from before and after both verify" |
+| The caseworker system's access model is not widened | narrowed | `test/adr0028.test.ts` G3/G7 — generic port-agent sole-actuator pattern built; AMQP/OIDC sidecar specifics not implemented |
+| Every screener's eligibility and tenure on the panel is provable | mechanism gated | `test/hub.test.ts` — enrollment/membership persists and is replayable |
+| One application's trace can be produced without exposing others | mechanism gated | `test/adr0009.test.ts` "the joint replay passes; deletion, divergence and two-story agreements fail by name" |
+| Disagreement between screeners survives into the verdict | mechanism gated | `test/allocation.test.ts` — dissent as a first-class Synthesis field |
+| The state transition is bound to the verdict that justified it | mechanism gated | `test/adr0010.test.ts` "afp:actsOn follows the DecisionRecord hop once, and never twice" |
+| Applicant free text cannot steer the agents | mechanism gated | `test/adr0027.test.ts` G2 — instruction-shaped external text quarantined, outcome unchanged |
+| Developers keep their pydantic-ai stack | edge not built | no Python/pydantic-ai/FastAPI brain integration exists in this repository; only the brain port's language-agnostic contract is built |
+
+**Counts:** 0 demonstrated · 6 gated · 1 narrowed · 1 not built.
+
+## Coverage as of 2026-09-13 (re-walk)
+
+ADR-0030 Decision 2's re-walk. Still no demo runs this scenario's own AMQP/OIDC sidecar
+shape, so no row moves to workload-demonstrated, but the generic mechanisms it leans on are
+now built rather than merely gated in the abstract. The sole-actuator constraint from beat
+1 — "the sidecar remains the sole holder of the OIDC client" — maps exactly onto
+`ExternalActuator`, one enrolled actuator per external system (README's own "The sidecar
+shape" section names this the same idea `AFP_CONTROLLERS` is for a human controller): a
+configuration discipline the deployment must maintain, and, as that section says plainly,
+not a protocol term the wire format carries — so the record shows *that* an authorized
+actuator acted, never a check that only one such actuator was ever enrolled. Beat 2's
+quarantine holds precisely as built: `test/adr0027.test.ts` G2 is this scenario's own
+"applicant free text cannot steer the agents" criterion, word for word. Beat 4's
+`afp:producedBy` versioned identity is proven for exactly one path — G3's llm brain, which
+sends the framing block and gets a template digest on its record — while a stub brain (as
+every offline demo including `demo:p8` runs) carries no template digest at all, so the
+AI-Act "what was this claim produced by" answer is a contract the wired path satisfies, not
+a check every Result-producing brain is held to. Beat 8's audit trace now has a concrete
+serving surface — `GET /threads/:id/rendering` under an `afp:AuditGrant` (`test/adr0029.test.ts`
+G2) is exactly the rendering this scenario's compliance officer would read — but it inherits
+01's re-walk finding: the verdict string is read back from a stored file, not recomputed
+by the read path.
+
+| Criterion | Class | Evidence |
+|---|---|---|
+| Screening decisions documented per the EU AI Act, replayable by a third party | narrowed | `test/adr0029.test.ts` G2 — a rendering under `afp:AuditGrant` now exists as a serving surface, but its verdict is read back from `VERDICT.json`, not recomputed (was: mechanism gated) |
+| The caseworker system's access model is not widened | narrowed | `test/adr0028.test.ts` G3/G7 — the generic sole-actuator shape is built; nothing checks that only one actuator ever holds the caseworker's credential, a discipline README's "The sidecar shape" leaves to the deployment (was: narrowed — sharper now) |
+| Every screener's eligibility and tenure on the panel is provable | mechanism gated | `test/hub.test.ts` — enrollment/membership persists and is replayable (unchanged) |
+| One application's trace can be produced without exposing others | mechanism gated | `test/adr0009.test.ts` "the joint replay passes; deletion, divergence and two-story agreements fail by name" (unchanged) |
+| Disagreement between screeners survives into the verdict | mechanism gated | `test/allocation.test.ts` — dissent as a first-class Synthesis field (unchanged) |
+| The state transition is bound to the verdict that justified it | mechanism gated | `test/adr0010.test.ts` "afp:actsOn follows the DecisionRecord hop once, and never twice" (unchanged) |
+| Applicant free text cannot steer the agents | mechanism gated | `test/adr0027.test.ts` G2 — instruction-shaped external text quarantined, outcome unchanged; no demo runs this scenario's own sidecar workload, so the row stays mechanism-gated even though G2 is this scenario's exact shape (unchanged) |
+| Developers keep their pydantic-ai stack | edge not built | no Python/pydantic-ai/FastAPI brain integration exists in this repository (unchanged) |
+
+**Findings raised:** 82, 83 ([ledger](README.md#campaign-11--open-the-re-walk-of-01-02-06-and-09-under-adr-002700280029)).
+
+**Counts:** 0 demonstrated · 5 gated · 2 narrowed · 1 not built.

@@ -269,3 +269,34 @@ clears that bar; an engagement whose findings feed a compliance case, or a stand
 subcontracting relationship where settlements accumulate into standing (ADR-0004),
 does. The agreement's expiry date is the tell: if nobody would notice it lapsing, the
 boundary did not need a protocol.
+
+## Coverage as of 2026-09-13
+
+ADR-0030 Decision 1 gives every acceptance criterion a coverage class — workload
+demonstrated, mechanism gated, narrowed, or edge not built — distinct from the "closed"
+verdict a finding already carries. `src/instance/src/demoP4.ts` actually runs six of
+these eleven workloads on real localhost sockets — the scoped, expiring handshake,
+Mallory's refused probe, the authenticated cross-boundary delegation, authorized fetch of
+published actor documents, and the two-export replay with Beta's scoped, redacted export
+sitting next to Alpha's full one — so those six now clear "workload demonstrated" once
+`test/demos.test.ts` (WP-4, forthcoming) is counted as the gate that gives each such demo
+run an outcome assertion, alongside the existing `adrNNNN.test.ts` case over the same
+shape. The remaining five — the 404-not-403 non-party read, result sandboxing, the
+receiving operator's settlement, expiry stalling new work, and the Mastodon audit window
+— are not narrated or run anywhere in `demoP4.ts`'s body, so they stay mechanism gated.
+
+| Criterion | Class | Evidence |
+|---|---|---|
+| Recognition is explicit, scoped, and expires | workload demonstrated | `npm run demo:p4` · `test/demos.test.ts` (bundle replays) · `test/adr0008.test.ts` "handshake, probe, delegation, expiry — the whole P4a shape" — co-signed agreement carries expiry |
+| A validly-signed stranger is refused | workload demonstrated | `npm run demo:p4` · `test/demos.test.ts` (bundle replays) · `test/adr0008.test.ts` "handshake, probe, delegation, expiry — the whole P4a shape" — Mallory's Offer hard-rejected |
+| Non-parties cannot confirm a record exists | mechanism gated | `test/adr0008.test.ts` "handshake, probe, delegation, expiry — the whole P4a shape" — parties-scoped fetch returns 404 |
+| The hop is authenticated; payloads stay portably signed | workload demonstrated | `npm run demo:p4` · `test/demos.test.ts` (bundle replays) · `test/adr0008.test.ts` "handshake, probe, delegation, expiry — the whole P4a shape" — HTTP Signatures plus object proof |
+| Cross-boundary identity rests on published documents | workload demonstrated | `npm run demo:p4` · `test/demos.test.ts` (bundle replays) · `test/adr0008.test.ts` "handshake, probe, delegation, expiry — the whole P4a shape" — actor document fetched across the boundary |
+| A counterparty's Result is sandboxed and summarized before anything trusts it | mechanism gated | `test/adr0008.test.ts` "sandboxes what crosses, and summarizes rather than trusts" — ADR-0008 Decision 5 |
+| The subcontract settles on the receiving operator's actuals | mechanism gated | `test/hub.test.ts` `afp:Settlement` cases — same machinery ADR-0004 gates, run with roles reversed |
+| Expiry stalls new work, never in-flight work | mechanism gated | `test/adr0008.test.ts` "handshake, probe, delegation, expiry — the whole P4a shape" — terminal-outcome rule exercised |
+| The operator can watch without joining | mechanism gated | `test/adr0008b.test.ts` "refuses an unauthorized controller and returns the fixed polite reply" plus the `afp:AuditGrant` cases |
+| A third party can replay the whole engagement | workload demonstrated | `npm run demo:p4` · `test/demos.test.ts` (bundle replays) · `test/adr0009.test.ts` "the joint replay passes; deletion, divergence and two-story agreements fail by name" |
+| A scoped export is distinguishable from a tampered one | workload demonstrated | `npm run demo:p4` · `test/demos.test.ts` (bundle replays) · `test/adr0009.test.ts` "the joint replay passes; deletion, divergence and two-story agreements fail by name" — redaction stubs vs. silent deletion |
+
+**Counts:** 6 demonstrated · 5 gated · 0 narrowed · 0 not built.

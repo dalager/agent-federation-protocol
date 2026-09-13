@@ -377,3 +377,27 @@ What *can* be run is the evidence a summary would sum: `npm run demo:p3` produce
 Results and settlements over a real auction, and `npm run demo:p6` produces the
 acceptance and governance record around them, including the expulsion finding 72 asks
 about. Replaying either bundle shows the ledger; nothing yet shows the roll-up.
+
+## Coverage as of 2026-09-13
+
+Per ADR-0030 Decision 1, this section classes each acceptance criterion by how it is
+covered rather than only whether its finding closed. Scenario 13's own criteria table
+predates ADR-0022; against today's build the strong majority run as workload in
+`npm run demo:p7` (four instances, real sockets, one quarter of tickets) with
+`test/adr0022.test.ts` gating the resulting bundles, and the remainder are gated
+mechanism checks the non-`:llm` demo does not narrate as workload.
+
+| Criterion | Class | Evidence |
+|---|---|---|
+| The work itself is signed, chained and attributable | workload demonstrated | `npm run demo:p7` · `test/adr0022.test.ts` G2 — co-authored Results chain and verify |
+| A Result is evidence of acceptance, not just of claiming | workload demonstrated | `npm run demo:p7` · `test/adr0022.test.ts` G2 — awarded, accepted, credited |
+| No one's arithmetic has to be trusted | workload demonstrated | `npm run demo:p7` · `test/adr0022.test.ts` G18 — a second party's arithmetic checked, not the computer's identity |
+| Contested quality escalates to a governed decision | workload demonstrated | `npm run demo:p7` · `test/adr0022.test.ts` G25 — mechanical dispute with evidence replays clean |
+| Two members recompute the same period and agree | workload demonstrated | `npm run demo:p7` · `test/adr0022.test.ts` G10/G14 — hub-observed period, declared scope |
+| Co-authored work is credited to its authors | workload demonstrated | `npm run demo:p7` · `test/adr0022.test.ts` G2/G4 — integer-share split replays clean |
+| The period has an edge no one can move | workload demonstrated | `npm run demo:p7` · `test/adr0022.test.ts` G10/G17 — hub-observed chain, not self-asserted time |
+| The summary states what it summed | mechanism gated | `test/adr0022.test.ts` G11/G13 — frameless or mismatched hash fails by name |
+| A dispute ends | workload demonstrated | `npm run demo:p7` · `test/adr0022.test.ts` G22/G24 — ratification resolves two standing summaries |
+| A quarter can still be recomputed years later | mechanism gated | `test/adr0022.test.ts` G9 — a retired-vocabulary bundle is read and the fact is named |
+
+**Counts:** 8 demonstrated · 2 gated · 0 narrowed · 0 not built.

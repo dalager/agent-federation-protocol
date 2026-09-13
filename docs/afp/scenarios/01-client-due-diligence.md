@@ -4,12 +4,12 @@
 > deadlines, rationale externalization, L0 weighted voting, `afp:DecisionRecord`,
 > Mastodon human-in-the-loop, audit replay. Verdict at the end.
 
-| **Support status** | **Supported — all findings closed** |
+| **Support status** | **Supported — 3 findings open (campaign 11, the re-walk)** |
 |---|---|
-| Findings raised | 3 |
+| Findings raised | 3 · closed + 3 · open |
 | Resolved by | spec v3.4 — [07 Audience & visibility](../07-visibility-and-artifacts.md), [03 External systems](../03-coordination.md) |
 | See it run | `npm run demo:offline` |
-| Gated by | `gate.test.ts` |
+| Gated by | `gate.test.ts`, `adr0029.test.ts` |
 
 **Read the walkthrough below as history.** It records what strained when this workload was
 first walked, and is deliberately left as written — that is what makes a scenario evidence
@@ -151,3 +151,58 @@ unknown" correctly kept ceremony out of all six workstreams.
    convention (§16) should extend: Results whose evidence is fetched from external
    sources SHOULD attach source URL + content hash + fetch timestamp, so evidence
    provenance doesn't stop at "the agent said so."
+
+## Coverage as of 2026-09-13
+
+This is ADR-0030 Decision 1's coverage section. None of this scenario's criteria are demonstrated by a demo running this scenario's own six-agent, Mastodon-driven due-diligence workload — `demo:offline` runs P1's generic draft/critique loop, not this shape — so most rows are mechanisms the ADR-0027/28/29 port work now gates rather than the workload itself; one row (audit replay) is generic enough that the export/verify machinery counts as demonstrating it, and hub-per-case isolation is narrower than tested.
+
+| Criterion | Class | Evidence |
+|---|---|---|
+| Kickoff and approval by a human, from a normal client app | mechanism gated | `test/adr0029.test.ts` G3(c)/G3(e) — command mapping and approval built generically |
+| Every check has an owner, a deadline, and a recorded outcome | mechanism gated | `test/gate.test.ts` case 8 — per-task context/correlationId, not six owners |
+| Case isolation — one prospect's data never bleeds into another's state | narrowed | `test/hub.test.ts` enroll/tally test — hub keyed generically, no cross-case leakage test |
+| Recommendation is multi-agent, weighted, and attributable | mechanism gated | `test/hub.test.ts` "enrolls agents, tallies a round, and rejects an out-of-snapshot vote" |
+| Decision is a recorded artifact bound to its evidence | mechanism gated | `test/adr0010.test.ts` "afp:actsOn follows the DecisionRecord hop once, and never twice" |
+| Human approval is distinct from agent recommendation | mechanism gated | `test/adr0029.test.ts` G3(c) — approve recorded as a distinct act from the panel's verdict |
+| Full replay under audit, completeness checkable | workload demonstrated | `npm run demo:offline` · `test/gate.test.ts` it 10 — independent verifier passes export, fails four mutations |
+
+**Counts:** 1 demonstrated · 5 gated · 1 narrowed · 0 not built.
+
+## Coverage as of 2026-09-13 (re-walk)
+
+ADR-0030 Decision 2's re-walk, against the surfaces ADR-0027, ADR-0028 and ADR-0029 actually
+built. Christian's Mastodon mention still has nowhere to land: `ports/command.ts`'s
+three-form grammar (`status`, `pause`, `approve`) is everything a mention or a signed
+`POST /agents/:name/command` can do, and none of the three opens a case — kickoff would
+still have to be a bespoke webhook route in `ports/webhook.ts`'s style, not the human
+window this ADR trio built. The six-workstream fan-out and the L0 round are unchanged from
+the first walk — `test/hub.test.ts`'s enroll/tally shape covers them exactly as before. The
+recommendation vote closing into `Create{afp:DecisionRecord}` and Christian's `approve`
+now has a concrete path: `POST /agents/case-manager/command` with body
+`{"content": "@case-manager approve", "thread": "...", "actsOn": "<decision-record-digest>"}`,
+checked against `AFP_CONTROLLERS` and run through `approveThroughPort`
+(`test/adr0029.test.ts` G3(c)) — except the actuation this produces is authored by a
+generic port agent (`actuatorName`), with Christian recorded only as `by`/`externalRef` on
+the reconciliation, never as a rostered actor in his own right. And the two-years-later
+audit still replays exactly as the first walk found — export and the independent
+verifier, unchanged — with a second surface now sitting alongside it: `GET
+/threads/:id/rendering` under an `afp:AuditGrant` (`test/adr0029.test.ts` G2) serves a
+narrative naming the export bundle and a `verdict` string, but that string is read back
+from a `VERDICT.json` the runtime never computes (`render/rendering.ts`'s
+`bundleInfoFor`), so the rendering is honest only if a verifier run already happened in
+the same session and wrote the file the reader is trusting — a limit on the rendering,
+not on replay itself.
+
+| Criterion | Class | Evidence |
+|---|---|---|
+| Kickoff and approval by a human, from a normal client app | narrowed | `test/adr0029.test.ts` G3(c) — narrowed to: approval is built and gated; kickoff has no verb in the three-form command grammar, so a case-opening mention still has no counterpart on the human-window surface (was: mechanism gated) |
+| Every check has an owner, a deadline, and a recorded outcome | mechanism gated | `test/gate.test.ts` case 8 — per-task context/correlationId, not six owners (unchanged) |
+| Case isolation — one prospect's data never bleeds into another's state | narrowed | `test/hub.test.ts` enroll/tally test — hub keyed generically, no cross-case leakage test (unchanged) |
+| Recommendation is multi-agent, weighted, and attributable | mechanism gated | `test/hub.test.ts` "enrolls agents, tallies a round, and rejects an out-of-snapshot vote" (unchanged) |
+| Decision is a recorded artifact bound to its evidence | mechanism gated | `test/adr0010.test.ts` "afp:actsOn follows the DecisionRecord hop once, and never twice" (unchanged) |
+| Human approval is distinct from agent recommendation | narrowed | `test/adr0029.test.ts` G3(c) — narrowed to: approve is a distinct, recorded act, but its actor is a generic port agent with Christian carried only as `by`/`externalRef`, not his own rostered actor (was: mechanism gated) |
+| Full replay under audit, completeness checkable | workload demonstrated | `npm run demo:offline` · `test/demos.test.ts` (bundle replays) · `test/gate.test.ts` — export replays under the independent verifier; the rendering surface's read-back verdict is finding 77, not a narrowing of replay (unchanged) |
+
+**Findings raised:** 75, 76, 77 ([ledger](README.md#campaign-11--open-the-re-walk-of-01-02-06-and-09-under-adr-002700280029)).
+
+**Counts:** 1 demonstrated · 3 gated · 3 narrowed · 0 not built.

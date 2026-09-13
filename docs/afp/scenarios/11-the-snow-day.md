@@ -348,3 +348,30 @@ small local model does not always vote the way the evidence points, which is its
 argument for why the record carries the vote and not the reasoning. The tally, the
 `afp:uncounted` entry, the discarded observer vote, the two `403`s at the write door and the
 post-mortem delegation surviving the host's death are all printed from the run.
+
+## Coverage as of 2026-09-13
+
+ADR-0030 Decision 1 gives every acceptance criterion a coverage class — workload
+demonstrated, mechanism gated, narrowed, or edge not built — distinct from the "closed"
+verdict a finding already carries. `npm run demo:p5:llm` is the scenario's own running
+counterpart, but it is a `:llm` variant, so per Decision 1's rule it never earns "workload
+demonstrated" on its own — it stands as an additional, judgement-bearing check alongside
+the deterministic `adr0018`/`adr0019` gates that actually assert each mechanism.
+
+| Criterion | Class | Evidence |
+|---|---|---|
+| One recorded decision, not three recollections of a phone call | mechanism gated | `test/adr0018.test.ts` "G1 — an option that clears the pinned bar decides the round, and replays clean" — plus `npm run demo:p5:llm` as the judgement-bearing run |
+| A party with no vote cannot influence the outcome | mechanism gated | `test/adr0019.test.ts` "G7 — an actuator is never pinned into a quorum snapshot" |
+| Weight does not follow headcount | mechanism gated | `test/adr0014.test.ts` "a round tells declined from silent, and replay holds it to the arithmetic" — per-operator weighting, regression-checked at beat 8 |
+| Absence is distinguishable from refusal | mechanism gated | `test/adr0018.test.ts` "G5 — a vote arriving after the deadline is dropped, and the round expires" — late voter recorded `"silent"`, never `"declined"` |
+| Nobody has to take another school's word for the outcome | mechanism gated | `test/adr0018.test.ts` "G3 — a hub that declares a winner it did not earn fails replay (finding 51's check)" — tally recomputed from `afp:countedVotes` |
+| Unverifiable local claims are recorded as claims | narrowed | `test/adr0015.test.ts` "received copies must agree across receivers — the auditor's own check" — narrowed to: replay recomputes signatures, chains, digests and tallies, and deliberately never a Result's `content`, so it proves what was said and signed, never whether it was true |
+| The decision survives the host dying | mechanism gated | `test/adr0014.test.ts` "mesh work rejoins the hub through afp:priorThread — the edge that already existed" — regression check for beat 8's host death |
+| The decision is reached before the buses leave | mechanism gated | `test/adr0018.test.ts` "G5 — a vote arriving after the deadline is dropped, and the round expires" — finding 50's deadline, now pinned and enforced |
+| The outcome cleared a stated bar | mechanism gated | `test/adr0018.test.ts` "G3 — a hub that declares a winner it did not earn fails replay (finding 51's check)" |
+| Seating an extra agent does not weaken your school | narrowed | `test/adr0018.test.ts` "G2 — the snow day: the winning option below the bar is afp:no-decision, not a winner" — narrowed to: the bar is computed over every pinned seat, silent ones included, so a diluted vote is caught by a correspondingly higher bar rather than restored to the operator's full weight (finding 52) |
+| The consequence is recorded and governed | mechanism gated | `test/adr0019.test.ts` "G1 — an actuator carries out a decided round, under the policy the round pinned" plus "G3 — an action by an agent enrolled in no hub fails replay" and "G8 — a governance thread has no task-bearing activity, and that is not a redaction hole" |
+| Being right, as the outvoted minority, counts for something | mechanism gated | `test/adr0018.test.ts` "G9 — a settlement on the decision, crediting the dissenter the world proved right" and "G10 — standing cannot be handed to someone who voted with the majority" |
+| A party bound by a decision it opposed is visibly bound | mechanism gated | `test/adr0018.test.ts` "G7 — an outvoted member departs on the record, and the hub lists it" |
+
+**Counts:** 0 demonstrated · 11 gated · 2 narrowed · 0 not built.

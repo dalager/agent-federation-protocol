@@ -272,3 +272,36 @@ and 48 traces to the same unstated decision — *the hub is somebody's server*. 
 avoid the question because there was no hub. P5 cannot, and the choices it implies
 (hosting, proof of membership, degraded operation, whose state the case file carries) are
 one decision with four faces rather than four decisions.
+
+## Coverage as of 2026-09-13
+
+ADR-0030 Decision 1 gives every acceptance criterion a coverage class — workload
+demonstrated, mechanism gated, narrowed, or edge not built — distinct from the "closed"
+verdict a finding already carries. `src/instance/src/demoP5.ts` runs four of these ten
+workloads over real sockets — three operators enrolling and voting on one shared hub,
+per-operator (not per-agent) weighting at n=3, and the host-kill: the in-flight mesh
+delegation completing while a new write toward the dead hub fails to its caller — plus
+producing all three operators' exports as the joint-replay material. Those four clear
+"workload demonstrated" once `test/demos.test.ts` (WP-4, forthcoming) is counted as the
+gate over the demo's own run, alongside the existing `adrNNNN.test.ts` case. The other
+six stay mechanism gated honestly: `demoP5.ts` never fetches hash-addressed evidence
+across the boundary, never publishes an `internal`-visibility activity, never adds a
+member mid-round, never calls `Archive`/`Freeze`, and the membership proof it does present
+is offered against a *write* the hub refuses regardless — not the cross-boundary *read*
+finding 43 names — so "members can read the shared work" and "the case file contains what
+the operators worked from" are not narrated as demo beats either.
+
+| Criterion | Class | Evidence |
+|---|---|---|
+| Three operators coordinate on one record, not three ticket systems | workload demonstrated | `npm run demo:p5` · `test/demos.test.ts` (bundle replays) · `test/adr0016.test.ts` "T7: the transport gate" — cross-instance CRDT sync over real sockets |
+| No operator's account is merely its own word | workload demonstrated | `npm run demo:p5` · `test/demos.test.ts` (bundle replays) · `test/adr0015.test.ts` "received copies must agree across receivers — the auditor's own check" |
+| Each operator's evidence stays on its own infrastructure | mechanism gated | `test/adr0014-m6.test.ts` "scenario 10's mechanics hold over real HTTP" |
+| Customer-impact detail never crosses the boundary | mechanism gated | `test/adr0014.test.ts` — `withProof.admits` asserts `"afp:visibility": "internal"` stays refused even with a valid membership proof |
+| Vote weight does not follow headcount | workload demonstrated | `npm run demo:p5` · `test/demos.test.ts` (bundle replays) · `test/adr0014.test.ts` "a round tells declined from silent, and replay holds it to the arithmetic" — per-operator weighting exercised at n=3 |
+| A member that joins mid-decision cannot alter it | mechanism gated | `test/adr0014.test.ts` "a round tells declined from silent, and replay holds it to the arithmetic" — snapshot pinning at propose time |
+| The incident closes with a canonical, frozen state | mechanism gated | `test/adr0015.test.ts` "an archived hub's carried state recomputes to its canon — and the census shows its zeros" |
+| Members can read the shared work | mechanism gated | `test/adr0014.test.ts` "a valid proof admits — and its absence is exactly the old refusal" — `afp:MembershipProof`, finding 43 closed |
+| The timeline survives a partition | workload demonstrated | `npm run demo:p5` · `test/demos.test.ts` (bundle replays) · `test/adr0014-m6.test.ts` "scenario 10's mechanics hold over real HTTP" plus `test/adr0014.test.ts` "the hub's chain head anchors like any actor's — ADR-0012's rule, no new rule" |
+| The case file contains what the operators worked from | mechanism gated | `test/adr0015.test.ts` "an archived hub's carried state recomputes to its canon — and the census shows its zeros" |
+
+**Counts:** 4 demonstrated · 6 gated · 0 narrowed · 0 not built.

@@ -25,51 +25,72 @@ protocol does; that review tested whether the build order still matched it.
 | [11](11-the-snow-day.md) | The snow day: three parties, one decision, and a clock nobody controls | A hub that binds action rather than pooling information — an indivisible outcome, an externally imposed deadline, unverifiable local evidence held by the losing party, actuation by a party with no vote, and grading a decision the morning after. First scenario with a running counterpart (`npm run demo:p5:llm`) | 8 |
 | [12](12-the-parametric-trigger.md) | The parametric trigger: five reinsurers, one storm, and a signature that voted twice | The P6 shakedown — first workload at n≥4 (real Byzantine tolerance), a rational equivocator with pinned incentives, a captured-key claim, backup-restore as accidental equivocation, quorum arithmetic after weight-zeroing, view-change capture, a merger the snapshot cannot see, recusal, and proof portability | 8 |
 | [13](13-the-quarterly-split.md) | The quarterly split: four support desks, one retainer, and a number nobody can check twice | The P7 shakedown — the first object whose subject is a *set* of events rather than an event: independent recomputation against visibility classes, co-authored credit, a period edge on self-asserted clocks, work that did not hold, an expelled member's quarter, a dispute with no terminal, and a roll-up whose inputs are historical by definition | 9 |
+| [14](14-the-seat-migration.md) | The seat migration: an instance leaves a hub, and comes back | An instance's seat from `Follow` through `Undo{Follow}` and re-`Follow`, walked under both seat policies the built hub runs today — implicit (the shipped default) and explicit (ADR-0017 Decision 4's conformant target) | 6 |
+| [16](16-the-hostile-edge.md) | The hostile edge: five adversaries, and what none of them need a mechanism to do | The first scenario whose cast is the attacker — a stranger with no standing, a counterparty turned hostile, a poisoned attachment, a forged authority claim, and a flood — walked against the built transport, ingestion, port-agent and command surfaces together | 6 |
 | [· tuesday](the-operators-tuesday.md) | The operator's Tuesday | The built stack's ordinary day, every noun pointing at a file — commands, tables, outputs and warts of the solo profile as it runs today; the hard-focus baseline the P4 build will be measured against | — |
 
 ## Is this workload supported?
 
 Every scenario above was written to *break* something, and each one did. This table is the
 answer to the question the walkthroughs deliberately do not answer: **what holds today, and
-how can you see it.** All seventy-four findings raised across ten campaigns are
-closed — finding 32's remainder last among the first eight (2026-08-22), when building
-this index caught that campaign 6 had been recording it as resolved while its own prose
-said otherwise; campaign 9's last three on 2026-08-23 with
+how can you see it.** Of the ninety-five findings raised across eleven campaigns, the
+first seventy-four are closed — finding 32's remainder last among the first eight
+(2026-08-22), when building this index caught that campaign 6 had been recording it as
+resolved while its own prose said otherwise; campaign 9's last three on 2026-08-23 with
 [ADR-0021](../adr/0021-conviction-to-consequence.md)'s remaining decisions; and campaign 10
 ([scenario 13](13-the-quarterly-split.md), the P7 shakedown) the same day — nine findings
 walked before any P7 stack ADR existed, triaged into
 [ADR-0022](../adr/0022-the-summary-declares-its-frame.md) with one amendment into
-[ADR-0017](../adr/0017-standards-conformance.md), and built.
+[ADR-0017](../adr/0017-standards-conformance.md), and built. Campaign 11's twenty-one —
+the [ADR-0030](../adr/0030-scenario-re-walks-and-the-coverage-index.md) Decision 2 re-walk
+of 01, 02, 06 and 09 against ADR-0027/28/29 (nine), plus Decision 3's two new scenarios,
+[14](14-the-seat-migration.md) and [16](16-the-hostile-edge.md), opened the same day
+(twelve) — are open.
 
 A scenario's own text is never rewritten when its findings land — a scenario records what
 was true when it was walked, which is what makes it evidence. So read a walkthrough as
 history and read this table as status; where a scenario has a runnable demonstration, the
 demo shows the *resolved* world and the walkthrough shows what it cost to get there.
 
-| Scenario | Findings | Resolved by | See it run | Gated by |
-|---|---|---|---|---|
-| [01](01-client-due-diligence.md) | 3 · closed | spec v3.4 ([07](../07-visibility-and-artifacts.md), [03](../03-coordination.md)) | `npm run demo:offline` | `gate.test.ts` |
-| [02](02-observability-fix-pipeline.md) | 3 · closed | spec v3.4 | `npm run demo:offline` | `gate.test.ts` |
-| [03](03-co-staffed-project.md) | 4 + 2 · closed | spec v3.4, [ADR-0005](../adr/0005-operators-are-equal.md) | `npm run demo:p2` | `hub.test.ts`, `adr0005.test.ts` |
-| [04](04-federated-estimation.md) | 6 · closed | spec v3.5 ([03](../03-coordination.md), [04](../04-operations.md)) | `npm run demo:p3` · `demo:p3:llm` | `allocation.test.ts` |
-| [05](05-integration-practice.md) | 3 · closed | [ADR-0004](../adr/0004-solo-foundation-hardening.md) | — | `adr0004.test.ts` |
-| [06](06-issue-triage-loop.md) | 6 · closed | [ADR-0006](../adr/0006-checkable-actuation.md), [ADR-0007](../adr/0007-supersession.md), spec v3.13–v3.14 | — | `adr0006.test.ts`, `adr0007.test.ts` |
-| [07](07-the-retraction.md) | 0 · sharpened 24 | [ADR-0007](../adr/0007-supersession.md) | — | `adr0007.test.ts` |
-| [08](08-the-subcontract.md) | 7 · closed | [ADR-0008](../adr/0008-p4-federation-stack.md), [ADR-0009](../adr/0009-federated-replay.md) | `npm run demo:p4` | `adr0008.test.ts`, `adr0008b.test.ts`, `adr0009.test.ts` |
-| [09](09-the-screening-sidecar.md) | 12 · closed | [ADR-0010](../adr/0010-pinning-without-an-auction.md), [ADR-0011](../adr/0011-supersession-meets-the-irreversible-world.md), [ADR-0012](../adr/0012-the-long-horizon.md) | — | `adr0010.test.ts`, `adr0010-parity.test.ts`, `adr0011.test.ts`, `adr0012.test.ts` |
-| [10](10-the-incident-bridge.md) | 7 · closed | [ADR-0014](../adr/0014-p5-shared-hub-stack.md), [ADR-0015](../adr/0015-the-case-file-at-n-parties.md) | `npm run demo:p5` | `adr0014.test.ts`, `adr0014-m6.test.ts`, `adr0015.test.ts`, `adr0016.test.ts` |
-| [11](11-the-snow-day.md) | 8 · closed | [ADR-0018](../adr/0018-the-round-as-a-commitment.md), [ADR-0019](../adr/0019-acting-on-a-decision.md) | `npm run demo:p5:llm` | `adr0018.test.ts`, `adr0019.test.ts` |
-| [12](12-the-parametric-trigger.md) | 8 · closed | [ADR-0020](../adr/0020-p6-hardened-round-stack.md) (58, 60, 61, 62) · [ADR-0005 amendment](../adr/0005-operators-are-equal.md) (63) · [ADR-0021](../adr/0021-conviction-to-consequence.md) (59, 64, 65) | `npm run demo:p6` · `demo:p6:llm` | `adr0020.test.ts`, `adr0005.test.ts`, `adr0021.test.ts` |
-| [13](13-the-quarterly-split.md) | 9 · closed | [ADR-0022](../adr/0022-the-summary-declares-its-frame.md) (66-73) + its [ADR-0017](../adr/0017-standards-conformance.md) amendment (74) | `npm run demo:p7` · `demo:p7:llm` | `adr0022.test.ts` |
+| Scenario | Findings | Resolved by | See it run | Gated by | Coverage |
+|---|---|---|---|---|---|
+| [01](01-client-due-diligence.md) | 3 · closed + 3 · open | spec v3.4 ([07](../07-visibility-and-artifacts.md), [03](../03-coordination.md)) | `npm run demo:offline` | `gate.test.ts`, `adr0029.test.ts` | [1·3·3·0](01-client-due-diligence.md#coverage-as-of-2026-09-13-re-walk) |
+| [02](02-observability-fix-pipeline.md) | 3 · closed + 2 · open | spec v3.4 | `npm run demo:offline` · `npm run demo:p8` | `gate.test.ts`, `adr0028.test.ts`, `adr0029.test.ts` | [5·1·1·1](02-observability-fix-pipeline.md#coverage-as-of-2026-09-13-re-walk) |
+| [03](03-co-staffed-project.md) | 4 + 2 · closed | spec v3.4, [ADR-0005](../adr/0005-operators-are-equal.md) | `npm run demo:p2` | `hub.test.ts`, `adr0005.test.ts` | [0·9·1·0](03-co-staffed-project.md#coverage-as-of-2026-09-13) |
+| [04](04-federated-estimation.md) | 6 · closed | spec v3.5 ([03](../03-coordination.md), [04](../04-operations.md)) | `npm run demo:p3` · `demo:p3:llm` | `allocation.test.ts` | [8·2·0·0](04-federated-estimation.md#coverage-as-of-2026-09-13) |
+| [05](05-integration-practice.md) | 3 · closed | [ADR-0004](../adr/0004-solo-foundation-hardening.md) | — | `adr0004.test.ts` | [0·9·2·1](05-integration-practice.md#coverage-as-of-2026-09-13) |
+| [06](06-issue-triage-loop.md) | 6 · closed + 2 · open | [ADR-0006](../adr/0006-checkable-actuation.md), [ADR-0007](../adr/0007-supersession.md), spec v3.13–v3.14 | `npm run demo:p8` | `adr0006.test.ts`, `adr0007.test.ts`, `adr0028.test.ts`, `adr0029.test.ts` | [4·4·3·1](06-issue-triage-loop.md#coverage-as-of-2026-09-13-re-walk) |
+| [07](07-the-retraction.md) | 0 · sharpened 24 | [ADR-0007](../adr/0007-supersession.md) | — | `adr0007.test.ts` | [0·6·0·0](07-the-retraction.md#coverage-as-of-2026-09-13) |
+| [08](08-the-subcontract.md) | 7 · closed | [ADR-0008](../adr/0008-p4-federation-stack.md), [ADR-0009](../adr/0009-federated-replay.md) | `npm run demo:p4` | `adr0008.test.ts`, `adr0008b.test.ts`, `adr0009.test.ts` | [6·5·0·0](08-the-subcontract.md#coverage-as-of-2026-09-13) |
+| [09](09-the-screening-sidecar.md) | 12 · closed + 2 · open | [ADR-0010](../adr/0010-pinning-without-an-auction.md), [ADR-0011](../adr/0011-supersession-meets-the-irreversible-world.md), [ADR-0012](../adr/0012-the-long-horizon.md) | — | `adr0010.test.ts`, `adr0010-parity.test.ts`, `adr0011.test.ts`, `adr0012.test.ts`, `adr0027.test.ts`, `adr0028.test.ts`, `adr0029.test.ts` | [0·5·2·1](09-the-screening-sidecar.md#coverage-as-of-2026-09-13-re-walk) |
+| [10](10-the-incident-bridge.md) | 7 · closed | [ADR-0014](../adr/0014-p5-shared-hub-stack.md), [ADR-0015](../adr/0015-the-case-file-at-n-parties.md) | `npm run demo:p5` | `adr0014.test.ts`, `adr0014-m6.test.ts`, `adr0015.test.ts`, `adr0016.test.ts` | [4·6·0·0](10-the-incident-bridge.md#coverage-as-of-2026-09-13) |
+| [11](11-the-snow-day.md) | 8 · closed | [ADR-0018](../adr/0018-the-round-as-a-commitment.md), [ADR-0019](../adr/0019-acting-on-a-decision.md) | `npm run demo:p5:llm` | `adr0018.test.ts`, `adr0019.test.ts` | [0·11·2·0](11-the-snow-day.md#coverage-as-of-2026-09-13) |
+| [12](12-the-parametric-trigger.md) | 8 · closed | [ADR-0020](../adr/0020-p6-hardened-round-stack.md) (58, 60, 61, 62) · [ADR-0005 amendment](../adr/0005-operators-are-equal.md) (63) · [ADR-0021](../adr/0021-conviction-to-consequence.md) (59, 64, 65) | `npm run demo:p6` · `demo:p6:llm` | `adr0020.test.ts`, `adr0005.test.ts`, `adr0021.test.ts` | [11·3·0·0](12-the-parametric-trigger.md#coverage-as-of-2026-09-13) |
+| [13](13-the-quarterly-split.md) | 9 · closed | [ADR-0022](../adr/0022-the-summary-declares-its-frame.md) (66-73) + its [ADR-0017](../adr/0017-standards-conformance.md) amendment (74) | `npm run demo:p7` · `demo:p7:llm` | `adr0022.test.ts` | [8·2·0·0](13-the-quarterly-split.md#coverage-as-of-2026-09-13) |
+| [14](14-the-seat-migration.md) | 6 · open | — ([ADR-0032](../adr/0032-deployment-profile.md) Decision 6 resolves finding 87) | — | `adr0017-d4-follow.test.ts` | [0·7·1·1](14-the-seat-migration.md#coverage-as-of-2026-09-13) |
+| [16](16-the-hostile-edge.md) | 6 · open | — | — | `adr0025.test.ts`, `adr0027.test.ts`, `adr0028.test.ts`, `adr0029.test.ts`, `adr0013.test.ts` | [0·10·1·1](16-the-hostile-edge.md#coverage-as-of-2026-09-13) |
+
+**Coverage** is [ADR-0030](../adr/0030-scenario-re-walks-and-the-coverage-index.md) Decision
+1's answer to the axis this table used to lack: "closed" said a finding was resolved, not
+whether the resolution was a workload someone ran or a sentence assigning a duty. Each
+cell reads *demonstrated · gated · narrowed · not built* — a demo running the criterion's
+workload with a gate over its outcome; a gate over the mechanism alone; the mechanism built
+narrower than the scenario's own reading, with the row saying how; or the criterion living
+in an external system, a human step, or a brain's judgement with no counterpart in code —
+and links to the scenario's own dated section, one row per acceptance criterion, appended
+below its verdict and never folded back into the walkthrough itself.
 
 **Where the "See it run" column is empty**, the scenario's shape is covered by its gate
-files rather than by a demo. Three of the four are workloads that live inside another
-system — 05's internal service answering other teams, 06's bug tracker, 09's caseworker
-sidecar — where a standalone demo would have to simulate the host system before it could
-show anything; 07 is a mechanism test with no standalone workload of its own. The gates
-exercise the same machinery against real exports and the real verifier, so what is missing
-is the narrative walkthrough, not the coverage. A demo for any of them would be a genuine
-improvement, not a formality.
+files rather than by a demo. Two of the three are workloads that live inside another
+system — 05's internal service answering other teams, 09's caseworker sidecar — where a
+standalone demo would have to simulate the host system before it could show anything; 07
+is a mechanism test with no standalone workload of its own. `npm run demo:p8`
+([ADR-0028](../adr/0028-port-agents.md)) has since filled in 06's cell — its header runs
+02's pipeline and 06's triage loop together, offline and deterministic — so 06 no longer
+belongs in this group; 02 gains it alongside its existing `demo:offline`. The remaining
+gates exercise the same machinery against real exports and the real verifier, so for 05,
+07 and 09 what is missing is the narrative walkthrough, not the coverage. A demo for any
+of them would be a genuine improvement, not a formality.
 
 **The last one to close — finding 32.** ADR-0012 landed its sharp half in v3.20 (the
 bundle's declared content inventory, CRDT state stated to be outside it) and the other half
@@ -125,11 +146,12 @@ Six findings from scenario 04. Two are protocol additions, not conventions:
 
 Useful scenarios stress an axis the existing ones don't. Untested so far: three or more
 operators (real Byzantine tolerance, coalition dynamics at n≥4), long-lived hubs with heavy
-membership churn, sneakernet/airgapped federation, an adversarial operator beyond
-[scenario 08](08-the-subcontract.md)'s probing Mallory (replay, equivocation, a captured
-key), and a task whose answer must be revised after the fact — exercised by
-[scenario 07](07-the-retraction.md) and resolved in [ADR-0007](../adr/0007-supersession.md). Client/observer participation was
-exercised by scenario 05 — and strained into finding 2 (requester roles).
+membership churn, sneakernet/airgapped federation, and a task whose answer must be revised
+after the fact — exercised by [scenario 07](07-the-retraction.md) and resolved in
+[ADR-0007](../adr/0007-supersession.md). Client/observer participation was exercised by
+scenario 05 — and strained into finding 2 (requester roles). An adversarial operator beyond
+scenario 08's probing Mallory — replay, a forged authority claim, a flood — is now
+[scenario 16](16-the-hostile-edge.md).
 
 ### Campaign 3 → v3.9 (ADR-0004)
 
@@ -521,3 +543,100 @@ unimplementable rather than merely awkward.
 | 72 | *(**closed** — ADR-0022 Decision 4, built)* An expulsion's accounting scope is unstated: ADR-0021 forward-scoped conviction for *weight* and said nothing about contribution, so a summary spanning one either counts the expelled member's accepted work or erases it | State the parallel — accounting is forward-scoped too — and record the membership change inside the period |
 | 73 | *(**closed** — ADR-0022 Decision 5, built)* A dispute has no terminal: 04 resolves the mechanical case by republishing a corrected summary, producing two unranked summaries for one period with no supersession edge and no rule for which stands | Ratify a summary in an ADR-0018 round; corrections supersede under ADR-0007's grammar; everything else is a draft and says so |
 | 74 | *(**closed** — ADR-0022's ADR-0017 amendment, built)* A summary's inputs are historical by definition, and the vocabulary moves under them: the `afp:bidCommit` → `afp:BidCommit` rename (ADR-0017 D5) shipped with no read-side compatibility, so pre-rename bundles fail replay today, and fail *misleadingly* | Read-side aliases for renamed types (the draft-cavage precedent, ADR-0017 D2); a named failure for a retired spelling; a summary that pins the vocabulary it was computed under |
+
+### Campaign 11 → open (the re-walk of 01, 02, 06 and 09 under ADR-0027/0028/0029)
+
+**Opened 2026-09-13.** [ADR-0030](../adr/0030-scenario-re-walks-and-the-coverage-index.md)
+Decision 2's re-walk of the four early scenarios — 01, 02, 06 and 09 — against the surfaces
+ADR-0027, ADR-0028 and ADR-0029 actually built: the ingestion boundary, the port-agent
+shapes (webhook initiator, git-forge actuator, approval port), and the human window
+(rendering, command, the fediverse shadow). Unlike campaigns 8, 9 and 10, this campaign
+walked no new workload — it re-read four scenarios already marked closed against machinery
+that did not exist when they closed, which is a different kind of pressure than a fresh
+scenario applies. Nine findings.
+
+**The through-line: the port trio built the edge, and every early scenario's remaining
+strain is at the seam behind it.** ADR-0027 answered "what enters the record," ADR-0028
+answered "what acts on the world," and ADR-0029 answered "how a human watches, approves, and
+speaks" — three different questions about the boundary, each answered generically. What the
+re-walk found is not that any of the three got its own question wrong; it is that a
+scenario's *specific* shape at that boundary is narrower than the generic answer. Scenario
+01's Mastodon kickoff still has no verb in the three-form command grammar, because
+ADR-0029 Decision 2 scoped the grammar to control (`status`, `pause`, `approve`), not to
+initiation. Scenario 01 and 09's human/regulator both read a decision through
+`ApprovalPort`, and both find the same seam: the record shows an authorized controller
+decided, carried as `by`/`externalRef` on a generic actuator agent, never the human's own
+rostered actor — a deliberate simplification the human window never claimed otherwise, but
+one an auditor will ask about regardless. And twice — 02's risk gate and 06's paused
+triager — a decision the record makes checkable (an action policy, a Reject) turns out to
+be checkable *only* up to a point: `instance.actuate` does not consult the hub role that
+recorded who acted, and a paused agent's Reject is the same shape on the wire as a genuine
+decline. None of these are ADR-0027/28/29 defects — each ADR's own build notes already say
+plainly where its generic answer stops — the re-walk's contribution is naming where a
+*specific* scenario's promise sits past that stop.
+
+A second, smaller pattern: two findings are genuinely new mechanism gaps rather than
+narrower readings of an existing one. `pause` has no `resume` and no duration in the
+grammar (79), which 02's own walkthrough assumed when Christian sent `mute checkout-latency
+2h`; and `afp:producedBy`'s versioned-identity proof (82) exists for exactly the one wired
+llm path, not as a general contract every capability under a statutory duty could be held
+to.
+
+| # | Finding | Candidate |
+|---|---|---|
+| 75 | The command grammar has no kickoff verb — `ports/command.ts`'s three forms are `status`, `pause`, `approve`, none of which opens a case; scenario 01's Mastodon-mention kickoff has no counterpart on the human-window surface | Spec precision: state in ADR-0029 § Command that the grammar is deliberately control-only, and that initiation is a port/webhook concern (`ports/webhook.ts`'s own shape), not a command form |
+| 76 | An approval's actor on the record is a generic port agent (`actuatorName`); the approving human is carried only as `by`/`externalRef` on the reconciliation, never as their own rostered actor | Spec precision, ADR-0033's signed policy document: one sentence stating this is deliberate — the record shows that an authorized controller decided, not who the controller was as a protocol-level identity |
+| 77 | A rendering's `verdict` field is read back from a stored `VERDICT.json`, never recomputed by the read path itself — honest only if a verifier run already happened in the same session | Operational guidance: a rendering served to an auditor SHOULD be preceded by a fresh verifier run in the same session, named next to the ADR-0029 build note that already documents the read-back behavior |
+| 78 | `instance.actuate` never consults the hub's role registry; an actuator's hub enrollment is the record's own account of who acted, not what admitted the act | Accepted — not a protocol's to answer, per [ADR-0030 § Consequences](../adr/0030-scenario-re-walks-and-the-coverage-index.md#consequences) "Accepted": ADR-0028's own build notes already state this design choice plainly (a P1-level call, not hub-mediated) |
+| 79 | The `pause` verb has no `resume` and no duration; scenario 02's `@signal-agent mute checkout-latency 2h` assumes both and neither exists in the built grammar | Mechanism: a natural home in a future ADR amending ADR-0029 Decision 2 — a timed pause, or a `resume` command form reachable the way `pause` is |
+| 80 | A tracker webhook's port-generated summary is free text in the port's own words, with no declared schema for what a payload "means" — nothing checks that a summary is even about the fields it claims to summarize | Accepted — not a protocol's to answer, per ADR-0030 § Consequences "Accepted": 03's own stance is that a port's summary is informal by design, since third-party payload shapes vary without bound |
+| 81 | A paused agent's `Reject` (ADR-0029 G3(b)) is, on the record, indistinguishable from a genuine capability decline — replay cannot tell "paused by its operator" from "declined on its own judgement" | Mechanism: a reason field on `Reject` distinguishing an operator-imposed pause from a brain's own decline, echoing finding 14's "silence is not a record" for a different kind of non-participation |
+| 82 | `afp:producedBy`'s versioned-identity proof exists for exactly one wired path (ADR-0027 G3's llm brain); a stub brain carries no template digest at all, so the AI-Act "what produced this claim" answer is a contract one path satisfies, not a check every capability under a statutory duty is held to | Candidate for a future ADR (home: ADR-0033 operator obligations, or a new decision): a gate that fails a Result under a declared-regulated capability with no `producedBy` template digest |
+| 83 | The sole-actuator constraint scenario 09 depends on (one `ExternalActuator` holding the caseworker's OIDC credential) is an operational discipline the deployment must maintain; nothing in the record checks that only one enrolled actuator ever held it | Accepted — not a protocol's to answer, per ADR-0030 § Consequences "Accepted": README's own "The sidecar shape" section already states this is a configuration decision, not a wire term |
+
+**Triage.** 79 and 81 are genuine mechanism gaps with a natural ADR home — a future
+amendment to ADR-0029 (79, the grammar itself) and a small addition alongside it (81, a
+`Reject` reason). 75, 76 and 77 are spec-precision sentences: each names a place the built
+surface already behaves consistently and asks the relevant ADR (0029, 0033, 0029 again) to
+say so in prose rather than leave a reader to infer it. 82 is the one candidate that wants
+its own decision rather than a sentence, because "prove what produced this" is exactly the
+kind of duty a statutory deployment cannot leave to one wired path. 78, 80 and 83 are
+accepted as narrowed, each citing [ADR-0030 § Consequences](../adr/0030-scenario-re-walks-and-the-coverage-index.md#consequences)
+"Accepted" and each pointing at a build note or README section that already made the
+narrowing a deliberate choice rather than an oversight — the pattern ADR-0030 itself
+predicted: "some narrowed rows will stay narrowed after the re-walk."
+
+### Campaign 11, continued → the two new scenarios (ADR-0030 Decision 3)
+
+**Opened 2026-09-13 — the same day as the re-walk above, and the same campaign.**
+ADR-0030 Decision 3's two buildable new scenarios — [14](14-the-seat-migration.md) (the
+seat migration) and [16](16-the-hostile-edge.md) (the hostile edge) — walked alongside the
+re-walk rather than as a separate campaign, since both are pressure ADR-0027/28/29 and
+ADR-0017 Decision 4 created, exactly as the re-walk above is. Scenario 15 (the production
+Tuesday) is not here: it waits on ADR-0031 and ADR-0032 landing first, per Decision 3
+itself. Twelve findings, continuing the numbering from 84.
+
+| # | Finding | Candidate |
+|---|---|---|
+| 84 | Under the shipped default (`enroll-implies-seat`), an instance's departure from a hub is not a mechanism — no `Undo` of anything, so a lapsed retainer and a quiet quarter are the same shape on replay | Resolved in name by ADR-0032 Decision 6 (the default flip), not yet built |
+| 85 | `Undo{Follow}`'s mass-unenroll has no stated rule for an unenrolled agent's in-flight work | Mechanism: the terminal-outcome discipline finding 28 gave agreement expiry, applied to seat revocation |
+| 86 | A revived seat (`Follow` after `Undo{Follow}`, then re-`Follow`) carries no stated continuity claim — 02 says it revives "empty" but does not rule on it | Spec precision: state the empty-revival rule explicitly in 02 rather than leave it inferable from test names |
+| 87 | The conformant seat policy (`follow-required`) is not the shipped default | Resolved in name by ADR-0032 Decision 6, not yet built |
+| 88 | Follow/Undo churn is not itself logged as an admission event, only its downstream Enroll effects are | Mechanism: a seat-change log entry parallel to the existing Enroll admission log |
+| 89 | Seat loss mid-round and a pinned electorate | Narrowed — already answered by ADR-0018 Decision 5's pinned electorate; not exercised because no round was open |
+| 90 | A refused stranger's attempt (unsigned, unagreed, or an anonymous command) is not recorded as a security event | Spec precision: state ADR-0013 Decision 5's "refusals are not logged" reasoning at the scope it actually operates — every refusal, not only reads |
+| 91 | Quarantine and the pinned-action rule bound what a poisoned attachment can make an agent *do*, not what it can make an agent *argue for* in a signed Result the next reader will not itself quarantine | Mechanism: a provenance marker on a Result produced while reasoning over quarantined evidence |
+| 92 | The per-address rate limiter is proven per-address; resources shared beneath it (connections, file descriptors) are not proven to survive a flood from one address | Operational: a load-shaped test beneath the token bucket, or an explicit deferral to ADR-0032's production checklist |
+| 93 | Refusals across unrelated mechanisms are not correlated into a pattern | Accepted — not a protocol's to answer, an operational intrusion-detection concern |
+| 94 | "Refusals are not logged" is universal in practice; its stated reasoning (ADR-0013 Decision 5) is scoped to the read gate's confirmation-leakage risk alone | Spec precision: extend the rule's stated reasoning to every refusal, or log the refusals that carry no leakage risk |
+| 95 | A subtler key-substitution — a resolving key document granting capabilities the agreement never scoped — is 08's own scope-grammar strain (finding 25), not a new one | Narrowed — filed against finding 25, not duplicated |
+
+**Triage.** 84 and 87 are the same fact from two sides and share one resolution already
+named: ADR-0032 Decision 6. 85, 88, 90, 91 and 94 are mechanism or spec-precision
+candidates with no ADR home yet. 86 is spec precision only. 89 and 95 are accepted as
+narrowed, each pointing at the ADR that already answers the deeper question. 92 and 93 are
+operational concerns this campaign names but does not claim as the protocol's to answer.
+Not every observation from the hostile-edge walk is a finding: that the forged-authority
+checks it relies on hold under adversarial pressure, and that no new mechanism was needed
+anywhere in the walk, are the scenario's own verdict — a held result, not a strain — and
+are recorded there rather than numbered here.

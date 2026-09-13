@@ -63,6 +63,26 @@ export function runVerifier(script: string, dir: string, thread: string, extraAr
 }
 
 /**
+ * The multi-bundle form of `runVerifier` — one or more export dirs, no
+ * implicit `--thread` (each demo's own `verify it:` line decides whether one
+ * belongs in `extraArgs`). This is what a joint replay across several
+ * operators' bundles looks like on the CLI, and what `test/demos.test.ts`
+ * (ADR-0030 Decision 4) replicates for p4–p7.
+ */
+export function runVerifierMulti(script: string, dirs: string[], extraArgs: string[] = []) {
+  try {
+    const output = execFileSync("python3", [script, ...dirs, ...extraArgs], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    return { code: 0, output };
+  } catch (error) {
+    const err = error as { status?: number; stdout?: string; stderr?: string };
+    return { code: err.status ?? 1, output: `${err.stdout ?? ""}${err.stderr ?? ""}` };
+  }
+}
+
+/**
  * An instance with N same-capability agents on deterministic brains — the bare
  * P1 shape a gate starts from when it has no hub to set up.
  */

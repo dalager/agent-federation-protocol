@@ -214,3 +214,27 @@ real job is knowing which one an ask is. Likewise, ratification-by-vote among fo
 agents of one team is theater unless policy makes it conditional (multi-performer
 syntheses, or effort above a threshold), which is exactly the "MAY require" latitude 04
 already grants.
+
+## Coverage as of 2026-09-13
+
+This is ADR-0030 Decision 1's coverage section. Scenario 05 has no standalone demo — the
+README's support index says the gates exercise the real machinery against the built P1–P3
+stack — so every row below is mechanism gated or narrowed against ADR-0004's replay gate,
+never workload demonstrated.
+
+| Criterion | Class | Evidence |
+|---|---|---|
+| Team knowledge is queryable evidence, not folklore | mechanism gated | `test/adr0004.test.ts` "the export passes the verifier clean, and targeted mutations fail the named checks" — asset registration read back from the record |
+| Estimates grounded in past estimate-vs-actual | mechanism gated | `test/allocation.test.ts` "gives a neutral prior of exactly 50 to a bidder with no history" — settlement-derived reputation feeding a rule |
+| Guidance to another team is shape + size + effort, with dissent intact | mechanism gated | `test/allocation.test.ts` "credits vindicated dissent with full accuracy" — Synthesis with dissent, not staged as guidance-to-a-requester specifically |
+| Guidance is eventually scored on the requester's actuals | narrowed | `test/adr0004.test.ts` "the export passes the verifier clean, and targeted mutations fail the named checks" — narrowed to: settles a requester-announced task against reported actuals, but no scenario walks the months-later reporting path itself |
+| Staffing/estimating by coverage, not by loudest voice | mechanism gated | `test/allocation.test.ts` "coverage picks the minimal covering set and names the broadest awardee synthesizer" |
+| The deal-scoper cannot bid on the work it scoped | mechanism gated | `test/allocation.test.ts` "rejects tampered reveals, out-of-window commits, strangers, and excluded estimators — all audit-logged" — `afp:estimatorPolicy: exclude` |
+| Component reuse is a recorded, verifiable outcome | mechanism gated | `test/adr0004.test.ts` "the export passes the verifier clean, and targeted mutations fail the named checks" — `afp:Asset` registered, referenced, and reused in a Bid |
+| Other teams can ask without joining the practice | mechanism gated | `test/hub.test.ts` "enforces roles: requester/observer never pinned or bidding; requester announces and settles" |
+| Cross-project component discovery | narrowed | `test/adr0004.test.ts` "the export passes the verifier clean, and targeted mutations fail the named checks" — narrowed to: registers one asset by id/version/digest on a single hub; no cross-hub asset lookup is built |
+| Past accuracy influences future selection | mechanism gated | `test/allocation.test.ts` "feeds the ranking rule's optional reputation weight" — pinned `divergence-decay` reputation rule |
+| Economy data serves estimates without leaking | edge not built | what a brain may say about economy data it read stays operator policy — a human/brain judgement call with no protocol counterpart |
+| A served team can audit "why this number" | mechanism gated | `test/allocation.test.ts` "the demo export passes the independent verifier, and targeted mutations fail it" — export + independent verifier replay |
+
+**Counts:** 0 demonstrated · 9 gated · 2 narrowed · 1 not built.
