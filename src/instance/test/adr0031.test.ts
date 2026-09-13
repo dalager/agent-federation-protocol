@@ -225,6 +225,10 @@ describe("Decision 1 — converge and the urgent push", () => {
 
     const hubKey = loadOrCreateHubKeyPair(leaderConfig.keyDir, "lead", leaderInstance.actorId("lead"), hubLeader.hubId);
 
+    // ADR-0032 Decision 6: the hub's default seatPolicy is now
+    // "follow-required" — the leader instance Follows before it enrolls.
+    await hubLeader.receive(leaderInstance.followHub(hubLeader.actorId).activity);
+
     // Enroll "lead" before the replica exists — the divergence G3 measures.
     const enrollEntry = leaderInstance.publishAsInstance([hubLeader.actorId], `${leaderConfig.origin}/threads/hub`, "hub", (envelope: Envelope) =>
       enroll(envelope, { agent: leaderInstance.actorId("lead"), hub: hubLeader.actorId, capabilities: [CAP], hubKey: hubKey.keyId }),

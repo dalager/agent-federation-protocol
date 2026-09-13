@@ -533,8 +533,14 @@ export function acceptStateDeltas(envelope: Envelope, spec: StateDeltasSpec): { 
 // ------------------------------------------------------------------- Seats (ADR-0017 D4)
 
 /** `Accept{Follow}` — the hub's reply to a Follow, `object` names the Follow activity itself. */
-export function acceptFollow(envelope: Envelope, followActivityId: string, follower: string): { [key: string]: JsonValue } {
-  return { ...base(envelope, "Accept"), object: followActivityId, to: [follower] };
+/**
+ * ADR-0032 Decision 6: this crosses a real federation boundary whenever the
+ * follower is a foreign instance, so it carries top-level `afp:hub` — the
+ * same convention every other hub-emitted activity follows — so the gate's
+ * `hub` grant (matching on `afp:hub`) admits it.
+ */
+export function acceptFollow(envelope: Envelope, followActivityId: string, follower: string, hub: string): { [key: string]: JsonValue } {
+  return { ...base(envelope, "Accept"), object: followActivityId, to: [follower], "afp:hub": hub };
 }
 
 // ------------------------------------------------------------------- Lifecycle

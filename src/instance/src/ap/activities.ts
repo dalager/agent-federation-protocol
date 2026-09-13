@@ -364,19 +364,23 @@ export function keyCompromiseClaim(
 /**
  * `Follow{actor, object: target}` (ADR-0017 Decision 4, R3) — the instance
  * actor's door-knock at a hub, published `public` as governance trail, same
- * class as Vouch/Disown.
+ * class as Vouch/Disown. ADR-0032 Decision 6: this crosses a real federation
+ * boundary whenever the hub is foreign, so it carries top-level `afp:hub` —
+ * the same convention every other hub-emitted/hub-addressed activity follows
+ * — so the gate's `hub` grant (matching on `afp:hub`) admits it.
  */
 export function follow(envelope: Envelope, target: string): { [key: string]: JsonValue } {
-  return { ...base(envelope, "Follow"), object: target };
+  return { ...base(envelope, "Follow"), object: target, "afp:hub": target };
 }
 
 /**
  * `Undo{Follow}` — revokes a prior Follow. `object` names the Follow
  * activity id being undone; `target` names the hub, for cheap resolution
- * without dereferencing the object.
+ * without dereferencing the object. Carries `afp:hub` for the same reason
+ * `follow` above does.
  */
 export function undoFollow(envelope: Envelope, followActivityId: string, target: string): { [key: string]: JsonValue } {
-  return { ...base(envelope, "Undo"), object: followActivityId, target };
+  return { ...base(envelope, "Undo"), object: followActivityId, target, "afp:hub": target };
 }
 
 /** Read `afp:correlationId` from an activity or its object. */

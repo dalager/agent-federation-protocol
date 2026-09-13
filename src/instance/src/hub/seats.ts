@@ -43,7 +43,7 @@ export function onFollow(deps: SeatDeps, activity: { [key: string]: JsonValue })
 
   saveSeat(deps.db, actor, String(activity.id), deps.now().toISOString());
   deps.emit([actor], String(activity.context ?? `${new URL(deps.actorId).origin}/threads/seats`), "public", (envelope) =>
-    acceptFollow(envelope, String(activity.id), actor),
+    acceptFollow(envelope, String(activity.id), actor, deps.actorId),
   );
 }
 

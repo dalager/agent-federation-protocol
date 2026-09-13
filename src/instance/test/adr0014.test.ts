@@ -41,9 +41,9 @@ const NOW = new Date("2026-08-21T10:00:00.000Z");
  * peer that does not host it. `roleOf` answers null throughout — the server
  * genuinely cannot answer enrollment locally, which is the whole finding.
  */
-async function threeParty() {
+async function threeParty(options: { seatPolicy?: "follow-required" | "enroll-implies-seat" } = {}) {
   const { instance, clock } = testInstance(["a1"], CAPABILITY);
-  const { hub, hubKeys } = testHub(instance, ["a1"], "bridge");
+  const { hub, hubKeys } = testHub(instance, ["a1"], "bridge", options);
   clock.jumpTo(NOW.toISOString());
   const agentId = instance.actorId("a1");
   // Membership is a recorded act even in miniature: enroll through the hub's
@@ -305,7 +305,11 @@ describe("ADR-0014 Decisions 2-4: the mesh edge, the hub's head, and the two sil
   });
 
   it("the hub's chain head anchors like any actor's — ADR-0012's rule, no new rule", async () => {
-    const t = await threeParty();
+    // ADR-0032 Decision 6: the default seatPolicy now makes the hub emit an
+    // Accept{Follow} before this test's own premise ("never emitted") can be
+    // checked — set explicitly here since this test's subject is the
+    // chain-head/anchor invariant, not the seat-default flip.
+    const t = await threeParty({ seatPolicy: "enroll-implies-seat" });
     assert.equal(t.hub.chainHead(), null, "a hub that never emitted has no head — receiving is not emitting");
     // The head exists once the hub authors something of its own.
     const config = (t.instance as unknown as { config: { origin: string; exportDir: string } }).config;

@@ -28,7 +28,6 @@ import {
   bidsFor,
   declinesFor,
   deletePendingAccept,
-  ensureAllocSchema,
   hasSettlementRecord,
   loadAuction,
   logAdmission,
@@ -70,7 +69,8 @@ export class Allocator {
 
   constructor(hub: AllocatorHub) {
     this.hub = hub;
-    ensureAllocSchema(hub.db);
+    // ADR-0032 Decision 4: alloc_* tables come from openDb's migration now —
+    // see store/migrations/001-baseline.ts.
   }
 
   auction(taskId: string): AuctionRow | null {

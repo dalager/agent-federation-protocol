@@ -301,6 +301,16 @@ export async function runP5Demo(
   await handshake(alpha, gamma);
   await handshake(bravo, gamma);
 
+  // --- ADR-0032 Decision 6: the hub's default seatPolicy is now
+  // "follow-required" — each operator Follows the bridge before its agents
+  // Enroll, in-process for the host and over the socket for every other.
+  for (const op of [alpha, bravo, gamma]) {
+    await cacheDoc(op.actorId);
+    const followEntry = op.instance.followHub(hub.actorId);
+    if (op === alpha) await hub.receive(followEntry.activity);
+    else await postToHubInbox(op, alpha.origin, followEntry.activity, clock);
+  }
+
   // --- Enrollment. The host's agents enroll in-process (local traffic never
   // crosses its own boundary); every foreign seat arrives through the socket.
   for (const [op, agent, role] of [

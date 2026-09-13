@@ -18,7 +18,7 @@
 | **Support status** | **Supported — findings 84–89** |
 |---|---|
 | Findings raised | 6 |
-| Resolved by | — (candidates named below; ADR-0032 Decision 6 resolves the default-flip half) |
+| Resolved by | finding 87 — closed (ADR-0032 D6); the rest, candidates named below |
 | See it run | — the gate covers it: no shipped demo calls `followHub`/`unfollowHub` (checked against `demoP5.ts`, `demoP6.ts`, `demoP7.ts`'s headers) |
 | Gated by | `adr0017-d4-follow.test.ts` |
 
@@ -192,8 +192,9 @@ asked for.
 87. **The conformant policy is not the default.** ADR-0017 Decision 4 named
     `follow-required` the conformant target and shipped it opt-in; a hub run with no
     configuration today runs the policy this scenario shows has the seat-loss gap.
-    Resolved in name already: [ADR-0032](../adr/0032-deployment-profile.md) Decision 6
-    flips the default and cites this scenario by number. Not yet built.
+    **Closed (ADR-0032 D6):** the default flipped — `Hub`'s `seatPolicy` now defaults to
+    `follow-required`, `enroll-implies-seat` remains available as an explicit setting, and
+    every shipped demo Follows before it Enrolls. See the coverage re-walk above.
 
 88. **Follow/Undo churn itself is not logged as an admission event.** The admission log
     (`admissionLog`) records `Enroll` outcomes; a `Follow`/`Undo{Follow}` cycle that
@@ -229,3 +230,27 @@ is at best mechanism gated, and the unbuilt default flip is honestly edge not bu
 | A seat revoked between rounds cannot retroactively change a pinned electorate | narrowed | `test/adr0018.test.ts` pinned-electorate cases — built for a different scenario, not re-walked here |
 
 **Counts:** 0 demonstrated · 7 gated · 1 narrowed · 1 not built.
+
+## Coverage as of 2026-09-13 (after the default flip)
+
+Per ADR-0030 Decision 1, re-walked after [ADR-0032](../adr/0032-deployment-profile.md)
+Decision 6 built. The default `seatPolicy` is now `follow-required`, and every demo this
+gate runs (`demo:p2`, `demo:p3`, `demo:p5`, `demo:p6`, `demo:p7`, `demo:p8`) Follows before
+it Enrolls — the "no demo runs any beat of this scenario" reading above no longer holds:
+`followHub` is now called from `demoP2.ts`, `demoP3.ts`, `demoP5.ts`, `demoP6.ts`,
+`demoP7.ts` and `demoP8.ts`. Only rows the flip actually changes are reclassified below;
+every other row keeps the prior section's class and evidence.
+
+| Criterion | Class | Evidence |
+|---|---|---|
+| A seat can be sought explicitly, and admitted with proof | workload demonstrated | `npm run demo:p2` — the instance Follows the hub before enrolling; **was: mechanism gated** |
+| Enrollment can be gated on a live seat | workload demonstrated | `npm run demo:p2` — under the new default, every demo's Enroll now rides a real prior seat; **was: mechanism gated** |
+| Enrollment without any seat concept is still possible | mechanism gated | `test/adr0017-d4-follow.test.ts` "enroll-implies-seat, set explicitly, still enrolls without any Follow…" — now reachable only by explicit override, no longer the default |
+| A seat's loss is an event on the record | mechanism gated | `test/adr0017-d4-follow.test.ts` "Undo{Follow} revokes the seat and mass-unenrolls only that instance's agents" |
+| A lost seat can be regained | mechanism gated | `test/adr0017-d4-follow.test.ts` "re-Following after Undo revives the same seat" |
+| A refusal for lack of a seat is on the record, not silent | mechanism gated | `test/adr0017-d4-follow.test.ts` "ADR-0032 D6: default seatPolicy is now follow-required…" — admission-log assertion on the reason string |
+| Revoking a seat unenrolls only that instance's agents, not the hub's other members | mechanism gated | `test/adr0017-d4-follow.test.ts` "Undo{Follow} revokes the seat…" — two-instance case |
+| The default policy is the conformant one | mechanism gated | `test/adr0017-d4-follow.test.ts` "ADR-0032 D6: default seatPolicy is now follow-required — an Enroll without a Follow is refused"; `src/hub/hub.ts` `seatPolicy` default; **was: edge not built — finding 87, now closed (ADR-0032 D6)** |
+| A seat revoked between rounds cannot retroactively change a pinned electorate | narrowed | `test/adr0018.test.ts` pinned-electorate cases — built for a different scenario, not re-walked here |
+
+**Counts:** 2 demonstrated · 6 gated · 1 narrowed · 0 not built.

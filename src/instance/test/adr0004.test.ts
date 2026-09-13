@@ -75,6 +75,8 @@ function setup() {
     fetchActor,
     now: () => instance.clock.now(),
   });
+  // ADR-0032 Decision 6: the hub's default seatPolicy is now "follow-required".
+  instance.followHub(hub.actorId);
   return { instance, config, clock, hub, hubKeys };
 }
 

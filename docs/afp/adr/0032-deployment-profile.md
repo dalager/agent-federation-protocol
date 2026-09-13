@@ -1,6 +1,6 @@
 # ADR-0032 — The deployment profile: TLS, origin, configuration, storage, upgrades, backup
 
-- **Status:** Proposed (2026-09-02) — program claim **C8** of
+- **Status:** Accepted (2026-09-02), **built** (2026-09-13) — program claim **C8** of
   [ADR-0024](0024-the-road-to-production.md); group: **Operations**
 - **Date:** 2026-09-02
 - **Applies to:** how an instance is put on the internet and kept there — everything
@@ -128,7 +128,99 @@ unchanged and the D4 gate green under both settings.
 
 ## Build status
 
-Not built.
+**Built (2026-09-13).** `cd src/instance && npm test` is green — `test/adr0032.test.ts`
+carries the ADR's own gate paragraph as G1–G8 (config check, the demo-store migration
+sweep, backup/restore round-trip, the seat-default flip, the legacy fixture, the
+newer-store refusal, the no-flag proof, and the full-bundle replay), plus an "ADR-0032
+primitives" block for the handful of cases (a failed migration's rollback,
+`readSecretFile`'s trim/empty-refusal) that map to no G-row; it replaces
+`test/adr0032-wp2.test.ts` and `test/adr0032-wp13.test.ts`, both deleted, with no case
+dropped. `test/adr0017-d4-follow.test.ts` carries the two D4/D6-specific cases G4 cites
+rather than repeats: the inverted default ("an Enroll without a Follow is refused") and
+the explicit-compat proof ("enroll-implies-seat, set explicitly, still enrolls").
+
+**What was built versus what the ADR wrote:**
+
+- **The `--experimental-sqlite` flag was already unnecessary** on the Node ≥24 line this
+  ADR targets — `node:sqlite` needs no flag past that line — so the npm scripts and the
+  documented service unit simply never carry it, rather than carrying it "pinned"; G7
+  proves no script does.
+- **`config check`'s signer probe is skipped, named**, before the instance key is ever
+  minted and while `serve` holds the store's lock — in both cases `config check` must
+  never mint a key or collide with a live process's lock, so the line reads
+  `skipped — no instance key minted yet` / `skipped — store held by pid <n>` rather than
+  failing or lying about a result it cannot honestly produce.
+- **`AFP_SIGNER_CLIENT_CERT_FILE` is validated (readable) but unconsumed** — nothing in
+  this codebase reads it yet; it is provisioned ahead of [ADR-0035](0035-remote-custody-and-the-asynchronous-port.md)'s
+  remote-signer adapter, which is the file's first reader.
+- **Migration 001 is the verbatim baseline**, every `CREATE TABLE IF NOT EXISTS` this
+  codebase had folded in with `IF NOT EXISTS` kept (and kept *only* there — every later
+  migration is plain DDL, since there is no pre-schema-version store left to be
+  compatible with); **migration 002** (`restore_points`) is the first real forward
+  migration. Six schema sites were folded into 001 — `store/db.ts`, `federation/federation.ts`,
+  `allocation/store.ts`, `hub/store.ts`, `store/dedupe.ts`, and `crdt/store.ts` — the last
+  of which the ADR's implementation-architecture table did not name; one door, one
+  schema (ADR-0027) meant it belonged here too, not left the sixth site creating tables
+  of its own.
+- **`afp restore` records its point per [ADR-0020](0020-p6-hardened-round-stack.md) Decision 2** — a `restore_points` row
+  logged after the swap, so a same-value duplicate vote observed after that instant is
+  explained by the log rather than mistaken for equivocation.
+- **"The seat-default flip leaves every shipped bundle unchanged"** reads as: previously
+  exported bundles still replay (the verifier accepts both the `enroll-implies-seat` and
+  `follow-required` shapes) — a *fresh* export of any demo legitimately gains a
+  Follow/Accept pair it did not carry before. Building the flip surfaced one real gap the
+  ADR's prose did not anticipate: `Follow`/`Accept{Follow}`/`Undo{Follow}` all cross a
+  real federation boundary whenever the hub or the follower is foreign (every
+  multi-operator demo), and the verifier's grant check matches a `"hub"` grant on
+  top-level `afp:hub` — a field none of the three carried. Fixed by adding `afp:hub` to
+  `follow`, `acceptFollow` and `undoFollow` (`ap/activities.ts`, `hub/activities.ts`),
+  the same convention every other hub-emitted/hub-addressed activity already follows
+  (`hub/activities.ts`'s own `castVote` docstring says as much for votes).
+- **Which tests kept `enroll-implies-seat` explicitly, and why:** `test/adr0017-d4-follow.test.ts`'s
+  own compat case, whose subject *is* the pre-flip behaviour; and `test/adr0014.test.ts`'s
+  chain-head/anchor test, whose subject is ADR-0012's anchoring invariant and needs the
+  hub to have emitted nothing yet — the default's Accept{Follow} would otherwise give it
+  a head before the test can check there wasn't one. Every other hub-building test and
+  demo now Follows before it Enrolls — `testHub` (`test/helpers.ts`) delivers the Follow
+  itself (unless told `seatPolicy: "enroll-implies-seat"`), so every other caller through
+  it needed no per-test change.
+- **A wire-shape change, not just a default flip:** `follow`, `acceptFollow` and
+  `undoFollow` (`ap/activities.ts`, `hub/activities.ts`) now carry top-level `afp:hub`
+  naming the hub — none of the three did before. Building the flip surfaced this: all
+  three cross a real federation boundary whenever the hub or the follower is foreign
+  (every multi-operator demo), and the verifier's grant check matches a `"hub"` grant on
+  top-level `afp:hub`, a field none of them carried. `test/demos.test.ts` (all eight) and
+  `test/adr0032.test.ts` G4 confirm the Python verifier admits the new shape.
+- **Seat state does not converge across replicas.** A relayed `afp:Enroll` — carried
+  inside a replica's `Accept{afp:StateDeltas}` or a `pushSync` (ADR-0016 Decision 2) —
+  was already admitted by the origin hub under *its* seat state; the replica re-derives
+  the Enroll rather than re-admitting it, since `hub_seats` is not itself CRDT-tracked
+  and a replica that never saw the Follow would otherwise refuse every synced Enroll
+  under the new default. `Hub.receive`/`dispatch`/`onEnroll` take a `relayed` flag,
+  set only by `onStateDeltas`, that skips the seat gate alone — signature verification
+  and dedupe still run. Converging seats themselves (shipping `Follow`/`Undo{Follow}`
+  in the sync set) is the recorded follow-up, not built here. `test/adr0032.test.ts` G4
+  carries the gate case; `test/adr0016.test.ts` T7 and `test/adr0031.test.ts` G3
+  (pre-existing replica-convergence gates) are what caught the gap.
+- **Three things the review changed after the build.** `restoreStore` decided whether the
+  target store was live by *opening* it — which ran the target's pending migrations as a
+  side effect of asking, before the `--force` refusal was even reached; it now reads the
+  lock (`db.ts`'s `lockHolder`: the in-process set, then the lock file's pid, a dead pid
+  reading as nobody) and never opens what it may be about to refuse to touch. Two gates
+  hung the suite at their 300-second ceiling rather than failing: `test/adr0016.test.ts`
+  T7 closed an operator's bootstrap server and rebound its port without awaiting the
+  close or dropping keep-alive sockets, so the client pool's next POST went to a dead
+  socket — a lost delivery that read as "0 of 5 seats converged", timing-dependent, and
+  a promise that never settled; the rebind now closes every connection and awaits the
+  close. And `test/adr0032.test.ts` G2 closed each multi-operator demo's instances but
+  not its HTTP servers, an open handle that kept the process alive after every case had
+  passed; it now calls each demo's own `close()`. The suite runs in under four seconds
+  again.
+- **The Containerfile's base image** is `node:24-slim` (Debian) rather than alpine or
+  distroless: `node:sqlite` is a native addition to the Node binary itself, so there is
+  no musl/glibc concern alpine would answer, and slim keeps a shell and a package
+  manager available for an operator's own proxy/TLS debugging without the full image's
+  size.
 
 ## References
 

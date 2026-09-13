@@ -48,7 +48,6 @@ import { CRDTStore, type LWWState, type ORMapState, type ORSetState } from "../c
 import {
   convictionByProof,
   convictionsFor,
-  ensureHubSchema,
   countedVoteTuple,
   hasSeat,
   isConvicted,
@@ -113,9 +112,10 @@ export interface HubDeps {
   replicaOf?: string;
   /**
    * ADR-0017 Decision 4 (R2): `"follow-required"` gates `afp:Enroll` on a live
-   * seat (this instance must have Followed this hub first); the default,
-   * `"enroll-implies-seat"`, keeps every existing hub test's behavior
-   * byte-identical — Enroll alone still fills `this.instances`.
+   * seat (this instance must have Followed this hub first). ADR-0032
+   * Decision 6 flips the default to `"follow-required"` — the conformant
+   * target ADR-0017 named — from the prior default `"enroll-implies-seat"`,
+   * which remains available as an explicit setting for a transition.
    */
   seatPolicy?: "follow-required" | "enroll-implies-seat";
 }
@@ -275,9 +275,11 @@ export class Hub {
     this.now = deps.now ?? (() => new Date());
     this.actorId = hubActorId(deps.origin, deps.hubId);
     this.hubIdentity = deps.replicaOf ?? this.actorId;
-    this.seatPolicy = deps.seatPolicy ?? "enroll-implies-seat";
+    // ADR-0032 Decision 6: the default flips to "follow-required".
+    this.seatPolicy = deps.seatPolicy ?? "follow-required";
 
-    ensureHubSchema(this.db);
+    // ADR-0032 Decision 4: hub_* tables come from openDb's migration now —
+    // see store/migrations/001-baseline.ts.
     this.crdt = new CRDTStore(this.db);
     this.keyDir = deps.keyDir;
     this.key = loadOrCreateKeyPair(deps.keyDir, `hub-${deps.hubId}`, this.actorId);
@@ -499,8 +501,15 @@ export class Hub {
   /**
    * Accept an inbound activity, addressed to this hub through the same
    * `Transport.deliver(target, activity)` call agents receive through.
+   *
+   * `relayed` (ADR-0016 Decision 2, ADR-0032 Decision 6): set only by
+   * `onStateDeltas` for an activity carried inside `Accept{afp:StateDeltas}`
+   * / a `pushSync`. The origin hub already admitted this activity under its
+   * own seat state; a replica re-derives it rather than re-admitting it, so
+   * `relayed` skips the seat gate alone — signature verification and dedupe
+   * still run exactly as for anything else `receive` is handed.
    */
-  async receive(activity: { [key: string]: JsonValue }): Promise<ReceiveOutcome> {
+  async receive(activity: { [key: string]: JsonValue }, options: { relayed?: boolean } = {}): Promise<ReceiveOutcome> {
     const activityId = typeof activity.id === "string" ? activity.id : "";
     if (!activityId) return { status: "rejected", reason: "activity has no id" };
     if (this.status === "archived") {
@@ -514,8 +523,9 @@ export class Hub {
       return { status: "duplicate", reason: `activity ${activityId} already delivered` };
     }
     this.seen.add(activityId);
+    const relayed = options.relayed ?? false;
 
-    await this.dispatch(activity);
+    await this.dispatch(activity, relayed);
     if (this.onUrgent && this.isUrgent(activity)) await this.onUrgent(activity);
     return { status: "dispatched" };
   }
@@ -571,7 +581,7 @@ export class Hub {
     return result.ok ? { ok: true } : { ok: false, reason: result.reason };
   }
 
-  private async dispatch(activity: { [key: string]: JsonValue }): Promise<void> {
+  private async dispatch(activity: { [key: string]: JsonValue }, relayed = false): Promise<void> {
     const type = String(activity.type ?? "");
     const object = activity.object;
     const objectType =
@@ -583,7 +593,7 @@ export class Hub {
     // own Accept fallthrough — the same class as Enroll/Unenroll above.
     if (type === "Follow") return this.onFollow(activity);
     if (type === "Undo") return this.onUndoFollow(activity);
-    if (type === "afp:Enroll") return this.onEnroll(activity);
+    if (type === "afp:Enroll") return this.onEnroll(activity, relayed);
     if (type === "afp:Unenroll") return this.onUnenroll(activity);
     // ADR-0005 amendment (2026-08-22): a declared change of control, on the
     // transferring instance's own chain — same class as Enroll/Unenroll.
@@ -650,7 +660,7 @@ export class Hub {
     // never an instruction.
   }
 
-  private onEnroll(activity: { [key: string]: JsonValue }): void {
+  private onEnroll(activity: { [key: string]: JsonValue }, relayed = false): void {
     if (this.status !== "active") return; // afp:Freeze suspends new work; enrollment is new work
     const agent = String(activity.object ?? "");
     if (!agent) return;
@@ -681,8 +691,14 @@ export class Hub {
 
     // ADR-0017 Decision 4 (R2): under `follow-required`, an Enroll from an
     // instance holding no live seat is refused — the seat, not the Enroll
-    // alone, is what admits new membership.
-    if (this.seatPolicy === "follow-required" && !hasSeat(this.db, origin)) {
+    // alone, is what admits new membership. ADR-0016 Decision 2 / ADR-0032
+    // Decision 6: a `relayed` Enroll (carried inside a replica's
+    // Accept{afp:StateDeltas}/pushSync) was already admitted under the
+    // origin hub's own seat state — seat state itself does not converge
+    // across replicas (`hub_seats` is not CRDT-tracked), so the replica
+    // re-derives this Enroll under the origin's authority rather than
+    // re-admitting it against seat state it never received.
+    if (this.seatPolicy === "follow-required" && !relayed && !hasSeat(this.db, origin)) {
       logAdmission(
         this.db,
         this.now().toISOString(),
@@ -1463,7 +1479,9 @@ export class Hub {
     const carried = Array.isArray(object["afp:activities"]) ? (object["afp:activities"] as JsonValue[]) : [];
     for (const entry of carried) {
       if (entry && typeof entry === "object" && !Array.isArray(entry)) {
-        await this.receive(entry as { [key: string]: JsonValue });
+        // ADR-0016 Decision 2 / ADR-0032 Decision 6: `relayed: true` — the
+        // origin hub already admitted this activity; this hub re-derives it.
+        await this.receive(entry as { [key: string]: JsonValue }, { relayed: true });
       }
     }
   }

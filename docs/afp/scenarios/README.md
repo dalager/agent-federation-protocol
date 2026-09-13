@@ -67,7 +67,7 @@ demo shows the *resolved* world and the walkthrough shows what it cost to get th
 | [11](11-the-snow-day.md) | 8 · closed | [ADR-0018](../adr/0018-the-round-as-a-commitment.md), [ADR-0019](../adr/0019-acting-on-a-decision.md) | `npm run demo:p5:llm` | `adr0018.test.ts`, `adr0019.test.ts` | [0·11·2·0](11-the-snow-day.md#coverage-as-of-2026-09-13) |
 | [12](12-the-parametric-trigger.md) | 8 · closed | [ADR-0020](../adr/0020-p6-hardened-round-stack.md) (58, 60, 61, 62) · [ADR-0005 amendment](../adr/0005-operators-are-equal.md) (63) · [ADR-0021](../adr/0021-conviction-to-consequence.md) (59, 64, 65) | `npm run demo:p6` · `demo:p6:llm` | `adr0020.test.ts`, `adr0005.test.ts`, `adr0021.test.ts` | [11·3·0·0](12-the-parametric-trigger.md#coverage-as-of-2026-09-13) |
 | [13](13-the-quarterly-split.md) | 9 · closed | [ADR-0022](../adr/0022-the-summary-declares-its-frame.md) (66-73) + its [ADR-0017](../adr/0017-standards-conformance.md) amendment (74) | `npm run demo:p7` · `demo:p7:llm` | `adr0022.test.ts` | [8·2·0·0](13-the-quarterly-split.md#coverage-as-of-2026-09-13) |
-| [14](14-the-seat-migration.md) | 6 · open | — ([ADR-0032](../adr/0032-deployment-profile.md) Decision 6 resolves finding 87) | — | `adr0017-d4-follow.test.ts` | [0·7·1·1](14-the-seat-migration.md#coverage-as-of-2026-09-13) |
+| [14](14-the-seat-migration.md) | 1 · closed + 5 · open | [ADR-0032](../adr/0032-deployment-profile.md) Decision 6 (closes finding 87) | `npm run demo:p2` | `adr0017-d4-follow.test.ts` | [2·6·1·0](14-the-seat-migration.md#coverage-as-of-2026-09-13-after-the-default-flip) |
 | [16](16-the-hostile-edge.md) | 6 · open | — | — | `adr0025.test.ts`, `adr0027.test.ts`, `adr0028.test.ts`, `adr0029.test.ts`, `adr0013.test.ts` | [0·10·1·1](16-the-hostile-edge.md#coverage-as-of-2026-09-13) |
 
 **Coverage** is [ADR-0030](../adr/0030-scenario-re-walks-and-the-coverage-index.md) Decision
@@ -621,7 +621,7 @@ itself. Twelve findings, continuing the numbering from 84.
 | 84 | Under the shipped default (`enroll-implies-seat`), an instance's departure from a hub is not a mechanism — no `Undo` of anything, so a lapsed retainer and a quiet quarter are the same shape on replay | Resolved in name by ADR-0032 Decision 6 (the default flip), not yet built |
 | 85 | `Undo{Follow}`'s mass-unenroll has no stated rule for an unenrolled agent's in-flight work | Mechanism: the terminal-outcome discipline finding 28 gave agreement expiry, applied to seat revocation |
 | 86 | A revived seat (`Follow` after `Undo{Follow}`, then re-`Follow`) carries no stated continuity claim — 02 says it revives "empty" but does not rule on it | Spec precision: state the empty-revival rule explicitly in 02 rather than leave it inferable from test names |
-| 87 | The conformant seat policy (`follow-required`) is not the shipped default | Resolved in name by ADR-0032 Decision 6, not yet built |
+| 87 | The conformant seat policy (`follow-required`) is not the shipped default | **Closed (ADR-0032 D6)** — the default flipped, every shipped demo Follows before it Enrolls |
 | 88 | Follow/Undo churn is not itself logged as an admission event, only its downstream Enroll effects are | Mechanism: a seat-change log entry parallel to the existing Enroll admission log |
 | 89 | Seat loss mid-round and a pinned electorate | Narrowed — already answered by ADR-0018 Decision 5's pinned electorate; not exercised because no round was open |
 | 90 | A refused stranger's attempt (unsigned, unagreed, or an anonymous command) is not recorded as a security event | Spec precision: state ADR-0013 Decision 5's "refusals are not logged" reasoning at the scope it actually operates — every refusal, not only reads |
@@ -631,8 +631,10 @@ itself. Twelve findings, continuing the numbering from 84.
 | 94 | "Refusals are not logged" is universal in practice; its stated reasoning (ADR-0013 Decision 5) is scoped to the read gate's confirmation-leakage risk alone | Spec precision: extend the rule's stated reasoning to every refusal, or log the refusals that carry no leakage risk |
 | 95 | A subtler key-substitution — a resolving key document granting capabilities the agreement never scoped — is 08's own scope-grammar strain (finding 25), not a new one | Narrowed — filed against finding 25, not duplicated |
 
-**Triage.** 84 and 87 are the same fact from two sides and share one resolution already
-named: ADR-0032 Decision 6. 85, 88, 90, 91 and 94 are mechanism or spec-precision
+**Triage.** 84 and 87 were the same fact from two sides and share one resolution:
+ADR-0032 Decision 6, which closes 87 outright; 84 (the in-flight-work and continuity
+half of "leaving") stays open — the default flip alone does not answer findings 85/86.
+85, 88, 90, 91 and 94 are mechanism or spec-precision
 candidates with no ADR home yet. 86 is spec precision only. 89 and 95 are accepted as
 narrowed, each pointing at the ADR that already answers the deeper question. 92 and 93 are
 operational concerns this campaign names but does not claim as the protocol's to answer.

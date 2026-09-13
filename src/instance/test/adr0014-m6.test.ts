@@ -196,6 +196,15 @@ describe("ADR-0014 M6: three operators, one hub, one partition", () => {
     await handshake(alpha, bravo);
     await handshake(alpha, gamma);
 
+    // ADR-0032 Decision 6: the hub's default seatPolicy is now
+    // "follow-required" — each operator Follows before it enrolls.
+    for (const op of [alpha, bravo, gamma]) {
+      const doc = await fetchActorDocument(op.actorId);
+      assert.ok(doc, `document for ${op.actorId} fetched over real HTTP`);
+      docCache.set(op.actorId, doc as { [key: string]: JsonValue });
+      await hub.receive(op.instance.followHub(hub.actorId).activity);
+    }
+
     // --- Enrollment: four members across three trust domains. Each operator
     // authors its own Enroll (ADR-0005's gate); the hub verifies each against
     // documents fetched over real HTTP, then admits.

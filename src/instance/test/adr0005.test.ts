@@ -182,6 +182,11 @@ describe("ADR-0005 gate: operators are equal against a hub", () => {
       now: () => alpha.instance.clock.now(),
     });
 
+    // ADR-0032 Decision 6: the hub's default seatPolicy is now
+    // "follow-required" — each operator Follows before it enrolls.
+    await hub.receive(alpha.instance.followHub(hub.actorId).activity);
+    await hub.receive(beta.instance.followHub(hub.actorId).activity);
+
     // Each operator enrolls its own agents, signed by itself.
     await hub.receive(enrolls(alpha, hub, "a1").activity);
     for (const name of ["b1", "b2", "b3"]) await hub.receive(enrolls(beta, hub, name).activity);
@@ -249,6 +254,10 @@ describe("ADR-0005 gate: operators are equal against a hub", () => {
 
     const b1 = beta.instance.actorId("b1");
 
+    // ADR-0032 Decision 6: both operators Follow before either enrolls.
+    await hub.receive(alpha.instance.followHub(hub.actorId).activity);
+    await hub.receive(beta.instance.followHub(hub.actorId).activity);
+
     // Alpha tries to enroll one of Beta's agents — validly signed by Alpha,
     // and refused anyway: a signature is not an entitlement to enroll.
     const poached = alpha.instance.publishAsInstance([hub.actorId], `${alpha.config.origin}/threads/enroll`, "hub", (envelope: Envelope) =>
@@ -296,6 +305,11 @@ describe("ADR-0005 amendment: declared change of control (scenario 12, finding 6
       fetchActor: actorResolver(() => hub, [alpha, beta, gamma]),
       now: () => clock.now(),
     });
+
+    // ADR-0032 Decision 6: every operator Follows before it enrolls.
+    await hub.receive(alpha.instance.followHub(hub.actorId).activity);
+    await hub.receive(beta.instance.followHub(hub.actorId).activity);
+    await hub.receive(gamma.instance.followHub(hub.actorId).activity);
 
     await hub.receive(enrolls(alpha, hub, "a1").activity);
     await hub.receive(enrolls(beta, hub, "b1").activity);

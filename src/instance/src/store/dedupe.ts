@@ -81,14 +81,8 @@ export class SeenSignatures {
   private readonly table: TtlSeenTable;
 
   constructor(db: Db, ttlMs: number) {
-    db.exec(
-      `CREATE TABLE IF NOT EXISTS seen_signatures (
-         fingerprint TEXT PRIMARY KEY,
-         seen_at     TEXT NOT NULL,
-         expires_at  TEXT NOT NULL
-       );
-       CREATE INDEX IF NOT EXISTS seen_signatures_expires ON seen_signatures (expires_at);`,
-    );
+    // ADR-0032 Decision 4: seen_signatures comes from openDb's migration now
+    // — see store/migrations/001-baseline.ts.
     this.table = new TtlSeenTable(db, "seen_signatures", "fingerprint", ttlMs);
   }
 

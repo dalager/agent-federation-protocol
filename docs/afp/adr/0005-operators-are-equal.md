@@ -211,7 +211,7 @@ was already issued by the agent's own instance.
 | **E1** | Per-instance weighting in `proposeRound`, with `L` from the pinned voters' instances; the enrolling instance folded into hub state and rehydrated on restart | **done** | `hub/weights.ts`, `hub/hub.ts` |
 | **E2** | The verifier recomputes `afp:voterWeights` from the pinned voters and the Enroll trail; a mismatch is a named failure | **done** | `decision.py` |
 | **E3** | Enroll issuer must be the agent's own instance — resolved from the agent's `afp:operatedBy`, at hub admission and mirrored in the verifier | **done** | `hub/hub.ts`, `decision.py` |
-| **E4** | Seat evidence (`Accept{Follow}`) required for enrollment | **done** — by [ADR-0017](0017-standards-conformance.md) Decision 4, as the hub's opt-in `seatPolicy: "follow-required"`; the default policy keeps deriving seats from the Enroll trail | `hub/hub.ts`, `instance/following.ts`, gated by `test/adr0017-d4-follow.test.ts` |
+| **E4** | Seat evidence (`Accept{Follow}`) required for enrollment | **done** — by [ADR-0017](0017-standards-conformance.md) Decision 4, as `seatPolicy: "follow-required"`, which [ADR-0032](0032-deployment-profile.md) Decision 6 made the default (`enroll-implies-seat` remains available as an explicit setting) | `hub/hub.ts`, `instance/following.ts`, gated by `test/adr0017-d4-follow.test.ts` |
 | **E5** | Parity cases for `L` and the per-instance division, in the raw-JSON harness ADR-0004 established | **done** | `test/parity/cases.json` |
 
 The gate is `test/adr0005.test.ts`: two operators, deliberately lopsided, where the one

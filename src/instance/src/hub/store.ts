@@ -1,5 +1,5 @@
 /**
- * Hub-scoped persistence: new tables in the instance's own SQLite file
+ * Hub-scoped persistence: tables in the instance's own SQLite file
  * (ADR-0002 Decision 1 — no second store, no broker).
  *
  * CRDT state itself lives in `src/instance/src/crdt/`'s `CRDTStore`
@@ -7,130 +7,17 @@
  * every delta through it. Rounds get their own table here because a round's
  * pinned voter list and weights are the evidence a `DecisionRecord`
  * recomputation needs, not derivable state.
+ *
+ * The tables themselves, and the two `PRAGMA table_info`/`ALTER TABLE`
+ * guards that used to backfill `hub_rounds` and `hub_vote_receipts`' later
+ * columns, now live in `store/migrations/001-baseline.ts` (ADR-0032
+ * Decision 4) — `openDb` runs them once, before this module ever sees the
+ * database.
  */
 
 import type { Db } from "../store/db.ts";
 import type { QuorumRule } from "./quorum.ts";
 import type { VotePhase } from "./equivocation.ts";
-
-const SCHEMA = `
-CREATE TABLE IF NOT EXISTS hub_rounds (
-  round_id       TEXT PRIMARY KEY,
-  hub_id         TEXT NOT NULL,
-  proposal_id    TEXT NOT NULL,
-  thread         TEXT NOT NULL,
-  options_json   TEXT NOT NULL,
-  voters_json    TEXT NOT NULL,
-  weights_json   TEXT NOT NULL,
-  quorum_snapshot TEXT NOT NULL,
-  proposal_hash  TEXT NOT NULL,
-  status         TEXT NOT NULL,          -- open | closed
-  created_at     TEXT NOT NULL,
-  deadline       TEXT,                   -- ADR-0018 W7: ISO instant, nullable
-  quorum_rule    TEXT,                   -- ADR-0018 W7: JSON QuorumRule, nullable
-  binding        TEXT                    -- ADR-0018 W7: 'joint', nullable
-);
-
--- The G-Set of counted vote receipts, one row per (round, voter) — evidence-set
--- completeness (ADR-0002 Decision 3 check 2) is "every hash here resolves to a
--- present, validly signed Vote in the outbox."
-CREATE TABLE IF NOT EXISTS hub_vote_receipts (
-  round_id    TEXT NOT NULL,
-  actor       TEXT NOT NULL,
-  vote_digest TEXT NOT NULL,
-  value       TEXT NOT NULL,
-  PRIMARY KEY (round_id, actor)
-);
-
--- ADR-0014 Decision 4: a recorded Reject of a round's proposal — what lets a
--- DecisionRecord tell "declined" from "silent" when it lists the snapshot
--- members no vote was counted from. Kept apart from vote receipts on purpose:
--- a decline is participation without assent, never a ballot, and closeRound
--- must not count it as one.
-CREATE TABLE IF NOT EXISTS hub_round_declines (
-  round_id       TEXT NOT NULL,
-  actor          TEXT NOT NULL,
-  reject_digest  TEXT NOT NULL,
-  PRIMARY KEY (round_id, actor)
-);
-
--- ADR-0017 Decision 4: a live seat is an instance's active Follow of this hub
--- -- the gate seatPolicy "follow-required" checks before admitting an Enroll.
--- revoked_at NULL means live; re-Following after Undo revives the same row
--- rather than inserting a second one, so a seat's history is one row with
--- two timestamps, not a trail to replay.
-CREATE TABLE IF NOT EXISTS hub_seats (
-  instance_actor TEXT PRIMARY KEY,
-  follow_activity TEXT NOT NULL,
-  followed_at     TEXT NOT NULL,
-  revoked_at      TEXT
-);
-
--- ADR-0018 W1/W7: one row per pinned voter who publishes an afp:Departure
--- from a binding decision -- mirrors hub_round_declines exactly.
-CREATE TABLE IF NOT EXISTS hub_departures (
-  round_id         TEXT NOT NULL,
-  actor            TEXT NOT NULL,
-  departure_digest TEXT NOT NULL,
-  PRIMARY KEY (round_id, actor)
-);
-
--- ADR-0020 W1/W4: one row per voter convicted in a round -- the zeroing
--- table. A conviction zeroes that voter's weight for the round's own doom
--- arithmetic (Decision 4) and blocks it from successor() (Decision 3); it
--- never shrinks the pinned electorate itself (Decision 4's denominator
--- ruling).
-CREATE TABLE IF NOT EXISTS hub_convictions (
-  round_id     TEXT NOT NULL,
-  actor        TEXT NOT NULL,
-  proof_digest TEXT NOT NULL,
-  PRIMARY KEY (round_id, actor)
-);
-
--- ADR-0021 Decision 4c: a restoration is a membership act like any other, and
--- it is forward-scoped. A ratified governance round whose outcome actuates
--- an afp:MemberAdmit restores the named agent's weight for rounds pinned AFTER
--- the decision landed — never retroactively, and never by re-tallying a closed
--- round, whose DecisionRecord is signed history. ADR-0020's forward-scoping
--- rule run in the other direction: neither conviction nor forgiveness reaches
--- backwards into a signed record.
-CREATE TABLE IF NOT EXISTS hub_restorations (
-  actor          TEXT NOT NULL,
-  decision_digest TEXT NOT NULL,
-  created_at     TEXT NOT NULL,
-  PRIMARY KEY (actor, decision_digest)
-);
-`;
-
-export function ensureHubSchema(db: Db): void {
-  db.exec(SCHEMA);
-  // ADR-0018 W7: additive migration for a pre-ADR-0018 `afp.db` — probe with
-  // PRAGMA table_info and ALTER TABLE only the columns actually missing, so
-  // an existing database opens unchanged and CREATE TABLE above still covers
-  // a fresh one.
-  const existing = new Set(
-    (db.prepare("PRAGMA table_info(hub_rounds)").all() as { name: string }[]).map((col) => col.name),
-  );
-  for (const [column, ddl] of [
-    ["deadline", "deadline TEXT"],
-    ["quorum_rule", "quorum_rule TEXT"],
-    ["binding", "binding TEXT"],
-  ] as const) {
-    if (!existing.has(column)) db.exec(`ALTER TABLE hub_rounds ADD COLUMN ${ddl}`);
-  }
-  // ADR-0020 W1/W2: additive migration for tuple-grain vote dedupe -- nullable
-  // so pre-ADR-0020 (L0) rows are untouched; only an L1 round's votes ever
-  // populate them.
-  const existingVoteReceiptCols = new Set(
-    (db.prepare("PRAGMA table_info(hub_vote_receipts)").all() as { name: string }[]).map((col) => col.name),
-  );
-  for (const [column, ddl] of [
-    ["phase", "phase TEXT"],
-    ["seq_no", "seq_no INTEGER"],
-  ] as const) {
-    if (!existingVoteReceiptCols.has(column)) db.exec(`ALTER TABLE hub_vote_receipts ADD COLUMN ${ddl}`);
-  }
-}
 
 export interface RoundRow {
   roundId: string;

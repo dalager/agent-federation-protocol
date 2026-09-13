@@ -1,106 +1,20 @@
 /**
- * Allocation persistence (ADR-0003 Decision 1): new tables in the instance's
- * own SQLite file, beside `hub_rounds` — no second store, no broker.
+ * Allocation persistence (ADR-0003 Decision 1): tables in the instance's own
+ * SQLite file, beside `hub_rounds` — no second store, no broker.
  *
  * `alloc_settlements` is Decision 5 made concrete: bid-vs-actual divergence is
  * a *recorded signal* visible to every member, never a live score feeding
  * selection. `alloc_admissions` is the audit log Decision 6 requires for
  * bids rejected at admission.
+ *
+ * The tables themselves, and the ADR-0004 H13 `ALTER TABLE` guard that used
+ * to backfill `alloc_auctions`' later columns, now live in
+ * `store/migrations/001-baseline.ts` (ADR-0032 Decision 4) — `openDb` runs
+ * them once, before this module ever sees the database.
  */
 
 import type { Db } from "../store/db.ts";
 import type { JsonValue } from "../crypto/jcs.ts";
-
-const SCHEMA = `
-CREATE TABLE IF NOT EXISTS alloc_auctions (
-  task_id        TEXT PRIMARY KEY,
-  hub_id         TEXT NOT NULL,
-  thread         TEXT NOT NULL,
-  correlation_id TEXT NOT NULL,
-  rule_json      TEXT NOT NULL,
-  window_opens   TEXT NOT NULL,
-  window_closes  TEXT NOT NULL,
-  estimator_policy TEXT NOT NULL,       -- exclude | permit-and-record
-  estimators_json  TEXT NOT NULL,
-  sufficiency_json TEXT NOT NULL,
-  status         TEXT NOT NULL,         -- bidding | awarded | reauctioned | failed
-  award_json     TEXT,
-  requester      TEXT                    -- ADR-0004: the announcing actor when a requester/member announced; the settlement's counterparty
-);
-
--- Outstanding Accepts per award — the P1 deadline-sweep pattern needs its
--- state in SQLite, or an award timeout would not survive a restart
--- (ADR-0003 Decision 4).
-CREATE TABLE IF NOT EXISTS alloc_pending_accepts (
-  award_id     TEXT PRIMARY KEY,
-  task_id      TEXT NOT NULL,
-  accept_by    TEXT NOT NULL,
-  missing_json TEXT NOT NULL
-);
-
--- One row per (task, bidder): the commit lands first, the reveal joins it.
-CREATE TABLE IF NOT EXISTS alloc_bids (
-  task_id          TEXT NOT NULL,
-  bidder           TEXT NOT NULL,
-  commitment       TEXT NOT NULL,
-  commit_published TEXT NOT NULL,
-  reveal_json      TEXT,
-  reveal_digest    TEXT,
-  PRIMARY KEY (task_id, bidder)
-);
-
--- Declining is a record; silence is not (03).
-CREATE TABLE IF NOT EXISTS alloc_declines (
-  task_id TEXT NOT NULL,
-  actor   TEXT NOT NULL,
-  reason  TEXT NOT NULL,
-  PRIMARY KEY (task_id, actor)
-);
-
--- Admission-time rejections, audit-logged (Decision 6).
-CREATE TABLE IF NOT EXISTS alloc_admissions (
-  at      TEXT NOT NULL,
-  task_id TEXT NOT NULL,
-  actor   TEXT NOT NULL,
-  outcome TEXT NOT NULL,
-  reason  TEXT NOT NULL
-);
-
--- One row per emitted afp:Settlement activity: its digest, published time and
--- full object — what an announce's afp:settlementSnapshot pins and what the
--- divergence-decay derivation resolves at award time (ADR-0004 Decision 3).
-CREATE TABLE IF NOT EXISTS alloc_settlement_records (
-  digest      TEXT PRIMARY KEY,
-  task_id     TEXT NOT NULL,
-  published   TEXT NOT NULL,
-  object_json TEXT NOT NULL
-);
-
--- Estimates linked to actuals; divergence visible, consumption deferred (Decision 5).
-CREATE TABLE IF NOT EXISTS alloc_settlements (
-  task_id     TEXT NOT NULL,
-  actor       TEXT NOT NULL,
-  bid_digest  TEXT NOT NULL,
-  estimated_json TEXT NOT NULL,
-  actual_json    TEXT NOT NULL,
-  recorded_at TEXT NOT NULL,
-  PRIMARY KEY (task_id, actor)
-);
-`;
-
-export function ensureAllocSchema(db: Db): void {
-  db.exec(SCHEMA);
-  // Pre-ADR-0004 databases lack these columns — add them in place. Only the
-  // already-applied case is swallowed: a bare catch here would equally hide a
-  // locked or corrupt store behind a silently missing column (H13).
-  for (const column of ["requester TEXT", "reputation_json TEXT", "snapshot_json TEXT", "excluded_prior_json TEXT"]) {
-    try {
-      db.exec(`ALTER TABLE alloc_auctions ADD COLUMN ${column}`);
-    } catch (error) {
-      if (!/duplicate column name/i.test((error as Error).message)) throw error;
-    }
-  }
-}
 
 export interface AuctionRow {
   taskId: string;

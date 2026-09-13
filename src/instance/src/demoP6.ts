@@ -488,6 +488,16 @@ export async function runP6Demo(
   };
   for (const op of foreign) await handshake(atlas, op);
 
+  // --- ADR-0032 Decision 6: the hub's default seatPolicy is now
+  // "follow-required" — every pool member Follows the hub before its seats
+  // Enroll, in-process for the host and over the socket for the foreign four.
+  for (const op of pool) {
+    await cacheDoc(op.actorId);
+    const followEntry = op.instance.followHub(hub.actorId);
+    if (op === atlas) await hub.receive(followEntry.activity);
+    else await postToHubInbox(op, atlas.origin, followEntry.activity, clock);
+  }
+
   // --- Enrollment. The host's seats enroll in-process; the four foreign seats
   // arrive through the socket.
   const enrollThread = `${atlas.origin}/threads/enroll`;

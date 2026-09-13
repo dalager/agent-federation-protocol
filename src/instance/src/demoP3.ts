@@ -144,6 +144,10 @@ export async function runP3Demo(
   });
   const transport: Transport = hubTransport(hub, instance.localTransport(), (t) => instance.nameOf(t) !== null);
 
+  // ADR-0032 Decision 6: the hub's default seatPolicy is now
+  // "follow-required" — the instance Follows before it Enrolls.
+  instance.followHub(hub.actorId);
+
   for (const name of names) {
     instance.publishAsInstance([hub.actorId], `${config.origin}/threads/enroll`, "hub", (envelope) =>
       enroll(envelope, {

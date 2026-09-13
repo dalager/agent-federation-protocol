@@ -128,6 +128,13 @@ describe("ADR-0015: the case file at N parties", () => {
       fetchActor: (actorId) => docCache.get(actorId) ?? null,
       now: () => alpha.clock.now(),
     });
+    // ADR-0032 Decision 6: the hub's default seatPolicy is now
+    // "follow-required" — each operator Follows before it enrolls.
+    for (const inst of [alpha, bravo]) {
+      docCache.set(String(inst.instance.instanceDocument().id), inst.instance.instanceDocument());
+      await hub.receive(inst.instance.followHub(hub.actorId).activity);
+    }
+
     for (const [inst, name] of [
       [alpha, "n-noc"],
       [alpha, "n-telemetry"],
@@ -234,6 +241,8 @@ describe("ADR-0015: the case file at N parties", () => {
     });
     docCache.set(String(instance.instanceDocument().id), instance.instanceDocument());
     docCache.set(instance.actorId("a1"), instance.agentDocument("a1"));
+    // ADR-0032 Decision 6: the hub's default seatPolicy is now "follow-required".
+    await hub.receive(instance.followHub(hub.actorId).activity);
     const hubKey = loadOrCreateHubKeyPair(config.keyDir, "a1", instance.actorId("a1"), "done");
     const entry = instance.publishAsInstance([hub.actorId], `${config.origin}/threads/enroll`, "hub", (envelope) =>
       enroll(envelope, { agent: instance.actorId("a1"), hub: hub.actorId, capabilities: [CAPABILITY], hubKey: hubKey.keyId }),

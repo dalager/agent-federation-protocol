@@ -52,10 +52,15 @@ npm run gate          # the acceptance gate: P1's 11 checks + CRDT + hub + aucti
 npm run serve         # the public HTTP surface + the federation inbox
 ```
 
-Requires **Node 22.5+** (24+ recommended). No build step — Node runs the
-TypeScript directly — and **no dependencies at all**: `node:crypto` covers
-Ed25519, `node:sqlite` covers the store, and the model endpoint is plain
-`fetch` against an OpenAI-compatible API rather than a vendor SDK.
+Requires **Node 24+** — the current LTS line
+([ADR-0032](../../docs/afp/adr/0032-deployment-profile.md) Decision 1), which
+loads `node:sqlite` without `--experimental-sqlite` (every script here still
+passes `--disable-warning=ExperimentalWarning` to silence the one warning
+that remains). No build step — Node runs the TypeScript directly — and **no
+dependencies at all**: `node:crypto` covers Ed25519, `node:sqlite` covers the
+store, and the model endpoint is plain `fetch` against an OpenAI-compatible
+API rather than a vendor SDK. A reference `Containerfile` is provided for an
+operator who wants one; it is a convenience, not a supported artifact.
 
 ## The demo
 
@@ -696,13 +701,22 @@ of names. Keep your own registry small and namespaced.
 ```
 src/
   config.ts          environment abstraction; no secrets, no direct process.env elsewhere
+  configSchema.ts    ADR-0032: one declarative table, one entry per env var —
+                     config.ts's loadConfig/validate both walk it
   crypto/
     jcs.ts           RFC 8785 canonicalization
     proof.ts         eddsa-jcs-2022 sign/verify — the only signature that survives export
     keys.ts          Ed25519 via node:crypto; keys on disk, never in the record
     multibase.ts     base58btc + Multikey
   store/
-    db.ts            SQLite schema — outbox, both dedupe layers, tasks, queue, audit log
+    db.ts            opens the store, runs pending migrations, holds the lock
+    migrations/      ADR-0032 Decision 4: versioned, forward-only schema
+                     migrations — index.ts's migrate()/migrateWith(), one
+                     numbered file per migration (001-baseline.ts is every
+                     `CREATE TABLE IF NOT EXISTS` folded in; 002-restore-points.ts
+                     is the first real forward migration)
+    backup.ts        ADR-0032 Decision 5: backupStore/restoreStore — the
+                     online backup API against a live WAL-mode store
     outbox.ts        append-only, per-actor hash chain
     dedupe.ts        layer 1: transport dedupe on activity id
     tasks.ts         layer 2: correlationId replay + pending-task table
@@ -762,6 +776,10 @@ src/
     log.ts             JSON-lines structured logging, `AFP_LOG_LEVEL`
     metrics.ts         the `/metrics` registry — counts only, no ids
     health.ts          `/healthz`, `/readyz`, `/metrics` — the server hook
+    probes.ts          ADR-0032 Decision 3: probeStore/probeSigner/probeSelfCheck
+                       — the functions `/readyz` and `afp config check` both call
+    configCheck.ts      ADR-0032 Decision 3: runConfigCheck — `afp config check`'s
+                       whole body, exported so the test suite calls it directly
   render/              ADR-0029 ("Watch"): the 04 § Renderings convention as
                       code
     rendering.ts       renderThread/renderTimeline, narrativeText,
@@ -784,6 +802,9 @@ src/
   export.ts          the bundle you hand to a third party — hub outboxes included
   demo.ts, demoP2.ts, demoP3.ts, demoP4.ts, demoP5.ts, demoP6.ts, demoP7.ts,
   demoP8.ts, experimentP3.ts, experimentP7.ts, experimentP8.ts, cli.ts
+Containerfile        ADR-0032 Decision 1: a reference container image — a
+                     convenience, not a supported artifact (no dependencies,
+                     no build step; `COPY . .` and `node ... cli.ts serve`)
 test/gate.test.ts    the 11 P1 acceptance checks
 test/crdt.test.ts    P2: merge property tests (commutative/associative/idempotent)
 test/hub.test.ts     P2: enrollment, a full L0 round, lifecycle, and the
@@ -816,7 +837,12 @@ Two consequences worth keeping:
 
 ## Configuration
 
-Environment variables, all optional (see `src/config.ts`):
+`npm run config:check` (`afp config check`, `--offline` to skip the self-check
+fetch) validates configuration and probes the store, signer, and self-check
+without starting the server ([ADR-0032](../../docs/afp/adr/0032-deployment-profile.md)
+Decision 3) — every problem is reported at once, never just the first.
+
+Environment variables, all optional (see `src/config.ts`, `src/configSchema.ts`):
 
 | Variable | Default | Notes |
 |---|---|---|
@@ -837,6 +863,8 @@ Environment variables, all optional (see `src/config.ts`):
 | `AFP_RATE_LIMIT_PER_ACTOR` / `_WINDOW_MS` | `60` / `60000` | Per-authenticated-actor bucket, checked after signature verification |
 | `AFP_REPLAY_CACHE_TTL_MS` | `300000` | How long a signed request's (keyId, date, signature) blocks a second presentation |
 | `AFP_KEY_PASSPHRASE_FILE` | *(none)* | File holding the passphrase the `file` signer adapter encrypts PEMs with at rest ([ADR-0026](../../docs/afp/adr/0026-key-custody-and-the-signer-port.md)). Unset, PEMs are unencrypted — as before. Protects a stolen backup, not a compromised host |
+| `AFP_WEBHOOK_SECRET_FILE` | *(none)* | File holding the [ADR-0028](../../docs/afp/adr/0028-port-agents.md) webhook initiator's shared secret ([ADR-0032](../../docs/afp/adr/0032-deployment-profile.md) Decision 3) |
+| `AFP_SIGNER_CLIENT_CERT_FILE` | *(none)* | File holding the [ADR-0035](../../docs/afp/adr/0035-remote-custody-and-the-asynchronous-port.md) remote signer's client certificate. Validated as readable by `afp config check`; nothing in this codebase reads it yet |
 | `AFP_CONTROLLERS` | *(none)* | Comma-separated actor URLs authorized to answer through `ApprovalPort` ([ADR-0028](../../docs/afp/adr/0028-port-agents.md) Decision 4) and the command grammar at `POST /agents/:name/command` ([ADR-0029](../../docs/afp/adr/0029-the-human-window-and-the-activitypub-premise.md) Decision 2) — configuration standing in for [ADR-0033](../../docs/afp/adr/0033-operator-obligations.md)'s signed policy document until it exists |
 | `AFP_FEDIVERSE_WINDOW` | `0` | `1` dual-publishes a `public` shadow Note alongside every operator-visible event ([ADR-0029](../../docs/afp/adr/0029-the-human-window-and-the-activitypub-premise.md) Decision 3). Off by default; every shipped bundle is byte-identical either way |
 | `AFP_SWEEP_MS` | `30000` | The resident scheduler's sweep-loop interval ([ADR-0031](../../docs/afp/adr/0031-the-resident-process.md) Decision 1) |
@@ -849,6 +877,12 @@ Environment variables, all optional (see `src/config.ts`):
 
 `AFP_LLM_API_KEY` is read at the point of use and never stored, logged, or
 written into the record. A local endpoint generally needs none.
+
+Every secret above is configured as a **file path**, never a value, in the
+environment ([ADR-0032](../../docs/afp/adr/0032-deployment-profile.md)
+Decision 3) — a process listing of a running instance leaks nothing. `afp
+config check` (below) validates every `*_FILE` path is set and readable
+without ever reading the secret itself into a log line.
 
 ## Key custody — the runbook
 
@@ -893,14 +927,17 @@ moment you need it.
 
 ## Backup — keys and data are two runbooks, not one
 
-A single `cp -r` of the data directory sweeps the private keys into whatever
-the backup lands in. Back the two up separately, with different handling
+A single `cp -r` of the data directory both risks a torn copy of a live
+database and sweeps the private keys into whatever the backup lands in.
+`afp backup`/`afp restore` ([ADR-0032](../../docs/afp/adr/0032-deployment-profile.md)
+Decision 5) fix the first; keys stay a separate runbook on purpose
 ([ADR-0026](../../docs/afp/adr/0026-key-custody-and-the-signer-port.md) Decision 6):
 
 ```bash
-# 1. The record — safe to store like any other database backup.
-sqlite3 "$AFP_DATA_DIR/afp.db" ".backup '/backups/afp-$(date -I).db'"
-cp -r "$AFP_DATA_DIR/artifacts" /backups/artifacts/
+# 1. The record — SQLite's online backup API against the live WAL-mode
+#    store, so this is safe to run while `serve` is up. Writes afp.db,
+#    artifacts/, and a BACKUP.json manifest under <dir>.
+npm run backup -- /backups/afp-$(date -I)
 
 # 2. The keys — a secret, and handled like one. Never into the same bucket.
 #    Under `remote` or `agent` custody there is nothing here to back up at all,
@@ -908,15 +945,116 @@ cp -r "$AFP_DATA_DIR/artifacts" /backups/artifacts/
 tar -czf - -C "$AFP_DATA_DIR" keys | age -r "$RECIPIENT" > /secure/afp-keys-$(date -I).tar.gz.age
 ```
 
-Restore is the reverse, keys first — an instance with a record and no keys
-cannot sign, and will refuse rather than mint replacements over a history that
-already exists.
+```bash
+# Restore: refuses a live target outright, and an existing one without
+# --force. Verifies the backup opens and migrates on a scratch copy before
+# touching anything real, then records a restore_points row (ADR-0020
+# Decision 2) so a same-value duplicate vote observed after this instant is
+# explained by the log rather than mistaken for equivocation.
+npm run restore -- /backups/afp-2026-09-13
+
+# Keys first — an instance with a record and no keys cannot sign, and
+# `afp restore` never touches keys at all: restore them via their own
+# runbook above before (or after) running this.
+```
+
+Exports under `AFP_EXPORT_DIR` are **not** restored — where they go is the
+operator's own `afp:retentionDuty` ([ADR-0012](../../docs/afp/adr/0012-the-long-horizon.md)),
+and `afp restore` prints the reminder every time.
 
 An export bundle is **not** a backup: it deliberately carries public halves
 only, and the exporter refuses to write one that contains private material
 (Decision 4). That refusal is a backstop, not a strategy — it fires on the
 accident of an operator attaching a key file to a task, which is the one
 mistake that cannot be undone once the bundle is handed over.
+
+## Production checklist
+
+[ADR-0032](../../docs/afp/adr/0032-deployment-profile.md) Decision 7: every line below
+is a command or a file, and the list is this README's, not the ADR's, so it can grow.
+
+- [ ] **Node 24 LTS.**
+  ```bash
+  node --version   # v24.x or newer
+  ```
+- [ ] **A reverse proxy terminates TLS** and forwards the inbox paths, the GET surface,
+  and the health/readiness endpoints to the instance's loopback port
+  ([ADR-0032](../../docs/afp/adr/0032-deployment-profile.md) Decision 2 — the instance
+  itself never terminates TLS). A minimal Caddy stanza:
+  ```caddyfile
+  your.origin.example {
+    reverse_proxy /actor/inbox        127.0.0.1:8787
+    reverse_proxy /agents/*/inbox     127.0.0.1:8787
+    reverse_proxy /hubs/*/inbox       127.0.0.1:8787
+    reverse_proxy /healthz            127.0.0.1:8787
+    reverse_proxy /readyz             127.0.0.1:8787
+    reverse_proxy /*                  127.0.0.1:8787
+  }
+  ```
+  or the equivalent nginx `location` blocks proxying to `http://127.0.0.1:8787`.
+- [ ] **`AFP_DEV` is unset.** Set, it permits `http:` origins and loopback/private fetch
+  targets ([ADR-0025](../../docs/afp/adr/0025-transport-hardening.md)) — every demo sets
+  it; a served production instance must not.
+- [ ] **`AFP_ORIGIN` is `https:`.** `loadConfig` refuses an `http:` origin outside dev
+  mode; `afp config check` reports it too.
+- [ ] **`npm run config:check` is clean:**
+  ```bash
+  $ npm run config:check
+  store: ok
+  signer: ok
+  self-check: ok
+  ```
+  A misconfiguration is named, not guessed at: `AFP_ORIGIN must be https: outside
+  development mode, got "http://..."`, `dataDir is not writable: ...`, and so on — every
+  problem reported at once ([ADR-0032](../../docs/afp/adr/0032-deployment-profile.md)
+  Decision 3).
+- [ ] **A key-custody mode is chosen and recorded** — see the
+  [Key custody runbook](#key-custody--the-runbook) above
+  ([ADR-0026](../../docs/afp/adr/0026-key-custody-and-the-signer-port.md)).
+- [ ] **Backups are scheduled**, separately from the keys runbook above:
+  ```
+  # /etc/cron.d/afp-backup — daily at 03:15, keeping the online-backup guarantee
+  15 3 * * * afp cd /opt/afp && npm run backup -- /backups/afp-$(date -I) >> /var/log/afp-backup.log 2>&1
+  ```
+  or a `systemd` timer unit calling the same command.
+- [ ] **`/readyz` is probed** by the proxy or the orchestrator, and a failing check is
+  acted on — it names the failing line (`store`/`signer`/`self-check`/`scheduler`), not
+  just "unhealthy".
+- [ ] **[ADR-0033](../../docs/afp/adr/0033-operator-obligations.md)'s policy document is
+  published** — when ADR-0033 lands; until then, `AFP_CONTROLLERS` stands in for the
+  controller half of it.
+
+A systemd unit, `AFP_*_FILE` secrets named as `Environment=` lines rather than values,
+and a drain timeout matching `serve`'s own SIGTERM handling:
+
+```ini
+[Unit]
+Description=AFP reference instance
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/afp/src/instance
+Environment=AFP_ORIGIN=https://your.origin.example
+Environment=AFP_DATA_DIR=/var/lib/afp
+Environment=AFP_KEY_PASSPHRASE_FILE=/etc/afp/secrets/key-passphrase
+Environment=AFP_WEBHOOK_SECRET_FILE=/etc/afp/secrets/webhook-secret
+ExecStart=/usr/bin/node --disable-warning=ExperimentalWarning src/cli.ts serve
+Restart=on-failure
+KillSignal=SIGTERM
+TimeoutStopSec=30
+User=afp
+Group=afp
+
+[Install]
+WantedBy=multi-user.target
+```
+
+`TimeoutStopSec` should be at or above the drain window `serve`'s shutdown handler
+needs to finish in-flight handlers and one final flush (see
+[Running it as a resident process](#running-it-as-a-resident-process) above) — 30s is
+generous for the reference workloads; size it to your own delivery-queue depth.
 
 ## Model provenance
 

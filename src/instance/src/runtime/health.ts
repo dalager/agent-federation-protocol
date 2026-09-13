@@ -8,11 +8,11 @@
  * `ap/server.ts` grows by a few lines.
  */
 
-import { publicKeyFromMultibase, verify } from "../crypto/keys.ts";
 import type { AfpInstance } from "../instance.ts";
 import type { Scheduler } from "./scheduler.ts";
 import { render as renderMetrics } from "./metrics.ts";
 import type { JsonValue } from "../crypto/jcs.ts";
+import { probeSelfCheck, probeSigner, probeStore } from "./probes.ts";
 
 export interface HealthDeps {
   /** Absent (a server built without a scheduler) reports `scheduler-not-running`. */
@@ -38,43 +38,22 @@ export interface HealthRouteContext {
   noStore: () => void;
 }
 
-function defaultSignerProbe(instance: AfpInstance): void {
-  const signer = instance.signer("@instance");
-  const message = new TextEncoder().encode("afp:readyz-signer-probe");
-  const signature = signer.sign(message);
-  const publicKey = publicKeyFromMultibase(signer.publicKeyMultibase);
-  if (!verify(publicKey, message, signature)) {
-    throw new Error("signer produced a signature that does not verify");
-  }
-}
-
 /**
  * Runs the four checks in order, stopping at the first failure — `readyz`'s
- * body names only that one check, nothing else about the instance.
+ * body names only that one check, nothing else about the instance. The store,
+ * signer, and self-check probes are shared with `afp config check`
+ * (`runtime/probes.ts`) so the two never drift.
  */
 async function checkReady(instance: AfpInstance, deps: HealthDeps): Promise<{ ok: true } | { ok: false; reason: string }> {
-  try {
-    instance.db.prepare("SELECT 1").get();
-  } catch {
-    return { ok: false, reason: "store-unavailable" };
-  }
+  const store = probeStore(instance);
+  if (!store.ok) return store;
 
-  try {
-    (deps.signerProbe ?? (() => defaultSignerProbe(instance)))();
-  } catch {
-    return { ok: false, reason: "signer-unavailable" };
-  }
+  const signer = probeSigner(instance, deps.signerProbe);
+  if (!signer.ok) return signer;
 
   if (deps.fetchActor) {
-    try {
-      const selfId = instance.instanceDocument().id as string;
-      const doc = await deps.fetchActor(`${instance.config.origin}/actor`);
-      if (!doc || doc.id !== selfId) {
-        return { ok: false, reason: "self-check-mismatch" };
-      }
-    } catch {
-      return { ok: false, reason: "self-check-failed" };
-    }
+    const selfCheck = await probeSelfCheck(instance, deps.fetchActor);
+    if (!selfCheck.ok) return selfCheck;
   }
 
   if (!deps.scheduler) {

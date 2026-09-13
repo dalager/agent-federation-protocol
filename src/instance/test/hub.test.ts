@@ -81,6 +81,8 @@ function makeHub(instance: AfpInstance, config: ReturnType<typeof loadConfig>, h
     fetchActor,
     now: () => instance.clock.now(),
   });
+  // ADR-0032 Decision 6: the hub's default seatPolicy is now "follow-required".
+  instance.followHub(hub.actorId);
   return hub;
 }
 

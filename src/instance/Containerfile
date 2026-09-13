@@ -1,0 +1,26 @@
+# ADR-0032 Decision 1 / Consequences "Accepted": a convenience, not a
+# supported artifact. The instance is a clean Node checkout with no
+# dependencies (ADR-0001 Decision 2) and no build step; this file exists so
+# an operator who wants a container has one, not because the project needs
+# one to run.
+#
+# node:24-slim (Debian, current LTS line) rather than alpine or distroless:
+# node:sqlite is a native addition to the Node binary itself, so there is no
+# musl/glibc concern to prefer alpine for, and slim keeps a shell and a
+# package manager available for an operator's own proxy/TLS debugging without
+# the full image's size.
+FROM node:24-slim
+
+WORKDIR /app
+COPY . .
+# No `npm install` — ADR-0001 Decision 2: this instance has no dependencies.
+
+ENV AFP_DATA_DIR=/data
+VOLUME /data
+EXPOSE 8787
+
+# slim has no curl; node itself is the only tool guaranteed present.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:8787/readyz').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+
+ENTRYPOINT ["node", "--disable-warning=ExperimentalWarning", "src/cli.ts", "serve"]

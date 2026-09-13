@@ -22,7 +22,7 @@ const command = process.argv[2] ?? "demo";
 // runs over plain `http://127.0.0.1` origins by construction — that is the
 // point of a demo. `serve` is the one command that runs a real deployment,
 // so it is the one command left to the operator's own `AFP_DEV`.
-if (command !== "serve" && process.env.AFP_DEV === undefined) {
+if (!["serve", "config", "backup", "restore"].includes(command) && process.env.AFP_DEV === undefined) {
   process.env.AFP_DEV = "1";
 }
 
@@ -1040,6 +1040,90 @@ async function main(): Promise<void> {
       break;
     }
 
+    case "config": {
+      const sub = process.argv[3];
+      if (sub !== "check") {
+        console.error("usage: config check [--offline]");
+        process.exit(1);
+        break;
+      }
+      const config = loadConfig();
+      const { runConfigCheck } = await import("./runtime/configCheck.ts");
+      const offline = process.argv.includes("--offline");
+      let fetchActor: import("./runtime/configCheck.ts").RunConfigCheckOptions["fetchActor"];
+      if (!offline) {
+        const { fetchActorDocument } = await import("./federation/inbox.ts");
+        fetchActor = (url: string) =>
+          fetchActorDocument(url, { devMode: config.devMode, trustedNets: config.trustedNets });
+      }
+      const result = await runConfigCheck(config, { offline, fetchActor });
+
+      for (const problem of result.problems) {
+        console.log(`FAIL  ${problem.field} (${problem.env}): ${problem.message}`);
+      }
+      for (const line of result.lines) {
+        console.log(`${line.ok ? "ok  " : "FAIL"}  ${line.name}${line.reason ? ` — ${line.reason}` : ""}`);
+      }
+      process.exit(result.allOk ? 0 : 1);
+      break;
+    }
+
+    case "backup": {
+      const config = loadConfig();
+      const dir = process.argv[3];
+      if (!dir) {
+        console.error("usage: backup <dir>");
+        process.exit(1);
+        break;
+      }
+      const { backupStore } = await import("./store/backup.ts");
+      const log = logger("cli:backup");
+      const manifest = await backupStore(dir, {
+        dbPath: config.dbPath,
+        artifactDir: config.artifactDir,
+        origin: config.origin,
+      });
+      console.log(`backup written to ${dir}`);
+      console.log(`  ${manifest.artifacts} artifacts, schema version ${manifest.schemaVersion}, taken ${manifest.takenAt}`);
+      console.log("  keys were NOT included — back those up separately (README § Backup, ADR-0026 Decision 6)");
+      log.info("backup", { dir });
+      break;
+    }
+
+    case "restore": {
+      const config = loadConfig();
+      const dir = process.argv[3];
+      if (!dir) {
+        console.error("usage: restore <dir> [--force]");
+        process.exit(1);
+        break;
+      }
+      const force = process.argv.includes("--force");
+      const { restoreStore, RestoreRefused } = await import("./store/backup.ts");
+      const log = logger("cli:restore");
+      try {
+        const { restoredAt, manifest } = restoreStore(dir, {
+          dbPath: config.dbPath,
+          artifactDir: config.artifactDir,
+          origin: config.origin,
+          force,
+        });
+        console.log(`restored from ${dir} at ${restoredAt} (backup taken ${manifest.takenAt})`);
+        console.log("  a restore point was recorded — a same-value duplicate vote after this instant");
+        console.log("  is explained by that record, not equivocation (ADR-0020 Decision 2)");
+        console.log("  reminder: exports under AFP_EXPORT_DIR were not restored — retention is the");
+        console.log("  operator's afp:retentionDuty (ADR-0012)");
+        log.info("restore", { dir, restoredAt });
+      } catch (error) {
+        if (error instanceof RestoreRefused) {
+          console.error(`refused: ${error.message}`);
+          process.exit(2);
+        }
+        throw error;
+      }
+      break;
+    }
+
     case "serve": {
       const config = loadConfig();
       const instance = new AfpInstance(config, agentRegistrations(config));
@@ -1133,7 +1217,7 @@ async function main(): Promise<void> {
     }
 
     default:
-      console.error(`unknown command: ${command}\nusage: cli.ts [demo|p2|p3|p3:llm|p4|p5|p5:llm|p6|p6:llm|p7|p7:llm|p8|p8:llm|export|keys|serve]`);
+      console.error(`unknown command: ${command}\nusage: cli.ts [demo|p2|p3|p3:llm|p4|p5|p5:llm|p6|p6:llm|p7|p7:llm|p8|p8:llm|export|keys|serve|config|backup|restore]`);
       process.exit(1);
   }
 }

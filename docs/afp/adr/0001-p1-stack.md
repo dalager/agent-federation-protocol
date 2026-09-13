@@ -169,6 +169,13 @@ disagreeing early, long before P4 goes near another implementation.
 | Airgapped deployment becomes the primary delivery mode | Decision 2 — single-binary runtime for the instance |
 | P5 multi-hub cross-operator sync | Decision 4 — SQLite → Postgres for the state store |
 
+*Fired at P5 (2026-08-21); outcome:* the store held. P5's cross-operator sync ships
+signed activities (`offerSync`/CRDT deltas over the wire), not shared database state, so
+the multi-hub case this trigger anticipated never required a second database to operate —
+and Postgres would have cost the file-copy export property SQLite gives for free
+([ADR-0023](0023-loose-ends-triaged.md) row L8; [ADR-0032](0032-deployment-profile.md)'s
+Option table reaches the same conclusion independently).
+
 ## Revised under contact
 
 P1 was implemented immediately after this ADR was accepted. Two decisions did not

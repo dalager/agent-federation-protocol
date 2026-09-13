@@ -100,8 +100,21 @@ export function testInstance(agentNames: readonly string[], capability: string, 
 /**
  * A hub over an existing instance, with per-agent hub keys and the actor
  * resolver wired — the setup every hub-bearing gate repeats verbatim.
+ *
+ * ADR-0032 Decision 6: the default seatPolicy is now "follow-required" —
+ * every caller of this helper enrolls agents next, so the instance Follows
+ * the hub here, before enrollment, the same way the demos do. Pass
+ * `seatPolicy: "enroll-implies-seat"` only where a test's subject is
+ * specifically the pre-flip behaviour (or, as in ADR-0014's chain-head test,
+ * needs the hub to have emitted nothing yet) — every other caller should
+ * take the default.
  */
-export function testHub(instance: AfpInstance, agentNames: readonly string[], hubId: string) {
+export function testHub(
+  instance: AfpInstance,
+  agentNames: readonly string[],
+  hubId: string,
+  options: { seatPolicy?: "follow-required" | "enroll-implies-seat" } = {},
+) {
   const hubKeys = new Map<string, KeyPair>(
     agentNames.map((name) => [
       name,
@@ -128,7 +141,11 @@ export function testHub(instance: AfpInstance, agentNames: readonly string[], hu
     backoffBaseMs: instance.config.backoffBaseMs,
     fetchActor,
     now: () => instance.clock.now(),
+    seatPolicy: options.seatPolicy,
   });
+  if (options.seatPolicy !== "enroll-implies-seat") {
+    void hub.receive(instance.followHub(hub.actorId).activity);
+  }
   return { hub, hubKeys };
 }
 

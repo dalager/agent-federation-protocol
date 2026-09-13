@@ -86,6 +86,10 @@ export async function runP2Demo(options: { fresh?: boolean; config?: Partial<Con
   });
   const transport = hubTransport(hub, instance.localTransport(), (target) => instance.nameOf(target) !== null);
 
+  // ADR-0032 Decision 6: the hub's default seatPolicy is now
+  // "follow-required" — the instance Follows before it Enrolls.
+  instance.followHub(hub.actorId);
+
   // Enroll all thirty, then open the round over the pinned membership.
   for (const { spec } of agents) {
     instance.publishAsInstance([hub.actorId], `${config.origin}/threads/enroll`, "hub", (envelope: Envelope) =>

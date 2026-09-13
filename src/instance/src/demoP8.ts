@@ -214,6 +214,10 @@ export async function runP8Demo(
   });
   const transport: Transport = hubTransport(hub, instance.localTransport(), (t) => instance.nameOf(t) !== null);
 
+  // ADR-0032 Decision 6: the hub's default seatPolicy is now
+  // "follow-required" — the instance Follows before it Enrolls.
+  instance.followHub(hub.actorId);
+
   // Every seat in its role (ADR-0004, ADR-0019): the initiator may ask and
   // never bid; the actuator may act and never vote.
   const seats = [["requester", "requester"] as const, ...TRIAGERS.map((n) => [n, "member"] as const), ["forge-out", "actuator"] as const];

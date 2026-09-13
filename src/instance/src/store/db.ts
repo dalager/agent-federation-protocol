@@ -4,12 +4,21 @@
  *
  * One file is a deliberate choice, not a convenience — "export the outbox" has
  * to stay a file copy for the sneakernet property in 06.
+ *
+ * ADR-0032 Decision 4: every table any module needs comes through this one
+ * door — `openDb` runs `migrate()` after the lock and the PRAGMAs, and no
+ * other module `CREATE TABLE`s or `ALTER TABLE`s its own tables into
+ * existence any more. One door, one schema, mirroring the ADR-0027 "one
+ * door" property for the store's shape itself.
  */
 
 import { DatabaseSync } from "node:sqlite";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { logger } from "../runtime/log.ts";
+import { migrate, MIGRATIONS } from "./migrations/index.ts";
+
+export { StoreNewerThanBinary } from "./migrations/index.ts";
 
 const log = logger("store/db");
 
@@ -65,6 +74,25 @@ function acquireLock(dbPath: string): void {
   writeFileSync(lockPath, JSON.stringify({ pid: process.pid, openedAt: new Date().toISOString() }));
 }
 
+/**
+ * Who holds `dbPath` right now, without opening it: this process (the
+ * in-process set), a live foreign process (its lock file), or nobody
+ * (`null`). A stale lock naming a dead pid reads as nobody. `restoreStore`
+ * asks this instead of `openDb`, because opening the target would run its
+ * migrations as a side effect of merely checking whether it is live.
+ */
+export function lockHolder(dbPath: string): number | null {
+  if (openPaths.has(dbPath)) return process.pid;
+  const lockPath = lockPathFor(dbPath);
+  if (!existsSync(lockPath)) return null;
+  try {
+    const held = JSON.parse(readFileSync(lockPath, "utf8")) as { pid: number };
+    return pidIsAlive(held.pid) ? held.pid : null;
+  } catch {
+    return null;
+  }
+}
+
 function releaseLock(dbPath: string): void {
   try {
     rmSync(lockPathFor(dbPath), { force: true });
@@ -73,108 +101,14 @@ function releaseLock(dbPath: string): void {
   }
 }
 
-const SCHEMA = `
--- Append-only activity log, one hash chain per actor.
-CREATE TABLE IF NOT EXISTS outbox (
-  activity_id   TEXT PRIMARY KEY,
-  actor         TEXT NOT NULL,
-  seq           INTEGER NOT NULL,
-  thread        TEXT,
-  digest        TEXT NOT NULL,          -- sha256:<hex> over the canonical activity
-  prev_activity TEXT,                   -- NULL only for an actor's first activity
-  visibility    TEXT NOT NULL,
-  published     TEXT NOT NULL,
-  activity_json TEXT NOT NULL,
-  UNIQUE (actor, seq)
-);
+/** The highest schema version this binary knows how to migrate to. */
+export const BINARY_SCHEMA_VERSION = MIGRATIONS.reduce((max, m) => Math.max(max, m.version), 0);
 
--- Received deliveries, by recipient inbox path (ADR-0017 Decision 3): what a
--- GET on an inbox serves to its owner. Admission already happened at the gate;
--- this is the record of it, not a second judgment.
-CREATE TABLE IF NOT EXISTS inbox_log (
-  activity_id   TEXT NOT NULL,
-  recipient     TEXT NOT NULL,          -- the inbox path the delivery hit
-  activity_json TEXT NOT NULL,
-  received_at   TEXT NOT NULL,
-  PRIMARY KEY (activity_id, recipient)
-);
-
--- Layer 1 of 2: transport dedupe. A redelivered activity id never reaches dispatch.
-CREATE TABLE IF NOT EXISTS seen_ids (
-  activity_id TEXT PRIMARY KEY,
-  seen_at     TEXT NOT NULL,
-  expires_at  TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS seen_ids_expires ON seen_ids (expires_at);
-
--- Layer 2 of 2: task-level replay, keyed by correlationId rather than activity id.
-CREATE TABLE IF NOT EXISTS pending_tasks (
-  correlation_id TEXT PRIMARY KEY,
-  thread         TEXT NOT NULL,
-  delegator      TEXT NOT NULL,
-  performer      TEXT NOT NULL,
-  deadline       TEXT,
-  state          TEXT NOT NULL,         -- offered | accepted | completed | failed
-  created_at     TEXT NOT NULL,
-  updated_at     TEXT NOT NULL
-);
-
--- Cached outcomes so a repeated correlationId replays instead of re-executing.
-CREATE TABLE IF NOT EXISTS task_results (
-  correlation_id TEXT PRIMARY KEY,
-  performer      TEXT NOT NULL,
-  activity_id    TEXT NOT NULL,
-  activity_json  TEXT NOT NULL,
-  created_at     TEXT NOT NULL
-);
-
--- Delivery queue. Backoff and dead-lettering are a query, not a broker.
-CREATE TABLE IF NOT EXISTS delivery_queue (
-  id              INTEGER PRIMARY KEY AUTOINCREMENT,
-  activity_id     TEXT NOT NULL,
-  target          TEXT NOT NULL,
-  attempts        INTEGER NOT NULL DEFAULT 0,
-  next_attempt_at INTEGER NOT NULL,
-  state           TEXT NOT NULL,        -- pending | delivered | dead
-  last_error      TEXT,
-  created_at      TEXT NOT NULL,
-  activity_json   TEXT NOT NULL
-);
-
-CREATE INDEX IF NOT EXISTS idx_queue_ready ON delivery_queue (state, next_attempt_at);
-CREATE INDEX IF NOT EXISTS idx_outbox_actor ON outbox (actor, seq);
-CREATE INDEX IF NOT EXISTS idx_outbox_thread ON outbox (thread);
-
--- Rejected and duplicate deliveries. An activity that fails the pipeline is
--- audit-logged and dropped, never silently discarded (04 § Security).
-CREATE TABLE IF NOT EXISTS audit_log (
-  id          INTEGER PRIMARY KEY AUTOINCREMENT,
-  at          TEXT NOT NULL,
-  outcome     TEXT NOT NULL,          -- rejected | duplicate
-  activity_id TEXT,
-  actor       TEXT,
-  reason      TEXT NOT NULL
-);
-
--- Artifact index. The bytes live on disk under their own digest.
-CREATE TABLE IF NOT EXISTS artifacts (
-  digest     TEXT PRIMARY KEY,
-  media_type TEXT NOT NULL,
-  size       INTEGER NOT NULL,
-  created_at TEXT NOT NULL,
-  -- Provenance for evidence that entered from outside AFP (07 § Artifacts).
-  source_url TEXT,
-  fetched_at TEXT
-);
-
--- ADR-0031 Decision 6: a per-peer minimum next-attempt time, set from a
--- peer's own Retry-After — independent of any one queue item's backoff, so
--- a 429 from one peer never touches the schedule for any other.
-CREATE TABLE IF NOT EXISTS peer_backoff (
-  target      TEXT PRIMARY KEY,
-  not_before  INTEGER NOT NULL
-);
-`;
+/** The schema version a store is currently at (0 for one that has never migrated). */
+export function schemaVersion(db: Db): number {
+  const row = db.prepare("SELECT MAX(version) AS v FROM schema_version").get() as { v: number | null } | undefined;
+  return row?.v ?? 0;
+}
 
 /**
  * ADR-0031 Decision 4: one writer, enforced. A file path is opened at most
@@ -186,7 +120,7 @@ export function openDb(path: string): Db {
   if (path === ":memory:") {
     const db = new DatabaseSync(path);
     db.exec("PRAGMA foreign_keys = ON");
-    db.exec(SCHEMA);
+    migrate(db);
     return db;
   }
 
@@ -200,7 +134,16 @@ export function openDb(path: string): Db {
   const db = new DatabaseSync(path);
   db.exec("PRAGMA journal_mode = WAL");
   db.exec("PRAGMA foreign_keys = ON");
-  db.exec(SCHEMA);
+  try {
+    migrate(db);
+  } catch (error) {
+    // A refused open (StoreNewerThanBinary, or a failed migration) must not
+    // leave the lock behind for the pid that never got to hold it.
+    db.close();
+    openPaths.delete(path);
+    releaseLock(path);
+    throw error;
+  }
 
   const nativeClose = db.close.bind(db);
   db.close = () => {

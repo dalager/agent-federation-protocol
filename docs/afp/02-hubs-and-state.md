@@ -17,11 +17,14 @@ different hubs.
 
 > **Migration (ADR-0017 Decision 4).** The hub's `Accept` answers the Follow with the
 > *Follow activity's id* as its `object` — the same convention every other Accept in
-> this spec follows. During the transition a hub MAY run `enroll-implies-seat`, deriving
+> this spec follows — and carries top-level `afp:hub` naming the hub, since crossing a
+> real federation boundary is exactly what this Accept does whenever the follower is a
+> foreign instance ([ADR-0032](adr/0032-deployment-profile.md) Decision 6). During the
+> transition a hub MAY run `enroll-implies-seat`, deriving
 > the instance seat from the `afp:Enroll` trail as earlier revisions of the reference
 > implementation did; `follow-required` — an `afp:Enroll` from an instance holding no
 > live seat is refused by name — is the conformant target, and the reference instance
-> flips its default in the next phase. `Undo{Follow}` revokes the seat and mass-unenrolls
+> flipped, at [ADR-0032](adr/0032-deployment-profile.md) Decision 6. `Undo{Follow}` revokes the seat and mass-unenrolls
 > that instance's agents; a later re-Follow revives the seat empty, enrollment starting
 > over per agent.
 

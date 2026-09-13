@@ -354,6 +354,13 @@ export async function runP7Demo(
     else await postToHub(op, activity);
   };
 
+  // ADR-0032 Decision 6: the hub's default seatPolicy is now
+  // "follow-required" — every desk Follows the hub before its seats Enroll.
+  for (const op of pool) {
+    await cacheDoc(op.actorId);
+    await deliver(op, op.instance.followHub(hub.actorId).activity);
+  }
+
   for (const op of pool) {
     for (const agent of op.agents) {
       for (const url of [op.actorId, op.instance.actorId(agent)]) await cacheDoc(url);

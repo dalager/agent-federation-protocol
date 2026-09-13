@@ -157,7 +157,12 @@ describe("ADR-0016: the hub's inbox and cross-instance CRDT sync, over real sock
         alpha.federation.receivedActivities().find((r) => String(r.activity.id) === activityId)?.activity ??
         null,
     });
-    alpha.server.close();
+    // Close the operator's bootstrap server fully before rebinding its port:
+    // a keep-alive socket left open by an earlier fetch would otherwise be
+    // reused by the client pool against a dead peer — a silent lost delivery
+    // and, on a POST, a promise that never settles.
+    alpha.server.closeAllConnections();
+    await new Promise<void>((resolve) => alpha.server.close(() => resolve()));
     const alphaServer = createHttpServer(alpha.instance, {
       inbox: { federation: alpha.federation, receive: (a) => alpha.instance.receiveAdmitted(a), fetchDocument: fetchActorDocument },
       hubs: [hub],
@@ -191,6 +196,16 @@ describe("ADR-0016: the hub's inbox and cross-instance CRDT sync, over real sock
     await handshake(alpha, bravo);
     await handshake(alpha, gamma);
     await handshake(bravo, gamma);
+
+    // ADR-0032 Decision 6: the hub's default seatPolicy is now
+    // "follow-required" — each operator Follows before it enrolls, in-process
+    // for the host and over the real inbox for the others.
+    for (const op of [alpha, bravo, gamma]) {
+      await cacheDoc(op.actorId);
+      const followEntry = op.instance.followHub(hub.actorId);
+      if (op === alpha) await hub.receive(followEntry.activity);
+      else await postToHubInbox(op, alpha.origin, followEntry.activity, clock);
+    }
 
     // --- T1/T2: FOREIGN enrollment through the REAL hub inbox — M6's honesty
     // note, closed. The host's own agents enroll in-process, which is the
@@ -315,7 +330,8 @@ describe("ADR-0016: the hub's inbox and cross-instance CRDT sync, over real sock
       now: () => clock.now(),
       replicaOf: hub.actorId,
     });
-    bravo.server.close();
+    bravo.server.closeAllConnections();
+    await new Promise<void>((resolve) => bravo.server.close(() => resolve()));
     const bravoServer = createHttpServer(bravo.instance, {
       inbox: { federation: bravo.federation, receive: (a) => bravo.instance.receiveAdmitted(a), fetchDocument: fetchActorDocument },
       hubs: [replica],

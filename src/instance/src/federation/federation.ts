@@ -27,54 +27,6 @@ import type { Envelope } from "../ap/activities.ts";
 import { AFP_CONTEXTS } from "../ap/documents.ts";
 import { admittingGrant, summarize, type AgreementObject } from "./grants.ts";
 
-const SCHEMA = `
-CREATE TABLE IF NOT EXISTS fed_agreements (
-  digest            TEXT PRIMARY KEY,   -- digest of the agreement OBJECT: its identity
-  object_json       TEXT NOT NULL,
-  counterparty      TEXT NOT NULL,      -- the other instance actor
-  own_create_json   TEXT,               -- our signed Create, once published
-  their_create_json TEXT,               -- theirs, once received through the inbox
-  expires           TEXT NOT NULL
-);
-
--- Admitted cross-boundary activities, verbatim as received (ADR-0009 Decision
--- 3's precondition): the joint replay checks these bytes against the sender's
--- own export. Store what you verified, not a re-serialization.
-CREATE TABLE IF NOT EXISTS fed_received (
-  digest        TEXT PRIMARY KEY,
-  from_instance TEXT NOT NULL,
-  at            TEXT NOT NULL,
-  activity_json TEXT NOT NULL
-);
-
--- Admitted cross-boundary correlations (ADR-0008 Decision 4): the in-time
--- Accept is what a late outcome rides; the earliest admitted instant wins.
-CREATE TABLE IF NOT EXISTS fed_accepts (
-  correlation_id TEXT PRIMARY KEY,
-  counterparty   TEXT NOT NULL,
-  published      TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS fed_denylist (
-  instance TEXT PRIMARY KEY,
-  at       TEXT NOT NULL,
-  reason   TEXT NOT NULL
-);
-
--- The boundary log (ADR-0008 Decision 3): hash-chained, instance-signed at
--- digest time, custody-grade not consensus-grade — and it says so out loud.
-CREATE TABLE IF NOT EXISTS fed_boundary_log (
-  seq          INTEGER PRIMARY KEY AUTOINCREMENT,
-  at           TEXT NOT NULL,
-  actor        TEXT NOT NULL,
-  claimed_type TEXT NOT NULL,
-  step         TEXT NOT NULL,           -- signature | agreement | denylist | operated-by
-  reason       TEXT NOT NULL,
-  activity_digest TEXT NOT NULL,
-  entry_hash   TEXT NOT NULL            -- sha256(JCS(entry sans hash) + prev entry_hash)
-);
-`;
-
 export interface AgreementSpec {
   parties: readonly [string, string];
   grants: readonly { [key: string]: JsonValue }[];
@@ -140,7 +92,8 @@ export class Federation {
     this.db = db;
     this.selfActor = selfActor;
     this.now = now;
-    db.exec(SCHEMA);
+    // ADR-0032 Decision 4: fed_* tables come from openDb's migration now, not a
+    // constructor-time exec — one door for schema, applied once at store open.
   }
 
   // ------------------------------------------------------------- agreements

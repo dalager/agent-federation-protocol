@@ -1,8 +1,9 @@
 /**
  * ADR-0017 Decision 4: Follow/Accept enrollment at the hub — a live seat
  * (this instance has Followed the hub) gates `afp:Enroll` under
- * `seatPolicy: "follow-required"`; the default policy stays byte-identical
- * to pre-D4 behavior.
+ * `seatPolicy: "follow-required"`, which ADR-0032 Decision 6 makes the
+ * default; `"enroll-implies-seat"`, set explicitly, keeps the pre-flip
+ * behavior byte-identical.
  *
  *   node --experimental-sqlite --test test/adr0017-d4-follow.test.ts
  */
@@ -195,14 +196,27 @@ describe("ADR-0017 Decision 4: Follow/Accept seats", () => {
     assert.ok(hub.members().includes(instance.actorId("f1")), "the revived seat admits Enroll");
   });
 
-  it("default seatPolicy (enroll-implies-seat) still enrolls without any Follow — the compat proof", async () => {
+  it("ADR-0032 D6: default seatPolicy is now follow-required — an Enroll without a Follow is refused", async () => {
     const db = openDb(":memory:");
     const instance = makeInstance("https://g.local", "g1");
     const hub = makeHub([instance], { db }); // no seatPolicy — default
 
     const outcome = await hub.receive(enrollAgent(instance, hub, "g1").activity);
+    assert.equal(outcome.status, "dispatched", "the Enroll's own signature still verifies");
+    assert.ok(!hub.members().includes(instance.actorId("g1")), "no seat, no admission — the flipped default");
+
+    const log = admissionLog(db, instance.actorId("g1"));
+    assert.match(log.at(-1)!.reason, /no seat/);
+  });
+
+  it("enroll-implies-seat, set explicitly, still enrolls without any Follow — the pre-flip compat proof", async () => {
+    const db = openDb(":memory:");
+    const instance = makeInstance("https://g2.local", "g2");
+    const hub = makeHub([instance], { db, seatPolicy: "enroll-implies-seat" });
+
+    const outcome = await hub.receive(enrollAgent(instance, hub, "g2").activity);
     assert.equal(outcome.status, "dispatched");
-    assert.ok(hub.members().includes(instance.actorId("g1")), "byte-identical to pre-D4: Enroll alone still admits");
+    assert.ok(hub.members().includes(instance.actorId("g2")), "byte-identical to pre-D4: Enroll alone still admits");
   });
 
   it("/actor/following lists the hub after followHub", async () => {

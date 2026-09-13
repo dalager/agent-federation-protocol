@@ -156,7 +156,7 @@ built in its ADR.
 | C5 | 0029 | built, less the human-approval controller binding's own signed policy document — that is [ADR-0033](0033-operator-obligations.md)'s job; `AFP_CONTROLLERS` stands in until then |
 | C6 | 0030 | built, less scenario 15 (waits for ADR-0031/0032) and the CI wiring (ADR-0034) |
 | C7 | 0031 | built, less a hub hosted by `serve` itself for the converge loop to advance — the scheduler takes replicas from an embedding program until then |
-| C8 | 0032 | proposed |
+| C8 | 0032 | built |
 | C9–C10 | 0033, 0034 | proposed |
 
 ## References
