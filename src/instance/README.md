@@ -450,11 +450,59 @@ Scenario 09's constraint — one sidecar stays the sole OIDC client of a casewor
 and the sole actuator against it — is not a new wire term. It is one enrolled
 `ExternalActuator` holding that system's credentials, and nothing else in the deployment
 holding them too. `AFP_CONTROLLERS` is the same idea one layer up, for `ApprovalPort`
-(ADR-0028 Decision 4): the instance's own configuration names which actor URLs may answer
-for a human controller, standing in for ADR-0029's signed policy document until it
-exists. Both are configuration decisions an operator makes, not protocol terms the wire
-format carries — the record shows *that* an authorized controller decided and *what* it
-decided, never how the deployment decided who counted as one.
+(ADR-0028 Decision 4) and for the command grammar below (ADR-0029 Decision 2): the
+instance's own configuration names which actor URLs may answer for a human controller,
+standing in for [ADR-0033](../../docs/afp/adr/0033-operator-obligations.md)'s signed
+policy document until it exists. Both are configuration decisions an operator makes, not
+protocol terms the wire format carries — the record shows *that* an authorized controller
+decided and *what* it decided, never how the deployment decided who counted as one.
+
+## The human window
+
+Watch, approve and command, over the same read gate as everything else
+([ADR-0029](../../docs/afp/adr/0029-the-human-window-and-the-activitypub-premise.md)).
+
+**Watch.** `GET /threads/:id/rendering` and `GET /agents/:name/timeline` serve an
+`afp:Rendering` — a narrative built from activity shape, plus the digests it summarizes,
+the chain heads among what was admitted, and the export bundle/verdict when one exists. An
+anonymous fetch on a `public` thread:
+
+```bash
+curl http://localhost:8787/threads/<thread-id>/rendering
+# or, for the plain-text narrative:
+curl -H 'Accept: text/plain' http://localhost:8787/threads/<thread-id>/rendering
+```
+
+A `parties` thread returns the same **404, not 403** every other gated route does. A
+signed fetch under an `afp:AuditGrant` (see [ADR-0013](../../docs/afp/adr/0013-authorized-fetch.md))
+is admitted and recorded:
+
+```bash
+# headers from signRequest("GET", "/threads/<thread-id>/rendering", host, "", auditorSigner, now)
+curl -H "Signature: ..." -H "Signature-Input: ..." -H "Date: ..." -H "Host: ..." \
+  http://localhost:8787/threads/<thread-id>/rendering
+```
+
+**Command.** `POST /agents/:name/command` runs the same three-form grammar
+(`visibility.ts`'s `parseCommand`) the inbox's `Create{Note}` mentions use — `@name pause`,
+`@name status`, and a bare `approve` (with `thread`/`actsOn` in the body) that goes through
+[ADR-0028](../../docs/afp/adr/0028-port-agents.md)'s `approveThroughPort`. The requester is
+the HTTP-signature's actor, checked against `AFP_CONTROLLERS`. Every refusal — unlisted,
+anonymous, unparseable — answers the identical `200 { reply: "…" }` polite reply, never on
+the chain; a verified signer's refusal lands on the operator's audit log, an anonymous one
+is not recorded at all (ADR-0013 Decision 5 — a free refusal logged is a stranger's pen):
+
+```bash
+curl -X POST http://localhost:8787/agents/<name>/command \
+  -H "Signature: ..." -H "Signature-Input: ..." -H "Digest: ..." -H "Date: ..." -H "Host: ..." \
+  -H "Content-Type: application/json" \
+  -d '{"content": "@<name> status"}'
+```
+
+`AFP_FEDIVERSE_WINDOW=1` additionally dual-publishes a `public` shadow Note alongside every
+operator-visible event, `to: []` — followable by AFP-aware software and by anything that
+can read a public outbox. Off by default; every shipped bundle is byte-identical either
+way.
 
 ## Using a running instance
 
@@ -640,6 +688,15 @@ src/
     gitForge.ts       the git-forge actuator: open-pull-request; refuses merge
     approval.ts       the human as a port agent: ApprovalPort, ADR-0029's
                       controller binding
+    command.ts        ADR-0029: executeCommand, the local carrier
+                      (`POST /agents/:name/command`) — the same decision
+                      function the inbox's onMention calls
+  render/              ADR-0029 ("Watch"): the 04 § Renderings convention as
+                      code
+    rendering.ts       renderThread/renderTimeline, narrativeText,
+                      bundleInfoFor — pure functions over already-gated entries
+    routes.ts          the HTTP hook: `GET /threads/:id/rendering`,
+                      `GET /agents/:name/timeline`
   tools/fake-forge/
     forge.ts          an in-process fake git forge, idempotent by construction —
                       proves gitForgeActuator's contract without a network
@@ -650,6 +707,9 @@ src/
   instance/external.ts  ADR-0028's adapter side: initiate/actuate, reconciliation
                      enforcement, afp:err:unreconciled — free functions over
                      AfpInstance, kept out of instance.ts's own line ceiling
+  instance/pause.ts   ADR-0029: the `pause` verb's in-memory state
+  instance/window.ts  ADR-0029: maybeShadow, instance.ts's one call site for
+                     the fediverse window's dual-publish
   export.ts          the bundle you hand to a third party — hub outboxes included
   demo.ts, demoP2.ts, demoP3.ts, demoP4.ts, demoP5.ts, demoP6.ts, demoP7.ts,
   demoP8.ts, experimentP3.ts, experimentP7.ts, experimentP8.ts, cli.ts
@@ -706,7 +766,8 @@ Environment variables, all optional (see `src/config.ts`):
 | `AFP_RATE_LIMIT_PER_ACTOR` / `_WINDOW_MS` | `60` / `60000` | Per-authenticated-actor bucket, checked after signature verification |
 | `AFP_REPLAY_CACHE_TTL_MS` | `300000` | How long a signed request's (keyId, date, signature) blocks a second presentation |
 | `AFP_KEY_PASSPHRASE_FILE` | *(none)* | File holding the passphrase the `file` signer adapter encrypts PEMs with at rest ([ADR-0026](../../docs/afp/adr/0026-key-custody-and-the-signer-port.md)). Unset, PEMs are unencrypted — as before. Protects a stolen backup, not a compromised host |
-| `AFP_CONTROLLERS` | *(none)* | Comma-separated actor URLs authorized to answer through `ApprovalPort` ([ADR-0028](../../docs/afp/adr/0028-port-agents.md) Decision 4) — configuration standing in for ADR-0029's signed policy document until it exists |
+| `AFP_CONTROLLERS` | *(none)* | Comma-separated actor URLs authorized to answer through `ApprovalPort` ([ADR-0028](../../docs/afp/adr/0028-port-agents.md) Decision 4) and the command grammar at `POST /agents/:name/command` ([ADR-0029](../../docs/afp/adr/0029-the-human-window-and-the-activitypub-premise.md) Decision 2) — configuration standing in for [ADR-0033](../../docs/afp/adr/0033-operator-obligations.md)'s signed policy document until it exists |
+| `AFP_FEDIVERSE_WINDOW` | `0` | `1` dual-publishes a `public` shadow Note alongside every operator-visible event ([ADR-0029](../../docs/afp/adr/0029-the-human-window-and-the-activitypub-premise.md) Decision 3). Off by default; every shipped bundle is byte-identical either way |
 
 `AFP_LLM_API_KEY` is read at the point of use and never stored, logged, or
 written into the record. A local endpoint generally needs none.
@@ -795,7 +856,11 @@ own identifier there.
 
 ## What this instance deliberately does not do yet
 
-Gossip anti-entropy and Mastodon visibility. Cross-operator hubs landed with P5,
+Gossip anti-entropy, and delivery to a real Mastodon inbox — the shadow timeline itself
+landed with [ADR-0029](../../docs/afp/adr/0029-the-human-window-and-the-activitypub-premise.md),
+behind `AFP_FEDIVERSE_WINDOW`; delivering it needs an RSA keypair per actor and the
+draft-cavage shim this instance does not have, and stays parked
+([ADR-0023](../../docs/afp/adr/0023-loose-ends-triaged.md) L18). Cross-operator hubs landed with P5,
 Byzantine rounds and the governed consequence of a conviction with P6, and
 contribution accounting with P7; federation agreements, real HTTP transport and
 HTTP Signatures landed with P4; TLS enforcement, an SSRF-safe fetch policy, real

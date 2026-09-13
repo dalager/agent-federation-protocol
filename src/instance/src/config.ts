@@ -91,6 +91,20 @@ export interface Config {
    * until an operator configures one.
    */
   readonly controllers: readonly string[];
+
+  // ---------------------------------------------------------- ADR-0029
+
+  /**
+   * ADR-0029 Decision 3: dual-publish a `public` `Create{Note}` shadow (built
+   * by `federation/visibility.ts` `shadowNote`) alongside every event 04
+   * lists as operator-visible. Off by default — this is a profile, not the
+   * premise (Decision 1): AFP objects are not consumable by fediverse
+   * software by design, and until delivery to a real Mastodon inbox exists
+   * (ADR-0023 L18, parked — it needs an RSA shim this instance does not
+   * have), the window is only "followable by AFP-aware software and by
+   * anything that can read a public outbox".
+   */
+  readonly fediverseWindow: boolean;
 }
 
 /**
@@ -190,6 +204,7 @@ export function loadConfig(overrides: Partial<Config> = {}): Config {
       .split(",")
       .map((s) => s.trim())
       .filter((s) => s.length > 0),
+    fediverseWindow: env("AFP_FEDIVERSE_WINDOW", "0") === "1",
   };
 
   return { ...base, ...overrides };

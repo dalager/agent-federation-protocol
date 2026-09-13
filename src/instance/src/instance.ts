@@ -43,6 +43,8 @@ import { validateActionPolicy, validateIrrevocableActions, type TaskPins } from 
 import type { Brain } from "./brains/port.ts";
 import { Inbox } from "./inbox.ts";
 import { followHub as followHubImpl, followingIds as followingIdsImpl, unfollowHub as unfollowHubImpl } from "./instance/following.ts";
+import { PausedAgents } from "./instance/pause.ts";
+import { maybeShadow } from "./instance/window.ts";
 import {
   actuate as actuateImpl,
   initiate as initiateImpl,
@@ -96,6 +98,8 @@ export class AfpInstance {
   readonly config: Config;
   readonly clock: Clock;
   private pipeline: Inbox | null = null;
+  /** ADR-0029 Decision 2 ("Command"): the `pause` verb's in-memory state. */
+  private readonly pausedAgents = new PausedAgents();
 
   constructor(
     config: Config,
@@ -389,6 +393,8 @@ export class AfpInstance {
 
     const entry = this.outbox.append(signed);
     for (const target of options.to) this.queue.enqueue(target, signed, this.clock.now());
+    // ADR-0029 Decision 3: a no-op unless AFP_FEDIVERSE_WINDOW is set (gate G4).
+    maybeShadow(this, signed, options);
     return entry;
   }
 
@@ -475,6 +481,23 @@ export class AfpInstance {
 
   followingIds(): string[] {
     return followingIdsImpl(this);
+  }
+
+  // -------------------------------------------------------------- pause
+  // ADR-0029 Decision 2 ("Command"): `pauseAgent` is reachable via a
+  // controller's `@name pause` mention/command; there is no `resume` in the
+  // grammar, so `resumeAgent` is here for the operator's own program only.
+
+  pauseAgent(name: string): void {
+    this.pausedAgents.pause(name);
+  }
+
+  resumeAgent(name: string): void {
+    this.pausedAgents.resume(name);
+  }
+
+  isPaused(name: string): boolean {
+    return this.pausedAgents.isPaused(name);
   }
 
   // ---------------------------------------------------------------- external

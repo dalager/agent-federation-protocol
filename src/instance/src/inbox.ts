@@ -14,7 +14,9 @@ import type { JsonValue } from "./crypto/jcs.ts";
 import { publicKeyFromMultibase } from "./crypto/keys.ts";
 import { verifyProof } from "./crypto/proof.ts";
 import { instanceActorId } from "./ap/documents.ts";
-import { acceptTask, correlationIdOf, createError, createResult } from "./ap/activities.ts";
+import { acceptTask, correlationIdOf, createError, createResult, rejectTask } from "./ap/activities.ts";
+import { isAuthorizedController, parseCommand, politeReply } from "./federation/visibility.ts";
+import { executeCommand } from "./ports/command.ts";
 import { Artifacts } from "./store/artifacts.ts";
 import {
   consumesBytes,
@@ -88,9 +90,15 @@ export class Inbox {
     return { status: "dispatched" };
   }
 
-  /** Record a dropped delivery, then report it. Nothing is discarded silently. */
+  /**
+   * Record a dropped delivery, then report it. Nothing is discarded silently.
+   *
+   * `"polite-reply"` (ADR-0029 Decision 2/3) is the fixed, read-only answer
+   * to an unauthorized, unparseable or anonymous command — recorded here so
+   * the attempt is on the operator's audit trail, never on the chain.
+   */
   dropDelivery(
-    outcome: "rejected" | "duplicate",
+    outcome: "rejected" | "duplicate" | "polite-reply",
     activityId: string,
     actor: string,
     reason: string,
@@ -139,8 +147,59 @@ export class Inbox {
     if (type === "Accept") return this.onAccepted(activity);
     if (type === "Create" && objectType === "afp:Result") return this.onResult(activity);
     if (type === "Create" && objectType === "afp:Error") return this.onError(activity);
+    // ADR-0029 Decision 3: the Mastodon carrier for the command grammar — a
+    // `Create{Note}` addressed to one of this instance's agents is a mention.
+    // This is the ONE call site in the instance that parses a stranger's free
+    // text (G3's "no other path"); every other inbound type above is a typed
+    // `afp:*` activity the boundary already trusts.
+    if (type === "Create" && objectType === "Note") return this.onMention(activity);
     // Unknown types are recorded as received and otherwise ignored — an inbox is
     // a hint, never an instruction (04 § Reliability).
+  }
+
+  /**
+   * ADR-0029 Decision 3: a `Create{Note}` mentioning one of this instance's
+   * agents. An authorized controller's parsed command runs through the same
+   * `executeCommand` the HTTP route calls (`ports/command.ts`) — one
+   * decision function, two carriers. Everyone and everything else — a
+   * stranger, an unparseable note, a controller naming the wrong agent — is
+   * dropped with the fixed polite reply recorded in the audit log; delivering
+   * that reply to a real Mastodon inbox is ADR-0023 L18, parked (04 §
+   * Mastodon interop), so it goes no further than this log line.
+   */
+  private async onMention(activity: { [key: string]: JsonValue }): Promise<void> {
+    const activityId = String(activity.id ?? "");
+    const sender = String(activity.actor ?? "");
+    const note = activity.object as { [key: string]: JsonValue };
+    const content = typeof note?.content === "string" ? note.content : "";
+    const thread = typeof activity.context === "string" ? activity.context : undefined;
+
+    // The sender is already verified — `receive` checked the proof, or the
+    // boundary checked the hop signature — so, unlike the HTTP route's
+    // anonymous case, every refusal here has a known author and is recorded
+    // (ADR-0013 Decision 5's line: identity known, cost paid).
+    const recipient = firstRecipient(activity);
+    const name = recipient ? this.instance.nameOf(recipient) : null;
+    if (!name) {
+      this.dropDelivery("polite-reply", activityId, sender, `${politeReply(content)} (no local agent addressed)`);
+      return;
+    }
+
+    if (!isAuthorizedController(sender, { controllers: this.instance.config.controllers })) {
+      this.dropDelivery("polite-reply", activityId, sender, politeReply(content));
+      return;
+    }
+
+    const command = parseCommand(content, this.instance.actorId(name));
+    if (!command || (command.command !== "approve" && command.target !== name)) {
+      this.dropDelivery("polite-reply", activityId, sender, politeReply(content));
+      return;
+    }
+
+    const result = await executeCommand(this.instance, { agentName: name, by: sender, command, thread, content });
+    if ("reply" in result) {
+      this.dropDelivery("polite-reply", activityId, sender, "approve target not admissible");
+    }
   }
 
   async onTaskOffered(activity: { [key: string]: JsonValue }): Promise<void> {
@@ -150,6 +209,17 @@ export class Inbox {
     const performerUrl = firstRecipient(activity);
     const performerName = performerUrl ? this.instance.nameOf(performerUrl) : null;
     if (!performerName) return;
+
+    // ADR-0029 Decision 2 ("Command"): a paused performer never reaches its
+    // brain — the delegator gets the same Reject shape a stranger's brain
+    // failure would produce, so a paused agent looks, from the outside,
+    // exactly like one that declined the task.
+    if (this.instance.isPaused(performerName)) {
+      this.instance.publish(performerName, [String(activity.actor ?? "")], thread, "parties", (envelope) =>
+        rejectTask(envelope, String(activity.id ?? ""), correlationId, "paused by controller"),
+      );
+      return;
+    }
 
     const performer = this.instance.agents.get(performerName)!;
 

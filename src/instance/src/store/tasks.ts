@@ -87,6 +87,14 @@ export class Tasks {
     }));
   }
 
+  /** ADR-0029 Decision 2 ("Command"): how many tasks `performer` still has open — the `status` command's `pending` count. */
+  openCountForPerformer(performer: string): number {
+    const row = this.db
+      .prepare("SELECT COUNT(*) AS n FROM pending_tasks WHERE performer = ? AND state IN ('offered', 'accepted')")
+      .get(performer) as { n: number };
+    return Number(row.n);
+  }
+
   /** Cache the outcome a performer produced for a correlationId. */
   cacheResult(
     correlationId: string,

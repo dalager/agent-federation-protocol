@@ -1,6 +1,6 @@
 # ADR-0029 — The human window and the ActivityPub premise, re-examined
 
-- **Status:** Proposed (2026-09-02) — program claim **C5** of
+- **Status:** Accepted (2026-09-02), **built** (2026-09-13) — program claim **C5** of
   [ADR-0024](0024-the-road-to-production.md); group: **Scenario coverage**. Depends on
   [ADR-0027](0027-the-port-is-a-security-boundary.md)
 - **Date:** 2026-09-02
@@ -135,7 +135,80 @@ flag and a caveat.
 
 ## Build status
 
-Not built.
+**Built (2026-09-13).** All five work packages, and the gate matrix passes G1–G6
+(`test/adr0029.test.ts`, 14 cases — G1–G6 plus two primitive checks carried over from the
+WP-2 unit gate). The full suite is 320 tests, all green. `npm run demo` and `npm run
+demo:p8` both run offline and deterministic with the window off (the default), and their
+exports pass the independent Python verifier clean.
+
+Notes on what was built versus what the ADR wrote:
+
+- **The verdict field is read back, never computed.** `render/rendering.ts`'s
+  `bundleInfoFor` reads a stored `VERDICT.json` next to the export's `MANIFEST.json` and
+  reports its `verdict` string verbatim, or the literal `"unverified"` when nothing was
+  stored — this instance runs no in-process verifier (that is the Python tool), so a
+  rendering never fabricates a pass.
+- **`afp:chainHeads` are heads among *admitted* entries,** not an actor's true chain head.
+  `render/rendering.ts`'s `chainHeadsOf` takes the last entry it sees per actor in the
+  entries the read gate already filtered — for a reader whose grant or membership does not
+  admit an actor's later activities, the head reported is the last one that reader can
+  verify against, which the module documents rather than silently overstates.
+- **Controllers authenticate by HTTP signature; `AFP_CONTROLLERS` stands in for
+  ADR-0033.** `ports/command.ts`'s `commandRoute` resolves the requester through
+  `authorizeRead`'s signature verification (extended with `method`/`body` for a signed
+  `POST`) before checking `isAuthorizedController` — exactly the binding ADR-0028 Decision
+  4 anticipated, carried forward rather than re-decided here.
+- **`pause` has no `resume` in the grammar.** `instance/pause.ts`'s `PausedAgents` exposes
+  `resume`, and `AfpInstance.resumeAgent` calls it, but no mention or command form reaches
+  it — an operator's own program is the only caller, exactly as Decision 2 states. A
+  durable stop is `disownAgent`, on the record; a pause is not.
+- **The operator-visible set is pinned in code, not read from 04 at runtime.**
+  `instance/window.ts`'s `OPERATOR_VISIBLE_OBJECT_TYPES`/`OPERATOR_VISIBLE_ACTIVITY_TYPES`
+  are the object types `{afp:Task, afp:Award, afp:Result, afp:Synthesis,
+  afp:DecisionRecord, afp:Vouch, afp:Disown, afp:Error, afp:Act}` and the activity types
+  `{afp:Award, afp:Vouch, afp:Disown}` 04 lists — a shadow's own object type (`"Note"`) is
+  in neither set, which is what keeps a shadow from ever shadowing a shadow, by
+  construction rather than by a runtime check.
+- **Shadows publish to `to: []`; Mastodon delivery stays parked.** `maybeShadow` signs and
+  chains the shadow through the instance's own `publish`/`publishAsInstance` with nothing
+  addressed — "followable by AFP-aware software and by anything that can read a public
+  outbox," per Decision 3. The RSA keypair and draft-cavage shim a real Mastodon inbox
+  needs is still ADR-0023 L18, and its trigger is unchanged: a real Mastodon follower is
+  wanted.
+- **`authorizeRead` grew `method`/`body`,** defaulting to `"GET"`/`""` so every existing
+  caller — a bare `GET` — is unaffected; a signed `POST`'s `Content-Digest` now covers the
+  same bytes an inbox POST already binds.
+- **The polite reply is recorded in the audit log, never on the chain — but only for a
+  *verified* signer** (ADR-0013 Decision 5, unchanged by this ADR): `ports/command.ts`'s
+  `commandRoute` calls `Inbox.dropDelivery("polite-reply", …)` for an unlisted controller,
+  an unparseable/misdirected command, and an inadmissible `approve`, but an anonymous or
+  non-verifying request is answered and never logged — a free, unbounded refusal logged
+  would be a pen any stranger could write into the operator's store with, and the
+  rate limiter, not the audit log, is what bounds the asking. G3(d) checks both halves: the
+  three verified refusals each add one `"polite-reply"` row, the anonymous one adds none.
+- **One audit outcome for both carriers.** `inbox.ts`'s `onMention` records the same
+  `"polite-reply"` outcome `commandRoute` does for its own three refusal paths (no local
+  agent addressed, unauthorized controller, unparseable/misdirected command) and for
+  `executeCommand`'s own inadmissible-`approve` fallback — one outcome value a reader
+  checks regardless of which carrier the attempt arrived on, which is what G3(e) asserts.
+- **A shadow's `publicSummary` is bounded, the same 120-character excerpt limit
+  `render/rendering.ts` puts on a rendering's `public` narrative line** — `instance/window.ts`'s
+  `publicSummaryOf` truncates with an ellipsis rather than re-surfacing an unbounded public
+  string verbatim, so the one field a shadow may legitimately carry from an already-`public`
+  activity stays a summary, never a full copy.
+- **No narrowing of the G-rows.** G1–G6 are exactly the matrix below; nothing was demoted
+  to a primitives-only check.
+
+## Build status — gate matrix
+
+| # | Case | Result |
+|---|---|---|
+| G1 | Anonymous fetch: `parties` 404, `public` renders with the digest of what it rendered | pass |
+| G2 | The same under an `afp:AuditGrant`: served, and the fetch is recorded | pass |
+| G3 | A command from an unlisted controller: the fixed polite reply; from a listed one, the action — `status`, `pause` (+ idempotent, + a paused performer's Reject), `approve` (+ reconciliation naming the controller), every refusal shape (verified refusals logged, an anonymous one not), and the inbox mention carrier | pass |
+| G4 | The fediverse window off: no shadow Notes emitted; every shipped bundle byte-identical | pass |
+| G5 | The window on, a `parties` event: the shadow carries no gated content | pass |
+| G6 | Every shipped bundle replayed, window off by default: `demo:p1` and `demo:p8` both PASSED | pass |
 
 ## References
 

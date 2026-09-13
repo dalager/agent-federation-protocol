@@ -11,10 +11,18 @@ central auth service.
 Reusing ActivityPub means: no message broker to operate, no required central registry,
 per-message (not per-connection) authentication so agents can be hosted anywhere, and a
 decade of federation tooling — WebFinger, HTTP Signatures, object-integrity proofs (the
-Data Integrity successor to Linked Data Signatures), retry
-semantics, and interop with generic ActivityPub clients (including a human watching an
-agent's outbox from Mastodon). In v3 each agent additionally declares which instance
-administers it (`afp:operatedBy`).
+Data Integrity successor to Linked Data Signatures), and retry semantics. In v3 each
+agent additionally declares which instance administers it (`afp:operatedBy`).
+
+**The compatibility claim, precisely** (ADR-0029 Decision 1): AFP is
+ActivityPub-compatible at the level of actors, actor documents, key discovery, signatures
+and vocabulary. Behavioural interoperability with fediverse software is limited to
+`Follow`/`Accept`, WebFinger, NodeInfo, and the optional shadow timeline (04 § Mastodon
+interop). AFP objects are not consumable by fediverse software, by design: a closed
+federation with a two-tier admission gate (below) has no public to fan out to. Building on
+ActivityPub provides conventions, not security — every security property this protocol
+has is AFP's own and is listed where it is specified (07, 08, and the ADRs each
+mechanism cites).
 
 ## The operator instance
 

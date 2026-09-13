@@ -19,6 +19,12 @@
  * authorization, never an exception: a bad signature is a caller with fewer
  * rights, not an error condition.
  *
+ * ADR-0029 Decision 2 ("Command"): `authorizeRead` also resolves the
+ * requester behind a signed `POST` — `/agents/:name/command`'s signature
+ * covers the body digest the way the inbox's does. `method`/`body` default
+ * to `"GET"`/`""`, so every existing caller (a bare `GET`) is unaffected —
+ * the compatibility proof this module has kept since ADR-0013.
+ *
  * Decision 5 shapes what this module does *not* do: it never logs a
  * refusal. A read refusal is free, anonymous and unbounded, so recording
  * one would let any stranger write into the record. The one read this ADR
@@ -88,6 +94,8 @@ async function resolveRequester(
   deps: ReadGateDeps,
   path: string,
   headers: RequestAuthHeaders,
+  method: string,
+  body: string,
 ): Promise<Requester | null> {
   const keyId = extractKeyId(headers);
   if (!keyId) return null;
@@ -100,7 +108,7 @@ async function resolveRequester(
   if (!resolvedKey) return null;
 
   const resolveKey = (id: string): KeyObject | null => (id === keyId ? resolvedKey : null);
-  const verified = verifyRequest("GET", path, headers, "", resolveKey, deps.now());
+  const verified = verifyRequest(method, path, headers, body, resolveKey, deps.now());
   if (!verified.ok) return null;
 
   const docType = controllerDoc.type;
@@ -247,9 +255,12 @@ export async function authorizeRead(
   request: {
     path: string;
     headers: RequestAuthHeaders & { "afp-membership-proof"?: string };
+    /** ADR-0029 Decision 2: `"POST"` for a signed command, with `body` the raw bytes the signature covers. Defaults to `"GET"`. */
+    method?: string;
+    body?: string;
   },
 ): Promise<ReadAuthorization> {
-  const requester = await resolveRequester(deps, request.path, request.headers);
+  const requester = await resolveRequester(deps, request.path, request.headers, request.method ?? "GET", request.body ?? "");
   const provenHubs = new Set<string>();
   if (requester !== null) {
     const hub = await provenHub(deps, requester, request.headers["afp-membership-proof"]);

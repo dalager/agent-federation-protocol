@@ -83,7 +83,7 @@ reaching a decision. What an auditor asks, and the record that answers it:
 | What was decided? | `afp:DecisionRecord` (below) |
 | What was answered, and how sure were we? | `afp:Synthesis` — answer, method, contributing Results, assumptions, dissent |
 | Did the estimate prove right? | `afp:Settlement`, if and when actuals exist |
-| Human-readable trail? | Dual-publish shadow Notes, followable from Mastodon |
+| Human-readable trail? | A rendering, served over the read gate ([ADR-0029](adr/0029-the-human-window-and-the-activitypub-premise.md)); dual-publish shadow Notes, followable from Mastodon, are the optional profile below |
 
 ### What the record does not answer
 
@@ -119,6 +119,12 @@ verified export, and SHOULD carry the bundle digest and the verifier's result al
 the narrative** — so a reader can check the story against the record it claims to
 summarize, and a rendering of a bundle that does not verify announces that fact instead of
 reading identically to one that does (scenario 09, finding 31).
+
+[ADR-0029](adr/0029-the-human-window-and-the-activitypub-premise.md) serves this
+convention as code, over the same gate as every other read: `GET /threads/:id/rendering`
+and `GET /agents/:name/timeline`. The verdict field is honest about its own limits — this
+instance runs no in-process verifier, so it reads a stored `VERDICT.json` back rather than
+computing one, and says `"unverified"` when nothing was stored, never a fabricated pass.
 
 This generalizes a rule the spec already has in one place: dissent "SHOULD travel with the
 answer all the way to any human notification, not be summarized away en route". That is
@@ -534,6 +540,15 @@ state machine idempotent, order-tolerant, and timeout-driven.
 
 ## Mastodon interop
 
+**This section describes an optional profile, not the human window itself**
+([ADR-0029](adr/0029-the-human-window-and-the-activitypub-premise.md) Decision 3). The
+protocol's own surface for watching, approving and commanding is the read-gated rendering
+and command route above; dual-publish is an operator-visible shadow of that surface, on by
+`AFP_FEDIVERSE_WINDOW`, off by default. It is followable today by AFP-aware software and
+by anything that can read a public outbox — delivering a shadow Note to a real Mastodon
+inbox needs an RSA keypair and the draft-cavage shim this instance does not have, and stays
+parked ([ADR-0023](adr/0023-loose-ends-triaged.md) L18).
+
 **Operator requirement:** operators want to partake and watch what is happening using
 *standard Mastodon* — their normal account, their normal client. That works — with one
 honest constraint up front.
@@ -572,6 +587,11 @@ Mastodon accounts are authorized controllers (verified via the Note's HTTP-Signe
 optionally bound bidirectionally with `alsoKnownAs` links). Unauthorized mentions get at
 most a polite read-only reply — command parsing from arbitrary fediverse strangers is an
 injection surface, treated as such.
+
+The grammar is wired ([ADR-0029](adr/0029-the-human-window-and-the-activitypub-premise.md)
+Decision 2) at a local endpoint, `POST /agents/:name/command`, under `AFP_CONTROLLERS`; the
+inbox's `Create{Note}` mention is the second carrier for the identical grammar, never the
+only one.
 
 ### What maps neatly, what doesn't
 

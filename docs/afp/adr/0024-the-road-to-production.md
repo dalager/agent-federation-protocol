@@ -153,7 +153,8 @@ built in its ADR.
 | C2 | 0026, 0035 | built, less the `remote` signer adapter — costed and designed in [ADR-0035](0035-remote-custody-and-the-asynchronous-port.md), whose `remote-issued` mode is the buildable half |
 | C3 | 0027 | built, less the scenario re-walks — those are C6's job in [ADR-0030](0030-scenario-re-walks-and-the-coverage-index.md) |
 | C4 | 0028 | built, less the human-approval port's own scenario re-walk — that is C6's job in [ADR-0030](0030-scenario-re-walks-and-the-coverage-index.md) |
-| C5–C6 | 0029, 0030 | proposed |
+| C5 | 0029 | built, less the human-approval controller binding's own signed policy document — that is [ADR-0033](0033-operator-obligations.md)'s job; `AFP_CONTROLLERS` stands in until then |
+| C6 | 0030 | proposed |
 | C7–C8 | 0031, 0032 | proposed |
 | C9–C10 | 0033, 0034 | proposed |
 

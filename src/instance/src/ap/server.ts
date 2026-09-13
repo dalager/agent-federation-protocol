@@ -27,6 +27,8 @@ import type { OutboxEntry } from "../store/outbox.ts";
 import type { JsonValue } from "../crypto/jcs.ts";
 import { RateLimiter } from "../federation/rateLimit.ts";
 import { handleWebhook, matchWebhookRoute, type WebhookRoute } from "../ports/webhook.ts";
+import { renderingRoute } from "../render/routes.ts";
+import { handleCommandPost, matchCommandRoute } from "../ports/command.ts";
 
 const AP_CONTENT_TYPE = "application/activity+json";
 
@@ -248,6 +250,15 @@ export function createHttpServer(instance: AfpInstance, options: ServerOptions =
       return;
     }
 
+    // ADR-0029 Decision 2 ("Command"): `POST /agents/:name/command`, body-read
+    // and dispatched in `ports/command.ts` — the same webhook-shaped seam
+    // `handleWebhook`/`matchWebhookRoute` use above, kept out of this file to
+    // hold it under its line ceiling.
+    if (matchCommandRoute(req.method ?? "", path)) {
+      handleCommandPost(instance, options.read, req, res, path);
+      return;
+    }
+
     if (req.method !== "GET") return notFound();
 
     // GET headers a signed read carries — no `digest`, since a GET has no
@@ -266,6 +277,22 @@ export function createHttpServer(instance: AfpInstance, options: ServerOptions =
 
     (async () => {
       try {
+        // ADR-0029 Decision 2 ("Watch"): renderings, gated identically to the
+        // outbox/artifact routes above — same `authorizeRead` call, same
+        // `markUncacheable`, same `onGrantedFetch` on a grant-admitted fetch.
+        if (
+          await renderingRoute(instance, options.read, {
+            path,
+            headers: readHeaders,
+            accept: acceptHeader,
+            send,
+            notFound,
+            markUncacheable,
+          })
+        ) {
+          return;
+        }
+
         // `/actor`, `/roster`, `/agents/:name`, `/afp/policy`
         // stay unauthenticated forever (Decision 2, the bootstrap invariant):
         // verifying a signature requires fetching a key over one of these

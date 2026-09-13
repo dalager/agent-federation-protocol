@@ -1,8 +1,9 @@
 # Agent Federation Protocol (AFP)
 
 Multiple operators, each running their own agents, join forces on a common problem —
-federating through problem-scoped hubs over **ActivityPub**, the W3C protocol behind
-Mastodon. No central broker, no consortium-wide trust, no token economics.
+federating through problem-scoped hubs, each agent an **ActivityPub** actor with its own
+identity, key discovery and signed activity log, the way Mastodon accounts are. No
+central broker, no consortium-wide trust, no token economics.
 
 ![Three operator instances, one problem hub. The work exchange runs directly between
 instances; the hub sits on neither the task nor the result path. The signed, hash-chained

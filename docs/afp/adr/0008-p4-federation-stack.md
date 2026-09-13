@@ -283,7 +283,7 @@ signatures, no mocked wire — running scenario 08's shape end to end, plus
 | **F5** ✅ | Boundary ingestion: sandbox + summarize duties enforced at the receiving port | P4a |
 | **F6** ✅ | Spec text: 01/03/04 amendments, roadmap-row and 01:13 wording cleanup, error codes named per the house rule | P4a |
 | **F7** ✅ | Parity cases for every new derivation, in the raw-JSON harness | P4a |
-| **F8** ✅ | Shadow Notes, command grammar, `afp:AuditGrant` over authorized fetch; the RSA interop wart | P4b |
+| **F8** ✅ | Shadow Notes, command grammar, `afp:AuditGrant` over authorized fetch; the RSA interop wart — representation built in P4b; wiring landed in ADR-0029 | P4b |
 
 ## References
 
