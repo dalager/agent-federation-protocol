@@ -105,6 +105,7 @@ async function operator(
     // write half above decides who may put an activity in; this decides who
     // may take one out, on the same deny-list and the same agreements.
     read: {
+      selfActor: String(instance.instanceDocument().id),
       fetchDocument: fetchActorDocument,
       isDenylisted: (who) => federation.isDenylisted(who),
       activeAgreementsWith: (counterparty, at) => federation.activeAgreementsWith(counterparty, at),

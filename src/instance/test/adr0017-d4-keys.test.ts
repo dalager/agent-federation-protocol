@@ -68,6 +68,7 @@ async function serve() {
     }
   };
   const read: ReadGateDeps = {
+    selfActor: String(instance.instanceDocument().id),
     fetchDocument,
     isDenylisted: () => false,
     activeAgreementsWith: () => [],

@@ -67,6 +67,7 @@ async function threeParty(options: { seatPolicy?: "follow-required" | "enroll-im
   } as unknown as { [key: string]: JsonValue };
 
   const deps = (over: Partial<ReadGateDeps> = {}): ReadGateDeps => ({
+    selfActor: String(instance.instanceDocument().id),
     fetchDocument: async (url: string) => {
       if (url === agentId) return instance.agentDocument("a1");
       if (url === hub.actorId) return hub.actorDocument();

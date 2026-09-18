@@ -78,6 +78,7 @@ async function watchServe() {
     }
   };
   const read: ReadGateDeps & { onGrantedFetch: (info: { grant: string; auditor: string; path: string; at: Date }) => void } = {
+    selfActor: String(instance.instanceDocument().id),
     fetchDocument,
     isDenylisted: () => false,
     // Every agent here resolves to the same `afp:operatedBy` (the instance
@@ -138,6 +139,7 @@ async function commandServe() {
     }
   };
   const read: ReadGateDeps = {
+    selfActor: String(instance.instanceDocument().id),
     fetchDocument,
     isDenylisted: () => false,
     activeAgreementsWith: () => [],

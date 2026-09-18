@@ -13,7 +13,7 @@ import { after, describe, it } from "node:test";
 import { createServer as createProbe } from "node:net";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import { AfpInstance, systemClock, type Clock } from "../src/instance.ts";
@@ -100,6 +100,7 @@ async function taskServe(options: { clock?: Clock } = {}) {
     }
   };
   const read: ReadGateDeps = {
+    selfActor: String(instance.instanceDocument().id),
     fetchDocument,
     isDenylisted: () => false,
     activeAgreementsWith: () => [],
@@ -424,6 +425,130 @@ describe("ADR-0038 gate — the operator's own work", () => {
       assert.equal(existsSync(join(fresh, "afp.db")), false, "no store was created");
       assert.equal(instance.outbox.headDigest(instance.actorId("controller")), head, "the served instance is undisturbed");
       assert.equal((await fetch(`${origin}/actor`)).status, 200, "the served instance still answers");
+    } finally {
+      server.close();
+      instance.close();
+    }
+  });
+
+  /**
+   * G8 harness: a served instance on the wall clock with a performed task,
+   * and the `show` CLI run against it from a *separate* data dir that holds a
+   * copy of the keys and no store — so "never opens the store" is checked
+   * by the absence of any `afp.db`/`afp.db.lock` there, not inferred.
+   */
+  async function showServe() {
+    const served = await taskServe({ clock: systemClock });
+    const { instance, scheduler, post, paths } = served;
+    const res = await post("controller", "/agents/worker/command", { content: "@worker task Assess the window." });
+    const slug = String(res.body.correlationId);
+    const thread = String(res.body.thread);
+    await scheduler.tick("flush");
+    await scheduler.tick("flush");
+    assert.equal(instance.outbox.byThread(thread).length, 3, "Offer, Accept, Result on the thread");
+
+    const clientData = join(dirname(paths.dataDir), "cli-data");
+    mkdirSync(clientData, { recursive: true });
+    cpSync(served.config.keyDir, join(clientData, "keys"), { recursive: true });
+    const env = {
+      ...process.env,
+      AFP_DATA_DIR: clientData,
+      AFP_ORIGIN: served.origin,
+      AFP_CONTROLLERS: served.controllers.join(","),
+      AFP_AGENTS_FILE: served.agentsFile,
+      AFP_BRAIN: "stub",
+      AFP_DEV: "1",
+      AFP_LOG_LEVEL: "silent",
+    };
+    const show = async (args: string[]) => {
+      try {
+        const { stdout, stderr } = await promisify(execFile)(process.execPath, ["--disable-warning=ExperimentalWarning", "src/cli.ts", "show", ...args], {
+          cwd: INSTANCE_DIR,
+          env,
+          encoding: "utf8",
+        });
+        return { code: 0, stdout, stderr };
+      } catch (error) {
+        const failed = error as { code?: number; stdout?: string; stderr?: string };
+        return { code: failed.code ?? 1, stdout: failed.stdout ?? "", stderr: failed.stderr ?? "" };
+      }
+    };
+    const noStoreOpened = () => {
+      assert.equal(existsSync(join(clientData, "afp.db")), false, "the CLI created no store");
+      assert.equal(existsSync(join(clientData, "afp.db.lock")), false, "the CLI took no lock");
+    };
+    return { ...served, slug, thread, show, noStoreOpened };
+  }
+
+  it("G8 — `show status`, an anonymous rendering fetch, and `show thread` on a thread the controller is no party to: served, 404, and exit 1 without opening the store", async () => {
+    const { instance, server, origin, slug, show, noStoreOpened } = await showServe();
+    try {
+      const status = await show(["status", "worker"]);
+      assert.equal(status.code, 0, status.stderr);
+      const body = JSON.parse(status.stdout) as { status: { chainHead: string; paused: boolean; pending: number } };
+      assert.equal(body.status.chainHead, instance.outbox.headDigest(instance.actorId("worker")), "the chain head, as the controller");
+      assert.equal(body.status.paused, false);
+
+      const anonymous = await fetch(`${origin}/threads/${slug}/rendering`);
+      assert.equal(anonymous.status, 404, "a parties thread to an anonymous caller is indistinguishable from no thread");
+
+      // A thread the controller is no party to: the worker's own note, addressed to nobody.
+      instance.publish("worker", [], `${origin}/threads/private-note`, "parties", (envelope) => ({
+        "@context": ["https://www.w3.org/ns/activitystreams", "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"],
+        id: envelope.activityId,
+        type: "Create",
+        actor: envelope.actor,
+        to: [],
+        published: envelope.published,
+        context: envelope.thread,
+        "afp:visibility": envelope.visibility,
+        ...(envelope.prevActivity !== null ? { "afp:prevActivity": envelope.prevActivity } : {}),
+        object: { type: "Note", content: "nobody's business" },
+      }));
+      const refused = await show(["thread", "private-note"]);
+      assert.equal(refused.code, 1);
+      assert.equal(refused.stdout, "");
+      assert.equal(refused.stderr.trim(), "not served to controller (404)", "one line, no speculation");
+      // A full URL resolves to the same slug; a foreign thread URL is refused locally, before any request.
+      const byUrl = await show(["thread", `${origin}/threads/private-note`]);
+      assert.equal(byUrl.stderr.trim(), "not served to controller (404)");
+      const foreign = await show(["thread", "https://other.example/threads/x"]);
+      assert.equal(foreign.code, 2);
+      assert.match(foreign.stderr, /not a thread under/);
+
+      // `show agent` runs the timeline route; the worker's entries are all
+      // `parties` and, under the finding below, none is admitted — the route
+      // answers 200 with an empty narrative rather than 404, by design.
+      const timeline = await show(["agent", "worker"]);
+      assert.equal(timeline.code, 0, timeline.stderr);
+      assert.match(timeline.stdout, /^Rendering of /);
+      noStoreOpened();
+    } finally {
+      server.close();
+      instance.close();
+    }
+  });
+
+  // Admitted by ADR-0013 Decision 3 as revised under contact (2026-09-18):
+  // the controller is self-operated (no self-agreement to check) and is the
+  // Offer's author and the Accept/Result's addressee — a party to all three.
+  it("G8(b) — `show thread <slug>` as the controller that delegated the task: the narrative names Offer, Accept and Result, and --json carries afp:bundle", async () => {
+    const { instance, server, slug, show, noStoreOpened } = await showServe();
+    try {
+      const narrative = await show(["thread", slug]);
+      assert.equal(narrative.code, 0, narrative.stderr);
+      assert.match(narrative.stdout, /^Rendering of .*\/threads\/task-[0-9a-f]{12} — digest [0-9a-f]{64}, rendered .*, no export\n/);
+      assert.match(narrative.stdout, /Offer\/afp:Task/);
+      assert.match(narrative.stdout, /Accept/);
+      assert.match(narrative.stdout, /Create\/afp:Result/);
+
+      const json = await show(["thread", slug, "--json"]);
+      assert.equal(json.code, 0, json.stderr);
+      const rendering = JSON.parse(json.stdout) as { "afp:bundle": unknown; "afp:renderingDigest": string; narrative: string[] };
+      assert.ok("afp:bundle" in rendering, "the bundle field the rendering already has (null before an export)");
+      assert.equal(rendering["afp:bundle"], null);
+      assert.equal(rendering.narrative.length, 3);
+      noStoreOpened();
     } finally {
       server.close();
       instance.close();

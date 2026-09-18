@@ -42,6 +42,9 @@ const hubAgreement = {
 
 function deps(over: Partial<ReadGateDeps> = {}): ReadGateDeps {
   return {
+    // A foreign self by default: every case below that does not say otherwise
+    // exercises the cross-boundary path, agreement stage included.
+    selfActor: ALPHA,
     fetchDocument: async () => null,
     isDenylisted: () => false,
     activeAgreementsWith: () => [hubAgreement],
@@ -180,6 +183,52 @@ describe("ADR-0013 gate: a grant widens entitlement, and never past a refusal", 
       "somebody else's mail",
     );
     g.instance.close();
+  });
+
+  it("self-operation waives the agreement stage — and only self-operation does (Decision 3, revised under contact)", async () => {
+    // ADR-0038's read CLI found a held controller refused the very thread it
+    // delegated on: its operator is the instance it reads from, which holds
+    // no agreement with itself. The revision waives the agreement stage for
+    // a self-operated requester. This case pins the boundary: a requester
+    // operated by ANOTHER instance, with no agreement, is still refused a
+    // `parties` activity that names it.
+    const g = signedGate({ activeAgreementsWith: () => [] });
+    const auth = await authorizeRead(g.deps, { path: g.path, headers: g.headers });
+    assert.notEqual(auth.requester, null);
+    assert.notEqual(auth.requester!.operatedBy, ALPHA, "the harness's self is foreign to this requester's operator");
+    assert.equal(auth.admits(activity("parties", { to: [g.agentId] })), false, "named, no agreement, not self-operated: refused");
+
+    // Positive control: the same requester, the same activity, the gate now
+    // run by the requester's own operator — admitted with no agreement at all.
+    const self = signedGate({ activeAgreementsWith: () => [], selfActor: auth.requester!.operatedBy });
+    const own = await authorizeRead(self.deps, { path: self.path, headers: self.headers });
+    assert.equal(own.admits(activity("parties", { to: [self.agentId] })), true, "self-operated: no self-agreement to check");
+    g.instance.close();
+    self.instance.close();
+  });
+
+  it("self-operation never waives the party rule; the author is a party (Decision 3, revised under contact)", async () => {
+    const g = signedGate();
+    const probe = await authorizeRead(g.deps, { path: g.path, headers: g.headers });
+    const self = signedGate({ activeAgreementsWith: () => [], selfActor: probe.requester!.operatedBy });
+    const auth = await authorizeRead(self.deps, { path: self.path, headers: self.headers });
+    assert.notEqual(auth.requester, null);
+
+    assert.equal(
+      auth.admits(activity("parties", { actor: "https://elsewhere.example/agents/x", to: ["https://elsewhere.example/agents/y"] })),
+      false,
+      "operated by this instance, but neither named nor the author: still somebody else's mail",
+    );
+    assert.equal(auth.admits(activity("parties", { actor: self.agentId, to: ["https://elsewhere.example/agents/y"] })), true, "the author holds the bytes it signed");
+    // `afp:actingAs` alone names nobody the gate reads: under instance custody
+    // it names the same agent `actor` already does, so `actor` is the author.
+    assert.equal(
+      auth.admits(activity("parties", { actor: "https://elsewhere.example/agents/x", "afp:actingAs": self.agentId, to: [] })),
+      false,
+      "actingAs is not consulted; actor is",
+    );
+    g.instance.close();
+    self.instance.close();
   });
 
   it("the same requester, not deny-listed, is admitted to its hub", async () => {

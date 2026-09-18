@@ -65,6 +65,14 @@ export interface ReadAuthorization {
 }
 
 export interface ReadGateDeps {
+  /**
+   * ADR-0013 Decision 3, revised under contact (ADR-0038): this instance's
+   * own actor id. A requester whose `operatedBy` IS this id is self-operated,
+   * and the `parties` predicate waives its agreement stage for it — an
+   * instance is not a counterparty to itself, and there is no self-agreement
+   * to model. Compared as an actor id, never as an origin prefix.
+   */
+  selfActor: string;
   fetchDocument: (url: string) => Promise<{ [key: string]: JsonValue } | null>;
   isDenylisted: (instanceActor: string) => boolean;
   activeAgreementsWith: (counterparty: string, at: Date) => { [key: string]: JsonValue }[];
@@ -174,14 +182,29 @@ function admitsHub(deps: ReadGateDeps, requester: Requester, activity: { [key: s
 }
 
 /** Decision 3's `parties` row: the requester's agent is named in `to`/`cc`,
- * or is itself the operating instance of a named actor (ADR-0005). No grant
- * type is required — the addressing is the entitlement — but an active,
- * non-deny-listed agreement with the requester's operator still gates it,
- * exactly as it gates every other cross-boundary read. */
+ * is the activity's author, or is itself the operating instance of a named
+ * actor (ADR-0005). No grant type is required — the addressing is the
+ * entitlement — but an active, non-deny-listed agreement with the requester's
+ * operator still gates it, exactly as it gates every other cross-boundary
+ * read, unless the requester is operated by this very instance.
+ *
+ * Two rules revised under contact (ADR-0038's read CLI found a held
+ * controller refused the thread it delegated on):
+ *
+ *  - **The author is a party.** `actor` joins the named list. The author
+ *    already holds the bytes they signed; admitting them to read back what
+ *    they published widens nothing a stranger can reach. Only `actor` —
+ *    under instance custody `afp:actingAs` names the same agent `actor`
+ *    already names (`instance.ts` `publish`), so it adds no one.
+ *  - **Self-operation waives the agreement stage, never the party rule.** A
+ *    requester whose operator is `deps.selfActor` is this instance's own;
+ *    there is no self-agreement to check. The deny-list and the party test
+ *    run unchanged. */
 function admitsParties(deps: ReadGateDeps, requester: Requester, activity: { [key: string]: JsonValue }): boolean {
   if (deps.isDenylisted(requester.operatedBy)) return false;
 
-  const named = [...actorList(activity, "to"), ...actorList(activity, "cc")];
+  const author = stringField(activity, "actor");
+  const named = [...actorList(activity, "to"), ...actorList(activity, "cc"), ...(author ? [author] : [])];
   const namedDirectly = named.includes(requester.agent);
   // The requester is itself an instance actor (it authenticated as its own
   // operator) and that same instance is named directly on the activity —
@@ -192,6 +215,7 @@ function admitsParties(deps: ReadGateDeps, requester: Requester, activity: { [ke
   const namedAsOperator = requester.agent === requester.operatedBy && named.includes(requester.operatedBy);
   if (!namedDirectly && !namedAsOperator) return false;
 
+  if (requester.operatedBy === deps.selfActor) return true;
   return deps.activeAgreementsWith(requester.operatedBy, deps.now()).length > 0;
 }
 

@@ -201,6 +201,24 @@ Notes on what was built versus what the ADR wrote:
 - **The CLI's `fetch` is not `policedFetch`.** The operator's tool addressing the
   operator's instance is outside ADR-0025's threat (what the *instance* fetches on a
   stranger's say-so); the module says so.
+- **The read CLI, and the CLI never opens the store — now for reads too.** `npm run show
+  -- thread <url-or-slug> | agent <name> | status <name>` (`ports/showCli.ts`) signs `GET
+  /threads/:id/rendering`, `GET /agents/:name/timeline` and `@name status` as the
+  controller, `text/plain` by default and `--json` for the document, and reports a refusal
+  as one line — `not served to <controller> (404)` — with no speculation, because the gate
+  is deliberately not an oracle. The controller resolution, never-mint refusal and
+  `signRequest`/`fileSigner` signing moved into `ports/clientCli.ts`, shared by `task` and
+  `show`, so the store-lock discipline of Decision 4 is written once. G8 covers it. **A
+  finding, resolved upstream:** as first built, `readGate.ts`'s `admitsParties` admitted a
+  `parties` activity only when the requester was named in `to`/`cc` *and* held an active
+  agreement — so a controller held on the instance it reads from (whose operator is that
+  instance, which holds no agreement with itself) was 404'd on the very task it delegated,
+  and the Offer named it as `actor`, not in `to`. Rather than patch around it here,
+  [ADR-0013](0013-authorized-fetch.md)'s Build status records a revision under contact: a
+  self-operated requester waives the agreement stage (never the party rule), and the author
+  of an activity is a party to it. G8(b) is the end-to-end case — `show thread` as the
+  controller renders Offer, Accept and Result — and `test/adr0013.test.ts` pins both
+  boundaries.
 - **G6 spawns the CLI asynchronously.** The served instance lives in the test process, so a
   synchronous exec would block the loop that has to answer the child's POST — the first
   draft did exactly that and waited out undici's 300 s headers timeout.

@@ -1178,6 +1178,27 @@ async function main(): Promise<void> {
       break;
     }
 
+    // ADR-0038 Decision 4, the read side: watch a served instance as a
+    // signed reader. Same client plumbing as `task` — no store, no minting.
+    //   afp show thread <url-or-slug> | agent <name> | status <name>  [--as <controller>] [--url <base>] [--json]
+    case "show": {
+      const config = loadConfig();
+      const { parseShowArgs, runShowCli } = await import("./ports/showCli.ts");
+      let result: Awaited<ReturnType<typeof runShowCli>>;
+      try {
+        result = await runShowCli(config, parseShowArgs(process.argv.slice(3)));
+      } catch (error) {
+        console.error(`\nrefused: ${(error as Error).message}\n`);
+        process.exit(2);
+      }
+      if (result.refused) {
+        console.error(result.refused);
+        process.exit(1);
+      }
+      console.log(result.output);
+      break;
+    }
+
     case "serve": {
       const config = loadConfig();
       const instance = new AfpInstance(config, agentCollection(config));
@@ -1220,6 +1241,7 @@ async function main(): Promise<void> {
           fetchDocument: fetchActorDocument,
         },
         read: {
+          selfActor: actorId,
           fetchDocument: fetchActorDocument,
           isDenylisted: (who) => federation.isDenylisted(who),
           activeAgreementsWith: (counterparty, at) => federation.activeAgreementsWith(counterparty, at),
@@ -1271,7 +1293,7 @@ async function main(): Promise<void> {
     }
 
     default:
-      console.error(`unknown command: ${command}\nusage: cli.ts [demo|p2|p3|p3:llm|p4|p5|p5:llm|p6|p6:llm|p7|p7:llm|p8|p8:llm|export|keys|serve|task|config|backup|restore]`);
+      console.error(`unknown command: ${command}\nusage: cli.ts [demo|p2|p3|p3:llm|p4|p5|p5:llm|p6|p6:llm|p7|p7:llm|p8|p8:llm|export|keys|serve|task|show|config|backup|restore]`);
       process.exit(1);
   }
 }

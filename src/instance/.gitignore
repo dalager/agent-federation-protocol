@@ -6,7 +6,7 @@ package-lock.json
 # the omission obvious — a demo's keys are regenerated on every run and have
 # no business in the record. The glob covers every phase, present and future.
 data/
-data-p*/
+data-*/
 export/
 # demo outputs: demo:p2, demo:p3, demo:p3:llm, demo:p4, demo:p5, demo:p6
 export-*/

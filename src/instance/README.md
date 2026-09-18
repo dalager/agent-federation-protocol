@@ -478,7 +478,9 @@ curl http://localhost:8787/threads/<thread-id>/rendering
 curl -H 'Accept: text/plain' http://localhost:8787/threads/<thread-id>/rendering
 ```
 
-A `parties` thread returns the same **404, not 403** every other gated route does. A
+A `parties` thread returns the same **404, not 403** every other gated route does. From a
+terminal, `npm run show -- thread <slug>` / `agent <name>` / `status <name>` makes the same
+fetches signed as a held controller (ADR-0038 Decision 4; see "Handing an agent a job"). A
 signed fetch under an `afp:AuditGrant` (see [ADR-0013](../../docs/afp/adr/0013-authorized-fetch.md))
 is admitted and recorded:
 
@@ -641,6 +643,25 @@ curl -X POST http://localhost:8787/agents/writer/command \
 A controller this instance does not hold, a capability the agent does not advertise, a
 newline in the brief, or a `task` arriving as a mention: the identical polite reply, nothing
 on the chain.
+
+Watching it from the same terminal, as the same controller, without stopping `serve`:
+
+```bash
+npm run show -- thread task-3f1c9a2b7d0e          # the narrative (Accept: text/plain); a full thread URL works too
+npm run show -- thread task-3f1c9a2b7d0e --json   # the afp:Rendering, with afp:renderingDigest and afp:bundle
+npm run show -- agent writer                       # the agent's timeline
+npm run show -- status writer                      # {"status": {"chainHead": …, "pending": …, "paused": …}}
+```
+
+`show` signs each read as the controller (`--as`, `--url` as for `task`) and is answered
+by the read gate ([ADR-0013](../../docs/afp/adr/0013-authorized-fetch.md)): served where
+the gate admits the signer, `404` otherwise — reported as one line, `not served to
+<controller> (404)`, with no guess at why; the gate is deliberately not an oracle. A held
+controller is a party to the tasks it issues (it authored the Offer and is addressed by
+the Accept and Result) and needs no federation agreement with its own instance — ADR-0013
+Decision 3 as revised under contact — so `show thread` on a task it handed out renders;
+a thread it is no party to is 404. Like `task`, it never opens the store and never mints
+a key.
 
 ### Wiring two instances together
 

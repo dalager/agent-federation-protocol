@@ -343,6 +343,35 @@ could be authenticated at all.
 | **A6** ✅ | Response discipline: one `notFound()` body for every refusal reason; resolve-then-judge so refusal order leaks nothing; `Cache-Control: private, no-store` and `Vary: Signature` on every non-`public` response; artifacts keep the all-referencing-activities-are-public rule for the anonymous path | `ap/server.ts` | 3 |
 | **A7** ✅ | Gate `test/adr0013.test.ts` on the real-HTTP scaffold from `adr0008.test.ts` (`freePort()`, `operator()`): a signed `GET` from an agreed, enrolled peer fetches a `hub` activity; the same peer is refused a `parties` activity it is not named in; a named peer fetches it; an unsigned `GET` gets `public` only; a deny-listed instance is refused; `internal` is refused to everyone including a grant holder; an expired agreement is refused; a grant-admitted fetch appears in the record while a refusal does not; and every refusal is byte-identical | `test/adr0013.test.ts` | 3 |
 
+**Revised under contact (2026-09-18).** [ADR-0038](0038-the-operators-own-work.md)'s read
+CLI (`npm run show`) found that a controller held on the instance it reads from was refused
+the very thread it had delegated on: Decision 3's `parties` row required an active agreement
+with the requester's operator, and an instance holds no agreement with itself. Two narrow
+rules amend the row, in `federation/readGate.ts`'s `admitsParties` only — `admitsHub` and
+the grant path are untouched:
+
+1. **A self-operated requester satisfies the agreement stage by construction.**
+   `ReadGateDeps` gains `selfActor`, this instance's own actor id; a requester whose
+   `afp:operatedBy` *is* that id (compared as an actor id, never as an origin prefix) skips
+   `activeAgreementsWith`. An instance is not a counterparty to itself — `inbox.ts` has said
+   "no self-agreement to model" since P1. The deny-list stage and the party test run
+   unchanged, so this widens nothing a stranger can reach: a requester operated by another
+   instance still needs an agreement, and a self-operated requester still has to be a party.
+2. **The author of an activity is a party to it.** `actor` joins the `to`/`cc` list. The
+   author already holds the bytes they signed; admitting them to read back what they
+   published discloses nothing to anyone who could not already produce it. Only `actor` —
+   under instance custody `afp:actingAs` names the same agent `actor` already names
+   (`instance.ts` `publish`), so it adds no one and is not consulted.
+
+Pinned by `test/adr0013.test.ts`: "self-operation waives the agreement stage — and only
+self-operation does" (a requester operated by another instance with no agreement is still
+refused a `parties` activity naming it; the same requester under its own operator is
+admitted) and "self-operation never waives the party rule; the author is a party" (a
+self-operated requester neither named nor author is refused; the author is admitted;
+`afp:actingAs` alone admits nobody). Every prior case in this file and in
+`test/adr0029.test.ts` passes with no assertion changed; ADR-0038's G8(b) is the end-to-end
+case over HTTP.
+
 A verifier task is conspicuously absent, and that absence is Decision 5 in executable
 form: reads leave no record, so there is nothing for replay to check. The single exception
 — the grant-admitted fetch of A5 — becomes an ordinary recorded activity and replays like

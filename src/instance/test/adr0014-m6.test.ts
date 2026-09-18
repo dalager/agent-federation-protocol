@@ -112,6 +112,7 @@ async function operator(
     ...(extras.readFetch
       ? {
           read: {
+            selfActor: actorId,
             fetchDocument: extras.readFetch,
             isDenylisted: (who: string) => federation.isDenylisted(who),
             activeAgreementsWith: (counterparty: string, at: Date) => federation.activeAgreementsWith(counterparty, at),

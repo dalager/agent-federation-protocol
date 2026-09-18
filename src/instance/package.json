@@ -16,6 +16,7 @@
     "serve": "node --disable-warning=ExperimentalWarning src/cli.ts serve",
     "keys": "node --disable-warning=ExperimentalWarning src/cli.ts keys",
     "task": "node --disable-warning=ExperimentalWarning src/cli.ts task",
+    "show": "node --disable-warning=ExperimentalWarning src/cli.ts show",
     "backup": "node --disable-warning=ExperimentalWarning src/cli.ts backup",
     "restore": "node --disable-warning=ExperimentalWarning src/cli.ts restore",
     "config:check": "node --disable-warning=ExperimentalWarning src/cli.ts config check",
