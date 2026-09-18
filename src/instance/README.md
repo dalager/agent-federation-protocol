@@ -630,7 +630,10 @@ this origin); `--capability <id>` (default: the agent's first advertised one —
 unadvertised one is refused), `--thread <url>`, `--deadline <iso>` and `--url <base>`
 (default `AFP_ORIGIN`) are optional. The command signs `POST /agents/<name>/command` with
 the controller's key from `AFP_DATA_DIR/keys` and **never opens the store** — `serve` holds
-its lock — and never mints a key: an absent controller key fails by name. The same request
+its lock — and never mints a key: an absent controller key fails by name. It therefore needs
+the same `AFP_ORIGIN`, `AFP_DATA_DIR` and `AFP_CONTROLLERS` the running `serve` has — put
+them in `.env` (see "Configuration") rather than retyping them; a mismatch shows up as the
+polite reply or a 404, which the command deliberately does not explain. The same request
 by hand, with `capability`/`thread`/`deadline`/`visibility` as optional body fields:
 
 ```bash
@@ -1024,6 +1027,14 @@ Two consequences worth keeping:
 fetch) validates configuration and probes the store, signer, and self-check
 without starting the server ([ADR-0032](../../docs/afp/adr/0032-deployment-profile.md)
 Decision 3) — every problem is reported at once, never just the first.
+
+The operator-facing scripts — `serve`, `task`, `show`, `keys`, `export`, `backup`,
+`restore`, `config:check` — also read a `.env` file in this directory when one exists
+(Node's own `--env-file-if-exists`, no dependency), so the variables `serve` was started
+with are the ones `task` and `show` sign with, without repeating them per command. A
+variable set in the shell wins over the file. The demos and the gate do not read it, so a
+local `.env` cannot change what they produce. `.env` is git-ignored: it may hold
+`AFP_LLM_API_KEY`.
 
 Environment variables, all optional (see `src/config.ts`, `src/configSchema.ts`):
 

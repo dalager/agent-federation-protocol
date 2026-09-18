@@ -1,5 +1,7 @@
 node_modules/
 package-lock.json
+# operator configuration for serve/task/show; may hold AFP_LLM_API_KEY
+.env
 
 # Demo runtime state: SQLite stores and generated keypairs, per phase.
 # `data-p5/` was tracked by accident until the ADR-0017 transport keys made
