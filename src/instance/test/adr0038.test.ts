@@ -84,7 +84,10 @@ async function taskServe(options: { clock?: Clock } = {}) {
   const foreignOrigin = "https://other.example";
   const foreignUrl = `${foreignOrigin}/agents/boss`;
   const controllers = [`${origin}/agents/controller`, foreignUrl];
-  const config = loadConfig({ ...paths, origin, agentsFile, controllers });
+  // A wide per-address bucket: the CLI cases fire several signed reads —
+  // each with the read gate's own fetch of the controller's document — inside
+  // one second, which the default 20/s bucket would answer 429.
+  const config = loadConfig({ ...paths, origin, agentsFile, controllers, rateLimitPerAddress: 1000 });
   const instance = new AfpInstance(config, agentCollection(config), clock);
 
   const foreignKey = loadOrCreateKeyPair(join(dirname(paths.dataDir), "foreign-keys"), "boss", foreignUrl);
@@ -548,6 +551,58 @@ describe("ADR-0038 gate — the operator's own work", () => {
       assert.ok("afp:bundle" in rendering, "the bundle field the rendering already has (null before an export)");
       assert.equal(rendering["afp:bundle"], null);
       assert.equal(rendering.narrative.length, 3);
+      noStoreOpened();
+    } finally {
+      server.close();
+      instance.close();
+    }
+  });
+
+  it("G9 — `show result <slug>` as the controller prints the performer's Result and afp:producedBy; --json yields the activity; before any flush it is `no result yet`; anonymous outbox omits it; no store opened", async () => {
+    // The unperformed case first: a fresh task on the same served instance, no flush.
+    const served = await showServe();
+    const { instance, server, origin, slug, show, noStoreOpened, post } = served;
+    try {
+      const pending = await post("controller", "/agents/worker/command", { content: "@worker task Not yet performed." });
+      const pendingSlug = String(pending.body.correlationId);
+      assert.equal(instance.outbox.byThread(String(pending.body.thread)).length, 1, "Offer only");
+      const early = await show(["result", pendingSlug]);
+      assert.equal(early.code, 1);
+      assert.equal(early.stdout, "");
+      assert.equal(early.stderr.trim(), `no result yet on ${origin}/threads/${pendingSlug}`);
+
+      // The performed task from the harness.
+      const text = await show(["result", slug]);
+      assert.equal(text.code, 0, text.stderr);
+      const [header, ...rest] = text.stdout.split("\n");
+      assert.match(header, /^worker · \d{4}-\d{2}-\d{2}T.* · afp:producedBy: stub$/);
+      assert.match(rest.join("\n"), /# worker: afp:cap:assess/, "the Result's content, verbatim");
+      assert.match(rest.join("\n"), /Assess the window\./);
+      assert.match(text.stdout, /attachment: text\/markdown sha256:[0-9a-f]{64}/, "attachments are named, not fetched");
+
+      const json = await show(["result", slug, "--json"]);
+      assert.equal(json.code, 0, json.stderr);
+      const activity = JSON.parse(json.stdout) as { type: string; actor: string; context: string; object: { type: string; "afp:producedBy": string } };
+      assert.equal(activity.type, "Create");
+      assert.equal(activity.object.type, "afp:Result");
+      assert.equal(activity.object["afp:producedBy"], "stub");
+      assert.equal(activity.actor, instance.actorId("worker"));
+      assert.equal(activity.context, `${origin}/threads/${slug}`);
+
+      // `--agent` names the performer outright; `--all` lists in order (one here).
+      const named = await show(["result", slug, "--agent", "worker", "--all", "--json"]);
+      assert.equal(named.code, 0, named.stderr);
+      assert.equal((JSON.parse(named.stdout) as unknown[]).length, 1);
+
+      // The Result is `parties`: anonymous, the performer's outbox does not carry it.
+      const anonymous = await fetch(`${origin}/agents/worker/outbox`);
+      const anonymousBody = await anonymous.text();
+      assert.ok(!anonymousBody.includes('"afp:Result"'), `no Result served anonymously (status ${anonymous.status}): ${anonymousBody.slice(0, 200)}`);
+
+      // A thread the controller is no party to: the rendering's 404, same line.
+      const refused = await show(["result", "nobody-elses"]);
+      assert.equal(refused.code, 1);
+      assert.equal(refused.stderr.trim(), "not served to controller (404)");
       noStoreOpened();
     } finally {
       server.close();

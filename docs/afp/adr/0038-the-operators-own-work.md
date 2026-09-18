@@ -208,7 +208,13 @@ Notes on what was built versus what the ADR wrote:
   as one line — `not served to <controller> (404)` — with no speculation, because the gate
   is deliberately not an oracle. The controller resolution, never-mint refusal and
   `signRequest`/`fileSigner` signing moved into `ports/clientCli.ts`, shared by `task` and
-  `show`, so the store-lock discipline of Decision 4 is written once. G8 covers it. **A
+  `show`, so the store-lock discipline of Decision 4 is written once. G8 covers it. `show
+  result <url-or-slug> [--agent <name>] [--all]` is the fourth form and the one that prints
+  what the agent actually answered: no new server route — it reads the thread rendering
+  (the trail) to find the performer, then that agent's `GET /agents/:name/outbox`, paged
+  through `first`/`next`, and selects the `afp:Result` entries whose `context` is the
+  thread; header, verbatim `content`, attachments named by media type and digest and never
+  fetched; `no result yet on <thread>` (exit 1) while the task is still running. G9. **A
   finding, resolved upstream:** as first built, `readGate.ts`'s `admitsParties` admitted a
   `parties` activity only when the requester was named in `to`/`cc` *and* held an active
   agreement — so a controller held on the instance it reads from (whose operator is that

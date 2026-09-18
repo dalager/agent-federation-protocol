@@ -652,9 +652,15 @@ Watching it from the same terminal, as the same controller, without stopping `se
 ```bash
 npm run show -- thread task-3f1c9a2b7d0e          # the narrative (Accept: text/plain); a full thread URL works too
 npm run show -- thread task-3f1c9a2b7d0e --json   # the afp:Rendering, with afp:renderingDigest and afp:bundle
+npm run show -- result task-3f1c9a2b7d0e          # what the agent answered: header, content, attachments named (--all, --agent, --json)
 npm run show -- agent writer                       # the agent's timeline
 npm run show -- status writer                      # {"status": {"chainHead": …, "pending": …, "paused": …}}
 ```
+
+The rendering is the trail — shape, digests, chain heads — and `show result` is the
+answer: it reads the rendering to find the performer, then that agent's gated outbox
+(paged), and prints the latest `afp:Result` on the thread (`--all` for every one, in order);
+a task still running answers `no result yet on <thread>`, exit 1.
 
 `show` signs each read as the controller (`--as`, `--url` as for `task`) and is answered
 by the read gate ([ADR-0013](../../docs/afp/adr/0013-authorized-fetch.md)): served where
@@ -1033,7 +1039,8 @@ The operator-facing scripts — `serve`, `task`, `show`, `keys`, `export`, `back
 (Node's own `--env-file-if-exists`, no dependency), so the variables `serve` was started
 with are the ones `task` and `show` sign with, without repeating them per command. A
 variable set in the shell wins over the file. The demos and the gate do not read it, so a
-local `.env` cannot change what they produce. `.env` is git-ignored: it may hold
+local `.env` cannot change what they produce. `.env.example` is the annotated starting
+point (`cp .env.example .env`); `.env` itself is git-ignored, since it may hold
 `AFP_LLM_API_KEY`.
 
 Environment variables, all optional (see `src/config.ts`, `src/configSchema.ts`):
