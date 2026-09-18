@@ -347,6 +347,13 @@ export function exportBundle(
   for (const hub of hubs) {
     for (const entry of hub.keyHistory?.() ?? []) pushHistoryEntry(hub.actorId, entry);
   }
+  // ADR-0035 Decision 2: a `remote-issued` root key's public half is NOT
+  // folded into `afp:keyHistory` — deliberately. `afp:keyHistory` is part of
+  // the manifest this same host produces, so a thief who has stolen it could
+  // assert any root they like there. The root instead publishes on the
+  // instance actor document (`instanceDocument()`, `afp:custody:
+  // "remote-issued"`), an anchor a counterparty already held before any
+  // theft — see `check_key_delegations` in `src/verifier/keys.py`.
 
   // ADR-0033 Decision 2: when the policy declares a retention duty or anchors
   // and the caller passes none in `extras`, the manifest's take comes from

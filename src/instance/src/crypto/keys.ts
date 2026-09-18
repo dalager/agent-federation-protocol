@@ -58,8 +58,23 @@ interface KeyIndexEntry {
   ordinal: number;
   /** Absent when never recorded — see `KeyPair.validFrom`. */
   validFrom?: string;
+  /** Set only at actual retirement (rotation/revocation) — `activeEntry` reads presence, not time, as "no longer signs". */
   validUntil?: string;
   retiredBy?: RetiredBy;
+  /**
+   * ADR-0035 Decision 2: the window a `remote-issued` root's
+   * `afp:KeyDelegation` declared for this key, set at mint time rather than
+   * at retirement. Deliberately a *separate* field from `validUntil`: this
+   * key keeps signing locally past this instant (a running process never
+   * re-consults the index mid-signature, and `activeEntry` must not treat a
+   * merely-declared future expiry as an already-closed interval — that
+   * would strand a freshly rotated key before it ever got to sign). Exported
+   * as the entry's `afp:validUntil` when no real retirement has happened
+   * yet, which is what lets `check_key_intervals` hold a signature to the
+   * delegated window at replay even though the local store never enforces
+   * it directly.
+   */
+  declaredValidUntil?: string;
 }
 
 /** A full history entry, shaped for the manifest's `afp:keyHistory` (ADR-0012 Decision 1). */
@@ -116,8 +131,15 @@ function withOrdinal(base: string, ordinal: number): string {
   return ordinal === 1 ? base : `${base}-${ordinal}`;
 }
 
-/** `#ed25519-key` for the first key, `#ed25519-key-<ordinal>` for every rotation after it. */
-function keyIdFor(controller: string, ordinal: number): string {
+/**
+ * `#ed25519-key` for the first key, `#ed25519-key-<ordinal>` for every
+ * rotation after it. Exported so ADR-0035's `remote-issued` rotation path can
+ * predict a successor's keyId before it is minted — the `afp:KeyDelegation`
+ * naming it must be signed before the local key store is touched (Decision
+ * 2's compromise-window property, and the reason rotation with a remote root
+ * fails closed rather than half-committing a key nobody delegated).
+ */
+export function keyIdFor(controller: string, ordinal: number): string {
   return withOrdinal(`${controller}#ed25519-key`, ordinal);
 }
 
@@ -341,6 +363,19 @@ export function rotateKeyPair(
   name: string,
   controller: string,
   at: Date = new Date(),
+  // ADR-0035 Decision 2: a caller that must know the successor's public half
+  // *before* committing it to disk — signing an `afp:KeyDelegation` with a
+  // remote root, which must not mutate the local key store if the remote
+  // call fails — supplies the keypair it already generated and already had
+  // delegated, rather than letting this function mint one no delegation
+  // named.
+  pair: { privateKey: KeyObject; publicKey: KeyObject } = generateKeyPairSync("ed25519"),
+  // ADR-0035 Decision 2: the delegated window a remote root handed this
+  // successor, recorded on the new entry's `declaredValidUntil` (see that
+  // field's comment for why it is not `validUntil`) — `afp:keyHistory`, and
+  // therefore `check_key_intervals` at replay, is where the compromise
+  // window is actually enforced.
+  declaredValidUntil?: Date,
 ): KeyPair {
   // Ensures ordinal 1 exists before rotating a brand-new actor — but only a
   // brand-new one. After a revocation there is history and no active key, and
@@ -355,7 +390,6 @@ export function rotateKeyPair(
   const retiredAt = at.toISOString();
   const nextOrdinal = Math.max(...entries.map((e) => e.ordinal)) + 1;
   const nextPath = pemPath(keyDir, name, nextOrdinal);
-  const pair = generateKeyPairSync("ed25519");
   writePrivatePem(nextPath, pair.privateKey);
 
   // Close the current key's interval where one is still open; after a
@@ -364,7 +398,11 @@ export function rotateKeyPair(
   const nextEntries = entries.map((e) =>
     current && e.ordinal === current.ordinal ? { ...e, validUntil: retiredAt, retiredBy: "rotation" as const } : e,
   );
-  const newEntry: KeyIndexEntry = { ordinal: nextOrdinal, validFrom: retiredAt };
+  const newEntry: KeyIndexEntry = {
+    ordinal: nextOrdinal,
+    validFrom: retiredAt,
+    ...(declaredValidUntil ? { declaredValidUntil: declaredValidUntil.toISOString() } : {}),
+  };
   nextEntries.push(newEntry);
   writeIndex(keyDir, name, nextEntries);
 
@@ -407,7 +445,10 @@ export function keyHistory(
       keyId: pair.keyId,
       publicKeyMultibase: pair.publicKeyMultibase,
       validFrom: pair.validFrom,
-      validUntil: pair.validUntil,
+      // A real retirement (rotation/revocation) always wins over a merely
+      // declared one — a delegation's window is what bounds a key that has
+      // not yet actually been retired, never a claim that outlives one.
+      validUntil: pair.validUntil ?? entry.declaredValidUntil,
       retiredBy: pair.retiredBy,
     };
   });
@@ -449,4 +490,44 @@ export function allKeyHistories(keyDir: string, name: string, controller: string
   }
   entries.push(...keyHistory(keyDir, `${name}--transport`, controller, transportKeyId));
   return entries;
+}
+
+// ------------------------------------------------------------- ADR-0035
+
+/** A `remote-issued` root key's public half, as this instance has come to know it. */
+export interface RemoteRootKeyEntry {
+  keyId: string;
+  publicKeyMultibase: string;
+}
+
+function rootsPath(keyDir: string): string {
+  return join(keyDir, "instance.roots.json");
+}
+
+/**
+ * Record a `remote-issued` root's public half so `instanceDocument()` can
+ * publish it across restarts — the root is never a local PEM, so nothing
+ * else in this file would otherwise remember it.
+ *
+ * Deliberately the *only* place a root key's public half is written: every
+ * `afp:KeyDelegation` a rotation produces is checked against what is
+ * published here, on the actor document, rather than against anything the
+ * delegation activity says about itself (ADR-0035 Decision 2's amendment —
+ * the same "never resolve a signer against the document under verification"
+ * discipline ADR-0026 Decision 1 already holds the manifest signature to).
+ * Idempotent: a root already on file is left untouched, not overwritten by
+ * a later rotation that names the same keyId again.
+ */
+export function recordRemoteRootKey(keyDir: string, root: RemoteRootKeyEntry): void {
+  mkdirSync(keyDir, { recursive: true });
+  const existing = remoteRootKeys(keyDir);
+  if (existing.some((r) => r.keyId === root.keyId)) return;
+  writeFileSync(rootsPath(keyDir), `${JSON.stringify([...existing, root], null, 2)}\n`);
+}
+
+/** Every `remote-issued` root key this instance has ever recorded, in the order recorded. */
+export function remoteRootKeys(keyDir: string): RemoteRootKeyEntry[] {
+  const path = rootsPath(keyDir);
+  if (!existsSync(path)) return [];
+  return JSON.parse(readFileSync(path, "utf8")) as RemoteRootKeyEntry[];
 }

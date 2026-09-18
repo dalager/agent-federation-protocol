@@ -10,7 +10,7 @@
 
 export type SeatPolicy = "follow-required" | "enroll-implies-seat";
 export type ThreadLayoutForm = "per-subject" | "per-case" | "per-engagement" | "other";
-export type CustodyMode = "file" | "remote" | "agent";
+export type CustodyMode = "file" | "remote" | "agent" | "remote-issued";
 export type SubjectPrecondition = "any-member" | "proof-or-dispute-on-record";
 export type ElectorateFloor = "refuse" | "no-decision:electorate-exhausted";
 
@@ -35,6 +35,14 @@ export interface CustodySpec {
   instance?: CustodyMode;
   agents?: CustodyMode;
   hub?: CustodyMode;
+  /**
+   * ADR-0035 Consequences: "remote-issued invites the misreading that the key
+   * is never in host memory" — a one-year 'short-lived' key is the mode's
+   * failure case, so the lifetime it publishes has to be a number an operator
+   * committed to, not left implicit. Milliseconds, required whenever any
+   * custody mode above is "remote-issued".
+   */
+  keyLifetimeMs?: number;
 }
 
 export interface BrainSpec {
@@ -80,7 +88,7 @@ export interface PolicySpec {
 const VISIBILITY_CLASSES = new Set(["public", "hub", "parties", "internal"]);
 const SEAT_POLICIES = new Set<SeatPolicy>(["follow-required", "enroll-implies-seat"]);
 const THREAD_FORMS = new Set<ThreadLayoutForm>(["per-subject", "per-case", "per-engagement", "other"]);
-const CUSTODY_MODES = new Set<CustodyMode>(["file", "remote", "agent"]);
+const CUSTODY_MODES = new Set<CustodyMode>(["file", "remote", "agent", "remote-issued"]);
 const SUBJECT_PRECONDITIONS = new Set<SubjectPrecondition>(["any-member", "proof-or-dispute-on-record"]);
 const ELECTORATE_FLOORS = new Set<ElectorateFloor>(["refuse", "no-decision:electorate-exhausted"]);
 
@@ -152,8 +160,14 @@ export function validatePolicySpec(spec: PolicySpec): string[] {
     for (const key of ["instance", "agents", "hub"] as const) {
       const mode = spec.custody[key];
       if (mode !== undefined && !CUSTODY_MODES.has(mode)) {
-        push(`custody.${key}`, `must be one of file/remote/agent, got ${JSON.stringify(mode)}`);
+        push(`custody.${key}`, `must be one of file/remote/agent/remote-issued, got ${JSON.stringify(mode)}`);
       }
+    }
+    const anyRemoteIssued = spec.custody.instance === "remote-issued" ||
+      spec.custody.agents === "remote-issued" ||
+      spec.custody.hub === "remote-issued";
+    if (anyRemoteIssued && !(Number.isFinite(spec.custody.keyLifetimeMs) && (spec.custody.keyLifetimeMs as number) > 0)) {
+      push("custody.keyLifetimeMs", "must be a positive number of milliseconds when any custody mode is remote-issued (ADR-0035 Consequences)");
     }
   }
 

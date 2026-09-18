@@ -112,12 +112,18 @@ export interface Config {
   readonly webhookSecretFile?: string;
 
   /**
-   * ADR-0032 Decision 3 / ADR-0035: the remote signer's client certificate
-   * file. Validated as readable by `validate()`; nothing in this codebase
-   * consumes it yet — the remote signer adapter of ADR-0035 is where it
-   * will be read.
+   * ADR-0035 Decision 3: the remote signer's mTLS client identity and the CA
+   * its own server certificate must chain to. `signerUrl` and
+   * `signerRootKeyId` name the root key `afp keys rotate --root remote`
+   * asks to sign a delegation; absent means `remote-issued` custody is not
+   * configured, and that rotation path refuses rather than guessing.
    */
   readonly signerClientCertFile?: string;
+  readonly signerClientKeyFile?: string;
+  readonly signerCaFile?: string;
+  readonly signerUrl?: string;
+  readonly signerRootKeyId?: string;
+  readonly issuedKeyLifetimeMs: number;
 
   // ---------------------------------------------------------- ADR-0029
 
@@ -228,6 +234,10 @@ export function loadConfig(overrides: Partial<Config> = {}): Config {
   const keyPassphraseFile = String(readEntry(entry("AFP_KEY_PASSPHRASE_FILE")));
   const webhookSecretFile = String(readEntry(entry("AFP_WEBHOOK_SECRET_FILE")));
   const signerClientCertFile = String(readEntry(entry("AFP_SIGNER_CLIENT_CERT_FILE")));
+  const signerClientKeyFile = String(readEntry(entry("AFP_SIGNER_CLIENT_KEY_FILE")));
+  const signerCaFile = String(readEntry(entry("AFP_SIGNER_CA_FILE")));
+  const signerUrl = String(readEntry(entry("AFP_SIGNER_URL")));
+  const signerRootKeyId = String(readEntry(entry("AFP_SIGNER_ROOT_KEY_ID")));
   const policyFile = String(readEntry(entry("AFP_POLICY_FILE")));
   const controllersFromEnv = readEntry(entry("AFP_CONTROLLERS")) as string[];
 
@@ -261,6 +271,11 @@ export function loadConfig(overrides: Partial<Config> = {}): Config {
     ...(keyPassphraseFile ? { keyPassphraseFile } : {}),
     ...(webhookSecretFile ? { webhookSecretFile } : {}),
     ...(signerClientCertFile ? { signerClientCertFile } : {}),
+    ...(signerClientKeyFile ? { signerClientKeyFile } : {}),
+    ...(signerCaFile ? { signerCaFile } : {}),
+    ...(signerUrl ? { signerUrl } : {}),
+    ...(signerRootKeyId ? { signerRootKeyId } : {}),
+    issuedKeyLifetimeMs: readEntry(entry("AFP_ISSUED_KEY_LIFETIME_MS")) as number,
     controllers: controllersFromEnv,
     fediverseWindow: readEntry(entry("AFP_FEDIVERSE_WINDOW")) as boolean,
     scheduler: {
@@ -405,6 +420,7 @@ export function validate(config: Config, options: ValidateOptions = {}): ConfigP
     ["rateLimitPerActorWindowMs", "AFP_RATE_LIMIT_PER_ACTOR_WINDOW_MS", "rateLimitPerActorWindowMs"],
     ["replayCacheTtlMs", "AFP_REPLAY_CACHE_TTL_MS", "replayCacheTtlMs"],
     ["backoffCeilingMs", "AFP_BACKOFF_CEILING_MS", "backoffCeilingMs"],
+    ["issuedKeyLifetimeMs", "AFP_ISSUED_KEY_LIFETIME_MS", "issuedKeyLifetimeMs"],
   ];
   for (const [field, env, name] of intFields) {
     const value = config[field] as unknown as number;
@@ -447,6 +463,8 @@ export function validate(config: Config, options: ValidateOptions = {}): ConfigP
     ["keyPassphraseFile", "AFP_KEY_PASSPHRASE_FILE", config.keyPassphraseFile] as const,
     ["webhookSecretFile", "AFP_WEBHOOK_SECRET_FILE", config.webhookSecretFile] as const,
     ["signerClientCertFile", "AFP_SIGNER_CLIENT_CERT_FILE", config.signerClientCertFile] as const,
+    ["signerClientKeyFile", "AFP_SIGNER_CLIENT_KEY_FILE", config.signerClientKeyFile] as const,
+    ["signerCaFile", "AFP_SIGNER_CA_FILE", config.signerCaFile] as const,
   ]) {
     if (path === undefined) continue;
     if (!existsSync(path)) {

@@ -43,6 +43,31 @@ export async function runConfigCheck(config: Config, options: RunConfigCheckOpti
   const problems = validate(config);
   const lines: ConfigCheckLine[] = [];
 
+  // ADR-0035 Decision 2, item 3 of its review: two lifetimes exist —
+  // AFP_ISSUED_KEY_LIFETIME_MS, which actually drives `keys rotate --root
+  // remote`, and the policy's published `custody.keyLifetimeMs`, which is
+  // the obligation a counterparty reads. Nothing else holds them to
+  // agreeing, so a changed env var with a stale policy file would publish a
+  // lifetime the instance does not honour — reported here, by name, rather
+  // than silently.
+  const custody = config.policy.custody;
+  const declaresRemoteIssued = custody?.instance === "remote-issued" ||
+    custody?.agents === "remote-issued" ||
+    custody?.hub === "remote-issued";
+  if (declaresRemoteIssued) {
+    const agree = custody?.keyLifetimeMs === config.issuedKeyLifetimeMs;
+    lines.push(
+      agree
+        ? { name: "custody", ok: true }
+        : {
+            name: "custody",
+            ok: false,
+            reason: `custody-lifetime-mismatch: policy declares custody.keyLifetimeMs=${custody?.keyLifetimeMs}, ` +
+              `but AFP_ISSUED_KEY_LIFETIME_MS=${config.issuedKeyLifetimeMs} is what rotation actually uses`,
+          },
+    );
+  }
+
   // Store: opens (and immediately closes) the store path — a running
   // instance holding the lock is reported as `store-locked` with its pid,
   // not as a failure, since the whole point is to check config *while*

@@ -10,7 +10,7 @@
 import { mkdirSync } from "node:fs";
 import type { Config } from "./config.ts";
 import type { JsonValue } from "./crypto/jcs.ts";
-import { loadOrCreateKeyPair, loadOrCreateTransportKeyPair, type KeyPair } from "./crypto/keys.ts";
+import { loadOrCreateKeyPair, loadOrCreateTransportKeyPair, remoteRootKeys, type KeyPair } from "./crypto/keys.ts";
 import { attachProof, digestOf } from "./crypto/proof.ts";
 import { fileSigner, type Signer } from "./crypto/signer.ts";
 import { openDb, type Db } from "./store/db.ts";
@@ -180,7 +180,24 @@ export class AfpInstance {
   }
 
   instanceDocument(): { [key: string]: JsonValue } {
-    return instanceActor(this.config.origin, this.config.operator, this.config.instanceName, this.key("@instance"), this.transportKey("@instance"));
+    // ADR-0035 Decision 2: every `remote-issued` root this instance has ever
+    // recorded, published as an informational assertionMethod entry — the
+    // anchor a counterparty holds *before* any theft, not a value asserted
+    // by the delegation activity it is meant to check.
+    const rootKeys = remoteRootKeys(this.config.keyDir).map((root) => ({
+      keyId: root.keyId,
+      controller: instanceActorId(this.config.origin),
+      publicKeyMultibase: root.publicKeyMultibase,
+      custody: "remote-issued" as const,
+    }));
+    return instanceActor(
+      this.config.origin,
+      this.config.operator,
+      this.config.instanceName,
+      this.key("@instance"),
+      this.transportKey("@instance"),
+      rootKeys,
+    );
   }
 
   agentDocument(name: string): { [key: string]: JsonValue } {

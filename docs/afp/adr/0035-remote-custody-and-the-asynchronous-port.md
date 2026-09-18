@@ -1,6 +1,7 @@
 # ADR-0035 — Remote custody: what an operator actually wants from an HSM, and what the asynchronous port would cost
 
-- **Status:** Proposed (2026-09-04) — completes program claim **C2** of
+- **Status:** Built in part (2026-09-18) — Decisions 2, 3, 5 built; Decision 4 costed and
+  deliberately unscheduled; completes program claim **C2** of
   [ADR-0024](0024-the-road-to-production.md), the one adapter
   [ADR-0026](0026-key-custody-and-the-signer-port.md) left unbuilt; group: **Security**
 - **Date:** 2026-09-04
@@ -255,8 +256,86 @@ no bundle anywhere serializes a `Promise`.
 
 ## Build status
 
-Not built. This ADR is a design; `remote-issued` (Decisions 2–3) is the buildable half and
-`remote` (Decision 4) is costed but deliberately unscheduled.
+**Decisions 2, 3 and 5 built, 2026-09-18.** Decision 4 (the async port, the full `remote`
+adapter) remains costed and deliberately unscheduled — nothing below builds it.
+
+**WP-1 — the reference signer**, `src/tools/signer/server.ts` (new): a file-backed
+`POST /sign` / `GET /keys/{keyId}` service behind mutual TLS, `node:https`/`node:crypto`
+only (ADR-0001). The client certificate's SHA-256 fingerprint must appear in the keyId's
+own authorized list — the service's own authorization, never the caller's assertion, per
+Decision 3. `src/tools/signer/devCerts.ts` generates a dev/test CA, server and client
+certificate through the system `openssl` binary — a test-time dependency of this file
+alone, not an npm package and not a runtime dependency of the instance.
+
+**WP-2 — the adapter**, `crypto/signer.ts`: `Custody` gains `"remote-issued"`; the async
+`AsyncSigner`/`remoteIssuedSigner`/`fetchRemoteSignerPublicKey` call the reference contract
+directly over `node:https` with a client certificate, never through `policedFetch` (Decision
+3's own point). `crypto/proof.ts` gains `attachProofAsync` — the one call site in the
+codebase that awaits a signature, exactly the narrow exception the ADR asked for.
+`config.ts`/`configSchema.ts` gain `AFP_SIGNER_URL`, `AFP_SIGNER_ROOT_KEY_ID`,
+`AFP_SIGNER_CLIENT_CERT_FILE`/`AFP_SIGNER_CLIENT_KEY_FILE`/`AFP_SIGNER_CA_FILE`, and
+`AFP_ISSUED_KEY_LIFETIME_MS` (named for what it actually drives — the *successor's*
+lifetime, not the root's; an earlier draft called it `AFP_SIGNER_ROOT_KEY_LIFETIME_MS` and
+was renamed on review before anything shipped under the old name). A remote request that
+never answers no longer hangs a rotation forever: `RemoteSignerClientConfig.timeoutMs`
+(default 10s) destroys the request and the failure propagates through the same fail-closed
+path as an unreachable host.
+
+**WP-3 — the delegation**, `ap/activities.ts` (`afp:KeyDelegation`, fields exactly as
+Decision 2 specified: `afp:delegatedKey` `{keyId, publicKeyMultibase}`, `afp:validFrom`,
+`afp:validUntil`, `afp:rootKey`), `instance/keyOps.ts` (`rotateKeyWithRemoteRoot`, reached
+by `afp keys rotate <actor> --root remote`), `verifier/keys.py` (`check_key_delegations`).
+Two amendments came out of review, both closing a hole the first pass left open:
+
+> **The root's public half is never asserted by the record it authenticates.** The first
+> pass embedded `afp:rootKeyMultibase` in the delegation activity itself and folded it into
+> the manifest's `afp:keyHistory` — both are part of the export the same host produces, so a
+> thief who had stolen it could mint a fake root, name the real `afp:rootKey` id, and
+> delegate themself a successor with every check passing (the same "a forger supplies the
+> public half of the key they signed with" hole ADR-0026 Decision 1 already closed for the
+> manifest signature). Fixed by publishing the root's public half on the **instance actor
+> document** instead — `instanceDocument()` gains an `assertionMethod` entry per recorded
+> root, `afp:custody: "remote-issued"`, sourced from `crypto/keys.ts`'s new
+> `recordRemoteRootKey`/`remoteRootKeys` (an `instance.roots.json` sidecar, written only
+> after a `/sign` call succeeds). `afp:rootKeyMultibase` and the `export.ts` fold are gone;
+> `check_key_delegations` resolves `afp:rootKey` from actor documents alone
+> (`collect_public_keys(export)`, no history) and both verifies the delegation's own
+> signature against that key and requires it be published there before anything else about
+> the delegation is trusted. The anchor is the actor document a counterparty already fetched
+> and cached *before* any theft — the same limit every other published key already has, and
+> the reason this is a real property rather than a repeated assertion: the root itself
+> carries no interval of its own on the document, since nothing here tracks its lifecycle.
+
+> **The compromise window is enforced at replay, not merely declared.** The first pass
+> minted the successor's `afp:keyHistory` entry with no `validUntil` at all, so a signature
+> made long after the delegation's own hour-long window verified anyway —
+> `check_key_intervals` had nothing to check it against. `rotateKeyPair` (`crypto/keys.ts`)
+> gained a `declaredValidUntil` parameter, kept deliberately separate from the field that
+> marks a key actually retired (`activeEntry` reads presence of `validUntil`, not time, as
+> "no longer signs" — writing the delegated bound directly into `validUntil` would have
+> stranded the key before it ever got to sign anything). `keyHistory` exports
+> `validUntil ?? declaredValidUntil`, so the delegated window reaches `afp:keyHistory` once
+> no real retirement has superseded it. Because that history entry is still something the
+> same (possibly stolen) host asserts, `check_key_delegations` independently holds every
+> signature by a delegated key to the window **its own root-signed delegation declares** —
+> unforgeable by whoever holds only the successor — so a doctored history entry cannot widen
+> what the delegation itself already fixed.
+
+`afp:custody: "remote-issued"` also now joins the `CustodyMode`/`Custody` enums
+(`policySpec.ts`, `crypto/signer.ts`), and the policy document gains `afp:keyLifetimeMs`
+(`ap/policy.ts`, `policySpec.ts` `CustodySpec.keyLifetimeMs`) — the small ADR-0033 addition
+the Consequences section asked for. `runtime/configCheck.ts` adds a `custody` line: when the
+policy declares any custody mode `remote-issued`, `custody.keyLifetimeMs` must equal
+`AFP_ISSUED_KEY_LIFETIME_MS`, failing by name (both values) otherwise — the two lifetimes are
+easy to change independently and nothing else holds them to agreeing.
+
+**WP-5 — gate and docs**, `test/adr0035.test.ts`: G1, G4, G5, G6, G7, G8 as specified; G2 and
+G3 each gained a "b" case pinning one of the two amendments above (G2b: a delegation whose
+root is stripped from the actor document fails by name; G3b: a signature made past the
+delegation's own `validUntil` fails even with `afp:keyHistory` otherwise untouched), plus a
+timeout case and a config-check mismatch case. 13/13. Instance README gains a "Remote-issued
+custody" runbook section. `npm test` (`src/instance`) — 568 tests, 566 pass, 2 pre-existing
+skips, 0 failures, including the full existing demo/parity/fixture gate unchanged.
 
 ## References
 

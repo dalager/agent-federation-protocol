@@ -77,9 +77,43 @@ export const CONFIG_SCHEMA: readonly ConfigEntry[] = [
     kind: "file",
     default: "",
     secret: true,
-    doc:
-      "File holding the ADR-0035 remote signer's client certificate. Validated as readable only — " +
-      "nothing in this codebase consumes it yet",
+    doc: "File holding the ADR-0035 remote signer's mTLS client certificate",
+  },
+  {
+    env: "AFP_SIGNER_CLIENT_KEY_FILE",
+    key: "signerClientKeyFile",
+    kind: "file",
+    default: "",
+    secret: true,
+    doc: "File holding the private key for AFP_SIGNER_CLIENT_CERT_FILE",
+  },
+  {
+    env: "AFP_SIGNER_CA_FILE",
+    key: "signerCaFile",
+    kind: "file",
+    default: "",
+    doc: "CA certificate the ADR-0035 remote signer's own server certificate must chain to — not a secret, but validated as readable",
+  },
+  {
+    env: "AFP_SIGNER_URL",
+    key: "signerUrl",
+    kind: "string",
+    default: "",
+    doc: "Base URL of the ADR-0035 remote signing service (tools/signer/, or an operator's KMS/HSM proxy speaking the same contract). Called directly, never through policedFetch",
+  },
+  {
+    env: "AFP_SIGNER_ROOT_KEY_ID",
+    key: "signerRootKeyId",
+    kind: "string",
+    default: "",
+    doc: "The keyId `remote-issued` custody's root key is known by on the remote signer — what `afp keys rotate --root remote` asks it to sign a delegation with",
+  },
+  {
+    env: "AFP_ISSUED_KEY_LIFETIME_MS",
+    key: "issuedKeyLifetimeMs",
+    kind: "int",
+    default: 60 * 60 * 1000,
+    doc: "How long a `remote-issued` successor key is valid before its next rotation — the compromise window ADR-0035 Decision 2 makes a configured number, one hour by default",
   },
 ];
 

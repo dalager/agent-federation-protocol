@@ -63,6 +63,7 @@ from electorate import (
 from equivocation import convicts, equivocation_proof_votes, proof_round, vote_tuple_of
 from federation import check_export_scope, check_federation, check_joint
 from keys import (
+    check_key_delegations,
     check_key_intervals,
     check_manifest_key_history,
     check_manifest_signature,
@@ -718,6 +719,17 @@ def verify_export(export: Path, thread: str | None, report: Report) -> dict:
     # signature collected above — a no-op when this bundle carries no
     # afp:keyHistory (Compatibility).
     check_key_intervals(report, history, labeled_activities)
+
+    # ADR-0035 Decision 2/5: the afp:KeyDelegation a remote-issued root key
+    # publishes when it mints a successor. Resolved against actor documents
+    # ONLY (`actor_only_keys`, never `keys`/`history`) — the root's public
+    # half must be something a counterparty already held before any theft,
+    # not a value the manifest's own (writer-controlled, editable by whoever
+    # holds the current signing key) afp:keyHistory or the delegation
+    # activity's own claim asserts about itself. A no-op when no such
+    # activity exists.
+    actor_only_keys = collect_public_keys(export)
+    check_key_delegations(report, actor_only_keys, labeled_activities)
 
     # ADR-0012 Decision 4: the content inventory — a no-op when this
     # manifest carries no afp:members (Compatibility).

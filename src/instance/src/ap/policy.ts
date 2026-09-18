@@ -56,6 +56,11 @@ function jsonOf(spec: PolicySpec): { [key: string]: JsonValue } {
     if (spec.custody.instance !== undefined) custody["afp:instance"] = spec.custody.instance;
     if (spec.custody.agents !== undefined) custody["afp:agents"] = spec.custody.agents;
     if (spec.custody.hub !== undefined) custody["afp:hub"] = spec.custody.hub;
+    // ADR-0035 Consequences: the mode alone invites the misreading that a
+    // remote-issued key never sits in host memory — publishing its lifetime
+    // is what makes the compromise window a number a stranger can check
+    // rather than a claim.
+    if (spec.custody.keyLifetimeMs !== undefined) custody["afp:keyLifetimeMs"] = spec.custody.keyLifetimeMs;
     wire["afp:custody"] = custody;
   }
   if (spec.brains !== undefined) {

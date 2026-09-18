@@ -63,6 +63,16 @@ export function instanceActor(
   key: KeyPair,
   /** ADR-0017 Decision 4 (R1): HTTP-signature key, published under `authentication`. */
   transportKey: KeyPair,
+  /**
+   * ADR-0035 Decision 2: `remote-issued` custody's root key(s) — never held
+   * locally, so the instance never signs with one of these directly, but
+   * their public halves publish here so a stranger can resolve an
+   * `afp:KeyDelegation`'s own signature against a key this actor document
+   * named *before* any theft, rather than against a value the delegation
+   * activity merely asserts about itself (the circularity ADR-0026 Decision
+   * 1 already closed for the manifest signature).
+   */
+  rootKeys: readonly PublishedKey[] = [],
 ): { [key: string]: JsonValue } {
   const id = instanceActorId(origin);
   return {
@@ -83,7 +93,7 @@ export function instanceActor(
     "afp:roster": `${origin}/roster`,
     "afp:policy": `${origin}/afp/policy`,
     "afp:visibility": "public",
-    assertionMethod: [multikey(key)],
+    assertionMethod: [multikey(key), ...rootKeys.map(multikey)],
     authentication: [multikey(transportKey)],
   };
 }

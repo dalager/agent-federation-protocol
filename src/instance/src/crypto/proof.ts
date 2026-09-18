@@ -108,6 +108,50 @@ export function attachProof(
   return { ...document, proof } as SignedDocument;
 }
 
+/**
+ * ADR-0035 Decision 2: the one call site in this codebase that awaits a
+ * signature — signing the `afp:KeyDelegation` activity with a
+ * `remote-issued` custody's root key, once per rotation. Everything else the
+ * signing core does stays synchronous, exactly as ADR-0026's revision note
+ * left it; turning the rest async is Decision 4's unbuilt, costed option.
+ */
+export interface AsyncSignOptions {
+  signer: { keyId: string; sign(bytes: Uint8Array): Promise<Uint8Array> };
+  created?: string;
+}
+
+/** The async twin of `attachProof`, for a signer whose signature crosses the network. */
+export async function attachProofAsync(
+  document: { [key: string]: JsonValue },
+  options: AsyncSignOptions,
+): Promise<SignedDocument> {
+  const created = options.created ?? new Date().toISOString();
+  const verificationMethod = options.signer.keyId;
+
+  const proofConfig: { [key: string]: JsonValue } = {
+    type: "DataIntegrityProof",
+    cryptosuite: CRYPTOSUITE,
+    created,
+    verificationMethod,
+    proofPurpose: "assertionMethod",
+  };
+  if (document["@context"] !== undefined) {
+    proofConfig["@context"] = document["@context"];
+  }
+
+  const signature = await options.signer.sign(buildSigningInput(document, proofConfig));
+  const proof: Proof = {
+    type: "DataIntegrityProof",
+    cryptosuite: CRYPTOSUITE,
+    created,
+    verificationMethod,
+    proofPurpose: "assertionMethod",
+    proofValue: multibaseEncode(signature),
+  };
+
+  return { ...document, proof } as SignedDocument;
+}
+
 export type VerifyResult = { ok: true } | { ok: false; reason: string };
 
 /** Check a document's proof against a public key. Never throws. */

@@ -1014,6 +1014,69 @@ leaves the store with no active key, which the loader refuses by design, so a
 command that needed a running instance could not run `rotate` at exactly the
 moment you need it.
 
+## Remote-issued custody
+
+[ADR-0035](../../docs/afp/adr/0035-remote-custody-and-the-asynchronous-port.md)
+Decision 2 adds a second answer to "where does your instance key live": a root
+key on a KMS or HSM that issues short-lived successors, rather than one that
+signs every activity itself. It answers "a stolen host can sign only until the
+current key expires"; it does **not** mean the key never sits in host memory —
+it does, for its lifetime. An operator whose rule forbids key material in host
+memory needs the full `remote` adapter, which this ADR costs and deliberately
+does not build.
+
+`tools/signer/` (`src/tools/signer/server.ts`) is a file-backed reference
+implementation of the contract every remote signer speaks — `POST /sign`,
+`GET /keys/{keyId}`, behind mutual TLS with the client certificate bound to
+the keyId it may sign for. Point `AFP_SIGNER_URL` at your own KMS/HSM proxy
+once it speaks the same contract.
+
+```bash
+export AFP_SIGNER_URL=https://kms.internal:8443
+export AFP_SIGNER_ROOT_KEY_ID='https://kms.internal/roots/alpha'
+export AFP_SIGNER_CLIENT_CERT_FILE=/secure/afp-signer-client.crt
+export AFP_SIGNER_CLIENT_KEY_FILE=/secure/afp-signer-client.key
+export AFP_SIGNER_CA_FILE=/secure/afp-signer-ca.crt
+export AFP_ISSUED_KEY_LIFETIME_MS=3600000   # one hour — the compromise window
+
+npm run keys -- rotate @instance --root remote
+```
+
+This mints a successor exactly like an ordinary rotation — same file-adapter
+key, same `afp:keyHistory` entry, now carrying the delegated `validUntil` so a
+signature made after the window closes fails at replay rather than reading as
+still-current — plus one thing an ordinary rotation does not: an
+`afp:KeyDelegation` activity, signed by the root key over the network (the one
+call to `/sign` this path ever makes), naming the successor's keyId, public
+key, and validity window. The call happens *before* anything local is
+touched: an unreachable or refusing signer leaves the current key exactly as
+it was, and the failure is reported rather than swallowed.
+
+The root's public half is fetched (`GET /keys/{keyId}`) and published on the
+**instance actor document** — an `assertionMethod` entry with
+`afp:custody: "remote-issued"` — never embedded in the delegation activity or
+folded into `afp:keyHistory`. Both of those live in the same export a stolen
+host could produce; the actor document is the one thing a counterparty
+already fetched and cached *before* any theft, which is the only anchor a
+verifier resolves an `afp:KeyDelegation`'s signer against
+([src/verifier/keys.py](../verifier/keys.py) `check_key_delegations`). Re-export
+after a remote-issued rotation, same as any other, so the delegation and the
+updated actor document both travel.
+
+The signer URL is configuration, not a fetched resource
+([ADR-0025](../../docs/afp/adr/0025-transport-hardening.md) Decision 2): it is
+called directly, never through the policed-fetch address guard, and its host
+is pinned by mutual TLS instead. Putting it on a routable address earns no
+exemption from that policy elsewhere.
+
+A deployment declaring this mode should say so in its published policy
+([ADR-0033](../../docs/afp/adr/0033-operator-obligations.md)): `custody.instance:
+"remote-issued"` plus `custody.keyLifetimeMs`, so the compromise window is a
+number a stranger can check rather than a claim — a one-year "short-lived" key
+is this mode's failure case. `custody.keyLifetimeMs` and
+`AFP_ISSUED_KEY_LIFETIME_MS` are two different settings that must agree;
+`afp config check` fails a `custody` line by name when they do not.
+
 ## Backup — keys and data are two runbooks, not one
 
 A single `cp -r` of the data directory both risks a torn copy of a live

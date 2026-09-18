@@ -369,6 +369,39 @@ export function keyCompromiseClaim(
  * the same convention every other hub-emitted/hub-addressed activity follows
  * — so the gate's `hub` grant (matching on `afp:hub`) admits it.
  */
+export interface KeyDelegationSpec {
+  delegatedKey: { keyId: string; publicKeyMultibase: string };
+  validFrom: string;
+  validUntil: string;
+  rootKey: string;
+}
+
+/**
+ * `Create{afp:KeyDelegation}` — ADR-0035 Decision 2's on-record artifact for
+ * `remote-issued` custody: the root key does not sign every activity, so its
+ * one act — introducing a short-lived successor — has to be checkable rather
+ * than merely asserted. Published by the instance on its own chain and
+ * signed with the *root* key (never the successor it introduces); the
+ * verifier's `keys.py` checks both — that this activity's signer is the key
+ * it names as root, and that the delegated interval falls inside the root's.
+ */
+export function keyDelegation(envelope: Envelope, spec: KeyDelegationSpec): { [key: string]: JsonValue } {
+  return {
+    ...base(envelope, "Create"),
+    object: {
+      id: `${envelope.activityId}#key-delegation`,
+      type: "afp:KeyDelegation",
+      "afp:delegatedKey": {
+        keyId: spec.delegatedKey.keyId,
+        publicKeyMultibase: spec.delegatedKey.publicKeyMultibase,
+      },
+      "afp:validFrom": spec.validFrom,
+      "afp:validUntil": spec.validUntil,
+      "afp:rootKey": spec.rootKey,
+    },
+  };
+}
+
 export function follow(envelope: Envelope, target: string): { [key: string]: JsonValue } {
   return { ...base(envelope, "Follow"), object: target, "afp:hub": target };
 }

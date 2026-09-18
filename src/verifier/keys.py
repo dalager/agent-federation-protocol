@@ -180,6 +180,100 @@ def check_key_intervals(
         )
 
 
+def check_key_delegations(
+    report,
+    actor_keys: dict[str, bytes],
+    labeled_activities: list[tuple[str, dict]],
+) -> None:
+    """ADR-0035 Decision 2/5 — the on-record artifact `remote-issued` custody
+    publishes when its root key mints a successor.
+
+    `actor_keys` MUST come from the bundle's actor documents alone (never
+    `afp:keyHistory`, never the delegation activity's own claim about its
+    root) — the same "never resolve a signer against the record under
+    verification" discipline `check_manifest_signature` already holds the
+    manifest to. A thief who has stolen the host holds every key the
+    manifest and its history can assert; the one thing they do not hold is
+    an actor document a counterparty already fetched and cached before the
+    theft, which is why that is the only anchor this check trusts.
+
+    Also holds every signature by a delegated key to the window **its own
+    delegation declares**, independent of `afp:keyHistory`'s entry for that
+    key: `check_key_intervals` above already checks the history entry, but
+    the history is asserted by the same (possibly stolen) key that signs the
+    rest of the export, so a widened `afp:validUntil` there proves nothing
+    on its own. The delegation is root-signed and therefore unforgeable by
+    whoever holds only the successor, so its declared window is what a
+    doctored history entry cannot override (the compromise window Decision 2
+    exists for).
+    """
+    # label -> (delegatedKeyId, validFrom ms, validUntil ms)
+    delegations: list[tuple[str, str, int, int]] = []
+
+    for label, activity in labeled_activities:
+        obj = activity.get("object")
+        if not isinstance(obj, dict) or obj.get("type") != "afp:KeyDelegation":
+            continue
+
+        root_key_id = obj.get("afp:rootKey")
+        root_published = isinstance(root_key_id, str) and root_key_id in actor_keys
+        report.record(
+            f"keys: {label} (afp:KeyDelegation)'s root key is published on an actor document",
+            root_published,
+            "" if root_published else
+            f"names root key {root_key_id!r}, which no actor document in this bundle publishes — "
+            f"resolving it from afp:keyHistory or the activity's own claim instead is exactly the "
+            f"circularity that would let a stolen host mint its own 'root' and delegate itself a "
+            f"successor (ADR-0035 Decision 2)",
+        )
+
+        proof = activity.get("proof")
+        signer = proof.get("verificationMethod") if isinstance(proof, dict) else None
+        signed_by_root = root_published and signer == root_key_id
+        report.record(
+            f"keys: {label} (afp:KeyDelegation) is signed by the root key it names",
+            signed_by_root,
+            "" if signed_by_root else
+            f"names root key {root_key_id!r} but is signed by {signer!r} — a delegation not "
+            f"signed by its own (published) root is an unchecked handoff, not a delegation",
+        )
+
+        from_raw = obj.get("afp:validFrom")
+        until_raw = obj.get("afp:validUntil")
+        interval_present = isinstance(from_raw, str) and isinstance(until_raw, str)
+        report.record(
+            f"keys: {label} (afp:KeyDelegation) declares both ends of its delegated interval",
+            interval_present,
+            "" if interval_present else
+            "afp:validFrom and afp:validUntil must both be present strings — an open-ended "
+            "delegation is not one Decision 2's compromise-window property can be checked against",
+        )
+
+        delegated = obj.get("afp:delegatedKey")
+        delegated_key_id = delegated.get("keyId") if isinstance(delegated, dict) else None
+        if root_published and signed_by_root and interval_present and isinstance(delegated_key_id, str):
+            delegations.append((label, delegated_key_id, instant_millis(from_raw), instant_millis(until_raw)))
+
+    for label, activity in labeled_activities:
+        proof = activity.get("proof")
+        method = proof.get("verificationMethod") if isinstance(proof, dict) else None
+        if method is None:
+            continue
+        published = instant_millis(activity.get("published"))
+        for delegation_label, delegated_key_id, valid_from, valid_until in delegations:
+            if method != delegated_key_id:
+                continue
+            ok = valid_from <= published <= valid_until
+            report.record(
+                f"keys: {label} signed by {method} falls inside its afp:KeyDelegation's declared window",
+                ok,
+                "" if ok else
+                f"signed at {published}, but {delegation_label}'s afp:KeyDelegation declared "
+                f"{method!r} valid {valid_from}..{valid_until} — a signature outside the delegated "
+                f"window is not saved by anything afp:keyHistory separately claims (ADR-0035)",
+            )
+
+
 def check_manifest_signature(report, manifest: dict, actor_keys: dict[str, bytes]) -> None:
     """ADR-0012 Decision 1: the manifest is a signed document, so its own
     bytes must verify — not merely name a plausible key.

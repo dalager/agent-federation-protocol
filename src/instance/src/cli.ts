@@ -978,9 +978,39 @@ async function main(): Promise<void> {
 
         if (sub === "rotate") {
           const actor = process.argv[4];
-          if (!actor) throw new Error("usage: keys rotate <actor> [--kind proof|transport|hub:<id>] [--at <instant>]");
+          if (!actor) {
+            throw new Error(
+              "usage: keys rotate <actor> [--kind proof|transport|hub:<id>] [--at <instant>] [--root remote]",
+            );
+          }
           const kind = parseKind(flag("kind"));
           const at = flag("at") ? new Date(flag("at")!) : new Date();
+
+          if (flag("root") === "remote") {
+            // ADR-0035 Decision 2: the root key lives on a remote signer and
+            // signs one thing — the afp:KeyDelegation introducing this
+            // rotation's successor. Configuration must name where it is;
+            // guessing would mean signing with the wrong root silently.
+            if (!config.signerUrl || !config.signerRootKeyId) {
+              throw new Error("--root remote requires AFP_SIGNER_URL and AFP_SIGNER_ROOT_KEY_ID to be configured");
+            }
+            const { rotateKeyWithRemoteRoot } = await import("./instance/keyOps.ts");
+            const { successor, delegation } = await rotateKeyWithRemoteRoot(deps, actor, kind, at, {
+              url: config.signerUrl,
+              keyId: config.signerRootKeyId,
+              clientCertFile: config.signerClientCertFile,
+              clientKeyFile: config.signerClientKeyFile,
+              caFile: config.signerCaFile,
+              lifetimeMs: config.issuedKeyLifetimeMs,
+            });
+            console.log(`rotated ${actor} (${flag("kind") ?? "proof"}) at ${at.toISOString()} — root: remote (${config.signerRootKeyId})`);
+            console.log(`  successor: ${successor.keyId}`);
+            console.log(`  afp:KeyDelegation published: ${delegation.activityId}`);
+            console.log(`  the retired key keeps its interval — everything it signed in-interval still verifies`);
+            console.log(`  next: re-export so the new afp:keyHistory and delegation travel, and hand peers the updated actor document`);
+            break;
+          }
+
           const successor = rotateKey(deps, actor, kind, at);
           console.log(`rotated ${actor} (${flag("kind") ?? "proof"}) at ${at.toISOString()}`);
           console.log(`  successor: ${successor.keyId}`);
