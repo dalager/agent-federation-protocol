@@ -161,6 +161,46 @@ One optional exception, in the additive direction: dual-publish shadow Notes (no
 need no agreement and may be switched on at any phase, since they are the cheapest external
 anchor for outbox chain heads — see above.
 
+## Hosting profiles: self-hosted and hosted
+
+The three profiles above are *trust topologies* — who federates with whom. A second
+axis, orthogonal to it, is *hosting* — where an instance runs — and it has two values.
+
+**Self-hosted** ([ADR-0032](adr/0032-deployment-profile.md)): one Node process from a
+clean checkout, one SQLite file, one writer held by a lock beside the file, ADR-0031's
+scheduler ticking in-process, TLS terminated by a proxy the operator runs. This is the
+reference profile: it runs with no account anywhere, and a claim it cannot honour is a
+claim the program does not make.
+
+**Hosted** ([ADR-0036](adr/0036-the-hosted-profile.md)): one platform actor per instance
+— a single-threaded object with attached SQLite storage, an alarm and a fetch handler,
+of which Cloudflare's Durable Objects are the concrete case. Stripped to invariants,
+ADR-0032's profile reads *one store, one writer, one clock, one origin, a proxy that
+terminates TLS*, and such an actor is that list: the pid lock, the WAL pragma and the
+`node:http` server are the self-hosted profile's ways of obtaining what the platform
+provides. The instance reaches it through two ports — a store port over plain SQL and a
+request port over standard `Request`/`Response` — with the Node runtime as one adapter
+of each and the actor as the other, the way the signer port already made key custody an
+adapter choice (ADR-0026).
+
+What the hosted profile buys is the shape the self-hosted one cannot: one operator, one
+object, and a host holding thousands with no isolation code of its own — an instance
+for the practitioner who wants one without wanting a server. What it costs is stated in
+the ADR and not softened here: the export stops being a file copy (ADR-0001 Decision 4
+deviates under this profile), the platform is a hard dependency, `agent` custody is
+unavailable and `remote-issued` custody (ADR-0035) is the baseline, and the attached
+storage ceiling is a retention bound to check `afp:retentionDuty` against.
+
+The rule for trust-topology profiles holds across the hosting axis too: **degenerate
+means fewer mechanisms, never fewer checks.** Where the platform makes a check
+unnecessary — the private-range refusal of ADR-0025, on an edge that cannot reach
+private ranges — the profile records `refused-by-platform` in the log rather than
+letting the check quietly become nothing. One conformance kit (ADR-0034) gates both
+profiles with the same fixtures; a release names which it was gated on.
+
+Every trust topology runs under either hosting profile. The pairing that matters most
+is *solo × hosted*: the consortium of one, on an object it never operates.
+
 ## Designing for per-subject disclosure
 
 Some deployments owe a trace to a *person* rather than to a counterparty: the EU AI Act

@@ -11,6 +11,7 @@
 |---|---|
 | What it is | the built stack's ordinary day, every noun pointing at a file. A baseline record, not a spec test |
 | Caveat | it describes the stack **as it ran when written**; the [support index](README.md#is-this-workload-supported) is the current view |
+| Successor | [scenario 15 — the production Tuesday](15-the-production-tuesday.md) (2026-09-15): the same operator on a served instance, after ADR-0031 and ADR-0032 answered the warts below |
 
 
 Kasper operates the integration practice's instance. "Operates" flatters it, he says:

@@ -16,7 +16,10 @@
 - **Driven by:** ADR-0026's revision-under-contact note, which deferred the `remote`
   adapter to "the asynchronous port" without costing either the port or the adapter — and
   which, measured, turns out to have overstated the cost by about a third and to have
-  specified the wire contract in a way Ed25519 cannot honour
+  specified the wire contract in a way Ed25519 cannot honour; and, since,
+  [scenario 15](../scenarios/15-the-production-tuesday.md) finding **98** — on a served
+  instance, custody improved by one word (file custody with a passphrase on the same
+  disk), and this ADR is the sentence's only remaining answer
 
 ## Context
 

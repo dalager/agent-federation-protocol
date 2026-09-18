@@ -1106,6 +1106,15 @@ is a command or a file, and the list is this README's, not the ADR's, so it can 
   15 3 * * * afp cd /opt/afp && npm run backup -- /backups/afp-$(date -I) >> /var/log/afp-backup.log 2>&1
   ```
   or a `systemd` timer unit calling the same command.
+- [ ] **Export retention is scheduled and matches the declared duty.** The policy's
+  `retentionDuty` ([ADR-0012](../../docs/afp/adr/0012-the-long-horizon.md), [ADR-0033](../../docs/afp/adr/0033-operator-obligations.md))
+  is a declaration the verifier checks, not a loop the runtime runs; `afp restore` does
+  not restore exports and says so. Schedule the export, name where it goes, and keep it
+  for the horizon you declared ([scenario 15](../../docs/afp/scenarios/15-the-production-tuesday.md) finding 100):
+  ```
+  # /etc/cron.d/afp-export — weekly, into the retention store the policy's anchors name
+  0 4 * * 1 afp cd /opt/afp/src/instance && AFP_EXPORT_DIR=/retention/afp-$(date -I) npm run export >> /var/log/afp-export.log 2>&1
+  ```
 - [ ] **`/readyz` is probed** by the proxy or the orchestrator, and a failing check is
   acted on — it names the failing line (`store`/`signer`/`self-check`/`scheduler`), not
   just "unhealthy".

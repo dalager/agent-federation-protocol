@@ -26,6 +26,7 @@ protocol does; that review tested whether the build order still matched it.
 | [12](12-the-parametric-trigger.md) | The parametric trigger: five reinsurers, one storm, and a signature that voted twice | The P6 shakedown — first workload at n≥4 (real Byzantine tolerance), a rational equivocator with pinned incentives, a captured-key claim, backup-restore as accidental equivocation, quorum arithmetic after weight-zeroing, view-change capture, a merger the snapshot cannot see, recusal, and proof portability | 8 |
 | [13](13-the-quarterly-split.md) | The quarterly split: four support desks, one retainer, and a number nobody can check twice | The P7 shakedown — the first object whose subject is a *set* of events rather than an event: independent recomputation against visibility classes, co-authored credit, a period edge on self-asserted clocks, work that did not hold, an expelled member's quarter, a dispute with no terminal, and a roll-up whose inputs are historical by definition | 9 |
 | [14](14-the-seat-migration.md) | The seat migration: an instance leaves a hub, and comes back | An instance's seat from `Follow` through `Undo{Follow}` and re-`Follow`, walked under both seat policies the built hub runs today — implicit (the shipped default) and explicit (ADR-0017 Decision 4's conformant target) | 6 |
+| [15](15-the-production-tuesday.md) | The production Tuesday: the same operator, on a served instance | ADR-0024 Decision 3's definition of done — an operator's day on a served, federating instance on the public internet, in the baseline's genre: the scheduler, the lock, `/readyz`, the release, the policy document, backup and custody, every noun a file, warts listed | 5 |
 | [16](16-the-hostile-edge.md) | The hostile edge: five adversaries, and what none of them need a mechanism to do | The first scenario whose cast is the attacker — a stranger with no standing, a counterparty turned hostile, a poisoned attachment, a forged authority claim, and a flood — walked against the built transport, ingestion, port-agent and command surfaces together | 6 |
 | [· tuesday](the-operators-tuesday.md) | The operator's Tuesday | The built stack's ordinary day, every noun pointing at a file — commands, tables, outputs and warts of the solo profile as it runs today; the hard-focus baseline the P4 build will be measured against | — |
 
@@ -68,6 +69,7 @@ demo shows the *resolved* world and the walkthrough shows what it cost to get th
 | [12](12-the-parametric-trigger.md) | 8 · closed | [ADR-0020](../adr/0020-p6-hardened-round-stack.md) (58, 60, 61, 62) · [ADR-0005 amendment](../adr/0005-operators-are-equal.md) (63) · [ADR-0021](../adr/0021-conviction-to-consequence.md) (59, 64, 65) | `npm run demo:p6` · `demo:p6:llm` | `adr0020.test.ts`, `adr0005.test.ts`, `adr0021.test.ts` | [11·3·0·0](12-the-parametric-trigger.md#coverage-as-of-2026-09-13) |
 | [13](13-the-quarterly-split.md) | 9 · closed | [ADR-0022](../adr/0022-the-summary-declares-its-frame.md) (66-73) + its [ADR-0017](../adr/0017-standards-conformance.md) amendment (74) | `npm run demo:p7` · `demo:p7:llm` | `adr0022.test.ts` | [8·2·0·0](13-the-quarterly-split.md#coverage-as-of-2026-09-13) |
 | [14](14-the-seat-migration.md) | 1 · closed + 5 · open | [ADR-0032](../adr/0032-deployment-profile.md) Decision 6 (closes finding 87) | `npm run demo:p2` | `adr0017-d4-follow.test.ts` | [2·6·1·0](14-the-seat-migration.md#coverage-as-of-2026-09-13-after-the-default-flip) |
+| [15](15-the-production-tuesday.md) | 5 · open | — | `npm run demo:p8` | `adr0031.test.ts`, `adr0032.test.ts`, `adr0033.test.ts`, `adr0034.test.ts`, `adr0026.test.ts` | [2·9·2·2](15-the-production-tuesday.md#coverage-as-of-2026-09-15) |
 | [16](16-the-hostile-edge.md) | 6 · open | — | — | `adr0025.test.ts`, `adr0027.test.ts`, `adr0028.test.ts`, `adr0029.test.ts`, `adr0013.test.ts` | [0·10·1·1](16-the-hostile-edge.md#coverage-as-of-2026-09-13) |
 
 **Coverage** is [ADR-0030](../adr/0030-scenario-re-walks-and-the-coverage-index.md) Decision
@@ -613,8 +615,8 @@ ADR-0030 Decision 3's two buildable new scenarios — [14](14-the-seat-migration
 seat migration) and [16](16-the-hostile-edge.md) (the hostile edge) — walked alongside the
 re-walk rather than as a separate campaign, since both are pressure ADR-0027/28/29 and
 ADR-0017 Decision 4 created, exactly as the re-walk above is. Scenario 15 (the production
-Tuesday) is not here: it waits on ADR-0031 and ADR-0032 landing first, per Decision 3
-itself. Twelve findings, continuing the numbering from 84.
+Tuesday) was not here: it waited on ADR-0031 and ADR-0032 landing first, per Decision 3
+itself, and is walked below as campaign 12. Twelve findings, continuing the numbering from 84.
 
 | # | Finding | Candidate |
 |---|---|---|
@@ -642,3 +644,29 @@ Not every observation from the hostile-edge walk is a finding: that the forged-a
 checks it relies on hold under adversarial pressure, and that no new mechanism was needed
 anywhere in the walk, are the scenario's own verdict — a held result, not a strain — and
 are recorded there rather than numbered here.
+
+### Campaign 12 → open (scenario 15, the production Tuesday)
+
+Five findings from [scenario 15](15-the-production-tuesday.md), the successor
+[the operator's Tuesday](the-operators-tuesday.md) promised and ADR-0030 Decision 3 held
+back until [ADR-0031](../adr/0031-the-resident-process.md) and
+[ADR-0032](../adr/0032-deployment-profile.md) had built. It is
+[ADR-0024](../adr/0024-the-road-to-production.md) Decision 3's definition of done, and
+the verdict is that it passes: every command runs, every output shape is the build's.
+The findings are what the served day still leans on that the checkout does not provide.
+
+| # | Finding | Candidate |
+|---|---|---|
+| 96 | `serve` hosts no hub of its own, so the converge loop on a served instance has nothing to converge — an operator who *hosts* a hub is still running "cron drives a library" | **Proposed** ([ADR-0037](../adr/0037-the-served-hub.md) Decisions 1–2): `afp:hubs` on the policy document names the hubs this instance hosts; `serve` constructs, routes and schedules them |
+| 97 | Seat state does not converge across hub replicas — a relayed `Enroll` is re-derived, not re-admitted, because `hub_seats` is not CRDT-tracked | **Proposed** ([ADR-0037](../adr/0037-the-served-hub.md) Decision 3): seats become an OR-Set in the sync set, `Follow`/`Accept{Follow}`/`Undo{Follow}` travel in the exchange, and `relayed` narrows to ordering — the follow-up ADR-0032's build status recorded, now an ADR |
+| 98 | Custody improved by one word: file custody with a passphrase on the same disk | **Attached** to [ADR-0035](../adr/0035-remote-custody-and-the-asynchronous-port.md) (proposed) as a driver — the `remote-issued` mode and the asynchronous port; closes when it builds |
+| 99 | The self-hosted profile needs four things outside the checkout — a proxy, a unit, a backup cron, a key runbook — before a solo practitioner's first federation | **Attached** to [ADR-0036](../adr/0036-the-hosted-profile.md) (proposed) as a driver — the hosted profile, in which all four are the platform's; scenario 15 is what it re-walks against |
+| 100 | The retention horizon is declared in the policy, carried in the manifest and checked at replay, and acted on by nothing in the runtime | **Accepted** as operational — the instance README's production checklist gains a retention line (schedule the export, name where it goes, match the horizon the policy declares); the protocol's part is the declaration, already built |
+
+**Triage (2026-09-15).** 96 and 97 are one ADR — [ADR-0037](../adr/0037-the-served-hub.md),
+proposed — because the hub a served instance hosts and the seats its replicas disagree on
+are the same object. 98 and 99 are attached as drivers to the proposed ADRs that already
+answer them. 100 is accepted as operational and has its checklist line. Held results from the walk — `config check`
+saying `skipped` beside a live process rather than failing or lying, a dead pid's lock
+taken over, the self-check catching a misrouted origin before a counterparty does — are
+recorded in the scenario's verdict, not numbered here.
