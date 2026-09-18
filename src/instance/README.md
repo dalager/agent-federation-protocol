@@ -627,14 +627,16 @@ npm run task -- writer "Draft a readiness note for the billing cutover."
 
 `--as <controller>` picks the controller (default: the first `afp:controllers` entry under
 this origin); `--capability <id>` (default: the agent's first advertised one — an
-unadvertised one is refused), `--thread <url>`, `--deadline <iso>` and `--url <base>`
-(default `AFP_ORIGIN`) are optional. The command signs `POST /agents/<name>/command` with
+unadvertised one is refused), `--thread <url-or-slug>`, `--deadline <iso>`, `--attach
+<digest>` (repeatable — an artifact the store already holds, by the digest `show result`
+prints; a reference, never bytes) and `--url <base>` (default `AFP_ORIGIN`) are optional. The command signs `POST /agents/<name>/command` with
 the controller's key from `AFP_DATA_DIR/keys` and **never opens the store** — `serve` holds
 its lock — and never mints a key: an absent controller key fails by name. It therefore needs
 the same `AFP_ORIGIN`, `AFP_DATA_DIR` and `AFP_CONTROLLERS` the running `serve` has — put
 them in `.env` (see "Configuration") rather than retyping them; a mismatch shows up as the
 polite reply or a 404, which the command deliberately does not explain. The same request
-by hand, with `capability`/`thread`/`deadline`/`visibility` as optional body fields:
+by hand, with `capability`/`thread`/`deadline`/`visibility`/`attachments` (an array of
+`sha256:` digests) as optional body fields:
 
 ```bash
 curl -X POST http://localhost:8787/agents/writer/command \
@@ -644,8 +646,20 @@ curl -X POST http://localhost:8787/agents/writer/command \
 ```
 
 A controller this instance does not hold, a capability the agent does not advertise, a
-newline in the brief, or a `task` arriving as a mention: the identical polite reply, nothing
-on the chain.
+newline in the brief, a digest the store does not hold, or a `task` arriving as a mention:
+the identical polite reply, nothing on the chain.
+
+The demo's writer → reviewer loop, by hand — the reviewer `consumes` markdown, so it is
+handed the draft's bytes ([ADR-0027](../../docs/afp/adr/0027-the-port-is-a-security-boundary.md)
+Decision 2), and the review lands on the draft's thread:
+
+```bash
+npm run task -- writer "Draft a readiness note for the billing cutover."   # → thread task-3f1c9a2b7d0e
+npm run show -- result task-3f1c9a2b7d0e                                    # … attachment: text/markdown sha256:9c1e…
+npm run task -- reviewer "Review the attached draft for unstated assumptions." \
+  --attach sha256:9c1e… --thread task-3f1c9a2b7d0e
+npm run show -- result task-3f1c9a2b7d0e                                    # the review; --all for draft and review in order
+```
 
 Watching it from the same terminal, as the same controller, without stopping `serve`:
 

@@ -1,145 +1,33 @@
 /**
  * ADR-0038 gate: the operator's own work — the agent collection from
- * configuration, and the `task` form of the command grammar. Seven checks,
- * by number, in `test/adr0029.test.ts`'s harness style: a served instance
- * with a real read gate, commands genuinely HTTP-signed, the scheduler's
- * flush driven by hand the way adr0031's gate drives ticks.
+ * configuration, and the `task` form of the command grammar. G1–G5 and G7,
+ * in `test/adr0029.test.ts`'s harness style: a served instance with a real
+ * read gate, commands genuinely HTTP-signed, the scheduler's flush driven by
+ * hand the way adr0031's gate drives ticks. The CLI half — G6, G8–G10 — is
+ * `test/adr0038-cli.test.ts`; the shared harness is `test/adr0038-harness.ts`.
  *
  *   node --experimental-sqlite --test test/adr0038.test.ts
  */
 
 import assert from "node:assert/strict";
 import { after, describe, it } from "node:test";
-import { createServer as createProbe } from "node:net";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
-import { cpSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 
-import { AfpInstance, systemClock, type Clock } from "../src/instance.ts";
+import { AfpInstance } from "../src/instance.ts";
 import { loadConfig } from "../src/config.ts";
 import { createHttpServer } from "../src/ap/server.ts";
-import { signRequest } from "../src/federation/httpSig.ts";
-import { fileSigner } from "../src/crypto/signer.ts";
-import { loadOrCreateKeyPair, type KeyPair } from "../src/crypto/keys.ts";
-import { agentActor } from "../src/ap/documents.ts";
-import type { ReadGateDeps } from "../src/federation/readGate.ts";
 import type { JsonValue } from "../src/crypto/jcs.ts";
 import { jumpClock } from "../src/demoP3.ts";
 import { agentRegistrations } from "../src/demo.ts";
-import { agentCollection, agentsCheck, DEFAULT_SINCE, validateAgentEntries } from "../src/agents.ts";
+import { agentCollection, agentsCheck, validateAgentEntries } from "../src/agents.ts";
 import { runConfigCheck } from "../src/runtime/configCheck.ts";
-import { Scheduler } from "../src/runtime/scheduler.ts";
-import { httpTransport } from "../src/federation/transport.ts";
 import { exportBundle } from "../src/export.ts";
 import { parseCommand } from "../src/federation/visibility.ts";
 import { cleanupWorkspaces, freshDemo, objectType, runVerifier, workspace } from "./helpers.ts";
+import { freePort, heads, taskServe, VERIFIER, writeAgentsFile } from "./adr0038-harness.ts";
 
 after(cleanupWorkspaces);
-
-const VERIFIER = join(import.meta.dirname, "..", "..", "verifier", "afp_verify.py");
-const INSTANCE_DIR = join(import.meta.dirname, "..");
-const SCHEDULER = { sweepMs: 30_000, flushMs: 10_000, convergeMs: 60_000, heartbeatMs: 0, jitterMs: 0 };
-
-function freePort(): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const probe = createProbe();
-    probe.listen(0, "127.0.0.1", () => {
-      const address = probe.address();
-      if (address && typeof address === "object") {
-        const port = address.port;
-        probe.close(() => resolve(port));
-      } else {
-        probe.close(() => reject(new Error("no port")));
-      }
-    });
-  });
-}
-
-function writeAgentsFile(paths: { dataDir: string }, entries: unknown): string {
-  const root = dirname(paths.dataDir);
-  mkdirSync(root, { recursive: true });
-  const file = join(root, "agents.json");
-  writeFileSync(file, JSON.stringify(entries, null, 2));
-  return file;
-}
-
-/**
- * A served instance booted from an `AFP_AGENTS_FILE`: "controller" is a
- * `brain: "none"` actor the instance holds, "worker" a stub. The policy
- * lists two controllers — the held one, and a *foreign* one whose actor
- * document the read gate can fetch (served from this harness) but whose key
- * this instance does not hold. `serve`'s own transport/scheduler wiring is
- * reproduced so a flush tick performs a locally delegated Offer.
- */
-async function taskServe(options: { clock?: Clock } = {}) {
-  const clock = options.clock ?? jumpClock("2026-09-13T09:00:00.000Z");
-  const port = await freePort();
-  const origin = `http://127.0.0.1:${port}`;
-  const paths = workspace();
-  const agentsFile = writeAgentsFile(paths, [
-    { name: "controller", capabilities: [], brain: "none" },
-    { name: "worker", capabilities: ["afp:cap:assess", "afp:cap:review"], brain: "stub" },
-  ]);
-  const foreignOrigin = "https://other.example";
-  const foreignUrl = `${foreignOrigin}/agents/boss`;
-  const controllers = [`${origin}/agents/controller`, foreignUrl];
-  // A wide per-address bucket: the CLI cases fire several signed reads —
-  // each with the read gate's own fetch of the controller's document — inside
-  // one second, which the default 20/s bucket would answer 429.
-  const config = loadConfig({ ...paths, origin, agentsFile, controllers, rateLimitPerAddress: 1000 });
-  const instance = new AfpInstance(config, agentCollection(config), clock);
-
-  const foreignKey = loadOrCreateKeyPair(join(dirname(paths.dataDir), "foreign-keys"), "boss", foreignUrl);
-  const foreignDoc = agentActor(foreignOrigin, { name: "boss", capabilities: [], keyCustody: "self", since: DEFAULT_SINCE }, foreignKey);
-
-  const fetchDocument = async (url: string): Promise<{ [key: string]: JsonValue } | null> => {
-    if (url === foreignUrl) return foreignDoc;
-    try {
-      const response = await fetch(url, { headers: { accept: "application/activity+json" } });
-      return response.ok ? ((await response.json()) as { [key: string]: JsonValue }) : null;
-    } catch {
-      return null;
-    }
-  };
-  const read: ReadGateDeps = {
-    selfActor: String(instance.instanceDocument().id),
-    fetchDocument,
-    isDenylisted: () => false,
-    activeAgreementsWith: () => [],
-    roleOf: () => null,
-    grants: () => [],
-    now: () => clock.now(),
-  };
-  const server = createHttpServer(instance, { read });
-  await new Promise<void>((resolve) => server.listen(port, "127.0.0.1", resolve));
-
-  const transport = httpTransport({
-    signer: instance.transportSigner("@instance"),
-    now: () => clock.now(),
-    isLocal: (target) => instance.nameOf(target) !== null,
-    local: instance.localTransport(),
-  });
-  const scheduler = new Scheduler({ instance, transport, config: SCHEDULER });
-
-  const postAs = async (pair: KeyPair, path: string, body: { [key: string]: unknown }) => {
-    const text = JSON.stringify(body);
-    const headers = signRequest("POST", path, `127.0.0.1:${port}`, text, fileSigner(pair), clock.now());
-    const res = await fetch(`${origin}${path}`, { method: "POST", headers: { ...headers, "content-type": "application/json" }, body: text });
-    return { status: res.status, body: (await res.json()) as { [key: string]: JsonValue } };
-  };
-  const post = (name: string, path: string, body: { [key: string]: unknown }) => postAs(instance.key(name), path, body);
-  const postUnsigned = async (path: string, body: { [key: string]: unknown }) => {
-    const res = await fetch(`${origin}${path}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-    return { status: res.status, body: (await res.json()) as { [key: string]: JsonValue } };
-  };
-
-  return { clock, origin, paths, agentsFile, controllers, config, instance, server, scheduler, foreignKey, foreignUrl, post, postAs, postUnsigned };
-}
-
-function heads(instance: AfpInstance, names: readonly string[]): string[] {
-  return names.map((name) => instance.outbox.headDigest(instance.actorId(name)) ?? "");
-}
 
 describe("ADR-0038 gate — the operator's own work", () => {
   it("G1 — AFP_AGENTS_FILE unset: the collection is the demo's writer/reviewer, and the P1 bundle replays clean", async () => {
@@ -368,242 +256,6 @@ describe("ADR-0038 gate — the operator's own work", () => {
       const last = instance.auditLog().at(-1)!;
       assert.equal(last.outcome, "polite-reply");
       assert.match(last.reason, /task is not carried by mentions/);
-    } finally {
-      server.close();
-      instance.close();
-    }
-  });
-
-  it("G6 — the CLI: `npm run task` against a served instance signs as the controller and gets the same 200; with the controller key absent it fails by name and opens no store", async () => {
-    // Wall clock: the CLI signs with `new Date()`, and the read gate checks skew against the instance's clock.
-    const { instance, server, paths, agentsFile, controllers, origin, scheduler } = await taskServe({ clock: systemClock });
-    try {
-      const env = {
-        ...process.env,
-        AFP_DATA_DIR: paths.dataDir,
-        AFP_ORIGIN: origin,
-        AFP_CONTROLLERS: controllers.join(","),
-        AFP_AGENTS_FILE: agentsFile,
-        AFP_BRAIN: "stub",
-        AFP_DEV: "1",
-        AFP_LOG_LEVEL: "silent",
-      };
-      // Asynchronous on purpose: the served instance lives in *this* process,
-      // so a synchronous exec would block the very event loop that has to
-      // answer the child's POST (and the read gate's fetch of the
-      // controller's actor document).
-      const cli = async (args: string[], overrides: Record<string, string> = {}) =>
-        (await promisify(execFile)(process.execPath, ["--disable-warning=ExperimentalWarning", "src/cli.ts", "task", ...args], {
-          cwd: INSTANCE_DIR,
-          env: { ...env, ...overrides },
-          encoding: "utf8",
-        })).stdout;
-
-      const out = await cli(["worker", "Draft a readiness note.", "--as", "controller"]);
-      const body = JSON.parse(out) as { task: string; thread: string; correlationId: string };
-      assert.match(body.task, new RegExp(`^${instance.actorId("controller")}/activities/`));
-      assert.equal(instance.outbox.byThread(body.thread).length, 1, "the Offer is on the record");
-      await scheduler.tick("flush");
-      assert.equal(instance.outbox.byThread(body.thread).length, 3, "…and performed on the next flush");
-
-      // `--as` defaults to the first locally-held controller.
-      const defaulted = JSON.parse(await cli(["worker", "Another job."])) as { task: string };
-      assert.match(defaulted.task, new RegExp(`^${instance.actorId("controller")}/activities/`));
-
-      // Key absent: a fresh data dir holds no `controller.pem`. Fails by name,
-      // and the CLI never opened a store there — no db, no lock.
-      const fresh = join(dirname(paths.dataDir), "cli-fresh");
-      const head = instance.outbox.headDigest(instance.actorId("controller"));
-      let failure: { code?: number; stderr?: string } | null = null;
-      try {
-        await cli(["worker", "Never sent."], { AFP_DATA_DIR: fresh });
-      } catch (error) {
-        failure = error as { code?: number; stderr?: string };
-      }
-      assert.ok(failure, "the CLI exits non-zero");
-      assert.equal(failure!.code, 2);
-      assert.match(String(failure!.stderr), /controller key for "controller" not found/);
-      assert.match(String(failure!.stderr), /never mints/);
-      assert.equal(existsSync(join(fresh, "afp.db.lock")), false, "no lock file appeared");
-      assert.equal(existsSync(join(fresh, "afp.db")), false, "no store was created");
-      assert.equal(instance.outbox.headDigest(instance.actorId("controller")), head, "the served instance is undisturbed");
-      assert.equal((await fetch(`${origin}/actor`)).status, 200, "the served instance still answers");
-    } finally {
-      server.close();
-      instance.close();
-    }
-  });
-
-  /**
-   * G8 harness: a served instance on the wall clock with a performed task,
-   * and the `show` CLI run against it from a *separate* data dir that holds a
-   * copy of the keys and no store — so "never opens the store" is checked
-   * by the absence of any `afp.db`/`afp.db.lock` there, not inferred.
-   */
-  async function showServe() {
-    const served = await taskServe({ clock: systemClock });
-    const { instance, scheduler, post, paths } = served;
-    const res = await post("controller", "/agents/worker/command", { content: "@worker task Assess the window." });
-    const slug = String(res.body.correlationId);
-    const thread = String(res.body.thread);
-    await scheduler.tick("flush");
-    await scheduler.tick("flush");
-    assert.equal(instance.outbox.byThread(thread).length, 3, "Offer, Accept, Result on the thread");
-
-    const clientData = join(dirname(paths.dataDir), "cli-data");
-    mkdirSync(clientData, { recursive: true });
-    cpSync(served.config.keyDir, join(clientData, "keys"), { recursive: true });
-    const env = {
-      ...process.env,
-      AFP_DATA_DIR: clientData,
-      AFP_ORIGIN: served.origin,
-      AFP_CONTROLLERS: served.controllers.join(","),
-      AFP_AGENTS_FILE: served.agentsFile,
-      AFP_BRAIN: "stub",
-      AFP_DEV: "1",
-      AFP_LOG_LEVEL: "silent",
-    };
-    const show = async (args: string[]) => {
-      try {
-        const { stdout, stderr } = await promisify(execFile)(process.execPath, ["--disable-warning=ExperimentalWarning", "src/cli.ts", "show", ...args], {
-          cwd: INSTANCE_DIR,
-          env,
-          encoding: "utf8",
-        });
-        return { code: 0, stdout, stderr };
-      } catch (error) {
-        const failed = error as { code?: number; stdout?: string; stderr?: string };
-        return { code: failed.code ?? 1, stdout: failed.stdout ?? "", stderr: failed.stderr ?? "" };
-      }
-    };
-    const noStoreOpened = () => {
-      assert.equal(existsSync(join(clientData, "afp.db")), false, "the CLI created no store");
-      assert.equal(existsSync(join(clientData, "afp.db.lock")), false, "the CLI took no lock");
-    };
-    return { ...served, slug, thread, show, noStoreOpened };
-  }
-
-  it("G8 — `show status`, an anonymous rendering fetch, and `show thread` on a thread the controller is no party to: served, 404, and exit 1 without opening the store", async () => {
-    const { instance, server, origin, slug, show, noStoreOpened } = await showServe();
-    try {
-      const status = await show(["status", "worker"]);
-      assert.equal(status.code, 0, status.stderr);
-      const body = JSON.parse(status.stdout) as { status: { chainHead: string; paused: boolean; pending: number } };
-      assert.equal(body.status.chainHead, instance.outbox.headDigest(instance.actorId("worker")), "the chain head, as the controller");
-      assert.equal(body.status.paused, false);
-
-      const anonymous = await fetch(`${origin}/threads/${slug}/rendering`);
-      assert.equal(anonymous.status, 404, "a parties thread to an anonymous caller is indistinguishable from no thread");
-
-      // A thread the controller is no party to: the worker's own note, addressed to nobody.
-      instance.publish("worker", [], `${origin}/threads/private-note`, "parties", (envelope) => ({
-        "@context": ["https://www.w3.org/ns/activitystreams", "https://dalager.github.io/agent-federation-protocol/ns/v3.jsonld"],
-        id: envelope.activityId,
-        type: "Create",
-        actor: envelope.actor,
-        to: [],
-        published: envelope.published,
-        context: envelope.thread,
-        "afp:visibility": envelope.visibility,
-        ...(envelope.prevActivity !== null ? { "afp:prevActivity": envelope.prevActivity } : {}),
-        object: { type: "Note", content: "nobody's business" },
-      }));
-      const refused = await show(["thread", "private-note"]);
-      assert.equal(refused.code, 1);
-      assert.equal(refused.stdout, "");
-      assert.equal(refused.stderr.trim(), "not served to controller (404)", "one line, no speculation");
-      // A full URL resolves to the same slug; a foreign thread URL is refused locally, before any request.
-      const byUrl = await show(["thread", `${origin}/threads/private-note`]);
-      assert.equal(byUrl.stderr.trim(), "not served to controller (404)");
-      const foreign = await show(["thread", "https://other.example/threads/x"]);
-      assert.equal(foreign.code, 2);
-      assert.match(foreign.stderr, /not a thread under/);
-
-      // `show agent` runs the timeline route; the worker's entries are all
-      // `parties` and, under the finding below, none is admitted — the route
-      // answers 200 with an empty narrative rather than 404, by design.
-      const timeline = await show(["agent", "worker"]);
-      assert.equal(timeline.code, 0, timeline.stderr);
-      assert.match(timeline.stdout, /^Rendering of /);
-      noStoreOpened();
-    } finally {
-      server.close();
-      instance.close();
-    }
-  });
-
-  // Admitted by ADR-0013 Decision 3 as revised under contact (2026-09-18):
-  // the controller is self-operated (no self-agreement to check) and is the
-  // Offer's author and the Accept/Result's addressee — a party to all three.
-  it("G8(b) — `show thread <slug>` as the controller that delegated the task: the narrative names Offer, Accept and Result, and --json carries afp:bundle", async () => {
-    const { instance, server, slug, show, noStoreOpened } = await showServe();
-    try {
-      const narrative = await show(["thread", slug]);
-      assert.equal(narrative.code, 0, narrative.stderr);
-      assert.match(narrative.stdout, /^Rendering of .*\/threads\/task-[0-9a-f]{12} — digest [0-9a-f]{64}, rendered .*, no export\n/);
-      assert.match(narrative.stdout, /Offer\/afp:Task/);
-      assert.match(narrative.stdout, /Accept/);
-      assert.match(narrative.stdout, /Create\/afp:Result/);
-
-      const json = await show(["thread", slug, "--json"]);
-      assert.equal(json.code, 0, json.stderr);
-      const rendering = JSON.parse(json.stdout) as { "afp:bundle": unknown; "afp:renderingDigest": string; narrative: string[] };
-      assert.ok("afp:bundle" in rendering, "the bundle field the rendering already has (null before an export)");
-      assert.equal(rendering["afp:bundle"], null);
-      assert.equal(rendering.narrative.length, 3);
-      noStoreOpened();
-    } finally {
-      server.close();
-      instance.close();
-    }
-  });
-
-  it("G9 — `show result <slug>` as the controller prints the performer's Result and afp:producedBy; --json yields the activity; before any flush it is `no result yet`; anonymous outbox omits it; no store opened", async () => {
-    // The unperformed case first: a fresh task on the same served instance, no flush.
-    const served = await showServe();
-    const { instance, server, origin, slug, show, noStoreOpened, post } = served;
-    try {
-      const pending = await post("controller", "/agents/worker/command", { content: "@worker task Not yet performed." });
-      const pendingSlug = String(pending.body.correlationId);
-      assert.equal(instance.outbox.byThread(String(pending.body.thread)).length, 1, "Offer only");
-      const early = await show(["result", pendingSlug]);
-      assert.equal(early.code, 1);
-      assert.equal(early.stdout, "");
-      assert.equal(early.stderr.trim(), `no result yet on ${origin}/threads/${pendingSlug}`);
-
-      // The performed task from the harness.
-      const text = await show(["result", slug]);
-      assert.equal(text.code, 0, text.stderr);
-      const [header, ...rest] = text.stdout.split("\n");
-      assert.match(header, /^worker · \d{4}-\d{2}-\d{2}T.* · afp:producedBy: stub$/);
-      assert.match(rest.join("\n"), /# worker: afp:cap:assess/, "the Result's content, verbatim");
-      assert.match(rest.join("\n"), /Assess the window\./);
-      assert.match(text.stdout, /attachment: text\/markdown sha256:[0-9a-f]{64}/, "attachments are named, not fetched");
-
-      const json = await show(["result", slug, "--json"]);
-      assert.equal(json.code, 0, json.stderr);
-      const activity = JSON.parse(json.stdout) as { type: string; actor: string; context: string; object: { type: string; "afp:producedBy": string } };
-      assert.equal(activity.type, "Create");
-      assert.equal(activity.object.type, "afp:Result");
-      assert.equal(activity.object["afp:producedBy"], "stub");
-      assert.equal(activity.actor, instance.actorId("worker"));
-      assert.equal(activity.context, `${origin}/threads/${slug}`);
-
-      // `--agent` names the performer outright; `--all` lists in order (one here).
-      const named = await show(["result", slug, "--agent", "worker", "--all", "--json"]);
-      assert.equal(named.code, 0, named.stderr);
-      assert.equal((JSON.parse(named.stdout) as unknown[]).length, 1);
-
-      // The Result is `parties`: anonymous, the performer's outbox does not carry it.
-      const anonymous = await fetch(`${origin}/agents/worker/outbox`);
-      const anonymousBody = await anonymous.text();
-      assert.ok(!anonymousBody.includes('"afp:Result"'), `no Result served anonymously (status ${anonymous.status}): ${anonymousBody.slice(0, 200)}`);
-
-      // A thread the controller is no party to: the rendering's 404, same line.
-      const refused = await show(["result", "nobody-elses"]);
-      assert.equal(refused.code, 1);
-      assert.equal(refused.stderr.trim(), "not served to controller (404)");
-      noStoreOpened();
     } finally {
       server.close();
       instance.close();

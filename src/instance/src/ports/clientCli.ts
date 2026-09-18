@@ -50,6 +50,19 @@ export function defaultController(config: Config): string | null {
   return null;
 }
 
+/** A full thread URL or a bare slug → the thread's slug under this origin; a foreign URL is refused locally. */
+export function threadSlug(config: Config, target: string): string {
+  let slug = target;
+  if (/^https?:/.test(target)) {
+    const url = new URL(target);
+    const match = /^\/threads\/([\w-]+)$/.exec(url.pathname);
+    if (url.origin !== new URL(config.origin).origin || !match) throw new Error(`not a thread under ${config.origin}: ${target}`);
+    slug = match[1];
+  }
+  if (!/^[\w-]+$/.test(slug)) throw new Error(`not a thread under ${config.origin}: ${target}`);
+  return slug;
+}
+
 export interface SignedClient {
   readonly controller: string;
   readonly controllerUrl: string;

@@ -110,7 +110,11 @@ export interface ExecuteCommandOptions {
   deadline?: string;
   /** `task` only: defaults to `"parties"`. */
   visibility?: string;
+  /** `task` only: `sha256:` digests of artifacts the store already holds — references, never bytes. */
+  attachments?: readonly string[];
 }
+
+const ARTIFACT_DIGEST = /^sha256:[0-9a-f]{64}$/;
 
 /**
  * Run an authorized, parsed command against the record.
@@ -213,6 +217,20 @@ function executeTask(instance: AfpInstance, options: ExecuteCommandOptions, brie
   const visibility = options.visibility ?? "parties";
   if (!VISIBILITY_CLASSES.has(visibility)) return polite();
 
+  // Attachments are references to what the store already holds, never
+  // bytes: the command port takes no content. ADR-0027's boundary — the
+  // operator may point a brain at evidence already on the record (a draft
+  // `show result` named by digest), but cannot smuggle new bytes past
+  // `artifacts.put`'s provenance through a command. A digest the store does
+  // not hold, or one that is not a digest, is refused like everything else.
+  const attachments = [];
+  for (const digest of options.attachments ?? []) {
+    if (!ARTIFACT_DIGEST.test(digest)) return polite();
+    const ref = instance.artifacts.lookup(digest);
+    if (!ref) return polite();
+    attachments.push(ref);
+  }
+
   const published = instance.clock.now().toISOString();
   const slug = taskSlug(options.by, brief, published);
   const thread = options.thread ?? `${instance.config.origin}/threads/${slug}`;
@@ -225,6 +243,7 @@ function executeTask(instance: AfpInstance, options: ExecuteCommandOptions, brie
     thread,
     correlationId: slug,
     ...(options.deadline !== undefined ? { deadline: options.deadline } : {}),
+    ...(attachments.length > 0 ? { attachments } : {}),
     visibility: visibility as "public" | "hub" | "parties" | "internal",
   });
   return { task: entry.activityId, thread, correlationId: slug };
@@ -258,7 +277,7 @@ export async function commandRoute(instance: AfpInstance, read: ReadOptions, ctx
     ctx.send(200, polite());
   };
 
-  let body: { content?: unknown; thread?: unknown; actsOn?: unknown; capability?: unknown; deadline?: unknown; visibility?: unknown };
+  let body: { content?: unknown; thread?: unknown; actsOn?: unknown; capability?: unknown; deadline?: unknown; visibility?: unknown; attachments?: unknown };
   try {
     body = JSON.parse(ctx.body || "{}");
   } catch {
@@ -271,6 +290,13 @@ export async function commandRoute(instance: AfpInstance, read: ReadOptions, ctx
   const capability = typeof body.capability === "string" ? body.capability : undefined;
   const deadline = typeof body.deadline === "string" ? body.deadline : undefined;
   const visibility = typeof body.visibility === "string" ? body.visibility : undefined;
+  // Anything but an array of strings is treated as "attachments present and
+  // malformed" — one bad entry refuses the whole command, never a partial send.
+  const attachments = body.attachments === undefined
+    ? undefined
+    : Array.isArray(body.attachments) && body.attachments.every((d) => typeof d === "string")
+      ? (body.attachments as string[])
+      : ["malformed"];
 
   if (!read) {
     refuse("", "no read gate configured — every command request is anonymous");
@@ -310,6 +336,7 @@ export async function commandRoute(instance: AfpInstance, read: ReadOptions, ctx
     capability,
     deadline,
     visibility,
+    attachments,
   });
 
   // `executeCommand` itself falls back to the polite reply for an `approve`

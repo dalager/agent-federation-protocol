@@ -14,6 +14,8 @@ const encoder = new TextEncoder();
 /** Counts invocations, so a replayed task can be shown *not* to run twice. */
 export class CountingBrain implements Brain {
   invocations = 0;
+  /** Test seam: every request this brain was handed, in order — what the port let it see (ADR-0027 Decision 2). */
+  readonly requests: TaskRequest[] = [];
 
   readonly name: string;
   readonly capabilities: readonly string[];
@@ -35,6 +37,7 @@ export class CountingBrain implements Brain {
 
   async handle(request: TaskRequest): Promise<TaskOutcome> {
     this.invocations++;
+    this.requests.push(request);
     return this.respond(request);
   }
 }

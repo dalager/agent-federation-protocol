@@ -167,9 +167,9 @@ stay with a program; the CLI is the operator's hand, not their workflow.
 | **WP-2 · grammar** | `federation/visibility.ts` (`task` form), `ports/command.ts` (`executeTask`, body fields) | Decision 2 |
 | **WP-3 · carriers** | `inbox.ts` `onMention` (refuses `task`) | Decision 3 |
 | **WP-4 · CLI** | `ports/taskCli.ts` (new), `crypto/keys.ts` (`keyExists`), `cli.ts` `task`, `package.json` | Decision 4 |
-| **WP-5 · gate + docs** | `test/adr0038.test.ts`, instance README, this ADR, ADR-0029's revision note | W2 |
+| **WP-5 · gate + docs** | `test/adr0038.test.ts` (G6, G8–G10 in `test/adr0038-cli.test.ts`; the shared harness is `test/adr0038-harness.ts`), instance README, this ADR, ADR-0029's revision note | W2 |
 
-### W2. Gate matrix — `test/adr0038.test.ts`
+### W2. Gate matrix — `test/adr0038.test.ts` (G6, G8–G10 in `test/adr0038-cli.test.ts`)
 
 | # | Case | Asserts |
 |---|---|---|
@@ -183,8 +183,9 @@ stay with a program; the CLI is the operator's hand, not their workflow.
 
 ## Build status
 
-**Built (2026-09-18).** All five work packages; `test/adr0038.test.ts` G1–G7, 7/7. `npm
-test` (`src/instance`) — 575 tests, 573 pass, 2 pre-existing skips, 0 failures, every
+**Built (2026-09-18).** All five work packages; `test/adr0038.test.ts` G1–G7, 7/7 (the CLI
+cases G6 and G8–G10 have since moved to `test/adr0038-cli.test.ts`). `npm
+test` (`src/instance`) at the last addition below — 582 tests, 580 pass, 2 pre-existing skips, 0 failures, every
 pre-existing gate, demo and fixture untouched.
 
 Notes on what was built versus what the ADR wrote:
@@ -198,6 +199,16 @@ Notes on what was built versus what the ADR wrote:
 - **The `task` slug includes the instant.** `approveCorrelationId` is a pure function of
   its inputs so a replayed approve reuses one intent; a repeated brief is a new task, so
   the instant is part of the hash. The Offer's own `published` is the clock's next read.
+- **`task` takes attachments by reference, never bytes** (Decision 2, extended on
+  review). `attachments: [<sha256:digest>, …]` in the body, `--attach <digest>` on the CLI,
+  each resolved through `instance.artifacts.lookup` and passed to `delegate` in the shape
+  `demo.ts` uses for the draft; a malformed or unknown digest is the polite reply, chain
+  unchanged. This is ADR-0027's boundary at the command port: the operator may point a
+  brain at evidence already on the record — the draft `show result` names — but cannot
+  smuggle new bytes past `artifacts.put`'s provenance through a command. `inbox.ts`'s
+  `materialize` then hands bytes or an excerpt per the performer's `afp:consumes`, so the
+  demo's writer → reviewer loop runs by hand: G10 checks the reviewer receives the draft
+  as bytes, the review lands on the draft's thread, and the thread replays clean.
 - **The CLI's `fetch` is not `policedFetch`.** The operator's tool addressing the
   operator's instance is outside ADR-0025's threat (what the *instance* fetches on a
   stranger's say-so); the module says so.

@@ -21,7 +21,7 @@
 
 import type { Config } from "../config.ts";
 import type { JsonValue } from "../crypto/jcs.ts";
-import { parsedBody, signedClient, type SignedClient } from "./clientCli.ts";
+import { parsedBody, signedClient, threadSlug, type SignedClient } from "./clientCli.ts";
 
 export type ShowWhat = "thread" | "agent" | "status" | "result";
 
@@ -71,18 +71,7 @@ export function parseShowArgs(argv: readonly string[]): ShowCliArgs {
   return { what: what as ShowWhat, target, json, all, ...flags } as ShowCliArgs;
 }
 
-/** A full thread URL or a bare slug → the thread's slug under this origin. */
-export function threadSlug(config: Config, target: string): string {
-  let slug = target;
-  if (/^https?:/.test(target)) {
-    const url = new URL(target);
-    const match = /^\/threads\/([\w-]+)$/.exec(url.pathname);
-    if (url.origin !== new URL(config.origin).origin || !match) throw new Error(`not a thread under ${config.origin}: ${target}`);
-    slug = match[1];
-  }
-  if (!/^[\w-]+$/.test(slug)) throw new Error(`not a thread under ${config.origin}: ${target}`);
-  return slug;
-}
+export { threadSlug };
 
 export interface ShowCliResult {
   status: number;
