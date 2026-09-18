@@ -1196,6 +1196,7 @@ async function main(): Promise<void> {
         process.exit(1);
       }
       console.log(result.output);
+      if (result.hint) console.error(result.hint);
       break;
     }
 

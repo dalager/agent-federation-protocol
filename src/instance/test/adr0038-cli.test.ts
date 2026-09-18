@@ -281,9 +281,14 @@ describe("ADR-0038 gate — the operator's own work, from the terminal", () => {
       assert.match(rest.join("\n"), /# worker: afp:cap:assess/, "the Result's content, verbatim");
       assert.match(rest.join("\n"), /Assess the window\./);
       assert.match(text.stdout, /attachment: text\/markdown sha256:[0-9a-f]{64}/, "attachments are named, not fetched");
+      // The next step, copy-pasteable, on stderr only — stdout stays the answer.
+      const digest = /attachment: text\/markdown (sha256:[0-9a-f]{64})/.exec(text.stdout)![1];
+      assert.equal(text.stderr.trim(), `next: npm run task -- <agent> "…" --attach ${digest} --thread ${slug}`);
+      assert.doesNotMatch(text.stdout, /^next: /m);
 
       const json = await show(["result", slug, "--json"]);
       assert.equal(json.code, 0, json.stderr);
+      assert.equal(json.stderr, "", "no hint in --json mode");
       const activity = JSON.parse(json.stdout) as { type: string; actor: string; context: string; object: { type: string; "afp:producedBy": string } };
       assert.equal(activity.type, "Create");
       assert.equal(activity.object.type, "afp:Result");

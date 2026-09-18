@@ -656,6 +656,7 @@ Decision 2), and the review lands on the draft's thread:
 ```bash
 npm run task -- writer "Draft a readiness note for the billing cutover."   # → thread task-3f1c9a2b7d0e
 npm run show -- result task-3f1c9a2b7d0e                                    # … attachment: text/markdown sha256:9c1e…
+# stderr: next: npm run task -- <agent> "…" --attach sha256:9c1e… --thread task-3f1c9a2b7d0e
 npm run task -- reviewer "Review the attached draft for unstated assumptions." \
   --attach sha256:9c1e… --thread task-3f1c9a2b7d0e
 npm run show -- result task-3f1c9a2b7d0e                                    # the review; --all for draft and review in order

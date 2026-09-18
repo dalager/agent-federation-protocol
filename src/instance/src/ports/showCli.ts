@@ -79,6 +79,8 @@ export interface ShowCliResult {
   output: string;
   /** Set when the instance did not serve the request; one line, no speculation. */
   refused?: string;
+  /** `result`, text mode, with an attachment: the copy-pasteable next step — printed to stderr so piped stdout stays the answer. */
+  hint?: string;
   controller: string;
   url: string;
 }
@@ -163,7 +165,18 @@ async function showResult(config: Config, client: SignedClient, args: ShowCliArg
   const output = args.json
     ? JSON.stringify(args.all ? selected : selected[0], null, 2)
     : selected.map(formatResult).join("\n\n");
-  return { ...base, output };
+
+  // The operator's next step is usually `task … --attach <that digest>`, so
+  // the latest Result's first attachment and this thread go on one line the
+  // shell can take verbatim — a bare slug when the thread is under
+  // AFP_ORIGIN, the URL otherwise. On stderr: piped stdout is the answer.
+  const latest = selected[selected.length - 1];
+  const links = Array.isArray((latest.object as Activity).attachment) ? ((latest.object as Activity).attachment as Activity[]) : [];
+  const first = links.find((link) => typeof link["afp:digest"] === "string");
+  const hint = !args.json && first
+    ? `next: npm run task -- <agent> "…" --attach ${String(first["afp:digest"])} --thread ${thread.startsWith(`${config.origin}/threads/`) ? slug : thread}`
+    : undefined;
+  return { ...base, output, ...(hint ? { hint } : {}) };
 }
 
 export async function runShowCli(config: Config, args: ShowCliArgs, fetchImpl: typeof fetch = fetch): Promise<ShowCliResult> {
