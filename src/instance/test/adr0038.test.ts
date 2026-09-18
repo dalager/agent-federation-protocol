@@ -11,8 +11,8 @@
 
 import assert from "node:assert/strict";
 import { after, describe, it } from "node:test";
-import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 
 import { AfpInstance } from "../src/instance.ts";
 import { loadConfig } from "../src/config.ts";
@@ -260,6 +260,57 @@ describe("ADR-0038 gate — the operator's own work", () => {
       server.close();
       instance.close();
     }
+  });
+
+  it("G11 — the published policy's brains are derived from the collection: stub → [stub]; llm+stub+none → both, deduplicated, none contributing nothing; a policy file's brains still win; unset → unchanged", () => {
+    const stubOnly = writeAgentsFile(workspace(), [
+      { name: "writer", capabilities: ["afp:cap:draft"], brain: "stub" },
+      { name: "reviewer", capabilities: ["afp:cap:review"], brain: "stub" },
+      { name: "ops", capabilities: [], brain: "none" },
+    ]);
+    // (a) The operator's default is AFP_BRAIN=llm; the collection runs stubs. The policy must say stubs.
+    const stubConfig = loadConfig({ ...workspace(), brain: "llm", agentsFile: stubOnly });
+    assert.deepEqual(stubConfig.policy.brains, [{ model: "stub" }]);
+
+    // (b) Mixed: one entry per kind that runs, in first-appearance order, deduplicated; `none` adds nothing.
+    const mixed = writeAgentsFile(workspace(), [
+      { name: "a", capabilities: ["afp:cap:x"], brain: "llm", persona: "A." },
+      { name: "b", capabilities: ["afp:cap:x"], brain: "stub" },
+      { name: "c", capabilities: [], brain: "none" },
+      { name: "d", capabilities: ["afp:cap:x"], brain: "llm", persona: "D." },
+      { name: "e", capabilities: ["afp:cap:x"], brain: "stub" },
+    ]);
+    const mixedConfig = loadConfig({ ...workspace(), brain: "stub", agentsFile: mixed });
+    assert.deepEqual(mixedConfig.policy.brains, [
+      { model: mixedConfig.llmModel, endpoint: mixedConfig.llmBaseUrl },
+      { model: "stub" },
+    ]);
+    // All-`none`: no brain runs, and the policy says so rather than naming one.
+    const heldOnly = writeAgentsFile(workspace(), [{ name: "ops", capabilities: [], brain: "none" }]);
+    assert.deepEqual(loadConfig({ ...workspace(), brain: "llm", agentsFile: heldOnly }).policy.brains, []);
+
+    // (c) An explicit `brains` in the policy file wins over the derivation, as it always has.
+    const paths = workspace();
+    const policyFile = join(dirname(paths.dataDir), "policy.json");
+    mkdirSync(dirname(policyFile), { recursive: true });
+    writeFileSync(policyFile, JSON.stringify({ brains: [{ model: "the-operator-says-so" }] }));
+    const saved = process.env.AFP_POLICY_FILE;
+    process.env.AFP_POLICY_FILE = policyFile;
+    try {
+      assert.deepEqual(loadConfig({ ...paths, brain: "llm", agentsFile: stubOnly }).policy.brains, [{ model: "the-operator-says-so" }]);
+    } finally {
+      if (saved === undefined) delete process.env.AFP_POLICY_FILE;
+      else process.env.AFP_POLICY_FILE = saved;
+    }
+
+    // (d) Unset: exactly today's AFP_BRAIN-derived default, both ways.
+    const stubDefault = loadConfig({ ...workspace(), brain: "stub" });
+    assert.deepEqual(stubDefault.policy.brains, [{ model: "stub" }]);
+    const llmDefault = loadConfig({ ...workspace(), brain: "llm" });
+    assert.deepEqual(llmDefault.policy.brains, [{ model: llmDefault.llmModel, endpoint: llmDefault.llmBaseUrl }]);
+    // And a file with problems falls back to that default — `config check`'s `agents` line reports it, `loadConfig` does not throw.
+    const broken = writeAgentsFile(workspace(), [{ name: "Bad_Name", capabilities: [], brain: "stub" }]);
+    assert.deepEqual(loadConfig({ ...workspace(), brain: "stub", agentsFile: broken }).policy.brains, [{ model: "stub" }]);
   });
 
   it("G7 — every shipped bundle replays unchanged", async () => {

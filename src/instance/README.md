@@ -52,6 +52,18 @@ npm run gate          # the acceptance gate: P1's 11 checks + CRDT + hub + aucti
 npm run serve         # the public HTTP surface + the federation inbox
 ```
 
+To drive your own agents instead of watching a scripted demo, see **"The operator's
+walkthrough — one instance, by hand"**: declare a collection, hand an agent a brief, feed
+its answer to the next agent, read the trail, and export a bundle the Python verifier
+replays.
+
+```bash
+npm run task -- writer "Draft a readiness note."   # hand an agent a brief (signed, on the record)
+npm run show -- result <thread>                    # what it answered, and what produced it
+npm run show -- thread <thread>                    # the trail: shape, digests, chain heads
+npm run export                                     # the bundle — stop `serve` first, it holds the lock
+```
+
 Requires **Node 24+** — the current LTS line
 ([ADR-0032](../../docs/afp/adr/0032-deployment-profile.md) Decision 1), which
 loads `node:sqlite` without `--experimental-sqlite` (every script here still
@@ -576,6 +588,164 @@ empties an electorate — are `afp:governance.afp:subjectPrecondition` and
 `afp:governance.afp:electorateFloor`, enforced at `Hub.proposeRound` and recomputed at
 replay ([ADR-0033](../../docs/afp/adr/0033-operator-obligations.md) Decision 4).
 
+## The operator's walkthrough — one instance, by hand
+
+The demos above run a scripted world end to end. This is the other way in: **your** agents,
+**your** briefs, driven one command at a time from a terminal, ending in a bundle a stranger
+can verify. It exists to make the moving parts legible before you wire a program against the
+library — every step below is a signed activity on a hash-chained record, and the last step
+proves it.
+
+It is deliberately hand-held. AFP is not a workflow engine
+([ADR-0024](../../docs/afp/adr/0024-the-road-to-production.md) Decision 4): nothing routes
+work from one agent to the next, so *you* are the workflow here. A real deployment replaces
+your typing with a program making the same calls — `src/demoP4.ts` is the reference for
+that — and keeps the record identical, because the record is what the ports produce, not
+what drove them.
+
+**1 — declare the collection.** One entry per agent, in `agents.json` beside this README
+(full key table under "The collection a served instance runs"). Two agents that do work and
+one actor you hold yourself:
+
+```json
+[
+  { "name": "writer",   "capabilities": ["afp:cap:draft"],  "persona": "You are a technical writer for a payments team.", "brain": "llm" },
+  { "name": "reviewer", "capabilities": ["afp:cap:review"], "persona": "You are a sceptical reviewer.", "brain": "llm", "consumes": ["text/markdown"] },
+  { "name": "ops",      "capabilities": [],                 "brain": "none" }
+]
+```
+
+`ops` is you: `brain: "none"` mints a key and puts the actor on the roster, and nothing
+performs for it. That is what lets you sign as a participant rather than command the
+instance from outside it — the briefs below are published *by* `ops`, on its own chain.
+
+**2 — point the commands at it.** `cp .env.example .env` and set the origin, the data
+directory, the collection and the controller (`serve`, `task` and `show` all read it; a
+shell variable still wins):
+
+```bash
+AFP_DEV=1                                              # loopback http; outside dev mode the origin must be https
+AFP_ORIGIN=http://127.0.0.1:8787
+AFP_PORT=8787
+AFP_DATA_DIR=./data
+AFP_AGENTS_FILE=./agents.json
+AFP_CONTROLLERS=http://127.0.0.1:8787/agents/ops       # the held actor above — a controller must be one
+```
+
+Brains default to an OpenAI-compatible endpoint at `AFP_LLM_BASE_URL` (a local Lemonade
+server). For an offline run set every entry's `"brain": "stub"` — deterministic echoes, the
+same record shape, no model.
+
+**3 — start it, and check it before trusting it.**
+
+```bash
+npm run config:check -- --offline
+# ok    agents — 3 from AFP_AGENTS_FILE
+# ok    store
+# ok    signer — skipped — no instance key minted yet
+# ok    self-check — skipped — --offline
+
+npm run serve                     # terminal 1, stays running — mints the keys, puts the three on the roster
+curl -s localhost:8787/readyz     # {"ok": false, "reason": "scheduler-not-ticked"} until the first tick, then {"ok": true}
+curl -s localhost:8787/roster     # the three actors, signed, derived from the Vouch trail
+```
+
+`--offline` skips the self-check, which fetches this instance's own `/actor` back through
+the origin: before `serve` is up there is nothing to answer it, and a `FAIL self-check`
+there means only that. On a directory this fresh the signer line is skipped too — no key
+exists until `serve` first runs. Run it again once the server is listening and the
+store/signer lines report `skipped — store held by pid …` instead, because the running
+process holds the lock and has already answered those live at `/readyz`. `/readyz` itself
+is `false` with a named reason until the scheduler's first tick lands (the flush loop, ten
+seconds by default), which is the point of it naming the line rather than saying
+"unhealthy".
+
+**4 — hand an agent a brief.** In a second terminal, from this directory:
+
+```bash
+npm run task -- writer "Draft a readiness note for the billing cutover."
+# { "task": ".../agents/ops/activities/0001",
+#   "thread": ".../threads/task-d8bab8b0a2b0",
+#   "correlationId": "task-d8bab8b0a2b0" }
+```
+
+That published an `Offer{afp:Task}` signed by `ops` and addressed to `writer`. The
+scheduler's flush loop performs it within a tick — nothing else to run, and no further
+call.
+
+**5 — read what came back.** The thread slug from step 4 is the handle for everything after
+it:
+
+```bash
+npm run show -- result task-d8bab8b0a2b0
+# writer · 2026-09-18T20:48:34.190Z · afp:producedBy: Qwen3.6-35B-A3B-NoThinking @ http://localhost:13305/api/v1 ; template sha256:1742…
+# <the note>
+# attachment: text/markdown sha256:96fca89a…
+# stderr: next: npm run task -- <agent> "…" --attach sha256:96fca89a… --thread task-d8bab8b0a2b0
+```
+
+`afp:producedBy` is the model and the framing that produced it, on the record, not a claim
+you have to take on trust. The attachment is the note itself, stored by digest — and the
+`next:` line on stderr is step 6 with the digest already filled in.
+
+**6 — chain it: one agent's output as another's evidence.** The reviewer declares
+`consumes: ["text/markdown"]`, so it is handed the draft's *bytes* rather than an excerpt
+([ADR-0027](../../docs/afp/adr/0027-the-port-is-a-security-boundary.md) Decision 2).
+`--attach` names an artifact the store already holds, by digest — a reference, never bytes
+over the wire — and `--thread` puts the review on the draft's thread instead of opening a
+new one:
+
+```bash
+npm run task -- reviewer "Review the attached draft for unstated assumptions." \
+  --attach sha256:96fca89a… --thread task-d8bab8b0a2b0
+
+npm run show -- result task-d8bab8b0a2b0          # the review — latest Result on the thread
+npm run show -- result task-d8bab8b0a2b0 --all    # draft and review, in order
+```
+
+A digest the store does not hold is refused; a malformed one never leaves your terminal.
+
+**7 — look at the trail.** The rendering is the *shape* of what happened — it never emits a
+`parties` activity's content, which is why step 5 exists:
+
+```bash
+npm run show -- thread task-d8bab8b0a2b0
+# Rendering of …/threads/task-d8bab8b0a2b0 — digest afa465c4…, rendered …, no export
+# … ops      Offer/afp:Task  — correlation task-d8bab8b0a2b0
+# … writer   Accept          — correlation task-d8bab8b0a2b0
+# … writer   Create/afp:Result
+# … ops      Offer/afp:Task  — correlation task-fa76671018ec
+# … reviewer Accept          — correlation task-fa76671018ec
+# … reviewer Create/afp:Result
+npm run show -- status writer     # chain head, pending count, paused
+```
+
+Each read is signed as `ops` and answered by the read gate: served where the gate admits
+the signer, `404` otherwise. Try `curl` on the same rendering with no signature — a
+`parties` thread is 404 to a stranger, indistinguishable from one that does not exist.
+
+**8 — export, and let something else check your work.** The exporter needs the store and
+`serve` holds its lock, so stop the server first (`Ctrl-C` — it drains). Then hand the
+bundle to the Python verifier, which shares no code with anything above:
+
+```bash
+npm run export
+# exported 9 activities to ./export
+
+python3 ../verifier/afp_verify.py ./export --thread http://127.0.0.1:8787/threads/task-d8bab8b0a2b0 --verbose
+# PASSED — 90 checks, no gaps
+# Every signature verifies, every chain is unbroken, every artifact matches its digest.
+```
+
+That bundle is the deliverable: the briefs, both answers, the artifacts by digest, the
+signed roster, the policy document, and every key that ever signed. Change one byte of the
+note and the replay fails by name; delete an activity and the chain breaks.
+
+**What this does not show.** One instance, so no federation gate, no agreement, no hub —
+"Wiring two instances together" below is that step, and the P4–P7 demos are it at scale.
+There is no scheduling, retry or fan-out here either: those belong to the program you
+write, which is the point of stopping the hand-held tour here.
+
 ## Using a running instance
 
 `npm run serve` starts the real HTTP surface — the same one the P4 demo runs
@@ -873,7 +1043,11 @@ before. The file is a JSON array, one entry per agent, shaped on `AgentProfile`:
 Decision 2): list its URL in `afp:controllers` and it can `pause`, `status`, `approve` and
 `task`. An Offer addressed to it is `Reject`ed on the record, the way a paused agent's is.
 `npm run config:check` reports every problem with the file by name, at once, on its
-`agents` line.
+`agents` line. The published policy's `afp:brains` is derived from the collection —
+`stub` entries list `{ "model": "stub" }`, `llm` entries the configured model and
+endpoint, `none` nothing — so an export from a served collection holds to what it actually
+ran ([ADR-0033](../../docs/afp/adr/0033-operator-obligations.md) Decision 1); a `brains`
+list in `AFP_POLICY_FILE` still wins.
 
 ## Layout
 

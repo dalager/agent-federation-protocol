@@ -21,6 +21,7 @@ import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync, unlinkSyn
 import { join } from "node:path";
 import { CONFIG_SCHEMA, readEntry, type ConfigEntry } from "./configSchema.ts";
 import { validatePolicySpec, type PolicySpec } from "./policySpec.ts";
+import { derivedBrains, readAgentsFile } from "./agentsSpec.ts";
 
 export interface Config {
   /** Public origin the instance publishes itself under. */
@@ -310,6 +311,7 @@ export function loadConfig(overrides: Partial<Config> = {}): Config {
       llmModel: merged.llmModel,
       llmBaseUrl: merged.llmBaseUrl,
       controllers: merged.controllers,
+      agentsFile: merged.agentsFile,
     }),
   };
 }
@@ -324,9 +326,18 @@ export function loadConfig(overrides: Partial<Config> = {}): Config {
  */
 function assemblePolicy(
   policyFile: string,
-  derived: { brain: "stub" | "llm"; llmModel: string; llmBaseUrl: string; controllers: readonly string[] },
+  derived: { brain: "stub" | "llm"; llmModel: string; llmBaseUrl: string; controllers: readonly string[]; agentsFile?: string },
 ): PolicySpec {
   const fromFile = readPolicyFile(policyFile);
+  // ADR-0038: with an agents file the brains are per agent, so the published
+  // list is the union the collection actually runs (`derivedBrains`). A file
+  // with problems falls back to the AFP_BRAIN default here — `config check`'s
+  // `agents` line is where those problems are reported, not a throw from
+  // `loadConfig`. Found by walkthrough: an export from a stub collection under
+  // the default AFP_BRAIN=llm failed its own verifier's check_policy.
+  const collectionBrains = derived.agentsFile
+    ? (({ entries, problems }) => (problems.length > 0 ? null : derivedBrains(entries, { model: derived.llmModel, endpoint: derived.llmBaseUrl })))(readAgentsFile(derived.agentsFile))
+    : null;
   const defaults: PolicySpec = {
     // ADR-0032 Decision 6's flipped default.
     seatPolicy: "follow-required",
@@ -339,7 +350,7 @@ function assemblePolicy(
     // endpoint)` = "<model> @ <endpoint> ; template sha256:…" — the verifier
     // matches a Result's producedBy against `afp:model` alone or against the
     // "<model> @ <endpoint>" prefix, so both forms are represented here.
-    brains: derived.brain === "stub" ? [{ model: "stub" }] : [{ model: derived.llmModel, endpoint: derived.llmBaseUrl }],
+    brains: collectionBrains ?? (derived.brain === "stub" ? [{ model: "stub" }] : [{ model: derived.llmModel, endpoint: derived.llmBaseUrl }]),
     // Today's behaviour for Q2 (ADR-0021 open question 2): any member may
     // pin a governanceSubject. Q3's floor names a close rather than leaving
     // an exhausted electorate to throw uncaught — `no-decision:electorate-exhausted`

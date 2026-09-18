@@ -209,6 +209,23 @@ Notes on what was built versus what the ADR wrote:
   `materialize` then hands bytes or an excerpt per the performer's `afp:consumes`, so the
   demo's writer → reviewer loop runs by hand: G10 checks the reviewer receives the draft
   as bytes, the review lands on the draft's thread, and the thread replays clean.
+- **The published policy's `brains` are derived from the collection** (found by
+  walkthrough, after the first build). `config.ts`'s default `PolicySpec` derived
+  `afp:brains` from the single global `AFP_BRAIN`, which predates this ADR; a stub
+  collection under the operator's default `AFP_BRAIN=llm` therefore published the LLM
+  model while its Results carried `afp:producedBy: "stub"`, and ADR-0033's `check_policy`
+  rightly failed the instance's own export. Now, with `AFP_AGENTS_FILE` set, the default
+  is the union the collection runs (`agentsSpec.ts` `derivedBrains`: `stub` →
+  `{model: "stub"}`, `llm` → the configured model and endpoint, `none` → nothing;
+  deduplicated, first-appearance order); an all-`none` collection yields `[]`, which the
+  verifier reads as "not declared" — the honest statement for an instance that runs no
+  brain and produces no Result, where naming a model would be the very mismatch. A file
+  with problems falls back to the `AFP_BRAIN` default so `loadConfig` never throws for it
+  (`config check`'s `agents` line is where it is reported); unset, nothing changes; an
+  explicit `brains` in the policy file still wins. The file's shape moved to a leaf
+  `agentsSpec.ts` (mirroring `policySpec.ts`) so `config.ts` can read it without a cycle
+  through `agents.ts`. G11 in both gate files: the derivation, and the end-to-end export of
+  a served stub collection under `AFP_BRAIN=llm` replayed clean.
 - **The CLI's `fetch` is not `policedFetch`.** The operator's tool addressing the
   operator's instance is outside ADR-0025's threat (what the *instance* fetches on a
   stranger's say-so); the module says so.

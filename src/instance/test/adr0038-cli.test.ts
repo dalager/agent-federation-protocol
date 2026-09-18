@@ -185,6 +185,36 @@ describe("ADR-0038 gate — the operator's own work, from the terminal", () => {
     }
   });
 
+  it("G11 — end to end, as the walkthrough runs it: a stub collection under the operator's default AFP_BRAIN=llm, the two-task loop, stop, export, verify — PASSED with no policy check failing", async () => {
+    // This is the case that would have caught the bug: the served
+    // collection's export replayed by the Python verifier against the policy
+    // the instance itself published — not one that happened to line up
+    // because the harness's AFP_BRAIN matched the agents' brains.
+    const { instance, server, slug, thread, show, task, scheduler, config } = await showServe({ globalBrain: "llm" });
+    assert.deepEqual(config.policy.brains, [{ model: "stub" }], "the policy names what the collection runs, not AFP_BRAIN");
+    let exported: ReturnType<typeof exportBundle> | null = null;
+    try {
+      const draft = await show(["result", slug, "--json"]);
+      assert.equal(draft.code, 0, draft.stderr);
+      const digest = (JSON.parse(draft.stdout) as { object: { attachment: { "afp:digest": string }[] } }).object.attachment[0]["afp:digest"];
+      const review = await task(["reviewer", "Review the attached draft.", "--attach", digest, "--thread", slug]);
+      assert.equal(review.code, 0, review.stderr);
+      await scheduler.tick("flush");
+      await scheduler.tick("flush");
+      assert.equal(instance.outbox.byThread(thread).length, 6);
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+      exported = exportBundle(instance, config.exportDir);
+    } finally {
+      if (!exported) server.close();
+      instance.close();
+    }
+    const verdict = runVerifier(VERIFIER, exported!.dir, thread, ["--verbose"]);
+    assert.equal(verdict.code, 0, verdict.output);
+    assert.match(verdict.output, /PASSED/);
+    assert.doesNotMatch(verdict.output, /FAIL[^\n]*policy:/, "no policy check fails");
+    assert.match(verdict.output, /policy: .*afp:producedBy names a listed brain/, "and the brains check actually ran");
+  });
+
   it("G8 — `show status`, an anonymous rendering fetch, and `show thread` on a thread the controller is no party to: served, 404, and exit 1 without opening the store", async () => {
     const { instance, server, origin, slug, show, noStoreOpened } = await showServe();
     try {

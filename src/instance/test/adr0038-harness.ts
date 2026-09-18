@@ -63,7 +63,7 @@ export function writeAgentsFile(paths: { dataDir: string }, entries: unknown): s
  * this instance does not hold. `serve`'s own transport/scheduler wiring is
  * reproduced so a flush tick performs a locally delegated Offer.
  */
-export async function taskServe(options: { clock?: Clock } = {}) {
+export async function taskServe(options: { clock?: Clock; globalBrain?: "stub" | "llm" } = {}) {
   const clock = options.clock ?? jumpClock("2026-09-13T09:00:00.000Z");
   const port = await freePort();
   const origin = `http://127.0.0.1:${port}`;
@@ -80,7 +80,10 @@ export async function taskServe(options: { clock?: Clock } = {}) {
   // A wide per-address bucket: the CLI cases fire several signed reads —
   // each with the read gate's own fetch of the controller's document — inside
   // one second, which the default 20/s bucket would answer 429.
-  const config = loadConfig({ ...paths, origin, agentsFile, controllers, rateLimitPerAddress: 1000 });
+  // `globalBrain` overrides the workspace's AFP_BRAIN=stub: an operator's
+  // default is `llm`, and the collection's own brain kinds — not that global
+  // — must be what the published policy lists (ADR-0038, found by walkthrough).
+  const config = loadConfig({ ...paths, brain: options.globalBrain ?? paths.brain, origin, agentsFile, controllers, rateLimitPerAddress: 1000 });
   const instance = new AfpInstance(config, agentCollection(config), clock);
 
   const foreignKey = loadOrCreateKeyPair(join(dirname(paths.dataDir), "foreign-keys"), "boss", foreignUrl);
@@ -139,8 +142,8 @@ export async function taskServe(options: { clock?: Clock } = {}) {
  * a synchronous exec would block the very event loop that has to answer the
  * child's requests (and the read gate's fetch of the controller's document).
  */
-export async function showServe() {
-  const served = await taskServe({ clock: systemClock });
+export async function showServe(options: { globalBrain?: "stub" | "llm" } = {}) {
+  const served = await taskServe({ clock: systemClock, ...options });
   const { instance, scheduler, post, paths } = served;
   const res = await post("controller", "/agents/worker/command", { content: "@worker task Assess the window." });
   const slug = String(res.body.correlationId);
