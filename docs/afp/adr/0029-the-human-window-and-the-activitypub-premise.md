@@ -199,6 +199,18 @@ Notes on what was built versus what the ADR wrote:
 - **No narrowing of the G-rows.** G1–G6 are exactly the matrix below; nothing was demoted
   to a primitives-only check.
 
+**Revised under contact (2026-09-18).** Decision 2's "three-form grammar" is four forms:
+[ADR-0038](0038-the-operators-own-work.md) adds `@<name> task <brief>` — the controller's
+one-line brief, executed as an `Offer{afp:Task}` from the controller's *held* actor through
+`instance.delegate`, so the record shows what a program would have produced and no new wire
+vocabulary appears. The additions this ADR's G3 relies on hold: the same `parseCommand`,
+the same `executeCommand`, the same polite reply for every refusal, and "no other path
+parses stranger free text" is still true by construction. One deliberate asymmetry: the
+mention carrier (Decision 3) refuses `task` by name, because it is the one form that hands
+a brain free text and a Note arrives on another operator's signature — ADR-0038 Decision 3
+records why. Scenario 15 could not name a command that hands a served instance's agent a
+job; `npm run task` is now that command.
+
 ## Build status — gate matrix
 
 | # | Case | Result |

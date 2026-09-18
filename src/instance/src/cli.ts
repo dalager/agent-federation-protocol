@@ -7,7 +7,8 @@
 import { loadConfig } from "./config.ts";
 import { endpointOf, runDemo } from "./demo.ts";
 import { AfpInstance } from "./instance.ts";
-import { agentRegistrations } from "./demo.ts";
+// ADR-0038 Decision 1: `AFP_AGENTS_FILE`'s collection when set, the demo's otherwise.
+import { agentCollection } from "./agents.ts";
 import { checkEndpoint } from "./brains/openai.ts";
 import { createHttpServer } from "./ap/server.ts";
 import { exportBundle } from "./export.ts";
@@ -931,7 +932,7 @@ async function main(): Promise<void> {
 
     case "export": {
       const config = loadConfig();
-      const instance = new AfpInstance(config, agentRegistrations(config));
+      const instance = new AfpInstance(config, agentCollection(config));
       const summary = exportBundle(instance, config.exportDir);
       console.log(`exported ${summary.activities} activities to ${summary.dir}`);
       instance.close();
@@ -964,7 +965,7 @@ async function main(): Promise<void> {
         if (sub === "list") {
           const actors = process.argv[4]
             ? [process.argv[4]]
-            : ["@instance", ...agentRegistrations(config).map((r) => r.spec.name)];
+            : ["@instance", ...agentCollection(config).map((r) => r.spec.name)];
           for (const actor of actors) {
             const { controller, file } = locate(deps, actor, { kind: "proof" });
             console.log(`\n${actor}  (${controller})`);
@@ -1042,7 +1043,7 @@ async function main(): Promise<void> {
             // path does need an instance — and can have one, because the
             // instance key is not the key being revoked in the case that
             // matters. If it is, mint the successor first.
-            const instance = new AfpInstance(config, agentRegistrations(config));
+            const instance = new AfpInstance(config, agentCollection(config));
             try {
               const published = instance.publishAsInstance(
                 [],
@@ -1154,9 +1155,32 @@ async function main(): Promise<void> {
       break;
     }
 
+    // ADR-0038 Decision 4: hand a served instance's agent a job. Never opens
+    // the store — `serve` holds its lock — and never mints a key; the body
+    // lives in `ports/taskCli.ts`.
+    //   afp task <agent> "<brief>" [--as <controller>] [--capability <id>] [--thread <url>] [--deadline <iso>] [--url <base>]
+    case "task": {
+      const config = loadConfig();
+      const { parseTaskArgs, runTaskCli } = await import("./ports/taskCli.ts");
+      let result: Awaited<ReturnType<typeof runTaskCli>>;
+      try {
+        result = await runTaskCli(config, parseTaskArgs(process.argv.slice(3)));
+      } catch (error) {
+        console.error(`\nrefused: ${(error as Error).message}\n`);
+        process.exit(2);
+      }
+      console.log(JSON.stringify(result.body, null, 2));
+      const refused = result.status !== 200 || (typeof result.body === "object" && result.body !== null && "reply" in result.body);
+      if (refused) {
+        console.error(`\n${result.url} answered ${result.status} as ${result.controller} — the polite reply means the instance declined; see README § Handing an agent a job`);
+        process.exit(1);
+      }
+      break;
+    }
+
     case "serve": {
       const config = loadConfig();
-      const instance = new AfpInstance(config, agentRegistrations(config));
+      const instance = new AfpInstance(config, agentCollection(config));
       const log = logger("cli:serve");
 
       // ADR-0008: the federation gate and signed inbox are live on a served
@@ -1247,7 +1271,7 @@ async function main(): Promise<void> {
     }
 
     default:
-      console.error(`unknown command: ${command}\nusage: cli.ts [demo|p2|p3|p3:llm|p4|p5|p5:llm|p6|p6:llm|p7|p7:llm|p8|p8:llm|export|keys|serve|config|backup|restore]`);
+      console.error(`unknown command: ${command}\nusage: cli.ts [demo|p2|p3|p3:llm|p4|p5|p5:llm|p6|p6:llm|p7|p7:llm|p8|p8:llm|export|keys|serve|task|config|backup|restore]`);
       process.exit(1);
   }
 }

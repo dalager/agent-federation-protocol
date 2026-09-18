@@ -314,6 +314,16 @@ export function loadOrCreateTransportKeyPair(
  * follow-up rotation — has no key to resume with; that is a deployment error
  * for the caller to notice, not a case this function papers over.)
  */
+/**
+ * ADR-0038 Decision 4: whether any key — active or retired — exists for
+ * `name`, without minting one. The `task` CLI asks this before
+ * `loadOrCreateKeyPair`, because a controller whose key is absent must fail
+ * by name rather than be silently minted a fresh identity by a client tool.
+ */
+export function keyExists(keyDir: string, name: string): boolean {
+  return effectiveIndex(keyDir, name).length > 0;
+}
+
 export function loadOrCreateKeyPair(keyDir: string, name: string, controller: string): KeyPair {
   mkdirSync(keyDir, { recursive: true });
   const existing = effectiveIndex(keyDir, name);

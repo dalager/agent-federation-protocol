@@ -87,18 +87,27 @@ export function shadowNote(activity: { [key: string]: JsonValue }, source: Shado
 export type Command =
   | { command: "pause"; target: string }
   | { command: "status"; target: string }
-  | { command: "approve"; target: string };
+  | { command: "approve"; target: string }
+  /** ADR-0038 Decision 2: the controller's brief on one line, `@<name> task <text>`. */
+  | { command: "task"; target: string; content: string };
 
 const MENTION_COMMAND = /^@(\S+)\s+(pause|status)$/;
+const TASK_COMMAND = /^@(\S+)\s+task\s+(\S.*)$/;
 
 /**
  * The narrow grammar 04 authorizes: exactly `@<name> pause`, `@<name>
- * status`, or a bare `approve` reply. `mentionedActor` supplies the target
- * for `approve`, which names no one itself (it replies on a governance
- * thread, so its target is context, not text). Anything else — extra
- * tokens, punctuation payloads, multiline strings, prompt-injection
- * attempts — returns null; this function never tries to be clever about
- * partial matches, because a stranger's free text is the threat model.
+ * status`, a bare `approve` reply, or — ADR-0038 Decision 2's fourth form —
+ * `@<name> task <brief>`. `mentionedActor` supplies the target for
+ * `approve`, which names no one itself (it replies on a governance thread,
+ * so its target is context, not text). Anything else — extra tokens,
+ * punctuation payloads, multiline strings, prompt-injection attempts —
+ * returns null; this function never tries to be clever about partial
+ * matches, because a stranger's free text is the threat model.
+ *
+ * `task` is the one form that carries free text past the parse: the brief
+ * is returned verbatim (one line, the no-newline rule above stands) and
+ * what may be done with it is `ports/command.ts`'s decision, gated on the
+ * requester resolving to an actor this instance holds.
  */
 export function parseCommand(noteContent: string, mentionedActor: string): Command | null {
   if (typeof noteContent !== "string") return null;
@@ -107,6 +116,9 @@ export function parseCommand(noteContent: string, mentionedActor: string): Comma
   if (trimmed.length === 0) return null;
 
   if (trimmed === "approve") return { command: "approve", target: mentionedActor };
+
+  const task = TASK_COMMAND.exec(trimmed);
+  if (task !== null) return { command: "task", target: task[1], content: task[2].trim() };
 
   const match = MENTION_COMMAND.exec(trimmed);
   if (match === null) return null;

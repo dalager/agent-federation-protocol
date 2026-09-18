@@ -87,6 +87,29 @@ export function makeReviewer(): CountingBrain {
   }, ["text/markdown"]);
 }
 
+/**
+ * ADR-0038 Decision 1: the deterministic brain an `AFP_AGENTS_FILE` entry
+ * with `brain: "stub"` gets. It answers any capability it advertises by
+ * echoing the brief back under a fixed heading, and names itself `stub` in
+ * `afp:producedBy` — the same value the default policy lists
+ * (`config.ts` `assemblePolicy`), so a served instance's Results replay
+ * clean under `check_policy` without an operator writing a policy file.
+ */
+export function makeEchoBrain(name: string, capabilities: readonly string[], consumes?: readonly string[]): CountingBrain {
+  return new CountingBrain(name, capabilities, (request) => {
+    const source = request.attachments[0];
+    const heading = `# ${name}: ${request.capability}`;
+    const body = source ? textOf(source) : request.content;
+    return {
+      ok: true,
+      content: `${heading}\n\n${body.trim()}\n`,
+      summary: `${name} answered ${request.capability}`,
+      producedBy: "stub",
+      attachments: [{ mediaType: "text/markdown", bytes: encoder.encode(`${heading}\n\n${body.trim()}\n`) }],
+    };
+  }, consumes);
+}
+
 /** A brain that always fails — used to exercise dead-lettering and `afp:Error`. */
 export function makeFailingBrain(name: string, capability: string): Brain {
   return {

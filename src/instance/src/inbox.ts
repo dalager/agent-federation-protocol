@@ -200,9 +200,23 @@ export class Inbox {
       return;
     }
 
+    // ADR-0038 Decision 3: `task` is not carried by mentions. The three
+    // older forms carry no payload past the parse (a verb, or a digest the
+    // body names); `task` hands a brain free text. A Note is the one inbound
+    // shape a stock fediverse account can author, and under instance custody
+    // it arrives signed by the *sender's operator* on the controller's
+    // behalf — so a listed controller's brief would reach a brain on the
+    // strength of another operator's key. The HTTP carrier, signed by the
+    // controller's own held key, is the only door for a brief; here the
+    // form gets the same fixed reply everything unparseable gets.
+    if (command.command === "task") {
+      this.dropDelivery("polite-reply", activityId, sender, `${politeReply(content)} (task is not carried by mentions — ADR-0038 Decision 3)`);
+      return;
+    }
+
     const result = await executeCommand(this.instance, { agentName: name, by: sender, command, thread, content });
     if ("reply" in result) {
-      this.dropDelivery("polite-reply", activityId, sender, "approve target not admissible");
+      this.dropDelivery("polite-reply", activityId, sender, `${command.command} target not admissible`);
     }
   }
 
@@ -218,9 +232,17 @@ export class Inbox {
     // brain — the delegator gets the same Reject shape a stranger's brain
     // failure would produce, so a paused agent looks, from the outside,
     // exactly like one that declined the task.
-    if (this.instance.isPaused(performerName)) {
+    // ADR-0038 Decision 1: a held actor (`brain: "none"`) has the same
+    // answer for the same reason — nothing performs for it, and the
+    // delegator must learn that on the record rather than from silence.
+    const declined = this.instance.isPaused(performerName)
+      ? "paused by controller"
+      : this.instance.isHeld(performerName)
+        ? "held actor: nothing performs for it"
+        : null;
+    if (declined !== null) {
       this.instance.publish(performerName, [String(activity.actor ?? "")], thread, "parties", (envelope) =>
-        rejectTask(envelope, String(activity.id ?? ""), correlationId, "paused by controller"),
+        rejectTask(envelope, String(activity.id ?? ""), correlationId, declined),
       );
       return;
     }

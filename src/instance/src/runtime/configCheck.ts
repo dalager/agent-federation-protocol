@@ -12,6 +12,7 @@ import { validate, type ConfigProblem } from "../config.ts";
 import { openDb, StoreLocked } from "../store/db.ts";
 import { AfpInstance } from "../instance.ts";
 import { probeSelfCheck } from "./probes.ts";
+import { agentsCheck } from "../agents.ts";
 import type { JsonValue } from "../crypto/jcs.ts";
 
 export interface ConfigCheckLine {
@@ -67,6 +68,11 @@ export async function runConfigCheck(config: Config, options: RunConfigCheckOpti
           },
     );
   }
+
+  // ADR-0038 Decision 1: the agent collection `serve` would boot — every
+  // problem with AFP_AGENTS_FILE named at once, or which collection applies.
+  const agents = agentsCheck(config);
+  lines.push({ name: "agents", ok: agents.ok, reason: agents.reason });
 
   // Store: opens (and immediately closes) the store path — a running
   // instance holding the lock is reported as `store-locked` with its pid,

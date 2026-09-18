@@ -488,10 +488,15 @@ curl -H "Signature: ..." -H "Signature-Input: ..." -H "Date: ..." -H "Host: ..."
   http://localhost:8787/threads/<thread-id>/rendering
 ```
 
-**Command.** `POST /agents/:name/command` runs the same three-form grammar
+**Command.** `POST /agents/:name/command` runs the same four-form grammar
 (`visibility.ts`'s `parseCommand`) the inbox's `Create{Note}` mentions use — `@name pause`,
-`@name status`, and a bare `approve` (with `thread`/`actsOn` in the body) that goes through
-[ADR-0028](../../docs/afp/adr/0028-port-agents.md)'s `approveThroughPort`. The requester is
+`@name status`, a bare `approve` (with `thread`/`actsOn` in the body) that goes through
+[ADR-0028](../../docs/afp/adr/0028-port-agents.md)'s `approveThroughPort`, and `@name task
+<brief>` ([ADR-0038](../../docs/afp/adr/0038-the-operators-own-work.md) Decision 2), which
+delegates the brief as an `Offer{afp:Task}` from the controller's own held actor — see
+"Handing an agent a job" below. `task` is the one form the mention carrier refuses (ADR-0038
+Decision 3): a brief reaches a brain only over this route, signed by the controller's own
+key. The requester is
 the HTTP-signature's actor, checked against the policy's `afp:controllers`
 ([ADR-0033](../../docs/afp/adr/0033-operator-obligations.md) Decision 1 — see "The policy
 document" below; `AFP_CONTROLLERS` populates it when the policy file names none). Every refusal — unlisted,
@@ -599,6 +604,43 @@ Writes are the boundary. Every inbox POST passes, in order:
    door-knock — but never the signature check or the deny-list. Fails → 403,
    and an entry in the hash-chained boundary log.
 3. **The same dispatch local delivery feeds** — dedupe, task table, brains.
+
+### Handing an agent a job
+
+A controller listed in the policy's `afp:controllers` **and held by this instance** (an
+`AFP_AGENTS_FILE` entry with `brain: "none"` — see "Defining the agent collection") hands
+an agent a brief with the `task` form of the command grammar
+([ADR-0038](../../docs/afp/adr/0038-the-operators-own-work.md)). The instance publishes an
+`Offer{afp:Task}` from the controller's actor to the agent; its own flush loop performs it,
+and the `Accept` and `Result` land on the thread with no further call:
+
+```bash
+npm run task -- writer "Draft a readiness note for the billing cutover."
+# {
+#   "task": "http://127.0.0.1:8787/agents/ops/activities/0003",
+#   "thread": "http://127.0.0.1:8787/threads/task-3f1c9a2b7d0e",
+#   "correlationId": "task-3f1c9a2b7d0e"
+# }
+```
+
+`--as <controller>` picks the controller (default: the first `afp:controllers` entry under
+this origin); `--capability <id>` (default: the agent's first advertised one — an
+unadvertised one is refused), `--thread <url>`, `--deadline <iso>` and `--url <base>`
+(default `AFP_ORIGIN`) are optional. The command signs `POST /agents/<name>/command` with
+the controller's key from `AFP_DATA_DIR/keys` and **never opens the store** — `serve` holds
+its lock — and never mints a key: an absent controller key fails by name. The same request
+by hand, with `capability`/`thread`/`deadline`/`visibility` as optional body fields:
+
+```bash
+curl -X POST http://localhost:8787/agents/writer/command \
+  -H "Signature: ..." -H "Signature-Input: ..." -H "Content-Digest: ..." -H "Date: ..." -H "Host: ..." \
+  -H "Content-Type: application/json" \
+  -d '{"content": "@writer task Draft a readiness note for the billing cutover.", "deadline": "2026-09-19T09:00:00Z"}'
+```
+
+A controller this instance does not hold, a capability the agent does not advertise, a
+newline in the brief, or a `task` arriving as a mention: the identical polite reply, nothing
+on the chain.
 
 ### Wiring two instances together
 
@@ -755,6 +797,38 @@ Collection-level rules enforced or exercised by the panel:
 Capability ids are **not** protocol vocabulary: AFP defines the machinery
 around capability strings (declaration, matching, settlement) but no catalogue
 of names. Keep your own registry small and namespaced.
+
+### The collection a served instance runs
+
+`serve`, `keys`, `export` and `config check` boot the collection `AFP_AGENTS_FILE`
+names ([ADR-0038](../../docs/afp/adr/0038-the-operators-own-work.md) Decision 1;
+`src/agents.ts`). Unset, they boot the demo's writer and reviewer, exactly as
+before. The file is a JSON array, one entry per agent, shaped on `AgentProfile`:
+
+```json
+[
+  { "name": "writer",   "capabilities": ["afp:cap:draft"],  "persona": "You are a technical writer for a payments team.", "brain": "llm" },
+  { "name": "reviewer", "capabilities": ["afp:cap:review"], "persona": "You are a sceptical reviewer.", "brain": "llm", "consumes": ["text/markdown"] },
+  { "name": "ops",      "capabilities": [],                 "brain": "none" }
+]
+```
+
+| Key | Meaning |
+|---|---|
+| `name` | `^[a-z][a-z0-9-]*$`, unique — the actor is `${AFP_ORIGIN}/agents/<name>` |
+| `capabilities` | what lands on the Vouch and the agent document; `task` defaults to the first |
+| `brain` | `llm` — `AFP_LLM_BASE_URL` with `persona` as the system prompt (framed the way the demo's writer is); `stub` — a deterministic echo, `afp:producedBy: "stub"`, for an offline served instance; `none` — an actor the instance **holds** and nothing performs for |
+| `persona` | required for `llm`; who the agent is, one or two sentences |
+| `consumes` | media types handed to the brain as bytes ([ADR-0027](../../docs/afp/adr/0027-the-port-is-a-security-boundary.md) Decision 2) |
+| `keyCustody` | `instance` only — `self` needs a signer a file cannot supply, and is refused by name |
+| `since` | ISO instant; defaults to the demo's fixed one so the roster stays deterministic |
+
+`brain: "none"` is how a human holds an actor under instance custody
+([ADR-0029](../../docs/afp/adr/0029-the-human-window-and-the-activitypub-premise.md)
+Decision 2): list its URL in `afp:controllers` and it can `pause`, `status`, `approve` and
+`task`. An Offer addressed to it is `Reject`ed on the record, the way a paused agent's is.
+`npm run config:check` reports every problem with the file by name, at once, on its
+`agents` line.
 
 ## Layout
 
@@ -954,6 +1028,7 @@ Environment variables, all optional (see `src/config.ts`, `src/configSchema.ts`)
 | `AFP_WEBHOOK_SECRET_FILE` | *(none)* | File holding the [ADR-0028](../../docs/afp/adr/0028-port-agents.md) webhook initiator's shared secret ([ADR-0032](../../docs/afp/adr/0032-deployment-profile.md) Decision 3) |
 | `AFP_SIGNER_CLIENT_CERT_FILE` | *(none)* | File holding the [ADR-0035](../../docs/afp/adr/0035-remote-custody-and-the-asynchronous-port.md) remote signer's client certificate. Validated as readable by `afp config check`; nothing in this codebase reads it yet |
 | `AFP_POLICY_FILE` | *(none)* | JSON file in the `PolicySpec` shape ([ADR-0033](../../docs/afp/adr/0033-operator-obligations.md); see "The policy document" above) — the operator's stated obligations, signed and served at `/afp/policy`, carried in every export |
+| `AFP_AGENTS_FILE` | *(none)* | JSON array of agent entries ([ADR-0038](../../docs/afp/adr/0038-the-operators-own-work.md) Decision 1; see "Defining the agent collection") — the collection `serve`/`keys`/`export` boot. Unset means the demo's writer and reviewer |
 | `AFP_CONTROLLERS` | *(none)* | Comma-separated actor URLs authorized to answer through `ApprovalPort` ([ADR-0028](../../docs/afp/adr/0028-port-agents.md) Decision 4) and the command grammar at `POST /agents/:name/command` ([ADR-0029](../../docs/afp/adr/0029-the-human-window-and-the-activitypub-premise.md) Decision 2) — populates the policy's `afp:controllers` only when `AFP_POLICY_FILE` names none ([ADR-0033](../../docs/afp/adr/0033-operator-obligations.md) Decision 1) |
 | `AFP_FEDIVERSE_WINDOW` | `0` | `1` dual-publishes a `public` shadow Note alongside every operator-visible event ([ADR-0029](../../docs/afp/adr/0029-the-human-window-and-the-activitypub-premise.md) Decision 3). Off by default; every shipped bundle is byte-identical either way |
 | `AFP_SWEEP_MS` | `30000` | The resident scheduler's sweep-loop interval ([ADR-0031](../../docs/afp/adr/0031-the-resident-process.md) Decision 1) |

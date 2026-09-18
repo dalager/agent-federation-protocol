@@ -167,6 +167,11 @@ export interface Config {
    * `AfpInstance.policyDocument()` is its signed form.
    */
   readonly policy: PolicySpec;
+
+  // ---------------------------------------------------------- ADR-0038
+
+  /** ADR-0038 Decision 1: the agent collection file (`src/agents.ts`); absent means the demo's writer/reviewer. */
+  readonly agentsFile?: string;
 }
 
 /**
@@ -239,6 +244,7 @@ export function loadConfig(overrides: Partial<Config> = {}): Config {
   const signerUrl = String(readEntry(entry("AFP_SIGNER_URL")));
   const signerRootKeyId = String(readEntry(entry("AFP_SIGNER_ROOT_KEY_ID")));
   const policyFile = String(readEntry(entry("AFP_POLICY_FILE")));
+  const agentsFile = String(readEntry(entry("AFP_AGENTS_FILE")));
   const controllersFromEnv = readEntry(entry("AFP_CONTROLLERS")) as string[];
 
   const base: Config = {
@@ -275,6 +281,7 @@ export function loadConfig(overrides: Partial<Config> = {}): Config {
     ...(signerCaFile ? { signerCaFile } : {}),
     ...(signerUrl ? { signerUrl } : {}),
     ...(signerRootKeyId ? { signerRootKeyId } : {}),
+    ...(agentsFile ? { agentsFile } : {}),
     issuedKeyLifetimeMs: readEntry(entry("AFP_ISSUED_KEY_LIFETIME_MS")) as number,
     controllers: controllersFromEnv,
     fediverseWindow: readEntry(entry("AFP_FEDIVERSE_WINDOW")) as boolean,
@@ -465,6 +472,7 @@ export function validate(config: Config, options: ValidateOptions = {}): ConfigP
     ["signerClientCertFile", "AFP_SIGNER_CLIENT_CERT_FILE", config.signerClientCertFile] as const,
     ["signerClientKeyFile", "AFP_SIGNER_CLIENT_KEY_FILE", config.signerClientKeyFile] as const,
     ["signerCaFile", "AFP_SIGNER_CA_FILE", config.signerCaFile] as const,
+    ["agentsFile", "AFP_AGENTS_FILE", config.agentsFile] as const,
   ]) {
     if (path === undefined) continue;
     if (!existsSync(path)) {

@@ -55,6 +55,13 @@ export const CONFIG_SCHEMA: readonly ConfigEntry[] = [
   { env: "AFP_KEY_PASSPHRASE_FILE", key: "keyPassphraseFile", kind: "file", default: "", secret: true, doc: "File holding the passphrase the file signer adapter encrypts PEMs with at rest (ADR-0026)" },
   { env: "AFP_CONTROLLERS", key: "controllers", kind: "list", default: [], doc: "Comma-separated actor URLs authorized to approve — a convenience that populates afp:controllers on the policy file when it names none (ADR-0028 Decision 4; ADR-0033 Decision 1 makes the policy file the source of record)" },
   { env: "AFP_POLICY_FILE", key: "policyFile", kind: "file", default: "", doc: "A JSON file in the PolicySpec shape (ap/policy.ts) — the operator's signed obligations (ADR-0033 Decision 1). Merged over instance-derived defaults; absent means the defaults alone" },
+  {
+    env: "AFP_AGENTS_FILE",
+    key: "agentsFile",
+    kind: "file",
+    default: "",
+    doc: "JSON array of agent entries (src/agents.ts, ADR-0038 Decision 1) — the collection serve/keys/export boot. Unset means the demo's writer/reviewer. keyCustody may only be \"instance\": \"self\" needs a signer a file cannot supply and is refused by name",
+  },
   { env: "AFP_FEDIVERSE_WINDOW", key: "fediverseWindow", kind: "bool", default: false, doc: "1 dual-publishes a public shadow Note (ADR-0029 Decision 3)" },
   { env: "AFP_SWEEP_MS", key: "scheduler.sweepMs", kind: "int", default: 30_000, doc: "The resident scheduler's sweep-loop interval (ADR-0031 Decision 1)" },
   { env: "AFP_FLUSH_MS", key: "scheduler.flushMs", kind: "int", default: 10_000, doc: "The resident scheduler's flush-loop interval" },

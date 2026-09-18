@@ -150,20 +150,23 @@ built in its ADR.
 | Claim | ADR | State |
 |---|---|---|
 | C1 | 0025 | built |
-| C2 | 0026, 0035 | built, less the `remote` signer adapter — costed and designed in [ADR-0035](0035-remote-custody-and-the-asynchronous-port.md), whose `remote-issued` mode is the buildable half |
+| C2 | 0026, 0035 | built — `remote-issued` custody landed 2026-09-18 ([ADR-0035](0035-remote-custody-and-the-asynchronous-port.md) Decisions 2, 3, 5); the full `remote` adapter (Decision 4, the asynchronous port) stays costed and deliberately unscheduled, which the claim does not require |
 | C3 | 0027 | built, less the scenario re-walks — those are C6's job in [ADR-0030](0030-scenario-re-walks-and-the-coverage-index.md) |
 | C4 | 0028 | built, less the human-approval port's own scenario re-walk — that is C6's job in [ADR-0030](0030-scenario-re-walks-and-the-coverage-index.md) |
 | C5 | 0029 | built — the human-approval controller binding now reads the signed policy document's `afp:controllers`, [ADR-0033](0033-operator-obligations.md)'s job |
-| C6 | 0030 | built, less scenario 15 (waits for ADR-0031/0032) and the CI wiring (ADR-0034) |
-| C7 | 0031 | built, less a hub hosted by `serve` itself for the converge loop to advance — the scheduler takes replicas from an embedding program until then |
+| C6 | 0030 | built — [scenario 15](../scenarios/15-the-production-tuesday.md) written 2026-09-15, verdict held, findings 96–100 triaged |
+| C7 | 0031, 0037 | built, less a hub hosted by `serve` itself for the converge loop to advance — proposed as [ADR-0037](0037-the-served-hub.md) (scenario 15 findings 96–97), unbuilt |
 | C8 | 0032 | built |
 | C9 | 0033 | built |
 | C10 | 0034 | built |
 
-Every claim is now built or built-less-a-named-remainder; scenario 15 is not written.
-What stands between the program and "closed" is scenario 15 (ADR-0030 D3) and the four
-named remainders: ADR-0035's remote signer, a hub hosted by `serve` itself, scenario 15
-itself, and the first green CI run and first signed release.
+Every claim is now built or built-less-a-named-remainder, and scenario 15 is written.
+What stands between the program and "closed" (as of 2026-09-18) is two remainders: a hub
+hosted by `serve` itself ([ADR-0037](0037-the-served-hub.md), proposed), and the first
+green CI run and first signed release (ADR-0034, mechanism built, never exercised).
+[ADR-0038](0038-the-operators-own-work.md) — the agent collection from a file and the
+`task` command — is not a claim of this program, but is what makes a served instance
+usable by the operator who runs it, which scenario 15's postscript could not name.
 
 ## References
 

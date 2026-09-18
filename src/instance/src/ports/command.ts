@@ -74,17 +74,42 @@ function approveCorrelationId(thread: string, actsOn: string): string {
   return `approve-${hash.slice(0, 16)}`;
 }
 
+/**
+ * `task-` + the first 12 hex characters of sha256(controller \0 brief \0
+ * instant) — the thread slug and correlationId of a `task` command, derived
+ * the way `approveCorrelationId` is rather than minted at random, so the
+ * same brief from the same controller at the same instant names one task.
+ */
+function taskSlug(controller: string, content: string, published: string): string {
+  const hash = createHash("sha256")
+    .update(Buffer.from(controller, "utf8"))
+    .update(Buffer.from([0x00]))
+    .update(Buffer.from(content, "utf8"))
+    .update(Buffer.from([0x00]))
+    .update(Buffer.from(published, "utf8"))
+    .digest("hex");
+  return `task-${hash.slice(0, 12)}`;
+}
+
+const VISIBILITY_CLASSES: ReadonlySet<string> = new Set(["public", "hub", "parties", "internal"]);
+
 export interface ExecuteCommandOptions {
   /** Local name of the agent the command addresses. */
   agentName: string;
   /** The controller actor URL that issued it — already authorized by the caller. */
   by: string;
   command: Command;
-  /** `approve` only. */
+  /** `approve` (required) and `task` (optional; defaults to a derived thread). */
   thread?: string;
   actsOn?: string;
   /** `approve` only — the note/command text, carried into the actuation's summary. */
   content?: string;
+  /** `task` only (ADR-0038 Decision 2): the capability asked for — defaults to the agent's first advertised one. */
+  capability?: string;
+  /** `task` only: an ISO instant. */
+  deadline?: string;
+  /** `task` only: defaults to `"parties"`. */
+  visibility?: string;
 }
 
 /**
@@ -122,6 +147,8 @@ export async function executeCommand(instance: AfpInstance, options: ExecuteComm
     return { paused: true };
   }
 
+  if (command.command === "task") return executeTask(instance, options, command.content);
+
   // command.command === "approve"
   if (!options.thread || !options.actsOn) return polite();
   const policy = pinnedPolicy(instance, options.thread);
@@ -156,6 +183,54 @@ export async function executeCommand(instance: AfpInstance, options: ExecuteComm
 }
 
 /**
+ * ADR-0038 Decision 2: `@<name> task <brief>` becomes an `Offer{afp:Task}`
+ * from the controller's own held actor to the agent — `instance.delegate`,
+ * the same call every demo makes, no new wire vocabulary.
+ *
+ * The requester must resolve to an actor this instance holds, over and
+ * above being a listed controller: the Offer is *signed* as the delegator,
+ * and only an actor whose key this instance holds can be signed for. A
+ * listed controller on another instance is authorized to `pause`, `status`
+ * and `approve` — none of which publishes as them — but cannot delegate
+ * from here, and gets the same polite reply as anything else refused: the
+ * endpoint is not an oracle for which controllers are local.
+ *
+ * Provenance: the brief enters the brain as `delegator` material by
+ * construction — `inbox.ts`'s `provenanceOf` sees an Offer from an actor
+ * under this origin, which is ADR-0027's `localProvenance`: the operator is
+ * not a stranger to their own instance.
+ */
+function executeTask(instance: AfpInstance, options: ExecuteCommandOptions, brief: string): { [key: string]: JsonValue } {
+  const controller = instance.nameOf(options.by);
+  if (controller === null) return polite();
+
+  const spec = instance.specs.find((candidate) => candidate.name === options.agentName);
+  if (!spec) return polite();
+  const capability = options.capability ?? spec.capabilities[0];
+  if (!capability || !spec.capabilities.includes(capability)) return polite();
+
+  if (options.deadline !== undefined && Number.isNaN(Date.parse(options.deadline))) return polite();
+  const visibility = options.visibility ?? "parties";
+  if (!VISIBILITY_CLASSES.has(visibility)) return polite();
+
+  const published = instance.clock.now().toISOString();
+  const slug = taskSlug(options.by, brief, published);
+  const thread = options.thread ?? `${instance.config.origin}/threads/${slug}`;
+
+  const entry = instance.delegate({
+    from: controller,
+    to: options.agentName,
+    capability,
+    content: brief,
+    thread,
+    correlationId: slug,
+    ...(options.deadline !== undefined ? { deadline: options.deadline } : {}),
+    visibility: visibility as "public" | "hub" | "parties" | "internal",
+  });
+  return { task: entry.activityId, thread, correlationId: slug };
+}
+
+/**
  * `POST /agents/:name/command` — the local carrier for ADR-0029 Decision 2.
  * Shaped like `render/routes.ts`'s `renderingRoute`: one function `ap/server.ts`
  * calls, returning whether it handled the request, so the routing table
@@ -183,7 +258,7 @@ export async function commandRoute(instance: AfpInstance, read: ReadOptions, ctx
     ctx.send(200, polite());
   };
 
-  let body: { content?: unknown; thread?: unknown; actsOn?: unknown };
+  let body: { content?: unknown; thread?: unknown; actsOn?: unknown; capability?: unknown; deadline?: unknown; visibility?: unknown };
   try {
     body = JSON.parse(ctx.body || "{}");
   } catch {
@@ -192,6 +267,10 @@ export async function commandRoute(instance: AfpInstance, read: ReadOptions, ctx
   const content = typeof body.content === "string" ? body.content : "";
   const thread = typeof body.thread === "string" ? body.thread : undefined;
   const actsOn = typeof body.actsOn === "string" ? body.actsOn : undefined;
+  // ADR-0038 Decision 2: `task`'s optional structured fields beside the brief.
+  const capability = typeof body.capability === "string" ? body.capability : undefined;
+  const deadline = typeof body.deadline === "string" ? body.deadline : undefined;
+  const visibility = typeof body.visibility === "string" ? body.visibility : undefined;
 
   if (!read) {
     refuse("", "no read gate configured — every command request is anonymous");
@@ -228,13 +307,17 @@ export async function commandRoute(instance: AfpInstance, read: ReadOptions, ctx
     thread,
     actsOn,
     content,
+    capability,
+    deadline,
+    visibility,
   });
 
   // `executeCommand` itself falls back to the polite reply for an `approve`
-  // whose thread/policy will not admit it — logged the same way every other
-  // refusal on this route is.
+  // whose thread/policy will not admit it, or a `task` from a controller
+  // this instance does not hold / for a capability the agent does not
+  // advertise — logged the same way every other refusal on this route is.
   if ("reply" in result) {
-    instance.inbox.dropDelivery("polite-reply", "", requester.agent, "approve target not admissible");
+    instance.inbox.dropDelivery("polite-reply", "", requester.agent, `${command.command} target not admissible`);
   }
   ctx.send(200, result);
   return true;

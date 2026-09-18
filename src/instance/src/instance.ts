@@ -67,6 +67,13 @@ export interface AgentRegistration {
    * was always supposed to mean and never did.
    */
   signer?: Signer;
+  /**
+   * ADR-0038 Decision 1, `brain: "none"`: the instance holds this actor's
+   * key and roster seat, and nothing performs for it — a human controller's
+   * actor "under instance custody" (ADR-0029 Decision 2). An Offer addressed
+   * to it is `Reject`ed on the record by `inbox.ts`, never handed to `brain`.
+   */
+  held?: boolean;
 }
 
 export type ReceiveOutcome =
@@ -543,6 +550,11 @@ export class AfpInstance {
 
   isPaused(name: string): boolean {
     return this.pausedAgents.isPaused(name);
+  }
+
+  /** ADR-0038 Decision 1: a held actor — registered with `held: true`, nothing performs for it. */
+  isHeld(name: string): boolean {
+    return this.agents.get(name)?.held === true;
   }
 
   // ---------------------------------------------------------------- external
