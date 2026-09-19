@@ -23,8 +23,8 @@ export interface RenderingRouteContext {
   path: string;
   headers: RequestAuthHeaders & { "afp-membership-proof"?: string };
   accept: string;
-  send: (status: number, body: unknown, contentType?: string) => void;
-  notFound: () => void;
+  send: (status: number, body: unknown, contentType?: string) => Response;
+  notFound: () => Response;
   markUncacheable: () => void;
 }
 
@@ -54,12 +54,10 @@ async function admittedEntries(
   return admitted;
 }
 
-function respond(ctx: RenderingRouteContext, rendering: ReturnType<typeof renderThread>): void {
-  if (ctx.accept.includes("text/plain")) {
-    ctx.send(200, narrativeText(rendering), "text/plain; charset=utf-8");
-  } else {
-    ctx.send(200, rendering, "application/json");
-  }
+function respond(ctx: RenderingRouteContext, rendering: ReturnType<typeof renderThread>): Response {
+  return ctx.accept.includes("text/plain")
+    ? ctx.send(200, narrativeText(rendering), "text/plain; charset=utf-8")
+    : ctx.send(200, rendering, "application/json");
 }
 
 /**
@@ -67,7 +65,8 @@ function respond(ctx: RenderingRouteContext, rendering: ReturnType<typeof render
  * either way — success or 404) so `server.ts` falls through to its own
  * routes for everything else.
  */
-export async function renderingRoute(instance: AfpInstance, read: ReadOptions, ctx: RenderingRouteContext): Promise<boolean> {
+/** The response, or `null` for "not a rendering route" (ADR-0036 Decision 3). */
+export async function renderingRoute(instance: AfpInstance, read: ReadOptions, ctx: RenderingRouteContext): Promise<Response | null> {
   const threadMatch = ctx.path.match(/^\/threads\/([\w-]+)\/rendering$/);
   if (threadMatch) {
     const threadUrl = `${instance.config.origin}/threads/${threadMatch[1]}`;
@@ -76,22 +75,19 @@ export async function renderingRoute(instance: AfpInstance, read: ReadOptions, c
     const admitted = await admittedEntries(read, ctx, entries, () => instance.clock.now());
 
     if (admitted.length === 0) {
-      ctx.notFound();
-      return true;
+      return ctx.notFound();
     }
 
     const bundle = bundleInfoFor(instance.config.exportDir, threadUrl);
     const rendering = renderThread(admitted, { thread: threadUrl, bundle, now: instance.clock.now().toISOString() });
-    respond(ctx, rendering);
-    return true;
+    return respond(ctx, rendering);
   }
 
   const timelineMatch = ctx.path.match(/^\/agents\/([\w-]+)\/timeline$/);
   if (timelineMatch) {
     const name = timelineMatch[1];
     if (!instance.specs.some((spec) => spec.name === name)) {
-      ctx.notFound();
-      return true;
+      return ctx.notFound();
     }
     const actorUrl = instance.actorId(name);
     const entries = instance.outbox.byActor(actorUrl);
@@ -99,9 +95,8 @@ export async function renderingRoute(instance: AfpInstance, read: ReadOptions, c
     const admitted = await admittedEntries(read, ctx, entries, () => instance.clock.now());
 
     const rendering = renderTimeline(admitted, { actor: actorUrl, now: instance.clock.now().toISOString() });
-    respond(ctx, rendering);
-    return true;
+    return respond(ctx, rendering);
   }
 
-  return false;
+  return null;
 }

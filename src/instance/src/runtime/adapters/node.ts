@@ -46,11 +46,16 @@ async function writeResponse(response: Response, res: ServerResponse): Promise<v
     res.end();
     return;
   }
+  // `res.write` takes a `Uint8Array` as-is, so the chunk crosses without a
+  // copy. Streaming rather than buffering costs one reader promise per chunk
+  // and, for every response this codebase produces today, there is exactly
+  // one chunk — but it is what lets a future large artifact leave without
+  // being held whole in memory first.
   const reader = response.body.getReader();
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
-    res.write(Buffer.from(value));
+    res.write(value);
   }
   res.end();
 }
@@ -68,11 +73,17 @@ export function serveHandler(handler: Handler, origin: string): Server {
     handler(request, { address: req.socket.remoteAddress ?? "unknown" })
       .then(async (response) => {
         await writeResponse(response, res);
-        // A refused body was never read, so the sender may still be sending
-        // one. Closing the socket is what stopped it before the port existed
-        // (`req.destroy()` beside the 413) and is still the only way to stop
-        // it (ADR-0025 Decision 4).
-        if (response.status === 413) req.destroy();
+        // A handler that answered without reading the body leaves a sender
+        // still sending one, and the only way to stop it is to close the
+        // socket (ADR-0025 Decision 4). The old code did this beside the 413
+        // it had just written; keying on the status would make the adapter
+        // re-derive a fact it can observe directly, and would miss every
+        // other early refusal. The observable fact is "a body was announced
+        // and not drained" — both halves needed: `readableEnded` alone is
+        // false for a GET too, which carries no body to drain and whose
+        // socket must stay open for keep-alive.
+        const announcedBody = req.headers["content-length"] !== undefined || req.headers["transfer-encoding"] !== undefined;
+        if (announcedBody && !req.readableEnded) req.destroy();
       })
       .catch(() => {
         if (res.headersSent) {

@@ -19,6 +19,9 @@ import type { Store } from "../src/store/port.ts";
 import { AfpInstance } from "../src/instance.ts";
 import { loadConfig } from "../src/config.ts";
 import { createHandler } from "../src/ap/server.ts";
+import { serveHandler } from "../src/runtime/adapters/node.ts";
+import { jsonResponse, readCappedBody, TOO_LARGE, type Handler } from "../src/runtime/httpPort.ts";
+import { connect } from "node:net";
 import { workspace } from "./helpers.ts";
 
 /** A row with its prototype normalised — see the port's note on row shape. */
@@ -234,6 +237,53 @@ describe("ADR-0036 WP-2 — the request port's contract", () => {
       assert.ok(produced < 100, `the producer was stopped early, at ${produced} chunks — refused, not buffered`);
     } finally {
       instance.close();
+    }
+  });
+
+  it("G11: an oversized POST is answered 413 and the socket is closed, so the sender stops", async () => {
+    // ADR-0025 Decision 4's other half: the 413 answers the sender, and
+    // closing the socket is what stops it. Remove the `req.destroy()` in
+    // `serveHandler` and this case fails in seconds — the connection stays
+    // open on keep-alive with the body still arriving.
+    //
+    // What this case does NOT do is choose between the two conditions an
+    // adapter could destroy on, and the measurements are worth recording
+    // because both intuitions about them were wrong. Here `content-length`
+    // exceeds the cap, so `readCappedBody` refuses before touching the
+    // stream and `request.bodyUsed` is still **false** — meaning the
+    // tempting `!request.bodyUsed` would also close, correctly. On a chunked
+    // body the cap is only reached by reading, so `bodyUsed` is **true** and
+    // `!bodyUsed` would not close — but node closes that one itself, so a
+    // test of it would pass for a reason the adapter did not supply. The
+    // explicit condition stays because "node cleans up after a mid-stream
+    // refusal" is a property no hosted adapter inherits.
+    const handler: Handler = async (request) => {
+      const body = await readCappedBody(request, 64);
+      return body === TOO_LARGE ? jsonResponse(413, { error: "payload too large" }) : jsonResponse(200, { ok: true });
+    };
+    const server = serveHandler(handler, "http://127.0.0.1");
+    await new Promise<void>((resolve) => server.listen(0, resolve));
+    const { port } = server.address() as { port: number };
+
+    try {
+      const { status, closed } = await new Promise<{ status: string; closed: boolean }>((resolve, reject) => {
+        const socket = connect(port, "127.0.0.1", () => {
+          socket.write(`POST / HTTP/1.1\r\nHost: x\r\nContent-Length: 100000\r\nConnection: keep-alive\r\n\r\n`);
+          socket.write("x".repeat(4096));
+        });
+        let received = "";
+        socket.on("data", (chunk) => {
+          received += String(chunk);
+        });
+        socket.on("close", () => resolve({ status: received.split("\r\n")[0], closed: true }));
+        socket.on("error", reject);
+        setTimeout(() => resolve({ status: received.split("\r\n")[0], closed: false }), 3000).unref();
+      });
+
+      assert.match(status, /^HTTP\/1\.1 413 /, "the cap answered");
+      assert.ok(closed, "the server closed the connection — a keep-alive here leaves the sender still sending");
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
     }
   });
 });

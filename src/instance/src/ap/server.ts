@@ -181,14 +181,6 @@ export function createHandler(instance: AfpInstance, options: ServerOptions = {}
       extra["Vary"] = "Signature";
     };
 
-    // `healthRoute` and `renderingRoute` answer through a `send` callback and
-    // report whether they handled the path. Capturing what they sent keeps
-    // their contract untouched while still producing one Response here.
-    let captured: Response | null = null;
-    const capture = (status: number, body: unknown, contentType?: string): void => {
-      captured = send(status, body, contentType);
-    };
-
     // ADR-0028 Decision 3: a webhook initiator's own door, capped and
     // signature-checked the same way the inbox is, ahead of it so it never
     // falls through to the inbox's activity-shaped parsing.
@@ -278,27 +270,23 @@ export function createHandler(instance: AfpInstance, options: ServerOptions = {}
     try {
       // ADR-0031 Decision 2: health/readiness/metrics — unauthenticated,
       // ahead of every gated route, the same shape as `renderingRoute`.
-      if (options.health && (await healthRoute(instance, options.health, { path, send: capture, noStore: () => { extra["Cache-Control"] = "no-store"; } }))) {
-      return captured ?? notFound();
-      }
+      const health = options.health
+        ? await healthRoute(instance, options.health, { path, send, noStore: () => { extra["Cache-Control"] = "no-store"; } })
+        : null;
+      if (health) return health;
 
       // ADR-0029 Decision 2 ("Watch"): renderings, gated identically to the
       // outbox/artifact routes above — same `authorizeRead` call, same
       // `markUncacheable`, same `onGrantedFetch` on a grant-admitted fetch.
-      if (
-      await renderingRoute(instance, options.read, {
+      const rendered = await renderingRoute(instance, options.read, {
         path,
         headers: readHeaders,
         accept: acceptHeader,
-        send: capture,
-        notFound: () => {
-          captured = notFound();
-        },
+        send,
+        notFound,
         markUncacheable,
-      })
-      ) {
-      return captured ?? notFound();
-      }
+      });
+      if (rendered) return rendered;
 
       // `/actor`, `/roster`, `/agents/:name`, `/afp/policy`
       // stay unauthenticated forever (Decision 2, the bootstrap invariant):

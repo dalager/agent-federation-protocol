@@ -33,7 +33,8 @@ export interface HealthDeps {
 
 export interface HealthRouteContext {
   path: string;
-  send: (status: number, body: unknown, contentType?: string) => void;
+  /** Builds the response, applying whatever headers the caller has collected. */
+  send: (status: number, body: unknown, contentType?: string) => Response;
   /** Sets `Cache-Control: no-store` on the response before `send`. */
   noStore: () => void;
 }
@@ -67,26 +68,23 @@ async function checkReady(instance: AfpInstance, deps: HealthDeps): Promise<{ ok
   return { ok: true };
 }
 
-/** Returns whether it handled the request — `false` means "not a health route". */
-export async function healthRoute(instance: AfpInstance, deps: HealthDeps, ctx: HealthRouteContext): Promise<boolean> {
+/** The response, or `null` for "not a health route" (ADR-0036 Decision 3). */
+export async function healthRoute(instance: AfpInstance, deps: HealthDeps, ctx: HealthRouteContext): Promise<Response | null> {
   if (ctx.path === "/healthz") {
     ctx.noStore();
-    ctx.send(200, "ok", "text/plain");
-    return true;
+    return ctx.send(200, "ok", "text/plain");
   }
 
   if (ctx.path === "/readyz") {
     const result = await checkReady(instance, deps);
     ctx.noStore();
-    ctx.send(result.ok ? 200 : 503, result.ok ? { ok: true } : { ok: false, reason: result.reason }, "application/json");
-    return true;
+    return ctx.send(result.ok ? 200 : 503, result.ok ? { ok: true } : { ok: false, reason: result.reason }, "application/json");
   }
 
   if (ctx.path === "/metrics") {
     ctx.noStore();
-    ctx.send(200, renderMetrics(), "text/plain; version=0.0.4");
-    return true;
+    return ctx.send(200, renderMetrics(), "text/plain; version=0.0.4");
   }
 
-  return false;
+  return null;
 }

@@ -386,6 +386,59 @@ that used to sit beside the 413 is now the node adapter's, on seeing that
 status: the sender may still be sending, and closing is still the only way to
 stop it.
 
+**Cleanup pass, same day.** A review of the landed port found three things,
+and the largest was one WP-2 created rather than inherited.
+
+- **The route protocol is `Response | null` now, not a `send` callback plus a
+  boolean.** `healthRoute`, `renderingRoute` and `commandRoute` used to answer
+  by calling a `send` callback and returning "did I handle it", which was the
+  right shape when the caller owned a `ServerResponse` and the callee could
+  only write to it. Once everything returns Responses it stopped being right:
+  the caller had to keep a mutable `captured`, hand in a `capture` wrapper,
+  and end with `captured ?? notFound()` — a fallback that could not fire,
+  because every `return true` in those files is preceded by a send, but that
+  read as load-bearing. Returning the Response deletes the mutable, the
+  wrapper and both dead fallbacks at four call sites. The callback survives
+  only as the *constructor* of the response (`ctx.send(...)` still applies the
+  caller's collected headers), which is the part that genuinely belongs to
+  the caller.
+- **The adapter no longer keys on a status code.** It closed the socket when
+  it saw a 413, which re-derived a fact it can observe: the handler answered
+  without draining a body the sender announced, and that sender is still
+  sending. `content-length`/`transfer-encoding` present and `readableEnded`
+  false is the general form, and it covers every early refusal rather than
+  the one status that happened to have a test. `test/adr0036.test.ts` G11
+  pins the behaviour — delete the close and it fails in seconds.
+
+  Two wrong turns on the way, both recorded because each was plausible.
+  `!readableEnded` alone also holds for a GET, which carries no body to
+  drain, and destroying those sockets broke keep-alive across the whole
+  suite. And the reviewer's suggested general form, `!request.bodyUsed`, is
+  not the invariant either: `bodyUsed` means the body was *disturbed*, not
+  *drained*. Measured on both paths — a `content-length` over the cap is
+  refused before the stream is touched, so `bodyUsed` is false and that
+  condition would close correctly; on a chunked body the cap is only reached
+  by reading, so `bodyUsed` is true and it would *not* close. That second
+  case does not show up as a failing test, because node closes the
+  connection itself there. Which is the actual reason to keep the explicit
+  condition: "node cleans up after a mid-stream refusal" is incidental
+  behaviour of one runtime, and a hosted actor's adapter inherits none of
+  it.
+- `ports/command.ts` was pre-stringifying a body that `jsonResponse` would
+  have stringified identically, and the node adapter copied every chunk
+  through `Buffer.from` when `res.write` takes a `Uint8Array` as it is.
+
+Two findings were **skipped**. The adapter builds a `Headers` from every
+inbound header while the handler reads about eight of them by name, which is
+a real per-request cost the old plain-object access did not have — but the
+port's whole value is that a handler receives a *standard* `Request`, and a
+lazy header wrapper would hand the node profile something a hosted actor's
+fetch method would never hand it. The two adapters differing in what they
+pass is a worse defect than the allocation. And `tools/signer/server.ts`
+keeps its own hand-rolled body read and JSON send: it is ADR-0026's separate
+mTLS admin surface, not this instance's public door, and folding it into this
+port would enlarge the port's claim rather than the signer's safety.
+
 `runtime/shutdown.ts` stays node-only and now says why in its header — a
 hosted actor has no process to drain, no signals to trap and no socket to stop
 accepting on, so the request port says nothing about shutdown and a second

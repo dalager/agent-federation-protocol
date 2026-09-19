@@ -34,7 +34,7 @@ export interface CommandRouteContext {
   headers: RequestAuthHeaders;
   /** Raw request body bytes — what the POST signature's content-digest covers. */
   body: string;
-  send: (status: number, body: unknown) => void;
+  send: (status: number, body: unknown) => Response;
 }
 
 type ReadOptions = ReadGateDeps | undefined;
@@ -264,23 +264,22 @@ function executeTask(instance: AfpInstance, options: ExecuteCommandOptions, brie
  * write into the operator's store with, and it proves only that somebody
  * asked. The rate limiter bounds the asking; nothing records it.
  */
-export async function commandRoute(instance: AfpInstance, read: ReadOptions, ctx: CommandRouteContext): Promise<boolean> {
+export async function commandRoute(instance: AfpInstance, read: ReadOptions, ctx: CommandRouteContext): Promise<Response | null> {
   // ADR-0039 Decision 1: the instance actor's own command port, addressed
   // where the acting actor is. Same authorization, same polite refusal; a
   // typed body instead of the grammar (Decision 2).
   if (ctx.path === "/actor/command") return actorCommandRoute(instance, read, ctx);
 
   const match = ctx.path.match(/^\/agents\/([\w-]+)\/command$/);
-  if (!match) return false;
+  if (!match) return null;
   const name = match[1];
   if (!instance.specs.some((spec) => spec.name === name)) {
-    ctx.send(404, { error: "not found" });
-    return true;
+    return ctx.send(404, { error: "not found" });
   }
 
-  const refuse = (actor: string, reason: string): void => {
+  const refuse = (actor: string, reason: string): Response => {
     if (actor) instance.inbox.dropDelivery("polite-reply", "", actor, reason);
-    ctx.send(200, polite());
+    return ctx.send(200, polite());
   };
 
   let body: { content?: unknown; thread?: unknown; actsOn?: unknown; capability?: unknown; deadline?: unknown; visibility?: unknown; attachments?: unknown };
@@ -305,19 +304,16 @@ export async function commandRoute(instance: AfpInstance, read: ReadOptions, ctx
       : ["malformed"];
 
   if (!read) {
-    refuse("", "no read gate configured — every command request is anonymous");
-    return true;
+    return refuse("", "no read gate configured — every command request is anonymous");
   }
 
   const auth = await authorizeRead(read, { path: ctx.path, headers: ctx.headers, method: "POST", body: ctx.body });
   const requester = auth.requester;
   if (!requester) {
-    refuse("", "no verifying signature — anonymous");
-    return true;
+    return refuse("", "no verifying signature — anonymous");
   }
   if (!isAuthorizedController(requester.agent, { controllers: instance.policy.controllers ?? [] })) {
-    refuse(requester.agent, `${requester.agent} is not an authorized controller`);
-    return true;
+    return refuse(requester.agent, `${requester.agent} is not an authorized controller`);
   }
 
   const agentActorUrl = instance.actorId(name);
@@ -328,8 +324,7 @@ export async function commandRoute(instance: AfpInstance, read: ReadOptions, ctx
   // on. `approve` names no one in its text (bare `approve`), so its target
   // is `agentActorUrl` by construction and never fails this check.
   if (!command || (command.command !== "approve" && command.target !== name)) {
-    refuse(requester.agent, "unparseable or misdirected command");
-    return true;
+    return refuse(requester.agent, "unparseable or misdirected command");
   }
 
   const result = await executeCommand(instance, {
@@ -352,8 +347,7 @@ export async function commandRoute(instance: AfpInstance, read: ReadOptions, ctx
   if ("reply" in result) {
     instance.inbox.dropDelivery("polite-reply", "", requester.agent, `${command.command} target not admissible`);
   }
-  ctx.send(200, result);
-  return true;
+  return ctx.send(200, result);
 }
 
 /** `true` for a `POST` on `/agents/:name/command` — `ap/server.ts`'s one-line dispatch check, mirrored on `matchWebhookRoute`'s shape. */
@@ -369,25 +363,22 @@ export function matchCommandRoute(method: string, path: string): boolean {
  * validated whole before anything is published, and four verbs that act on
  * the instance rather than on an agent.
  */
-async function actorCommandRoute(instance: AfpInstance, read: ReadOptions, ctx: CommandRouteContext): Promise<boolean> {
-  const refuse = (actor: string, reason: string): void => {
+async function actorCommandRoute(instance: AfpInstance, read: ReadOptions, ctx: CommandRouteContext): Promise<Response | null> {
+  const refuse = (actor: string, reason: string): Response => {
     if (actor) instance.inbox.dropDelivery("polite-reply", "", actor, reason);
-    ctx.send(200, polite());
+    return ctx.send(200, polite());
   };
 
   if (!read) {
-    refuse("", "no read gate configured — every command request is anonymous");
-    return true;
+    return refuse("", "no read gate configured — every command request is anonymous");
   }
   const auth = await authorizeRead(read, { path: ctx.path, headers: ctx.headers, method: "POST", body: ctx.body });
   const requester = auth.requester;
   if (!requester) {
-    refuse("", "no verifying signature — anonymous");
-    return true;
+    return refuse("", "no verifying signature — anonymous");
   }
   if (!isAuthorizedController(requester.agent, { controllers: instance.policy.controllers ?? [] })) {
-    refuse(requester.agent, `${requester.agent} is not an authorized controller`);
-    return true;
+    return refuse(requester.agent, `${requester.agent} is not an authorized controller`);
   }
 
   let body: unknown;
@@ -398,17 +389,14 @@ async function actorCommandRoute(instance: AfpInstance, read: ReadOptions, ctx: 
   }
   const parsed = parseHubCommand(body);
   if ("refuse" in parsed) {
-    refuse(requester.agent, parsed.refuse);
-    return true;
+    return refuse(requester.agent, parsed.refuse);
   }
 
   const result = executeHubCommand(instance, parsed.command);
   if ("refuse" in result) {
-    refuse(requester.agent, result.refuse);
-    return true;
+    return refuse(requester.agent, result.refuse);
   }
-  ctx.send(200, result);
-  return true;
+  return ctx.send(200, result);
 }
 
 /**
@@ -424,17 +412,8 @@ export async function handleCommandPost(instance: AfpInstance, read: ReadOptions
   if (raw === TOO_LARGE) return jsonResponse(413, { error: "payload too large" });
   const body = new TextDecoder().decode(raw);
 
-  // `commandRoute` answers through a `send` callback rather than by
-  // returning, because it decides mid-flight whether it handled the path at
-  // all. Capturing what it sent keeps that contract and still hands one
-  // Response back to the port.
-  let answer: Response | null = null;
-  const send = (status: number, respBody: unknown): void => {
-    answer = jsonResponse(status, JSON.stringify(respBody, null, 2));
-  };
-
   try {
-    const handled = await commandRoute(instance, read, {
+    const answer = await commandRoute(instance, read, {
       path,
       headers: {
         host: request.headers.get("host") ?? "",
@@ -445,11 +424,10 @@ export async function handleCommandPost(instance: AfpInstance, read: ReadOptions
         signature: request.headers.get("signature") ?? "",
       },
       body,
-      send,
+      send: jsonResponse,
     });
-    if (!handled) return jsonResponse(404, { error: "not found" });
+    return answer ?? jsonResponse(404, { error: "not found" });
   } catch {
     return jsonResponse(500, { error: "internal" });
   }
-  return answer ?? jsonResponse(500, { error: "internal" });
 }
