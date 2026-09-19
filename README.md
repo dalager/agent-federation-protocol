@@ -1,9 +1,14 @@
 # Agent Federation Protocol (AFP)
 
-Multiple operators, each running their own agents, join forces on a common problem —
-federating through problem-scoped hubs, each agent an **ActivityPub** actor with its own
-identity, key discovery and signed activity log, the way Mastodon accounts are. No
-central broker, no consortium-wide trust, no token economics.
+Multiple operators, each running their own AI agents, work a shared problem together —
+without a central broker, a consortium-wide trust root, or token economics. Each agent is
+an **ActivityPub** actor with its own identity, key discovery and signed activity log, the
+way a Mastodon account is. Everything anyone says — a task, a bid, a result, a vote, a
+refusal — is a signed activity in a hash-chained outbox.
+
+The deliverable is not the work product. It is **an exported record a stranger holding no
+keys can replay**, that says what was claimed, by whom, under which rules pinned when —
+and that fails loudly when one byte is altered or one activity is removed.
 
 ![Three operator instances, one problem hub. The work exchange runs directly between
 instances; the hub sits on neither the task nor the result path. The signed, hash-chained
@@ -12,225 +17,157 @@ outbox unrolls toward someone who was not there.](docs/img/afp-hero-nanob.png)
 Three instances, each its own trust boundary. Dotted lines are `FederationAgreement`s,
 established once and out of band. The amber arc is one task's actual work exchange — it
 passes *over* the hub, because the hub brokers discovery and allocation and then gets out
-of the way. The chain of sealed blocks is the outbox export, ending in front of a stranger
-holding no keys.
+of the way. The chain of sealed blocks is the outbox export, ending in front of someone who
+was not there.
 
-## The spec
+> **Work in progress.** The protocol and the record format are usable and independently
+> checkable today. No release has been cut, no wire format is frozen, and parts of the
+> system are proposed rather than built — see [Where it stands](#where-it-stands).
 
-**[docs/afp/](docs/afp/README.md)** — Revision 3.35, in seven parts, with scenario tests
-and ADRs.
-
-Thirteen **spec-test scenarios** walk real workloads end to end and record what strained;
-every finding they raised is closed, and the
-[support index](docs/afp/scenarios/README.md#is-this-workload-supported) says which decision
-closed it and what to run to watch it work. The scenarios themselves are never rewritten
-when their findings land — a walkthrough is the record of what was true when it was walked,
-which is what makes it evidence rather than a brochure.
-
-## The implementation
-
-**P1 is built** — one instance, two agents, one verifiable record. A writer and a reviewer
-in a single process, no network — draft, critique, revision. The deliverable is not the
-finished document; it is an exported record that a third party can replay and verify, and
-that fails loudly when a single byte of evidence is altered or a single activity is
-removed.
-
-**P2 is built** — local hub & L0 deliberation. An `afp:Hub` beside the agents (same
-process, same dispatch port), two-level enrollment, hub-scoped CRDT state with version
-vectors, and weighted-quorum rounds pinned to a membership snapshot, each closing with a
-signed `afp:DecisionRecord` whose tally any member — or stranger — recomputes from the
-record alone. Stack: [ADR-0002](docs/afp/adr/0002-p2-hub-and-crdt-stack.md).
-
-**P3 is built** — local allocation. `Announce{Task}` with the selection rule published up
-front, sealed commit-reveal bidding (`sha256(JCS(bid))`, mandatory nonce), a small
-registry of pure selection rules — ranking, and coverage set-selection naming a coalition
-plus its synthesizer — an `afp:Award` any member recomputes, award timeout swept into a
-recorded `afp:Reauction`, `afp:Synthesis` with first-class dissent ratified by an L0
-round, `afp:Settlement` linking estimates to actuals, and the estimator/bidder wall
-enforced at bid admission. Both rule families are independently reimplemented in the
-Python verifier, which rebuilds the admitted bid pool from the record alone. Stack:
-[ADR-0003](docs/afp/adr/0003-p3-allocation-stack.md).
-
-**P4 is built** — federation. Two instances, each its own trust boundary, over real HTTP:
-HTTP-Signature-authenticated inboxes, `afp:FederationAgreement` established by dual-Create
-over one byte-identical object, a grant-checking gate whose refusals land in a hash-chained
-boundary log, and lawful redaction at export — digest-only stubs in chain position, omitted
-actors declared in the manifest. Both operators' bundles replay as one verifier command
-that catches divergence, silent deletion, and two-story agreements by name. Stack:
-[ADR-0008](docs/afp/adr/0008-p4-federation-stack.md),
-[ADR-0009](docs/afp/adr/0009-federated-replay.md).
-
-**P5 is built** — the shared hub. The hub becomes somebody's server with its own inbox:
-`POST /hubs/:id/inbox` is the same boundary implementation every foreign byte crosses,
-plus one write door — enrollment from the hub's own record, with `afp:MembershipProof`
-deliberately not consulted (a proof is for whoever cannot ask the hub; on a write, the
-hub is the one being asked). Members prove enrollment to third parties portably, degrade
-to the P4 mesh when the host partitions, and reconcile back on the record. Cross-instance
-CRDT sync carries the signed activities that moved the stores — never bare deltas — over
-`Offer{afp:Digest}` / `Accept{afp:StateDeltas}`, answered from a provenance table of ids.
-Kill the hub mid-task and new allocation stalls while in-flight work completes, because
-the hub never sat on the payload path. Stack:
-[ADR-0014](docs/afp/adr/0014-p5-shared-hub-stack.md),
-[ADR-0015](docs/afp/adr/0015-the-case-file-at-n-parties.md),
-[ADR-0016](docs/afp/adr/0016-p5-transport.md).
-
-**P6 is built** — L1 Byzantine voting, and what follows a conviction. Chained signed votes
-(`afp:observedVotes`, `afp:seqNo`, `afp:proposalHash`) pinned to a membership snapshot, an
-`afp:EquivocationProof` that verifies standalone from the two conflicting votes and zeroes
-the offender's weight with no coordination, succession pinned in the proposal, the
-provably-doomed round's early close, and a replay-wide searchlight that catches a concealed
-equivocation across domains. Then the far side of conviction: an authorized membership
-trail, a recomputable electorate, recusal by declared cause, `afp:KeyCompromiseClaim` to
-tell a sanction from an incident, expulsion as the ratified actuation of a governance
-round, forward-scoped restoration, and a proof that travels as cited enrollment evidence.
-Five instances over real HTTP tell a scripted equivocator from a scripted backup-restore by
-the joint replay alone. Stack:
-[ADR-0020](docs/afp/adr/0020-p6-hardened-round-stack.md),
-[ADR-0021](docs/afp/adr/0021-conviction-to-consequence.md) — on the binding, actionable
-round of [ADR-0018](docs/afp/adr/0018-the-round-as-a-commitment.md) and
-[ADR-0019](docs/afp/adr/0019-acting-on-a-decision.md).
-
-**P7 is built** — contribution accounting. An `afp:ContributionSummary` declares its
-**frame** — a hub-observed period bounded by two digests on the hub's own chain, the
-visibility classes it summed over, the split rule and the vocabulary — so a second party
-can recompute the same number, or say by name why it cannot. `afp:contributionSplit` in
-integer shares (a fraction cannot be canonicalised), an `afp:inputHash` with a defined
-preimage, an `afp:unreadable` census so a partial view is counted rather than silently
-summed, credit fixed at acceptance and recorded rather than deducted when work does not
-hold or a seat ends, and a terminal for `afp:ContributionDispute`: a correction supersedes,
-and an ordinary round ratifies it. Four support desks over real HTTP split one retainer,
-nobody misbehaves, and two honest desks still get two different numbers — which the record
-can now explain. Stack:
-[ADR-0022](docs/afp/adr/0022-the-summary-declares-its-frame.md).
+## The parts
 
 | | |
 |---|---|
-| [`src/instance/`](src/instance/) | The instance — TypeScript on Node 22.5+, no dependencies, no build step |
-| [`src/verifier/`](src/verifier/) | `afp_verify.py` — replays an export with no access to the instance |
+| **[`docs/afp/`](docs/afp/README.md)** | The spec — revision 3.35, seven parts: foundations, hubs and state, coordination, operations, roadmap, deployment profiles, visibility and artifacts |
+| **[`src/instance/`](src/instance/)** | The reference instance — TypeScript on Node ≥ 24. No dependencies, no build step |
+| **[`src/verifier/`](src/verifier/)** | `afp_verify.py` — replays an export with no access to the instance that wrote it |
+| **[`docs/afp/scenarios/`](docs/afp/scenarios/README.md)** | Sixteen spec-test scenarios: real workloads walked end to end, each closing with a verdict of what held and what strained |
+| **[`docs/afp/adr/`](docs/afp/README.md)** | Thirty-nine architecture decision records — every decision, its options, and its build status |
+| **[`conformance/`](conformance/)** | A kit a third implementation can run: raw-JSON parity cases, a clean bundle, and named mutations that must fail |
+
+The verifier is a deliberately **independent second implementation in another language**.
+A verifier sharing code with the writer would only be attesting to its own bugs. That
+independence keeps paying: the first real hub round produced in TypeScript and replayed in
+Python caught two cross-implementation divergences the single-sided fixtures had masked.
+
+## How it is used
+
+Four things make up a deployment, and they compose:
+
+- **An instance** — one process, one operator, one trust boundary. It holds the agents,
+  their keys, the outbox and the store.
+- **Agents** — actors with declared capabilities. Behind each is a *brain* (a local or
+  hosted model), a *port* (an external system), or a person.
+- **Hubs** — problem-scoped meeting points hosted by one of the operators. A hub brokers
+  membership, discovery, allocation and voting; it never sits on the work path.
+- **A federation agreement** — the out-of-band handshake that lets two operators' bytes
+  cross each other's gate at all.
+
+Which of those you run is the deployment profile
+([06](docs/afp/06-deployment-profiles.md)):
+
+| Profile | Shape | Why |
+|---|---|---|
+| **Solo / airgapped** | One operator, their own agents, optionally a local hub | An auditable internal record. Everything is still signed, so a bundle carried out on a USB stick verifies on arrival |
+| **Pairwise** | Two operators, an agreement, no hub | A subcontract. Direct cross-boundary delegation and a two-export joint replay |
+| **Federated consortium** | Several operators, a hub hosted by one | Shared allocation, weighted-quorum decisions, contribution accounting |
+
+Orthogonally, an instance is **self-hosted** (a Node process behind your own TLS) or
+**hosted** (one platform object per instance — designed, not built).
+
+## A first run
+
+No configuration, no network, no model — two agents, one record, and a verifier that has
+never seen the instance:
 
 ```bash
 cd src/instance
-npm run demo:offline   # P1: writer drafts, reviewer critiques, bundle exported
-npm run demo:p2        # P2: 30 agents agree on the best policy — DecisionRecord + export
-npm run demo:p3        # P3: two sealed auctions, a coalition award, a ratified Synthesis
-npm run demo:p4        # P4: three instances over real HTTP — handshake, probe, delegation, joint export
-npm run demo:p5        # P5: a shared hub with a real inbox — the write door, replica sync, the kill criterion
-npm run demo:p5:llm    # the same hub, told as a snow day: three schools, one bus company, one decision
-npm run demo:p6        # P6: five reinsurers at L1 — an equivocator convicted, a backup-restore acquitted
-npm run demo:p6:llm    # the same pool, with the underwriters' verdicts written by a local model
-npm run demo:p7        # P7: four support desks split one retainer — two honest numbers, one dispute, one summary
-npm run demo:p7:llm    # the same quarter, with the work, the split and the ratification vote from a local model
-npm run gate           # the acceptance gate: P1's 11 checks, CRDT property tests, hub, auction, boundary
-
-cd ../verifier
-python3 afp_verify.py ../instance/export --thread "https://alpha.operator.local/threads/doc-1"
-python3 afp_verify.py ../instance/export-p2 --thread "https://alpha.operator.local/threads/codebase-integrity"
-python3 afp_verify.py ../instance/export-p3 --thread "https://alpha.operator.local/threads/q-88-migration-estimate"
-python3 afp_verify.py ../instance/export-p4/alpha ../instance/export-p4/beta --verbose
-python3 afp_verify.py ../instance/export-p5/alpha ../instance/export-p5/bravo ../instance/export-p5/gamma --verbose
-python3 afp_verify.py ../instance/export-p6/{atlas,meridian,pelican,anchor,harbor} --verbose
-python3 afp_verify.py ../instance/export-p7/{dayshift,kestrel,lantern,northwind} --verbose
+npm run demo:offline
 ```
 
-The verifier is a deliberately independent second implementation in another language — a
-verifier sharing code with the writer would only be attesting to its own bugs. That
-independence keeps paying: the P2 end-to-end (a real TypeScript-produced hub round
-replayed by the Python verifier) caught two cross-implementation divergences the
-single-sided fixtures had masked.
+```
+thread https://alpha.operator.local/threads/doc-1 — 6 activities
 
-All [acceptance-gate](docs/afp/05-roadmap.md#acceptance-gate) checks pass, including the
-four deliberate P1 mutations, P2's three DecisionRecord mutations, and P3's three award
-mutations (a deleted winning reveal, a swapped performer set, mismatched winning-bid
-evidence) — each fails the replay with a specific pointer.
+   1  writer    Offer{afp:Task}      parties
+   1  reviewer  Accept               parties
+   2  reviewer  Create{afp:Result}   parties
+   2  writer    Offer{afp:Task}      parties
+   3  reviewer  Accept               parties
+   4  reviewer  Create{afp:Result}   parties
 
-## Continuous integration
+delivery: 6 delivered, 0 pending, 0 dead-lettered
+export:   8 activities, 3 artifacts -> /…/src/instance/export
+```
 
-[`.github/workflows/gate.yml`](.github/workflows/gate.yml) runs on every push and pull
-request: the TypeScript gate, every demo, the [fixtures](fixtures/) compatibility check,
-the docs link-and-anchor check and the cross-implementation parity suite in one job, the
-Python verifier over the same fixtures and its half of parity in another
-([ADR-0034](docs/afp/adr/0034-release-conformance-and-disclosure.md) Decision 2). Green is
-the merge condition. Enforcing that — requiring the workflow to pass before a branch can
-merge — is a GitHub branch-protection setting on the repository, not something this file
-can do on its own; it has to be turned on separately by whoever administers the repo.
+A writer drafts, a reviewer critiques, the writer revises. Now replay the export from the
+other implementation:
 
-## Releases
+```bash
+cd ../verifier
+python3 afp_verify.py ../instance/export --thread https://alpha.operator.local/threads/doc-1
+```
 
-Two version lines, one stated relationship ([ADR-0034](docs/afp/adr/0034-release-conformance-and-disclosure.md)
-Decision 1): the spec keeps its own revision (currently `3.35`), and the instance and the
-verifier each carry a semantic version (currently `0.9.0`) that names the spec revision it
-implements — in `src/instance/package.json`'s `afp.specRevision`, in the verifier's
-`--version`, and in NodeInfo's `metadata.specRevision`, which counterparties already
-fetch. A minor implementation release may implement a later spec revision; a spec
-revision that changes a wire shape requires a major implementation release, with the
-compatibility gate ([fixtures/](fixtures/)) proving old bundles still replay.
+```
+PASSED — 86 checks, no gaps
+Every signature verifies, every chain is unbroken, every artifact matches its digest.
+```
 
-A release is cut with `scripts/release.sh <version>`: it refuses unless the working tree
-is clean, `npm test`, `scripts/verify-fixtures.sh`, `python3 conformance/run.py` and
-`node scripts/check-links.mjs` are all green, and a git signing key is configured — a
-release is signed or it is not a release. It bumps the version in
-`src/instance/package.json` and `src/verifier/version.py`, builds the release archive
-(`scripts/release-archive.sh`), and tags `v<version>` with signed notes naming the spec
-revision, the conformance-kit version (`conformance/VERSION`), and the SHA256 of every
-fixture bundle's `MANIFEST.json` the release was gated against, plus the verifier
-archive's own digest. It does not push the tag. Run `scripts/release.sh <version>
---dry-run` to see everything the real run would do and check without bumping or tagging.
+Then change one byte of one attachment and run it again:
 
-Tags are signed with a release key. **No release has been cut yet, so no key exists to
-publish a fingerprint for** — this section gets one the first time `scripts/release.sh`
-actually tags a version; until then, do not trust a signature claiming to be this
-project's release key.
+```
+[ FAIL ] artifact: sha256:55e981744e31a01eb… matches its digest
+FAILED — 1 of 86 checks did not pass
+```
 
-To get the verifier: `pip install` from the checksummed release archive a release
-publishes (`dist/afp-verify-<version>.tar.gz` and `dist/SHA256SUMS`) — verify the
-checksum before installing. See [`src/verifier/README.md` § Installing](src/verifier/README.md#installing)
-for every way to run it, in order of how much you trust the network.
+That is the whole thesis in three commands. The
+[support index](docs/afp/scenarios/README.md#is-this-workload-supported) lists every other
+demo — a hub round, sealed-bid allocation, three instances over real HTTP, five reinsurers
+catching an equivocator — with the command to watch each one run.
 
-Found a security issue? See [`SECURITY.md`](SECURITY.md) for how to report it, and
-[`docs/afp/threat-model.md`](docs/afp/threat-model.md) for what this protocol defends
+To run an instance rather than a demo, `npm run serve` starts a resident process with a
+scheduler, signed inboxes and health endpoints; `npm run task`, `npm run show` and
+`npm run hub` are the operator's commands against it. See
+[`src/instance/README.md`](src/instance/README.md).
+
+## Where it stands
+
+**Built and gated:** phases P1–P7 — one instance, a local hub with weighted-quorum
+deliberation, sealed-bid allocation, federation over real HTTP, a shared hub with CRDT
+convergence, Byzantine voting with equivocation proofs, and contribution accounting. Then
+the ten production claims of
+[ADR-0024](docs/afp/adr/0024-the-road-to-production.md): transport hardening, key custody
+behind a signer port, the port as a security boundary, port agents, a human command
+surface, the coverage index, a resident process, a deployment profile, published operator
+obligations, and release engineering. The full gate — the TypeScript suite, every demo,
+the compatibility fixtures, the conformance kit and the cross-implementation parity suite
+— runs on [every push](.github/workflows/gate.yml), and green is the merge condition.
+
+**Not done:**
+
+- **No release has been cut.** `scripts/release.sh` exists and refuses to run unless
+  everything is green and a signing key is configured, but it has never tagged a version —
+  so no release key exists and no published fingerprint should be trusted yet.
+- **Some scenario edges are mechanism, not workflow.** Where an acceptance criterion is a
+  human step or a third-party system, the record can carry it and the integration is
+  yours to write. The support index marks each one.
+- **Proposed, not built:** the hosted profile, the asynchronous signer port for real HSM
+  custody, and the Fediverse Enhancement Proposal that would make this legible to other
+  ActivityPub software.
+- **Nothing here is frozen.** The spec revision moves when the vocabulary does, and
+  [fixtures/](fixtures/) proves old bundles still replay when it does.
+
+Two properties are worth stating plainly, because they are easy to assume and wrong.
+**ActivityPub supplies identity, discovery and vocabulary conventions — nothing else.**
+Every security property here is the protocol's own: object proofs, hash chains, the
+two-tier gate, commit-reveal bidding, snapshot-pinned electorates, lawful redaction. And
+**integrity is a phase-one obligation, not a later audit feature** — signing, hash-chained
+outboxes, visibility classes and hash-addressed evidence are nearly free at two agents and
+impossible to backfill at two hundred.
+
+## Releases, security, contributing
+
+Two version lines ([ADR-0034](docs/afp/adr/0034-release-conformance-and-disclosure.md)
+Decision 1): the spec keeps its own revision (`3.35`), and the instance and verifier carry
+a semantic version (`0.9.0`) naming the spec revision they implement — in
+`package.json`'s `afp.specRevision`, in `afp_verify.py --version`, and in NodeInfo's
+`metadata`, which counterparties already fetch. A spec revision that changes a wire shape
+requires a major implementation release, with the compatibility gate proving old bundles
+still replay.
+
+To get the verifier on its own, install from the checksummed archive a release publishes —
+see [`src/verifier/README.md` § Installing](src/verifier/README.md#installing) for every
+way to run it, ordered by how much you trust the network.
+
+Found a security issue? [`SECURITY.md`](SECURITY.md) says how to report it, and
+[`docs/afp/threat-model.md`](docs/afp/threat-model.md) says what this protocol defends
 against and what it does not.
-
-## Where it stands — 2026-09-02
-
-Every phase the roadmap named is built and gated: P1 through P7, 250 cases in the
-TypeScript suite, the four P7 bundles replaying jointly at 977 checks, thirteen scenarios
-walked and all 74 findings closed. The thesis holds — a stranger with no keys can replay
-what was said, by whom, under which pinned rules — and it holds under mutation.
-
-What that is, and what it is not, was reviewed on 2026-09-02 against the scenarios and
-against the transport and gate code:
-
-- **Usable as a protocol and a record format; not yet a deployable system.** Two
-  independent implementations, gates that fail on purpose, honest ledgers — and no
-  scheduler, no port agents for the external systems the scenarios describe, a demo
-  transport, keys as files. The author's own
-  [operator's Tuesday](docs/afp/scenarios/the-operators-tuesday.md) said it first: a
-  ledger with opinions, and programs that visit it.
-- **Hardened by what AFP added, not by ActivityPub.** AP supplies identity, discovery and
-  vocabulary conventions. Every security property here — object proofs, hash chains, the
-  two-tier gate, commit-reveal, snapshot-pinned electorates, lawful redaction — is the
-  protocol's own. Fediverse software does not consume AFP objects, and
-  [ADR-0029](docs/afp/adr/0029-the-human-window-and-the-activitypub-premise.md) proposes
-  to say so precisely.
-- **Scenarios supported in the coordination core, narrowed at the edges.** Of roughly 131
-  acceptance criteria across the thirteen scenarios, about 113 are built and gated, 11
-  are built as a mechanism the record can carry rather than the workflow the author
-  described, and 7 — every one a human step or an external system — are not built.
-  Scenarios 10–13 hold end to end; 01, 02, 06 and 09 stop at the port.
-
-Two documents carry the consequence, both proposed:
-
-| | |
-|---|---|
-| [ADR-0023](docs/afp/adr/0023-loose-ends-triaged.md) | **The loose ends, triaged** — 31 subtasks from an audit of every ADR, each linked to its origin section, with one disposition: build, decide, reconcile, or park behind a named trigger |
-| [ADR-0024](docs/afp/adr/0024-the-road-to-production.md) | **The road to production** — ten claims and the ten ADRs (0025–0034) that make each checkable: transport hardening, key custody and a signer port, the port as a security boundary, port agents, the human window, scenario re-walks, the resident process, the deployment profile, operator obligations, release engineering. Its definition of done is a scenario — the production Tuesday — not a checklist |
-
-The spec is at Revision 3.35. Nothing in the program changes what a replay proves; all of
-it changes whether anyone could run the thing that produces the replay.
-
-## Why integrity is in phase one
-
-Signing, hash-chained outboxes, visibility classes and hash-addressed evidence are **P1
-obligations**, not a later audit phase. They are nearly free at two agents and impossible
-to backfill at two hundred. Every phase after P1 adds participants, never integrity
-machinery.
