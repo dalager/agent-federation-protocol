@@ -22,6 +22,12 @@ import { createHandler } from "../src/ap/server.ts";
 import { serveHandler } from "../src/runtime/adapters/node.ts";
 import { jsonResponse, readCappedBody, TOO_LARGE, type Handler } from "../src/runtime/httpPort.ts";
 import { connect } from "node:net";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { readSecretFile } from "../src/config.ts";
+import { nodeinfoDocument } from "../src/ap/nodeinfo.ts";
+import { fileSecrets, useSecretLoader } from "../src/runtime/secrets.ts";
 import { Schedule } from "../src/runtime/schedule.ts";
 import { policedFetch } from "../src/federation/fetchPolicy.ts";
 import { workspace } from "./helpers.ts";
@@ -368,5 +374,82 @@ describe("ADR-0036 WP-3 — one alarm's worth of schedule", () => {
       (error: Error) => !/private\/loopback\/link-local/.test(error.message),
       "platform-enforced skips the address judgement, and fails for some other reason instead",
     );
+  });
+});
+
+// ------------------------------------------------- WP-4, secrets as bindings
+
+describe("ADR-0036 WP-4 — a secret is a reference, and the profile resolves it", () => {
+  it("G17: the file loader is the default, and an empty or missing file reads as absent", () => {
+    const dir = mkdtempSync(join(tmpdir(), "afp-secret-"));
+    const present = join(dir, "pass");
+    const empty = join(dir, "empty");
+    writeFileSync(present, "  hunter2\n");
+    writeFileSync(empty, "   \n");
+
+    assert.equal(readSecretFile(present), "hunter2", "trimmed");
+    assert.equal(readSecretFile(empty), undefined, "an empty file is absent, not the empty secret");
+    assert.equal(readSecretFile(join(dir, "nope")), undefined, "a missing file is absent");
+    assert.equal(readSecretFile(""), undefined, "an unset reference is absent");
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("G18: a profile's loader replaces the file read, and resolves the same references", () => {
+    // What a hosted adapter does: the schema still says AFP_*_FILE and still
+    // carries a reference, but the reference names a binding rather than a
+    // path, and nothing touches a filesystem.
+    const bindings: Record<string, string> = { "kms://passphrase": "from-the-platform", "kms://blank": "  " };
+    try {
+      useSecretLoader((reference) => {
+        const value = bindings[reference];
+        return value !== undefined && value.trim().length > 0 ? value.trim() : undefined;
+      });
+
+      assert.equal(readSecretFile("kms://passphrase"), "from-the-platform", "resolved through the binding");
+      assert.equal(readSecretFile("kms://blank"), undefined, "an empty binding is absent, exactly as an empty file is");
+      assert.equal(readSecretFile("/etc/afp/passphrase"), undefined, "a path means nothing to this profile, and is not read from disk");
+    } finally {
+      useSecretLoader(fileSecrets);
+    }
+
+    // Restored: the default loader is the file one, so no other case in this
+    // suite inherits the hosted profile's answers.
+    const dir = mkdtempSync(join(tmpdir(), "afp-secret-"));
+    const path = join(dir, "pass");
+    writeFileSync(path, "back-to-files");
+    assert.equal(readSecretFile(path), "back-to-files");
+    rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+// -------------------------------- WP-5 (part), the profile the record names
+
+describe("ADR-0036 WP-5 — an instance says which profile it runs", () => {
+  it("G19: AFP_PROFILE defaults to self-hosted and refuses anything it does not know", () => {
+    assert.equal(loadConfig({ ...workspace() }).profile, "self-hosted", "the reference profile is the default");
+    assert.equal(loadConfig({ ...workspace(), profile: "hosted" }).profile, "hosted");
+
+    const previous = process.env.AFP_PROFILE;
+    try {
+      process.env.AFP_PROFILE = "serverless";
+      assert.throws(() => loadConfig({ ...workspace() }), /AFP_PROFILE must be/, "refused at load, not discovered later");
+    } finally {
+      if (previous === undefined) delete process.env.AFP_PROFILE;
+      else process.env.AFP_PROFILE = previous;
+    }
+  });
+
+  it("G20: NodeInfo publishes the profile, so a counterparty reads it without asking", () => {
+    // ADR-0036 Decision 10 says to record this in the policy document's
+    // `afp:terms`. It cannot go there: `afp:terms` is a {url, digest} pair
+    // pointing at an external document (ap/policy.ts), not a place to put a
+    // machine-readable fact. NodeInfo's metadata block is free-form and
+    // already carries `afp:specRevision`, so the profile sits beside it and
+    // needs no new AFP vocabulary.
+    const selfHosted = nodeinfoDocument(2) as { metadata: { afp: { profile: string } } };
+    assert.equal(selfHosted.metadata.afp.profile, "self-hosted", "the default is explicit on the wire, not implied by absence");
+
+    const hosted = nodeinfoDocument(2, "hosted") as { metadata: { afp: { profile: string } } };
+    assert.equal(hosted.metadata.afp.profile, "hosted");
   });
 });

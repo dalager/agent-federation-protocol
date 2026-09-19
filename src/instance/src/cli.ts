@@ -1108,6 +1108,20 @@ async function main(): Promise<void> {
         process.exit(1);
         break;
       }
+      // ADR-0036 Decision 7: under the hosted profile the store is not a
+      // file this process can copy, and the platform's point-in-time
+      // recovery is the mechanism. Refusing by name beats appearing to
+      // succeed: an operator who believes they have a backup and does not is
+      // worse off than one who is told where the real one lives. The signed
+      // export is untouched either way — it never depended on the file.
+      if (config.profile === "hosted") {
+        console.error("backup: not this process's to take under the hosted profile (ADR-0036 Decision 7).");
+        console.error("  The store is the platform's, and so is its point-in-time recovery — take the");
+        console.error("  restore point there. `npm run export` is unchanged and is the signed record:");
+        console.error("  it goes through the store port and is replayed by a verifier sharing no code.");
+        process.exit(1);
+        break;
+      }
       const { backupStore } = await import("./store/backup.ts");
       const log = logger("cli:backup");
       const manifest = await backupStore(dir, {

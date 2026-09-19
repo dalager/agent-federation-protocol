@@ -467,7 +467,7 @@ export function createHandler(instance: AfpInstance, options: ServerOptions = {}
         return send(200, nodeinfoDiscovery(instance.config.origin), "application/json");
       }
       if (path === "/nodeinfo/2.1") {
-        return send(200, nodeinfoDocument(instance.specs.length), "application/json");
+        return send(200, nodeinfoDocument(instance.specs.length, instance.config.profile), "application/json");
       }
 
       return notFound();

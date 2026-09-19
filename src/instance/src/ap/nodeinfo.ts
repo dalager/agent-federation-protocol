@@ -17,7 +17,7 @@ export function nodeinfoDiscovery(origin: string): { [key: string]: unknown } {
   };
 }
 
-export function nodeinfoDocument(agentCount: number): { [key: string]: unknown } {
+export function nodeinfoDocument(agentCount: number, profile: "self-hosted" | "hosted" = "self-hosted"): { [key: string]: unknown } {
   return {
     version: "2.1",
     software: {
@@ -32,7 +32,7 @@ export function nodeinfoDocument(agentCount: number): { [key: string]: unknown }
     usage: { users: { total: 0 } },
     metadata: {
       agents: agentCount,
-      afp: { cryptosuite: "eddsa-jcs-2022" },
+      afp: { cryptosuite: "eddsa-jcs-2022", profile },
       "afp:specRevision": SPEC_REVISION,
     },
   };

@@ -20,6 +20,7 @@ import { resolve } from "node:path";
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { CONFIG_SCHEMA, readEntry, type ConfigEntry } from "./configSchema.ts";
+import { readSecret } from "./runtime/secrets.ts";
 import { validatePolicySpec, type PolicySpec } from "./policySpec.ts";
 import { derivedBrains, readAgentsFile } from "./agentsSpec.ts";
 
@@ -36,6 +37,13 @@ export interface Config {
   readonly httpPort: number;
   /** Which brain implementation the agents run behind their port. */
   readonly brain: "stub" | "llm";
+  /**
+   * ADR-0036 Decision 10: which deployment profile this instance runs. A
+   * hosting platform is a dependency of a different kind from a library, and
+   * the record says which one an instance took — published in NodeInfo so a
+   * counterparty can read it without asking.
+   */
+  readonly profile: "self-hosted" | "hosted";
   /** OpenAI-compatible endpoint, including the version segment. */
   readonly llmBaseUrl: string;
   readonly llmModel: string;
@@ -196,15 +204,17 @@ export function devModeFromEnv(): boolean {
 }
 
 /**
- * ADR-0032 Decision 3: read a secret file, trimmed, refusing an empty file.
+ * ADR-0032 Decision 3: read a secret, trimmed, refusing an empty one.
  * Shared by every `*_FILE` secret — `keyPassphraseFromEnv` predates this
  * helper (ADR-0026) and keeps its own shape for compatibility, but is one
  * line different from what this would do.
+ *
+ * ADR-0036 Decision 6: the *reading* is the profile's now (`runtime/secrets.ts`),
+ * so this name is kept for its twenty-odd callers while the mechanism moved.
+ * A hosted deployment resolves the same reference against a binding.
  */
 export function readSecretFile(path: string): string | undefined {
-  if (!path || !existsSync(path)) return undefined;
-  const value = readFileSync(path, "utf8").trim();
-  return value.length > 0 ? value : undefined;
+  return readSecret(path);
 }
 
 /**
@@ -229,6 +239,13 @@ export function loadConfig(overrides: Partial<Config> = {}): Config {
   const brain = String(readEntry(entry("AFP_BRAIN")));
   if (brain !== "stub" && brain !== "llm") {
     throw new Error(`AFP_BRAIN must be "stub" or "llm", got ${brain}`);
+  }
+
+  // ADR-0036 Decision 10: which profile this instance runs, refused at load
+  // time like every other enum the schema cannot express.
+  const profile = String(readEntry(entry("AFP_PROFILE")));
+  if (profile !== "self-hosted" && profile !== "hosted") {
+    throw new Error(`AFP_PROFILE must be "self-hosted" or "hosted", got ${profile}`);
   }
 
   const devMode = overrides.devMode ?? (readEntry(entry("AFP_DEV")) as boolean);
@@ -270,6 +287,7 @@ export function loadConfig(overrides: Partial<Config> = {}): Config {
     exportDir: resolve(overrides.exportDir ?? String(readEntry(entry("AFP_EXPORT_DIR")))),
     httpPort: readEntry(entry("AFP_PORT")) as number,
     brain,
+    profile,
     llmBaseUrl,
     llmModel: String(readEntry(entry("AFP_LLM_MODEL"))),
     llmMaxTokens: readEntry(entry("AFP_LLM_MAX_TOKENS")) as number,

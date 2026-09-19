@@ -4,7 +4,9 @@
   `node` adapter, and **WP-2 built (2026-09-19)** — the request port and its `node`
   adapter, and **WP-3 built (2026-09-19)** — the alarm schedule and the resolver seam.
   All three landed as refactors with the suite green, per the build order below.
-  WP-4 and WP-5 unbuilt, and no `actor` adapter exists. Extends program claim **C8** of
+  **WP-4 is half built** (secrets as bindings; the asynchronous signer port stays
+  parked by the operator's decision) and **WP-5 partly** (the profile the record
+  names). No `actor` adapter exists, which is what the remainder waits on. Extends program claim **C8** of
   [ADR-0024](0024-the-road-to-production.md) with a second hosting profile; group:
   **Operations**
 - **Date:** 2026-09-15
@@ -538,6 +540,83 @@ no actor adapter exists to call them. They are gated rather than left
 untested for the reason WP-1's `transaction` was — an unused verb that ships
 untested is the part of a port most likely to be wrong when its first real
 caller arrives.
+
+### WP-4 · secrets as bindings — built 2026-09-19; the asynchronous port is **not**
+
+Decision 6 has two halves and only the second is built. `runtime/secrets.ts`
+holds a `SecretLoader`: the self-hosted loader reads the file a schema entry
+names, a hosted loader would read the binding of that name, and
+`readSecretFile` — twenty-odd callers, unchanged at every one — now goes
+through whichever the profile installed. The schema is untouched and so is
+`validate()`, exactly as Decision 6 asks. One rule crosses both loaders and
+G17/G18 pin it: an empty secret is *absent*, not the empty string, because an
+empty file has always meant that and a binding set to `""` must not mean
+something else, or the two profiles would disagree about whether a deployment
+is configured.
+
+**The asynchronous signer port (ADR-0035 Decision 4) is deliberately not
+built, and this is the third time that call has been made.** ADR-0035 titled
+it "if and when it is built"; ADR-0024's status records the full `remote`
+adapter as costed and unscheduled. Decision 6 above says this profile builds
+it, and the operator's decision on 2026-09-19 was to keep it parked. The
+reasons, so the next reader does not re-derive them:
+
+- Its only consumer is an `actor` adapter that does not exist. Migrating now
+  means carrying the change against no caller.
+- The change is wide: 19 `attachProof` sites, and 209 `it(...)` callbacks
+  that gain `async`. `AfpInstance` construction becomes `static async open`,
+  because `provision()` signs.
+- **This repository has no typechecker.** Node strips types and the suite is
+  the only proof, so a forgotten `await` yields a `Promise` where an activity
+  was expected. ADR-0035 D4 already prescribes the net — a gate asserting no
+  serialized activity carries `"[object Promise]"` or an undecodable
+  `proofValue` — and that net must land *before* the migration, not with it.
+- The one path that genuinely needs async already has it: `AsyncSigner` in
+  `crypto/signer.ts`, the narrow exception ADR-0035 Decision 2 built for the
+  `remote-issued` rotation signature.
+
+So WP-4 is half built and says so. The remaining half belongs to whichever
+work package builds the actor adapter, and it should open with the safety
+net.
+
+### WP-5 (part) · the profile the record names — built 2026-09-19
+
+Decisions 8 and 10 in the parts that do not need an actor to exist.
+
+**Decision 8 needed no code.** The self-check already fetches its own
+`/actor` through the edge and requires the `id` to equal the origin; a
+platform route is an origin like any other. Recorded here because "nothing
+to build" is a result, and a later reader should not go looking.
+
+**Decision 10's prescribed location does not fit the built shape, and the
+decision text above is wrong about it.** It says to record the profile in the
+policy document's `afp:terms`. `afp:terms` is a `{url, digest}` pair pointing
+at an external terms document (`ap/policy.ts`) — a link, not a field a
+machine-readable fact can go in. Writing the profile into the document that
+link points at would put it somewhere no counterparty can parse. The built
+home is NodeInfo's metadata block, which is free-form, already carries
+`afp:specRevision`, and needs **no new AFP vocabulary** — which matters,
+because a policy-document term naming a profile would be a wire term shipped
+before its second value exists. `AFP_PROFILE` is `self-hosted` (the default)
+or `hosted`, refused at load like every other enum the schema cannot express,
+and published at `metadata.afp.profile`. G19, G20.
+
+**Decision 7, the buildable half.** There is no hosted backup *implementation*
+to write — the platform's point-in-time recovery is the mechanism, and it is
+not this process's code. What is this process's job is not to pretend
+otherwise: `npm run backup` under `AFP_PROFILE=hosted` refuses by name and
+points at the restore point, because an operator who believes they hold a
+backup and does not is worse off than one who is told where the real one
+lives. The signed export is untouched and the refusal says so — it never
+depended on the file.
+
+**What WP-5 cannot finish here.** Decision 9 wants every shipped demo run
+against the `actor` adapters in a local platform emulator in CI. There is no
+actor adapter and no emulator in this repository, so the conformance kit's
+profile axis would today record one profile and assert nothing about the
+other — a column of "untested" dressed as coverage. It waits for the adapter,
+and so does the release's claim about which profiles it was gated on
+(ADR-0034 Decision 6).
 
 ## References
 

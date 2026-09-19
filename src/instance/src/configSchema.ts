@@ -63,6 +63,13 @@ export const CONFIG_SCHEMA: readonly ConfigEntry[] = [
     default: "",
     doc: "JSON array of agent entries (src/agents.ts, ADR-0038 Decision 1) — the collection serve/keys/export boot. Unset means the demo's writer/reviewer. keyCustody may only be \"instance\": \"self\" needs a signer a file cannot supply and is refused by name",
   },
+  {
+    env: "AFP_PROFILE",
+    key: "profile",
+    kind: "string",
+    default: "self-hosted",
+    doc: "Which deployment profile this instance runs (ADR-0032, ADR-0036). Published in NodeInfo so a counterparty can see it; `hosted` refuses the commands the platform owns instead of this process",
+  },
   { env: "AFP_FEDIVERSE_WINDOW", key: "fediverseWindow", kind: "bool", default: false, doc: "1 dual-publishes a public shadow Note (ADR-0029 Decision 3)" },
   { env: "AFP_SWEEP_MS", key: "scheduler.sweepMs", kind: "int", default: 30_000, doc: "The resident scheduler's sweep-loop interval (ADR-0031 Decision 1)" },
   { env: "AFP_FLUSH_MS", key: "scheduler.flushMs", kind: "int", default: 10_000, doc: "The resident scheduler's flush-loop interval" },
