@@ -12,17 +12,27 @@
  * door" property for the store's shape itself.
  */
 
-import { DatabaseSync } from "node:sqlite";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { logger } from "../runtime/log.ts";
 import { migrate, MIGRATIONS } from "./migrations/index.ts";
+import { openNodeStore } from "./adapters/node.ts";
+import type { Store } from "./port.ts";
 
 export { StoreNewerThanBinary } from "./migrations/index.ts";
+export type { RunResult, SqlValue, Store } from "./port.ts";
 
 const log = logger("store/db");
 
-export type Db = DatabaseSync;
+/**
+ * ADR-0036 Decision 2: `Db` is the port now, not `node:sqlite`'s handle. The
+ * alias stays because every module in this codebase names it, and because
+ * what those modules meant by it — "the one door to the state store" — is
+ * exactly what the port is. `openDb` still returns the `node` adapter; the
+ * hosted profile's adapter is WP-1's reason for existing and not yet its
+ * content.
+ */
+export type Db = Store;
 
 /**
  * ADR-0031 Decision 4: one writer, enforced. `openDb` and this set together
@@ -106,7 +116,7 @@ export const BINARY_SCHEMA_VERSION = MIGRATIONS.reduce((max, m) => Math.max(max,
 
 /** The schema version a store is currently at (0 for one that has never migrated). */
 export function schemaVersion(db: Db): number {
-  const row = db.prepare("SELECT MAX(version) AS v FROM schema_version").get() as { v: number | null } | undefined;
+  const row = db.get("SELECT MAX(version) AS v FROM schema_version") as { v: number | null } | undefined;
   return row?.v ?? 0;
 }
 
@@ -118,7 +128,7 @@ export function schemaVersion(db: Db): number {
  */
 export function openDb(path: string): Db {
   if (path === ":memory:") {
-    const db = new DatabaseSync(path);
+    const db = openNodeStore(path);
     db.exec("PRAGMA foreign_keys = ON");
     migrate(db);
     return db;
@@ -131,7 +141,14 @@ export function openDb(path: string): Db {
   acquireLock(path);
   openPaths.add(path);
 
-  const db = new DatabaseSync(path);
+  // The lock is released by the adapter's `close`, so a caller that closes
+  // the port releases the file the same way it always did.
+  const db = openNodeStore(path, {
+    onClose: () => {
+      openPaths.delete(path);
+      releaseLock(path);
+    },
+  });
   db.exec("PRAGMA journal_mode = WAL");
   db.exec("PRAGMA foreign_keys = ON");
   try {
@@ -140,16 +157,7 @@ export function openDb(path: string): Db {
     // A refused open (StoreNewerThanBinary, or a failed migration) must not
     // leave the lock behind for the pid that never got to hold it.
     db.close();
-    openPaths.delete(path);
-    releaseLock(path);
     throw error;
   }
-
-  const nativeClose = db.close.bind(db);
-  db.close = () => {
-    nativeClose();
-    openPaths.delete(path);
-    releaseLock(path);
-  };
   return db;
 }

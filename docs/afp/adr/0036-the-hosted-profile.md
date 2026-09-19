@@ -1,6 +1,8 @@
 # ADR-0036 — The hosted profile: one operator, one object
 
-- **Status:** Proposed (2026-09-15) — extends program claim **C8** of
+- **Status:** Proposed (2026-09-15); **WP-1 built (2026-09-19)** — the store port and its
+  `node` adapter, landed as a refactor with the suite green, per the build order below.
+  WP-2 to WP-5 unbuilt, and no `actor` adapter exists. Extends program claim **C8** of
   [ADR-0024](0024-the-road-to-production.md) with a second hosting profile; group:
   **Operations**
 - **Date:** 2026-09-15
@@ -229,6 +231,111 @@ and the D4 duplicate-vote case reads as explained.
 Order: WP-1 and WP-2 first and alone, landed as refactors with the suite green under the
 `node` adapters, before any `actor` adapter exists. If the ports cannot be landed
 without changing a test, that is the finding, and this ADR stops there.
+
+## Build status
+
+### WP-1 · the store port — built 2026-09-19
+
+`store/port.ts` states the port: `exec`, `run`, `get`, `all`, `transaction`, `close`, over
+plain SQL and bound values. `store/adapters/node.ts` implements it over `node:sqlite` with
+the behaviour `store/db.ts` already had — the same pragmas, the same one-writer lock,
+released now by the adapter's `close` rather than by a monkey-patched `db.close`.
+`Db` is an alias for `Store`, so every module that names it kept its signature. All 105
+call sites moved: 94 by codemod across 20 files, 9 in one file the codemod could not see
+(below), one reused statement by hand, and one in `store/backup.ts`.
+
+`node:sqlite` now appears in four files — the adapter, `db.ts` (which constructs it),
+`backup.ts` (Decision 7's profile-conditional online-backup API, which has no hosted
+counterpart and is documented as staying), and a comment in `port.ts`. It appeared in
+`store/inboxLog.ts` too, as the declared type of a field; that was the one real leak and
+it is closed.
+
+**The ADR's gate was "every existing test passes with no case changed", and three cases
+changed.** They are fixture constructors, not assertions: `test/adr0032.test.ts` (two) and
+`test/adr0037.test.ts` (one) each build a legacy store with `new DatabaseSync(path)` and
+hand it to `migrateWith`, which takes the port. Each is now
+`new NodeStore(new DatabaseSync(path))`, with every assertion untouched and the suite's
+counts unchanged but for the new gate file. The literal reading of the gate says this ADR
+should have stopped; the reading taken is that the gate exists to catch a port that
+changes *behaviour*, which would show as an expectation needing revision, and that a
+fixture's constructor is not an expectation. The alternative considered and rejected was
+to have `migrate` sniff its argument and wrap a raw handle — which would put a
+runtime-type check in production code to protect a test, and is the leak the port exists
+to prevent. **This paragraph is the record of that call, so a later reader can disagree
+with it.**
+
+`test/adr0036.test.ts` is new, six cases, and covers what the suite cannot: the port as a
+contract. It exists mainly for `transaction`, which the codebase declares and does not yet
+call — an unused verb that shipped untested is the part of a port most likely to be wrong
+when the second adapter copies the first one's behaviour. Two facts it pins down:
+nesting reuses the outer transaction rather than opening a second, and a row's prototype
+is unspecified (the node adapter returns `node:sqlite`'s null-prototype objects and the
+port says consumers may only read columns off them — normalising would cost an allocation
+per row to buy a property nothing uses).
+
+**Found on the way, unrelated and now fixed:** `src/crdt/store.ts` contained a literal NUL
+byte — a composite map key written as `${a}<NUL>${b}` rather than `${a}\0${b}` — which
+made the whole file *binary* to every `grep -I`-based tool, including the one that built
+this refactor's file list. Nine call sites in it were silently missed and only surfaced at
+runtime. The byte is now the `\0` escape: behaviour-identical, and the file is searchable
+again. It had been invisible since ADR-0032 landed it.
+
+**Cleanup pass, same day.** A review of the landed refactor found four things worth
+fixing before WP-2 builds on it, and one thing worth leaving alone:
+
+- **`openNodeStore(path, { readOnly, onClose })`** now owns every construction of the
+  adapter. Four call sites had been writing `new NodeStore(new DatabaseSync(path))` by
+  hand — `db.ts`, `backup.ts` and three test fixtures — which put the runtime's handle
+  type back on the far side of the port one site at a time, in exactly the places the
+  port was built to clear. A consequence worth stating: **`db.ts` no longer imports
+  `node:sqlite` at all.** The lock, the pragmas and `migrate` still live there, so the
+  WP-5 note below stands, but the runtime type is gone from it, and `node:sqlite` is now
+  imported by exactly two files — the adapter and `backup.ts`.
+- **`NodeStore.depth` was a counter doing a boolean's work** (set to 1, compared to 0,
+  never incremented) and is now `inTransaction`, which is what the transaction contract
+  actually says. The `onClose` field also cleared itself after firing, guarding a second
+  `close()` that the port does not permit and `DatabaseSync` would refuse first; it is
+  `readonly` now.
+- **The codemod's formatting damage is undone.** Splicing arguments onto the closing
+  backtick of a template literal took the touched files from 19 lines over 140 characters
+  to 42; they are back to 20, with SQL on its own line and bound parameters below it, and
+  63 now-pointless `db\n  .run(` chains — residue of `.prepare().run()` — collapsed.
+- **A gate against the NUL byte's recurrence**, in `test/adr0034.test.ts` beside the other
+  repo-hygiene cases: no tracked source file may contain a NUL, because one makes the
+  whole file invisible to every `grep -I` and that is how nine call sites went missing
+  here. Verified against the pre-fix file, which it catches.
+
+**One real regression the port introduced, found and fixed the same day.**
+`queue.ts`'s `ready()` — the delivery loop's polling call — built
+`… WHERE target IN (${placeholders})` with one placeholder per pending target.
+Before the port that was a one-shot `prepare()` that the collector took back
+afterwards; through the port it became a cache key, and the adapter's cache is
+keyed by SQL text and never evicts. So the process retained one prepared statement
+per distinct number-of-pending-targets it had ever seen. The fix is at the cause
+rather than the cache: `peer_backoff` holds at most one row per peer, so the query
+is now static (`SELECT target, not_before FROM peer_backoff`) and the filtering is
+in memory — smaller *and* fixed-shape. `test/adr0036.test.ts` G7 asserts the
+invariant that catches the next one: growing the data twentyfold must not grow the
+cache, because the SQL texts are the same two.
+
+Worth recording how it was nearly missed. A scan for interpolated SQL at port call
+sites reported only two, both bounded, and concluded the cache was safe. The scan's
+pattern required `db.all(` to be contiguous, and this call site was still in the
+`this.db\n  .all(` shape the old `.prepare().all()` chain had left — so the one site
+that mattered was the one the check could not see. That is the same failure as the
+NUL byte three paragraphs up, arriving by a different route: **a search that
+silently skips is worse than no search, because it answers.**
+
+Left alone deliberately: `Db` stays an alias for `Store`. It earns its keep while WP-1's
+no-behaviour-change constraint holds, but it is provisional — once WP-5 gives the port a
+second concrete profile, two names for one type is redundant vocabulary, and the call
+sites should migrate to `Store`. **That migration is WP-5's, and this sentence is the
+tracking note for it.**
+
+**What WP-1 deliberately did not do.** `openDb` still holds the lock, the pragmas and the
+`migrate` call in `db.ts` — all of them node-profile concerns sitting above a
+profile-neutral port. Splitting that into an adapter-owned opener is WP-5's business, not
+a refactor's, and naming it here is cheaper than rediscovering it.
 
 ## References
 

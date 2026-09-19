@@ -45,28 +45,24 @@ class TtlSeenTable {
     if (this.has(key, now)) return false;
     // An expired row for this key may still be sitting here — it read as
     // absent above, and this replaces it with a fresh window.
-    this.db
-      .prepare(
+    this.db.run(
         `INSERT INTO ${this.table} (${this.keyColumn}, seen_at, expires_at) VALUES (?, ?, ?)
            ON CONFLICT (${this.keyColumn}) DO UPDATE SET seen_at = excluded.seen_at, expires_at = excluded.expires_at`,
-      )
-      .run(key, now.toISOString(), new Date(now.getTime() + this.ttlMs).toISOString());
+        key, now.toISOString(), new Date(now.getTime() + this.ttlMs).toISOString());
     return true;
   }
 
   /** Unexpired-only by construction: an expired row is indistinguishable from no row. */
   has(key: string, now: Date): boolean {
     return (
-      this.db
-        .prepare(`SELECT 1 FROM ${this.table} WHERE ${this.keyColumn} = ? AND expires_at > ?`)
-        .get(key, now.toISOString()) != null
+      this.db.get(`SELECT 1 FROM ${this.table} WHERE ${this.keyColumn} = ? AND expires_at > ?`, key, now.toISOString()) != null
     );
   }
 
   private purgeIfDue(now: Date): void {
     if (now.getTime() - this.lastPurgeMs < PURGE_INTERVAL_MS) return;
     this.lastPurgeMs = now.getTime();
-    this.db.prepare(`DELETE FROM ${this.table} WHERE expires_at <= ?`).run(now.toISOString());
+    this.db.run(`DELETE FROM ${this.table} WHERE expires_at <= ?`, now.toISOString());
   }
 }
 

@@ -72,7 +72,7 @@ export function keyFileName(actorName: string, kind: KeyKind): string {
 export function votesEmbeddedInProofs(
   deps: KeyOpsDeps,
 ): { verificationMethod: string; published: string }[] {
-  const rows = deps.db.prepare("SELECT activity_json FROM outbox").all() as { activity_json: string }[];
+  const rows = deps.db.all("SELECT activity_json FROM outbox") as { activity_json: string }[];
   const found: { verificationMethod: string; published: string }[] = [];
 
   const walk = (node: JsonValue): void => {

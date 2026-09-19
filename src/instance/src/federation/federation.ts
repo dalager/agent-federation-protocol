@@ -114,23 +114,20 @@ export class Federation {
     const digest = digestOf(object);
     const parties = (object["afp:parties"] as JsonValue[]) ?? [];
     const counterparty = String(parties.find((p) => p !== this.selfActor) ?? "");
-    this.db
-      .prepare(
+    this.db.run(
         `INSERT INTO fed_agreements (digest, object_json, counterparty, expires, ${column})
            VALUES (?, ?, ?, ?, ?)
          ON CONFLICT (digest) DO UPDATE SET ${column} = excluded.${column}`,
-      )
-      .run(digest, JSON.stringify(object), counterparty, String(object["afp:expires"] ?? ""), JSON.stringify(signed));
+        digest, JSON.stringify(object), counterparty, String(object["afp:expires"] ?? ""), JSON.stringify(signed));
     return digest;
   }
 
   /** Active = both Creates held over digest-equal objects, and not expired at `at`. */
   activeAgreementsWith(counterparty: string, at: Date = this.now()): AgreementObject[] {
-    const rows = this.db
-      .prepare(
+    const rows = this.db.all(
         "SELECT object_json, expires FROM fed_agreements WHERE counterparty = ? AND own_create_json IS NOT NULL AND their_create_json IS NOT NULL",
-      )
-      .all(counterparty) as { object_json: string; expires: string }[];
+        counterparty,
+      ) as { object_json: string; expires: string }[];
     return rows
       .filter((row) => at.getTime() < instantMillis(row.expires))
       .map((row) => JSON.parse(row.object_json) as AgreementObject);
@@ -138,25 +135,23 @@ export class Federation {
 
   /** All agreements with a counterparty regardless of expiry — the late-outcome rule needs them. */
   agreementsWith(counterparty: string): AgreementObject[] {
-    const rows = this.db
-      .prepare(
+    const rows = this.db.all(
         "SELECT object_json FROM fed_agreements WHERE counterparty = ? AND own_create_json IS NOT NULL AND their_create_json IS NOT NULL",
-      )
-      .all(counterparty) as { object_json: string }[];
+        counterparty,
+      ) as { object_json: string }[];
     return rows.map((row) => JSON.parse(row.object_json) as AgreementObject);
   }
 
   /** Store an admitted cross-boundary activity verbatim (ADR-0009). */
   recordReceived(activity: { [key: string]: JsonValue }, fromInstance: string): void {
-    this.db
-      .prepare(
+    this.db.run(
         "INSERT INTO fed_received (digest, from_instance, at, activity_json) VALUES (?, ?, ?, ?) ON CONFLICT (digest) DO NOTHING",
-      )
-      .run(digestOf(activity), fromInstance, this.now().toISOString(), JSON.stringify(activity));
+        digestOf(activity,
+      ), fromInstance, this.now().toISOString(), JSON.stringify(activity));
   }
 
   receivedActivities(): { digest: string; fromInstance: string; activity: { [key: string]: JsonValue } }[] {
-    const rows = this.db.prepare("SELECT * FROM fed_received ORDER BY at, digest").all() as Record<string, unknown>[];
+    const rows = this.db.all("SELECT * FROM fed_received ORDER BY at, digest") as Record<string, unknown>[];
     return rows.map((row) => ({
       digest: String(row.digest),
       fromInstance: String(row.from_instance),
@@ -166,28 +161,27 @@ export class Federation {
 
   /** Record an admitted cross-boundary correlation's acceptance instant. */
   recordAccept(correlationId: string, counterparty: string, published: string): void {
-    this.db
-      .prepare(
+    this.db.run(
         "INSERT INTO fed_accepts (correlation_id, counterparty, published) VALUES (?, ?, ?) ON CONFLICT (correlation_id) DO NOTHING",
-      )
-      .run(correlationId, counterparty, published);
+        correlationId, counterparty, published,
+      );
   }
 
   acceptPublishedFor(correlationId: string): string | null {
-    const row = this.db
-      .prepare("SELECT published FROM fed_accepts WHERE correlation_id = ?")
-      .get(correlationId) as { published?: string } | undefined;
+    const row = this.db.get("SELECT published FROM fed_accepts WHERE correlation_id = ?",
+      correlationId
+    ) as { published?: string } | undefined;
     return row?.published ?? null;
   }
 
   denylist(instance: string, reason: string): void {
-    this.db
-      .prepare("INSERT INTO fed_denylist (instance, at, reason) VALUES (?, ?, ?) ON CONFLICT (instance) DO NOTHING")
-      .run(instance, this.now().toISOString(), reason);
+    this.db.run("INSERT INTO fed_denylist (instance, at, reason) VALUES (?, ?, ?) ON CONFLICT (instance) DO NOTHING",
+      instance, this.now().toISOString(), reason
+    );
   }
 
   isDenylisted(instance: string): boolean {
-    return this.db.prepare("SELECT 1 FROM fed_denylist WHERE instance = ?").get(instance) !== undefined;
+    return this.db.get("SELECT 1 FROM fed_denylist WHERE instance = ?", instance) !== undefined;
   }
 
   // ------------------------------------------------------------------ gate
@@ -251,9 +245,7 @@ export class Federation {
   // ---------------------------------------------------------- boundary log
 
   private logRejection(activity: { [key: string]: JsonValue }, step: string, reason: string): void {
-    const prev = this.db
-      .prepare("SELECT entry_hash FROM fed_boundary_log ORDER BY seq DESC LIMIT 1")
-      .get() as { entry_hash?: string } | undefined;
+    const prev = this.db.get("SELECT entry_hash FROM fed_boundary_log ORDER BY seq DESC LIMIT 1") as { entry_hash?: string } | undefined;
     const entry = {
       at: this.now().toISOString(),
       actor: String(activity.actor ?? "<none>"),
@@ -266,15 +258,14 @@ export class Federation {
       .update(canonicalize(entry as unknown as JsonValue))
       .update(prev?.entry_hash ?? "genesis")
       .digest("hex");
-    this.db
-      .prepare(
+    this.db.run(
         "INSERT INTO fed_boundary_log (at, actor, claimed_type, step, reason, activity_digest, entry_hash) VALUES (?, ?, ?, ?, ?, ?, ?)",
-      )
-      .run(entry.at, entry.actor, entry.claimed_type, entry.step, entry.reason, entry.activity_digest, hash);
+        entry.at, entry.actor, entry.claimed_type, entry.step, entry.reason, entry.activity_digest, hash,
+      );
   }
 
   boundaryLog(): { at: string; actor: string; claimedType: string; step: string; reason: string; entryHash: string }[] {
-    const rows = this.db.prepare("SELECT * FROM fed_boundary_log ORDER BY seq").all() as Record<string, unknown>[];
+    const rows = this.db.all("SELECT * FROM fed_boundary_log ORDER BY seq") as Record<string, unknown>[];
     return rows.map((row) => ({
       at: String(row.at),
       actor: String(row.actor),
@@ -287,7 +278,7 @@ export class Federation {
 
   /** Recompute the chain — a tampered row breaks every hash after it. */
   verifyBoundaryLog(): boolean {
-    const rows = this.db.prepare("SELECT * FROM fed_boundary_log ORDER BY seq").all() as Record<string, unknown>[];
+    const rows = this.db.all("SELECT * FROM fed_boundary_log ORDER BY seq") as Record<string, unknown>[];
     let prev = "genesis";
     for (const row of rows) {
       const entry = {
@@ -308,10 +299,8 @@ export class Federation {
   /** `afp:BoundaryDigest` payload — the outbox carries a heartbeat-sized
    * commitment; the log carries the detail (Decision 3). */
   boundaryDigest(): { [key: string]: JsonValue } {
-    const count = this.db.prepare("SELECT COUNT(*) AS n FROM fed_boundary_log").get() as { n: number };
-    const head = this.db
-      .prepare("SELECT entry_hash FROM fed_boundary_log ORDER BY seq DESC LIMIT 1")
-      .get() as { entry_hash?: string } | undefined;
+    const count = this.db.get("SELECT COUNT(*) AS n FROM fed_boundary_log") as { n: number };
+    const head = this.db.get("SELECT entry_hash FROM fed_boundary_log ORDER BY seq DESC LIMIT 1") as { entry_hash?: string } | undefined;
     return {
       type: "afp:BoundaryDigest",
       "afp:entryCount": Number(count.n),

@@ -1267,8 +1267,7 @@ export class Hub {
    * round ids carry relative to each other.
    */
   private isZeroedFor(round: string, actor: string): boolean {
-    const row = this.db
-      .prepare(
+    const row = this.db.get(
         `SELECT 1 FROM hub_convictions c
            JOIN hub_rounds cr ON cr.round_id = c.round_id
            JOIN hub_rounds tr ON tr.round_id = ?
@@ -1280,8 +1279,7 @@ export class Hub {
                  AND r.created_at < tr.created_at
             )
           LIMIT 1`,
-      )
-      .get(round, actor) as unknown;
+        round, actor) as unknown;
     return row !== undefined;
   }
 

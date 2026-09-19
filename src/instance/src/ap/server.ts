@@ -108,9 +108,7 @@ function collectionDocument(
 
 /** Every outbox entry, anywhere, whose activity JSON mentions this digest — the artifact-visibility query, resource-agnostic. */
 function referencingEntries(instance: AfpInstance, digest: string): OutboxEntry[] {
-  const rows = instance.db
-    .prepare("SELECT * FROM outbox WHERE activity_json LIKE ?")
-    .all(`%${digest}%`) as Record<string, unknown>[];
+  const rows = instance.db.all("SELECT * FROM outbox WHERE activity_json LIKE ?", `%${digest}%`) as Record<string, unknown>[];
   return rows.map((row) => ({
     activityId: String(row.activity_id),
     actor: String(row.actor),

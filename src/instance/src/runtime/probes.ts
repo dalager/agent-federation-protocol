@@ -13,7 +13,7 @@ export type ProbeResult = { ok: true } | { ok: false; reason: string };
 /** The store answers a trivial query. */
 export function probeStore(instance: AfpInstance): ProbeResult {
   try {
-    instance.db.prepare("SELECT 1").get();
+    instance.db.get("SELECT 1");
     return { ok: true };
   } catch {
     return { ok: false, reason: "store-unavailable" };

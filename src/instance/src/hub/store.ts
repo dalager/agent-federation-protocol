@@ -39,12 +39,11 @@ export interface RoundRow {
 }
 
 export function saveRound(db: Db, row: RoundRow, now: string): void {
-  db.prepare(
+  db.run(
     `INSERT INTO hub_rounds
        (round_id, hub_id, proposal_id, thread, options_json, voters_json, weights_json, quorum_snapshot, proposal_hash, status, created_at, deadline, quorum_rule, binding)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT (round_id) DO UPDATE SET status = excluded.status`,
-  ).run(
     row.roundId,
     row.hubId,
     row.proposalId,
@@ -59,11 +58,11 @@ export function saveRound(db: Db, row: RoundRow, now: string): void {
     row.deadline ?? null,
     row.quorumRule ? JSON.stringify(row.quorumRule) : null,
     row.binding ?? null,
-  );
+    );
 }
 
 export function loadRound(db: Db, roundId: string): RoundRow | null {
-  const row = db.prepare("SELECT * FROM hub_rounds WHERE round_id = ?").get(roundId) as
+  const row = db.get("SELECT * FROM hub_rounds WHERE round_id = ?", roundId) as
     | Record<string, unknown>
     | undefined;
   if (!row) return null;
@@ -97,12 +96,12 @@ export function saveVoteReceipt(
   phase?: VotePhase,
   seqNo?: number,
 ): void {
-  db.prepare(
+  db.run(
     `INSERT INTO hub_vote_receipts (round_id, actor, vote_digest, value, phase, seq_no)
        VALUES (?, ?, ?, ?, ?, ?)
      ON CONFLICT (round_id, actor) DO UPDATE SET
        vote_digest = excluded.vote_digest, value = excluded.value, phase = excluded.phase, seq_no = excluded.seq_no`,
-  ).run(roundId, actor, voteDigest, value, phase ?? null, seqNo ?? null);
+    roundId, actor, voteDigest, value, phase ?? null, seqNo ?? null);
 }
 
 export function voteReceiptsFor(db: Db, roundId: string): { actor: string; voteDigest: string; value: string }[] {
@@ -110,8 +109,7 @@ export function voteReceiptsFor(db: Db, roundId: string): { actor: string; voteD
     // Ordered: `closeRound` publishes these digests as `afp:countedVotes`, and
     // an unordered scan would let the same round sign different bytes on a
     // different run or a different SQLite build (H11).
-    .prepare("SELECT actor, vote_digest, value FROM hub_vote_receipts WHERE round_id = ? ORDER BY actor")
-    .all(roundId) as Record<string, unknown>[];
+    .all("SELECT actor, vote_digest, value FROM hub_vote_receipts WHERE round_id = ? ORDER BY actor", roundId) as Record<string, unknown>[];
   return rows.map((row) => ({
     actor: String(row.actor),
     voteDigest: String(row.vote_digest),
@@ -132,16 +130,16 @@ export function countedVoteTuple(
   roundId: string,
   actor: string,
 ): { phase: VotePhase; seqNo: number } | null {
-  const row = db
-    .prepare("SELECT phase, seq_no FROM hub_vote_receipts WHERE round_id = ? AND actor = ?")
-    .get(roundId, actor) as { phase: string | null; seq_no: number | null } | undefined;
+  const row = db.get("SELECT phase, seq_no FROM hub_vote_receipts WHERE round_id = ? AND actor = ?",
+    roundId, actor
+  ) as { phase: string | null; seq_no: number | null } | undefined;
   if (!row || (row.phase !== "prepare" && row.phase !== "commit") || typeof row.seq_no !== "number") return null;
   return { phase: row.phase, seqNo: row.seq_no };
 }
 
 /** The open round a proposal belongs to — how a `Reject{proposal}` finds its round. */
 export function roundByProposal(db: Db, proposalId: string): RoundRow | null {
-  const row = db.prepare("SELECT round_id FROM hub_rounds WHERE proposal_id = ?").get(proposalId) as
+  const row = db.get("SELECT round_id FROM hub_rounds WHERE proposal_id = ?", proposalId) as
     | Record<string, unknown>
     | undefined;
   return row ? loadRound(db, String(row.round_id)) : null;
@@ -149,16 +147,16 @@ export function roundByProposal(db: Db, proposalId: string): RoundRow | null {
 
 /** ADR-0014 Decision 4: record a member's Reject of a round's proposal. */
 export function saveRoundDecline(db: Db, roundId: string, actor: string, rejectDigest: string): void {
-  db.prepare(
+  db.run(
     `INSERT INTO hub_round_declines (round_id, actor, reject_digest)
        VALUES (?, ?, ?)
        ON CONFLICT (round_id, actor) DO NOTHING`,
-  ).run(roundId, actor, rejectDigest);
+    roundId, actor, rejectDigest);
 }
 
 /** Actors who declined a round, for closeRound's afp:uncounted partition. */
 export function roundDeclinesFor(db: Db, roundId: string): string[] {
-  return (db.prepare("SELECT actor FROM hub_round_declines WHERE round_id = ?").all(roundId) as { actor: string }[]).map(
+  return (db.all("SELECT actor FROM hub_round_declines WHERE round_id = ?", roundId) as { actor: string }[]).map(
     (row) => String(row.actor),
   );
 }
@@ -167,17 +165,17 @@ export function roundDeclinesFor(db: Db, roundId: string): string[] {
 
 /** Record a pinned voter's `afp:Departure` from a binding decision. */
 export function saveDeparture(db: Db, roundId: string, actor: string, digest: string): void {
-  db.prepare(
+  db.run(
     `INSERT INTO hub_departures (round_id, actor, departure_digest)
        VALUES (?, ?, ?)
        ON CONFLICT (round_id, actor) DO NOTHING`,
-  ).run(roundId, actor, digest);
+    roundId, actor, digest);
 }
 
 /** Departures recorded for a round, for `roundDepartures`. */
 export function departuresFor(db: Db, roundId: string): { actor: string; digest: string }[] {
   return (
-    db.prepare("SELECT actor, departure_digest FROM hub_departures WHERE round_id = ?").all(roundId) as {
+    db.all("SELECT actor, departure_digest FROM hub_departures WHERE round_id = ?", roundId) as {
       actor: string;
       departure_digest: string;
     }[]
@@ -209,17 +207,17 @@ export function departuresFor(db: Db, roundId: string): { actor: string; digest:
 
 /** Record a round-scoped conviction (an on-record `afp:EquivocationProof`) against `actor`. */
 export function recordConviction(db: Db, roundId: string, actor: string, proofDigest: string): void {
-  db.prepare(
+  db.run(
     `INSERT INTO hub_convictions (round_id, actor, proof_digest)
        VALUES (?, ?, ?)
      ON CONFLICT (round_id, actor) DO NOTHING`,
-  ).run(roundId, actor, proofDigest);
+    roundId, actor, proofDigest);
 }
 
 /** Convictions on record for a round -- the doom arithmetic's and `successor`'s zeroing set. */
 export function convictionsFor(db: Db, roundId: string): { actor: string; proofDigest: string }[] {
   return (
-    db.prepare("SELECT actor, proof_digest FROM hub_convictions WHERE round_id = ?").all(roundId) as {
+    db.all("SELECT actor, proof_digest FROM hub_convictions WHERE round_id = ?", roundId) as {
       actor: string;
       proof_digest: string;
     }[]
@@ -233,11 +231,11 @@ export function convictionsFor(db: Db, roundId: string): { actor: string; proofD
  * two round ids carry relative to each other.
  */
 export function recordRestoration(db: Db, actor: string, decisionDigest: string, now: string): void {
-  db.prepare(
+  db.run(
     `INSERT INTO hub_restorations (actor, decision_digest, created_at)
        VALUES (?, ?, ?)
      ON CONFLICT (actor, decision_digest) DO NOTHING`,
-  ).run(actor, decisionDigest, now);
+    actor, decisionDigest, now);
 }
 
 /**
@@ -249,16 +247,12 @@ export function recordRestoration(db: Db, actor: string, decisionDigest: string,
  * will sign it.
  */
 export function convictionByProof(db: Db, actor: string, proofDigest: string): boolean {
-  const row = db
-    .prepare("SELECT 1 FROM hub_convictions WHERE actor = ? AND proof_digest = ? LIMIT 1")
-    .get(actor, proofDigest) as unknown;
+  const row = db.get("SELECT 1 FROM hub_convictions WHERE actor = ? AND proof_digest = ? LIMIT 1", actor, proofDigest) as unknown;
   return row !== undefined;
 }
 
 /** Whether `actor` is convicted in `roundId`. */
 export function isConvicted(db: Db, roundId: string, actor: string): boolean {
-  const row = db
-    .prepare("SELECT 1 FROM hub_convictions WHERE round_id = ? AND actor = ?")
-    .get(roundId, actor) as unknown;
+  const row = db.get("SELECT 1 FROM hub_convictions WHERE round_id = ? AND actor = ?", roundId, actor) as unknown;
   return row !== undefined;
 }

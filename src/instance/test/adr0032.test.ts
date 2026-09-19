@@ -11,7 +11,7 @@
  */
 
 import assert from "node:assert/strict";
-import { DatabaseSync } from "node:sqlite";
+import { openNodeStore } from "../src/store/adapters/node.ts";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -282,7 +282,7 @@ describe("ADR-0032 gate — G3: backup then restore round-trips a store whose re
     const restored = new AfpInstance(targetConfig, agentRegistrations(targetConfig));
     assert.equal(schemaVersion(restored.db), BINARY_SCHEMA_VERSION);
 
-    const restorePoints = restored.db.prepare("SELECT * FROM restore_points").all();
+    const restorePoints = restored.db.all("SELECT * FROM restore_points");
     assert.equal(restorePoints.length, 1);
 
     const reExportDir = join(scratch(), "reexport");
@@ -479,9 +479,7 @@ describe("ADR-0032 gate — G5: the legacy fixture migrates 0 → BINARY_SCHEMA_
   it("a fresh store opens at version 1, recorded by name and applied_at", () => {
     const { instance } = testInstance(["writer"], "afp:cap:write");
     assert.equal(schemaVersion(instance.db), BINARY_SCHEMA_VERSION);
-    const row = instance.db
-      .prepare("SELECT version, name, applied_at FROM schema_version WHERE version = 1")
-      .get() as { version: number; name: string; applied_at: string } | undefined;
+    const row = instance.db.get("SELECT version, name, applied_at FROM schema_version WHERE version = 1") as { version: number; name: string; applied_at: string } | undefined;
     assert.ok(row, "schema_version has a row for version 1");
     assert.equal(row!.name, "001-baseline");
     assert.ok(!Number.isNaN(Date.parse(row!.applied_at)), "applied_at is a real instant");
@@ -493,9 +491,12 @@ describe("ADR-0032 gate — G5: the legacy fixture migrates 0 → BINARY_SCHEMA_
     mkdirSync(paths.dataDir, { recursive: true });
     const dbPath = join(paths.dataDir, "afp.db");
 
-    const raw = new DatabaseSync(dbPath);
+    // ADR-0036 WP-1: the fixture is built through the `node` adapter now,
+    // because `migrateWith` takes the store port. What is asserted below is
+    // unchanged.
+    const raw = openNodeStore(dbPath);
     raw.exec(LEGACY_SCHEMA_SQL);
-    const preExisting = raw.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'schema_version'").get();
+    const preExisting = raw.get("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'schema_version'");
     assert.equal(preExisting, undefined, "the fixture predates schema_version");
     raw.close();
 
@@ -503,28 +504,28 @@ describe("ADR-0032 gate — G5: the legacy fixture migrates 0 → BINARY_SCHEMA_
     assert.equal(schemaVersion(db), BINARY_SCHEMA_VERSION);
 
     const auctionCols = new Set(
-      (db.prepare("PRAGMA table_info(alloc_auctions)").all() as { name: string }[]).map((c) => c.name),
+      (db.all("PRAGMA table_info(alloc_auctions)") as { name: string }[]).map((c) => c.name),
     );
     for (const col of ["reputation_json", "snapshot_json", "excluded_prior_json"]) {
       assert.ok(auctionCols.has(col), `alloc_auctions gained ${col}`);
     }
 
     const roundCols = new Set(
-      (db.prepare("PRAGMA table_info(hub_rounds)").all() as { name: string }[]).map((c) => c.name),
+      (db.all("PRAGMA table_info(hub_rounds)") as { name: string }[]).map((c) => c.name),
     );
     for (const col of ["deadline", "quorum_rule", "binding"]) {
       assert.ok(roundCols.has(col), `hub_rounds gained ${col}`);
     }
 
     const voteCols = new Set(
-      (db.prepare("PRAGMA table_info(hub_vote_receipts)").all() as { name: string }[]).map((c) => c.name),
+      (db.all("PRAGMA table_info(hub_vote_receipts)") as { name: string }[]).map((c) => c.name),
     );
     for (const col of ["phase", "seq_no"]) {
       assert.ok(voteCols.has(col), `hub_vote_receipts gained ${col}`);
     }
 
     for (const table of ["crdt_state", "crdt_version_vector", "crdt_provenance"]) {
-      const present = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?").get(table);
+      const present = db.get("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?", table);
       assert.ok(present, `${table} exists after migration`);
     }
     db.close();
@@ -547,11 +548,9 @@ describe("ADR-0032 gate — G6: a newer store is refused, and the lock released"
     const dbPath = join(paths.dataDir, "afp.db");
 
     const seed = openDb(dbPath);
-    seed.prepare("INSERT INTO schema_version (version, applied_at, name) VALUES (?, ?, ?)").run(
-      BINARY_SCHEMA_VERSION + 1,
+    seed.run("INSERT INTO schema_version (version, applied_at, name) VALUES (?, ?, ?)", BINARY_SCHEMA_VERSION + 1,
       new Date().toISOString(),
-      "from-the-future",
-    );
+      "from-the-future");
     seed.close();
 
     assert.throws(() => openDb(dbPath), StoreNewerThanBinary);
@@ -617,7 +616,7 @@ describe("ADR-0032 primitives", () => {
   });
 
   it("a failed migration rolls back: schema_version is unchanged and the half-applied table is absent", () => {
-    const db = new DatabaseSync(":memory:");
+    const db = openNodeStore(":memory:");
     const poisoned: Migration = {
       version: 2,
       name: "002-poisoned",
@@ -632,11 +631,9 @@ describe("ADR-0032 primitives", () => {
 
     assert.throws(() => migrateWith(db, [MIGRATION_001, poisoned]), /boom/);
 
-    const row = db.prepare("SELECT MAX(version) AS v FROM schema_version").get() as { v: number | null };
+    const row = db.get("SELECT MAX(version) AS v FROM schema_version") as { v: number | null };
     assert.equal(row.v, 1, "schema_version was not advanced by the failed migration");
-    const table = db
-      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'half_applied'")
-      .get();
+    const table = db.get("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'half_applied'");
     assert.equal(table, undefined, "the half-applied table was rolled back");
   });
 });

@@ -40,14 +40,13 @@ export interface AuctionRow {
 }
 
 export function saveAuction(db: Db, row: AuctionRow): void {
-  db.prepare(
+  db.run(
     `INSERT INTO alloc_auctions
        (task_id, hub_id, thread, correlation_id, rule_json, window_opens, window_closes,
         estimator_policy, estimators_json, sufficiency_json, status, award_json, requester,
         reputation_json, snapshot_json, excluded_prior_json)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT (task_id) DO UPDATE SET status = excluded.status, award_json = excluded.award_json`,
-  ).run(
     row.taskId,
     row.hubId,
     row.thread,
@@ -64,11 +63,11 @@ export function saveAuction(db: Db, row: AuctionRow): void {
     row.reputationRule === null ? null : JSON.stringify(row.reputationRule),
     row.settlementSnapshot === null ? null : JSON.stringify(row.settlementSnapshot),
     row.excludePerformersOf === null ? null : JSON.stringify(row.excludePerformersOf),
-  );
+    );
 }
 
 export function loadAuction(db: Db, taskId: string): AuctionRow | null {
-  const row = db.prepare("SELECT * FROM alloc_auctions WHERE task_id = ?").get(taskId) as
+  const row = db.get("SELECT * FROM alloc_auctions WHERE task_id = ?", taskId) as
     | Record<string, unknown>
     | undefined;
   return row ? auctionFromRow(row) : null;
@@ -82,7 +81,7 @@ export function loadAuction(db: Db, taskId: string): AuctionRow | null {
  * (H9). `announce()` keeps threads unique; this is the second line.
  */
 export function auctionByThread(db: Db, thread: string): AuctionRow | null {
-  const rows = db.prepare("SELECT * FROM alloc_auctions WHERE thread = ? ORDER BY task_id").all(thread) as Record<
+  const rows = db.all("SELECT * FROM alloc_auctions WHERE thread = ? ORDER BY task_id", thread) as Record<
     string,
     unknown
   >[];
@@ -120,26 +119,24 @@ export interface SettlementRecordRow {
 }
 
 export function saveSettlementRecord(db: Db, row: SettlementRecordRow): void {
-  db.prepare(
+  db.run(
     `INSERT INTO alloc_settlement_records (digest, task_id, published, object_json)
        VALUES (?, ?, ?, ?)
      ON CONFLICT (digest) DO NOTHING`,
-  ).run(row.digest, row.taskId, row.published, JSON.stringify(row.object));
+    row.digest, row.taskId, row.published, JSON.stringify(row.object));
 }
 
 /** Has this task already been settled? Settlement is once-per-task (ADR-0004). */
 export function hasSettlementRecord(db: Db, taskId: string): boolean {
-  const row = db
-    .prepare("SELECT 1 FROM alloc_settlement_records WHERE task_id = ? LIMIT 1")
-    .get(taskId) as unknown;
+  const row = db.get("SELECT 1 FROM alloc_settlement_records WHERE task_id = ? LIMIT 1", taskId) as unknown;
   return row !== undefined && row !== null;
 }
 
 /** Every settlement record published strictly before `before`, in (published, digest) order. */
 export function settlementRecordsBefore(db: Db, before: string): SettlementRecordRow[] {
-  const rows = db
-    .prepare("SELECT * FROM alloc_settlement_records WHERE published < ? ORDER BY published, digest")
-    .all(before) as Record<string, unknown>[];
+  const rows = db.all("SELECT * FROM alloc_settlement_records WHERE published < ? ORDER BY published, digest",
+    before
+  ) as Record<string, unknown>[];
   return rows.map((row) => ({
     digest: String(row.digest),
     taskId: String(row.task_id),
@@ -150,9 +147,10 @@ export function settlementRecordsBefore(db: Db, before: string): SettlementRecor
 
 /** Resolve pinned digests to their records; a missing digest returns null in place. */
 export function settlementRecordsByDigest(db: Db, digests: readonly string[]): (SettlementRecordRow | null)[] {
-  const stmt = db.prepare("SELECT * FROM alloc_settlement_records WHERE digest = ?");
+  // The port takes SQL per call and the node adapter caches by SQL text, so
+  // this reads once per digest and still prepares once (ADR-0036 D2).
   return digests.map((digest) => {
-    const row = stmt.get(digest) as Record<string, unknown> | undefined;
+    const row = db.get("SELECT * FROM alloc_settlement_records WHERE digest = ?", digest) as Record<string, unknown> | undefined;
     if (!row) return null;
     return {
       digest: String(row.digest),
@@ -164,20 +162,18 @@ export function settlementRecordsByDigest(db: Db, digests: readonly string[]): (
 }
 
 export function saveCommit(db: Db, taskId: string, bidder: string, commitment: string, published: string): void {
-  db.prepare(
+  db.run(
     `INSERT INTO alloc_bids (task_id, bidder, commitment, commit_published)
        VALUES (?, ?, ?, ?)
      ON CONFLICT (task_id, bidder) DO NOTHING`,
-  ).run(taskId, bidder, commitment, published);
+    taskId, bidder, commitment, published);
 }
 
 export function saveReveal(db: Db, taskId: string, bidder: string, payload: JsonValue, digest: string): void {
-  db.prepare("UPDATE alloc_bids SET reveal_json = ?, reveal_digest = ? WHERE task_id = ? AND bidder = ?").run(
-    JSON.stringify(payload),
+  db.run("UPDATE alloc_bids SET reveal_json = ?, reveal_digest = ? WHERE task_id = ? AND bidder = ?", JSON.stringify(payload),
     digest,
     taskId,
-    bidder,
-  );
+    bidder);
 }
 
 export interface BidRow {
@@ -189,7 +185,7 @@ export interface BidRow {
 }
 
 export function bidsFor(db: Db, taskId: string): BidRow[] {
-  const rows = db.prepare("SELECT * FROM alloc_bids WHERE task_id = ? ORDER BY bidder").all(taskId) as Record<
+  const rows = db.all("SELECT * FROM alloc_bids WHERE task_id = ? ORDER BY bidder", taskId) as Record<
     string,
     unknown
   >[];
@@ -203,30 +199,27 @@ export function bidsFor(db: Db, taskId: string): BidRow[] {
 }
 
 export function saveDecline(db: Db, taskId: string, actor: string, reason: string): void {
-  db.prepare(
-    "INSERT INTO alloc_declines (task_id, actor, reason) VALUES (?, ?, ?) ON CONFLICT (task_id, actor) DO NOTHING",
-  ).run(taskId, actor, reason);
+  db.run(
+    "INSERT INTO alloc_declines (task_id, actor, reason) VALUES (?, ?, ?) ON CONFLICT (task_id, actor) DO NOTHING", taskId, actor, reason);
 }
 
 export function declinesFor(db: Db, taskId: string): { actor: string; reason: string }[] {
-  const rows = db.prepare("SELECT actor, reason FROM alloc_declines WHERE task_id = ? ORDER BY actor").all(taskId) as Record<string, unknown>[];
+  const rows = db.all("SELECT actor, reason FROM alloc_declines WHERE task_id = ? ORDER BY actor", taskId) as Record<string, unknown>[];
   return rows.map((row) => ({ actor: String(row.actor), reason: String(row.reason) }));
 }
 
 export function logAdmission(db: Db, at: string, taskId: string, actor: string, outcome: string, reason: string): void {
-  db.prepare("INSERT INTO alloc_admissions (at, task_id, actor, outcome, reason) VALUES (?, ?, ?, ?, ?)").run(
-    at,
+  db.run("INSERT INTO alloc_admissions (at, task_id, actor, outcome, reason) VALUES (?, ?, ?, ?, ?)", at,
     taskId,
     actor,
     outcome,
-    reason,
-  );
+    reason);
 }
 
 export function admissionLog(db: Db, taskId: string): { at: string; actor: string; outcome: string; reason: string }[] {
-  const rows = db
-    .prepare("SELECT at, actor, outcome, reason FROM alloc_admissions WHERE task_id = ? ORDER BY at")
-    .all(taskId) as Record<string, unknown>[];
+  const rows = db.all("SELECT at, actor, outcome, reason FROM alloc_admissions WHERE task_id = ? ORDER BY at",
+    taskId
+  ) as Record<string, unknown>[];
   return rows.map((row) => ({
     at: String(row.at),
     actor: String(row.actor),
@@ -243,19 +236,19 @@ export interface PendingAcceptRow {
 }
 
 export function savePendingAccept(db: Db, row: PendingAcceptRow): void {
-  db.prepare(
+  db.run(
     `INSERT INTO alloc_pending_accepts (award_id, task_id, accept_by, missing_json)
        VALUES (?, ?, ?, ?)
      ON CONFLICT (award_id) DO UPDATE SET missing_json = excluded.missing_json`,
-  ).run(row.awardId, row.taskId, row.acceptBy, JSON.stringify(row.missing));
+    row.awardId, row.taskId, row.acceptBy, JSON.stringify(row.missing));
 }
 
 export function deletePendingAccept(db: Db, awardId: string): void {
-  db.prepare("DELETE FROM alloc_pending_accepts WHERE award_id = ?").run(awardId);
+  db.run("DELETE FROM alloc_pending_accepts WHERE award_id = ?", awardId);
 }
 
 export function pendingAccepts(db: Db): PendingAcceptRow[] {
-  const rows = db.prepare("SELECT * FROM alloc_pending_accepts ORDER BY award_id").all() as Record<string, unknown>[];
+  const rows = db.all("SELECT * FROM alloc_pending_accepts ORDER BY award_id") as Record<string, unknown>[];
   return rows.map((row) => ({
     awardId: String(row.award_id),
     taskId: String(row.task_id),
@@ -273,9 +266,9 @@ export function saveSettlement(
   actual: JsonValue,
   at: string,
 ): void {
-  db.prepare(
+  db.run(
     `INSERT INTO alloc_settlements (task_id, actor, bid_digest, estimated_json, actual_json, recorded_at)
        VALUES (?, ?, ?, ?, ?, ?)
      ON CONFLICT (task_id, actor) DO NOTHING`,
-  ).run(taskId, actor, bidDigest, JSON.stringify(estimated), JSON.stringify(actual), at);
+    taskId, actor, bidDigest, JSON.stringify(estimated), JSON.stringify(actual), at);
 }

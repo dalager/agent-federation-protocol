@@ -85,20 +85,11 @@ export class Artifacts {
     const path = this.pathFor(digest);
     if (!existsSync(path)) writeFileSync(path, bytes);
 
-    this.db
-      .prepare(
+    this.db.run(
         `INSERT INTO artifacts (digest, media_type, size, created_at, source_url, fetched_at)
          VALUES (?, ?, ?, ?, ?, ?)
          ON CONFLICT (digest) DO NOTHING`,
-      )
-      .run(
-        digest,
-        mediaType,
-        bytes.length,
-        now.toISOString(),
-        source?.sourceUrl ?? null,
-        source?.fetchedAt ?? null,
-      );
+        digest, mediaType, bytes.length, now.toISOString(), source?.sourceUrl ?? null, source?.fetchedAt ?? null);
 
     return this.ref(digest, mediaType, bytes.length, source);
   }
@@ -139,17 +130,13 @@ export class Artifacts {
   }
 
   lookup(digest: string): ArtifactRef | null {
-    const row = this.db
-      .prepare("SELECT * FROM artifacts WHERE digest = ?")
-      .get(digest) as Record<string, unknown> | undefined;
+    const row = this.db.get("SELECT * FROM artifacts WHERE digest = ?", digest) as Record<string, unknown> | undefined;
     if (!row) return null;
     return this.ref(String(row.digest), String(row.media_type), Number(row.size), sourceOf(row));
   }
 
   all(): ArtifactRef[] {
-    const rows = this.db
-      .prepare("SELECT * FROM artifacts ORDER BY digest")
-      .all() as Record<string, unknown>[];
+    const rows = this.db.all("SELECT * FROM artifacts ORDER BY digest") as Record<string, unknown>[];
     return rows.map((row) =>
       this.ref(String(row.digest), String(row.media_type), Number(row.size), sourceOf(row)),
     );

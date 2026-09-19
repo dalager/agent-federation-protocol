@@ -30,14 +30,11 @@ export class Tasks {
   }
 
   open(task: Omit<PendingTask, "state">, now = new Date()): void {
-    this.db
-      .prepare(
+    this.db.run(
         `INSERT INTO pending_tasks
            (correlation_id, thread, delegator, performer, deadline, state, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, 'offered', ?, ?)
          ON CONFLICT (correlation_id) DO NOTHING`,
-      )
-      .run(
         task.correlationId,
         task.thread,
         task.delegator,
@@ -45,19 +42,15 @@ export class Tasks {
         task.deadline,
         now.toISOString(),
         now.toISOString(),
-      );
+        );
   }
 
   setState(correlationId: string, state: TaskState, now = new Date()): void {
-    this.db
-      .prepare("UPDATE pending_tasks SET state = ?, updated_at = ? WHERE correlation_id = ?")
-      .run(state, now.toISOString(), correlationId);
+    this.db.run("UPDATE pending_tasks SET state = ?, updated_at = ? WHERE correlation_id = ?", state, now.toISOString(), correlationId);
   }
 
   get(correlationId: string): PendingTask | null {
-    const row = this.db
-      .prepare("SELECT * FROM pending_tasks WHERE correlation_id = ?")
-      .get(correlationId) as Record<string, unknown> | undefined;
+    const row = this.db.get("SELECT * FROM pending_tasks WHERE correlation_id = ?", correlationId) as Record<string, unknown> | undefined;
     if (!row) return null;
     return {
       correlationId: String(row.correlation_id),
@@ -71,12 +64,10 @@ export class Tasks {
 
   /** Tasks still awaiting an outcome past their deadline. */
   overdue(now = new Date()): PendingTask[] {
-    const rows = this.db
-      .prepare(
+    const rows = this.db.all(
         `SELECT * FROM pending_tasks
           WHERE state IN ('offered', 'accepted') AND deadline IS NOT NULL AND deadline < ?`,
-      )
-      .all(now.toISOString()) as Record<string, unknown>[];
+        now.toISOString()) as Record<string, unknown>[];
     return rows.map((row) => ({
       correlationId: String(row.correlation_id),
       thread: String(row.thread),
@@ -89,9 +80,9 @@ export class Tasks {
 
   /** ADR-0029 Decision 2 ("Command"): how many tasks `performer` still has open — the `status` command's `pending` count. */
   openCountForPerformer(performer: string): number {
-    const row = this.db
-      .prepare("SELECT COUNT(*) AS n FROM pending_tasks WHERE performer = ? AND state IN ('offered', 'accepted')")
-      .get(performer) as { n: number };
+    const row = this.db.get("SELECT COUNT(*) AS n FROM pending_tasks WHERE performer = ? AND state IN ('offered', 'accepted')",
+      performer
+    ) as { n: number };
     return Number(row.n);
   }
 
@@ -102,19 +93,11 @@ export class Tasks {
     activity: { [key: string]: JsonValue },
     now = new Date(),
   ): void {
-    this.db
-      .prepare(
+    this.db.run(
         `INSERT INTO task_results (correlation_id, performer, activity_id, activity_json, created_at)
          VALUES (?, ?, ?, ?, ?)
          ON CONFLICT (correlation_id) DO NOTHING`,
-      )
-      .run(
-        correlationId,
-        performer,
-        String(activity.id ?? ""),
-        JSON.stringify(activity),
-        now.toISOString(),
-      );
+        correlationId, performer, String(activity.id ?? ""), JSON.stringify(activity), now.toISOString());
   }
 
   /**
@@ -127,9 +110,9 @@ export class Tasks {
     correlationId: string,
     performer: string,
   ): { [key: string]: JsonValue } | null {
-    const row = this.db
-      .prepare("SELECT activity_json FROM task_results WHERE correlation_id = ? AND performer = ?")
-      .get(correlationId, performer) as { activity_json?: string } | undefined;
+    const row = this.db.get("SELECT activity_json FROM task_results WHERE correlation_id = ? AND performer = ?",
+      correlationId, performer
+    ) as { activity_json?: string } | undefined;
     return row?.activity_json ? JSON.parse(row.activity_json) : null;
   }
 }

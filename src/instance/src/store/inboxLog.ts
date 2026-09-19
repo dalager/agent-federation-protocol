@@ -8,28 +8,28 @@
  * and a refused delivery never lands here.
  */
 
-import type { DatabaseSync } from "node:sqlite";
+import type { Store } from "./port.ts";
 import type { JsonValue } from "../crypto/jcs.ts";
 
 export class InboxLog {
-  private readonly db: DatabaseSync;
+  private readonly db: Store;
 
-  constructor(db: DatabaseSync) {
+  constructor(db: Store) {
     this.db = db;
   }
 
   record(recipient: string, activity: { [key: string]: JsonValue }, at: Date): void {
     const id = typeof activity.id === "string" ? activity.id : null;
     if (!id) return; // transient activities carry no id and leave no inbox record
-    this.db
-      .prepare("INSERT OR IGNORE INTO inbox_log (activity_id, recipient, activity_json, received_at) VALUES (?, ?, ?, ?)")
-      .run(id, recipient, JSON.stringify(activity), at.toISOString());
+    this.db.run("INSERT OR IGNORE INTO inbox_log (activity_id, recipient, activity_json, received_at) VALUES (?, ?, ?, ?)",
+      id, recipient, JSON.stringify(activity), at.toISOString()
+    );
   }
 
   byRecipient(recipient: string): { [key: string]: JsonValue }[] {
-    const rows = this.db
-      .prepare("SELECT activity_json FROM inbox_log WHERE recipient = ? ORDER BY received_at, activity_id")
-      .all(recipient) as { activity_json: string }[];
+    const rows = this.db.all("SELECT activity_json FROM inbox_log WHERE recipient = ? ORDER BY received_at, activity_id",
+      recipient
+    ) as { activity_json: string }[];
     return rows.map((row) => JSON.parse(row.activity_json));
   }
 }

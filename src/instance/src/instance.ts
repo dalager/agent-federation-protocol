@@ -294,9 +294,9 @@ export class AfpInstance {
    * though its URL is guessable from the digest.
    */
   artifactIsPublic(digest: string): boolean {
-    const referencing = this.db
-      .prepare("SELECT visibility, activity_json FROM outbox WHERE activity_json LIKE ?")
-      .all(`%${digest}%`) as Record<string, unknown>[];
+    const referencing = this.db.all("SELECT visibility, activity_json FROM outbox WHERE activity_json LIKE ?",
+      `%${digest}%`
+    ) as Record<string, unknown>[];
     return referencing.length > 0 && referencing.every((row) => String(row.visibility) === "public");
   }
 

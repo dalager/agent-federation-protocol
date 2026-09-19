@@ -46,7 +46,7 @@ function ensureVersionTable(db: Db): void {
 
 /** The highest version recorded in `schema_version`, or 0 for a store that has never migrated. */
 function currentVersion(db: Db): number {
-  const row = db.prepare("SELECT MAX(version) AS v FROM schema_version").get() as { v: number | null };
+  const row = db.get("SELECT MAX(version) AS v FROM schema_version") as { v: number | null };
   return row.v ?? 0;
 }
 
@@ -70,11 +70,9 @@ export function migrateWith(db: Db, migrations: readonly Migration[]): { from: n
     db.exec("BEGIN");
     try {
       migration.up(db);
-      db.prepare("INSERT INTO schema_version (version, applied_at, name) VALUES (?, ?, ?)").run(
-        migration.version,
+      db.run("INSERT INTO schema_version (version, applied_at, name) VALUES (?, ?, ?)", migration.version,
         new Date().toISOString(),
-        migration.name,
-      );
+        migration.name);
       db.exec("COMMIT");
     } catch (error) {
       db.exec("ROLLBACK");

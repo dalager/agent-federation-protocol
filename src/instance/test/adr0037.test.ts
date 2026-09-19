@@ -30,7 +30,7 @@ import { enroll } from "../src/hub/activities.ts";
 import { loadOrCreateHubKeyPair } from "../src/crypto/keys.ts";
 import { fileSigner } from "../src/crypto/signer.ts";
 import { signRequest } from "../src/federation/httpSig.ts";
-import { DatabaseSync } from "node:sqlite";
+import { openNodeStore } from "../src/store/adapters/node.ts";
 import { migrateWith, MIGRATIONS } from "../src/store/migrations/index.ts";
 import { MIGRATION_001 } from "../src/store/migrations/001-baseline.ts";
 import { MIGRATION_002 } from "../src/store/migrations/002-restore-points.ts";
@@ -386,22 +386,26 @@ describe("ADR-0037 G5 — migration 003 moves hub_seats into CRDT state", () => 
 
     // A store at version 2 — before this ADR — holding one hub's CRDT state
     // and two seat rows.
-    const db = new DatabaseSync(dbPath);
+    // ADR-0036 WP-1: fixture built through the `node` adapter; assertions unchanged.
+    const db = openNodeStore(dbPath);
     db.exec("PRAGMA foreign_keys = ON");
     migrateWith(db, [MIGRATION_001, MIGRATION_002]);
-    db.prepare(
+    db.run(
       "INSERT INTO crdt_state (hub_id, crdt_id, crdt_type, state_json, updated_at) VALUES (?, 'membership', 'OR_SET', ?, ?)",
-    ).run(HUB, JSON.stringify({ elementTags: {}, tombstones: {} }), "2026-09-01T00:00:00.000Z");
-    db.prepare(
+      HUB, JSON.stringify({ elementTags: {}, tombstones: {} },
+    ), "2026-09-01T00:00:00.000Z");
+    db.run(
       "INSERT INTO hub_seats (instance_actor, follow_activity, followed_at, revoked_at) VALUES (?, ?, ?, NULL)",
-    ).run("https://live.test/actor", "https://live.test/act/1", "2026-09-01T00:00:00.000Z");
-    db.prepare(
+      "https://live.test/actor", "https://live.test/act/1", "2026-09-01T00:00:00.000Z",
+    );
+    db.run(
       "INSERT INTO hub_seats (instance_actor, follow_activity, followed_at, revoked_at) VALUES (?, ?, ?, ?)",
-    ).run("https://gone.test/actor", "https://gone.test/act/1", "2026-09-01T00:00:00.000Z", "2026-09-02T00:00:00.000Z");
+      "https://gone.test/actor", "https://gone.test/act/1", "2026-09-01T00:00:00.000Z", "2026-09-02T00:00:00.000Z",
+    );
 
     migrateWith(db, MIGRATIONS);
 
-    const row = db.prepare("SELECT state_json FROM crdt_state WHERE hub_id = ? AND crdt_id = 'seats'").get(HUB) as
+    const row = db.get("SELECT state_json FROM crdt_state WHERE hub_id = ? AND crdt_id = 'seats'", HUB) as
       | { state_json: string }
       | undefined;
     assert.ok(row, "the seats store exists under the one hub this store held state for");
@@ -410,7 +414,7 @@ describe("ADR-0037 G5 — migration 003 moves hub_seats into CRDT state", () => 
     assert.deepEqual(state.tombstones["https://gone.test/actor"], ["https://gone.test/act/1"], "a revoked seat is a tombstoned tag");
     assert.equal(state.tombstones["https://live.test/actor"], undefined, "a live seat is untombstoned");
 
-    assert.throws(() => db.prepare("SELECT 1 FROM hub_seats").get(), /no such table/, "the table is gone, not shadowed");
+    assert.throws(() => db.get("SELECT 1 FROM hub_seats"), /no such table/, "the table is gone, not shadowed");
     db.close();
   });
 });

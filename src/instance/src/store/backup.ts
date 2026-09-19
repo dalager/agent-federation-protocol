@@ -17,6 +17,13 @@
  */
 
 import { backup as sqliteBackup, DatabaseSync } from "node:sqlite";
+
+// ADR-0036 Decision 7: backup is profile-conditional, and this file is the
+// self-hosted profile's — `node:sqlite`'s online backup API has no hosted
+// counterpart (a platform actor's point-in-time recovery is Decision 7's
+// answer there). So the raw handle stays; what changes is that anything
+// speaking the store port — `schemaVersion` — is handed the adapter.
+import { openNodeStore } from "./adapters/node.ts";
 import {
   cpSync,
   existsSync,
@@ -97,7 +104,7 @@ export async function backupStore(dir: string, options: BackupOptions): Promise<
   // The restored copy's own version, read without holding any lock beyond
   // this brief open — the point of the manifest is "what version was this",
   // not "what version is the live store right now".
-  const check = new DatabaseSync(join(target, "afp.db"), { readOnly: true });
+  const check = openNodeStore(join(target, "afp.db"), { readOnly: true });
   const version = schemaVersion(check);
   check.close();
 
@@ -197,9 +204,10 @@ export function restoreStore(dir: string, options: RestoreOptions): { restoredAt
         `restored store is at schema version ${schemaVersion(db)}, expected ${BINARY_SCHEMA_VERSION} — this should not happen after openDb's own migration`,
       );
     }
-    db.prepare(
+    db.run(
       "INSERT INTO restore_points (restored_at, backup_taken_at, origin, note) VALUES (?, ?, ?, ?)",
-    ).run(restoredAt, manifest.takenAt, options.origin, `restored from ${source}`);
+      restoredAt, manifest.takenAt, options.origin, `restored from ${source}`,
+    );
   } finally {
     db.close();
   }

@@ -390,6 +390,26 @@ describe("ADR-0034 primitives", () => {
       assert.match(output, /^ok —/);
     });
 
+    it("no tracked source file is binary — a stray control byte hides a whole file from grep", () => {
+      // ADR-0036 WP-1 found `src/crdt/store.ts` carrying a literal NUL (a
+      // composite map key written with the control character instead of
+      // `\0`). Every `grep -I`-based tool — including the one that built
+      // that refactor's file list — classifies such a file as binary and
+      // skips it silently, so nine call sites went missing and only
+      // surfaced at runtime. Escaping that byte fixed the file; this case
+      // is what stops the next one.
+      const tracked = execFileSync("git", ["ls-files", "-z", "*.ts", "*.py", "*.mjs", "*.json", "*.md", "*.yml", "*.jsonld"], {
+        cwd: REPO_ROOT,
+        encoding: "buffer",
+      });
+      const offenders: string[] = [];
+      for (const name of tracked.toString("utf8").split("\0").filter(Boolean)) {
+        const nul = readFileSync(join(REPO_ROOT, name)).indexOf(0);
+        if (nul !== -1) offenders.push(`${name}: NUL byte at offset ${nul}`);
+      }
+      assert.deepEqual(offenders, [], "write control characters as escapes — a literal one makes the file invisible to grep");
+    });
+
     it(".github/workflows/gate.yml parses as YAML and runs on push and pull_request", () => {
       const workflowText = readFileSync(WORKFLOW, "utf8");
       assert.match(workflowText, /^name:\s*gate/m);

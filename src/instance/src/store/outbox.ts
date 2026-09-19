@@ -33,16 +33,14 @@ export class Outbox {
 
   /** The digest of `actor`'s most recent activity, or null if it has none. */
   headDigest(actor: string): string | null {
-    const row = this.db
-      .prepare("SELECT digest FROM outbox WHERE actor = ? ORDER BY seq DESC LIMIT 1")
-      .get(actor) as { digest?: string } | undefined;
+    const row = this.db.get("SELECT digest FROM outbox WHERE actor = ? ORDER BY seq DESC LIMIT 1",
+      actor
+    ) as { digest?: string } | undefined;
     return row?.digest ?? null;
   }
 
   nextSeq(actor: string): number {
-    const row = this.db
-      .prepare("SELECT COALESCE(MAX(seq), 0) AS max_seq FROM outbox WHERE actor = ?")
-      .get(actor) as { max_seq: number };
+    const row = this.db.get("SELECT COALESCE(MAX(seq), 0) AS max_seq FROM outbox WHERE actor = ?", actor) as { max_seq: number };
     return Number(row.max_seq) + 1;
   }
 
@@ -81,13 +79,10 @@ export class Outbox {
       activity,
     };
 
-    this.db
-      .prepare(
+    this.db.run(
         `INSERT INTO outbox
            (activity_id, actor, seq, thread, digest, prev_activity, visibility, published, activity_json)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      )
-      .run(
         entry.activityId,
         entry.actor,
         entry.seq,
@@ -97,38 +92,32 @@ export class Outbox {
         entry.visibility,
         entry.published,
         JSON.stringify(activity),
-      );
+        );
 
     return entry;
   }
 
   /** Every activity by one actor, in chain order. */
   byActor(actor: string): OutboxEntry[] {
-    const rows = this.db
-      .prepare("SELECT * FROM outbox WHERE actor = ? ORDER BY seq ASC")
-      .all(actor) as Record<string, unknown>[];
+    const rows = this.db.all("SELECT * FROM outbox WHERE actor = ? ORDER BY seq ASC", actor) as Record<string, unknown>[];
     return rows.map(toEntry);
   }
 
   /** Every activity in one thread, across actors — the audit replay selector. */
   byThread(thread: string): OutboxEntry[] {
-    const rows = this.db
-      .prepare("SELECT * FROM outbox WHERE thread = ? ORDER BY published ASC, actor ASC, seq ASC")
-      .all(thread) as Record<string, unknown>[];
+    const rows = this.db.all("SELECT * FROM outbox WHERE thread = ? ORDER BY published ASC, actor ASC, seq ASC",
+      thread
+    ) as Record<string, unknown>[];
     return rows.map(toEntry);
   }
 
   actors(): string[] {
-    const rows = this.db
-      .prepare("SELECT DISTINCT actor FROM outbox ORDER BY actor")
-      .all() as { actor: string }[];
+    const rows = this.db.all("SELECT DISTINCT actor FROM outbox ORDER BY actor") as { actor: string }[];
     return rows.map((row) => row.actor);
   }
 
   get(activityId: string): OutboxEntry | null {
-    const row = this.db
-      .prepare("SELECT * FROM outbox WHERE activity_id = ?")
-      .get(activityId) as Record<string, unknown> | undefined;
+    const row = this.db.get("SELECT * FROM outbox WHERE activity_id = ?", activityId) as Record<string, unknown> | undefined;
     return row ? toEntry(row) : null;
   }
 }

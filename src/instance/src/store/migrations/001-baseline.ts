@@ -412,7 +412,7 @@ function legacyAllocColumns(db: Db): void {
 /** The ADR-0018 W7 / ADR-0020 W1-2 guards, reproduced for a legacy `hub_rounds` / `hub_vote_receipts`. */
 function legacyHubColumns(db: Db): void {
   const existingRoundCols = new Set(
-    (db.prepare("PRAGMA table_info(hub_rounds)").all() as { name: string }[]).map((col) => col.name),
+    (db.all("PRAGMA table_info(hub_rounds)") as { name: string }[]).map((col) => col.name),
   );
   for (const [column, ddl] of [
     ["deadline", "deadline TEXT"],
@@ -423,7 +423,7 @@ function legacyHubColumns(db: Db): void {
   }
 
   const existingVoteReceiptCols = new Set(
-    (db.prepare("PRAGMA table_info(hub_vote_receipts)").all() as { name: string }[]).map((col) => col.name),
+    (db.all("PRAGMA table_info(hub_vote_receipts)") as { name: string }[]).map((col) => col.name),
   );
   for (const [column, ddl] of [
     ["phase", "phase TEXT"],

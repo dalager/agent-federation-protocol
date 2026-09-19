@@ -106,18 +106,16 @@ export class Inbox {
     actor: string,
     reason: string,
   ): ReceiveOutcome {
-    this.instance.db
-      .prepare("INSERT INTO audit_log (at, outcome, activity_id, actor, reason) VALUES (?, ?, ?, ?, ?)")
-      .run(this.instance.clock.now().toISOString(), outcome, activityId || null, actor || null, reason);
+    this.instance.db.run("INSERT INTO audit_log (at, outcome, activity_id, actor, reason) VALUES (?, ?, ?, ?, ?)",
+      this.instance.clock.now().toISOString(), outcome, activityId || null, actor || null, reason
+    );
     metrics.inboxRefused(outcome);
     return { status: outcome, reason } as ReceiveOutcome;
   }
 
   /** The audit log of dropped deliveries, newest last. */
   auditLog(): { at: string; outcome: string; activityId: string | null; reason: string }[] {
-    const rows = this.instance.db
-      .prepare("SELECT at, outcome, activity_id, reason FROM audit_log ORDER BY id ASC")
-      .all() as Record<string, unknown>[];
+    const rows = this.instance.db.all("SELECT at, outcome, activity_id, reason FROM audit_log ORDER BY id ASC") as Record<string, unknown>[];
     return rows.map((row) => ({
       at: String(row.at),
       outcome: String(row.outcome),

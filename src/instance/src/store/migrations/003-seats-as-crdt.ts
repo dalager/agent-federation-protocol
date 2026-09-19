@@ -48,20 +48,18 @@ export const MIGRATION_003: Migration = {
   version: 3,
   name: "seats-as-crdt",
   up(db: Db): void {
-    const rows = db
-      .prepare("SELECT instance_actor, follow_activity, revoked_at FROM hub_seats")
-      .all() as SeatRow[];
-    const hubs = (db.prepare("SELECT DISTINCT hub_id FROM crdt_state").all() as { hub_id: string }[]).map((row) =>
+    const rows = db.all("SELECT instance_actor, follow_activity, revoked_at FROM hub_seats") as SeatRow[];
+    const hubs = (db.all("SELECT DISTINCT hub_id FROM crdt_state") as { hub_id: string }[]).map((row) =>
       String(row.hub_id),
     );
 
     if (rows.length > 0 && hubs.length === 1) {
-      db.prepare(
+      db.run(
         `INSERT INTO crdt_state (hub_id, crdt_id, crdt_type, state_json, updated_at)
            VALUES (?, 'seats', 'OR_SET', ?, ?)
          ON CONFLICT (hub_id, crdt_id) DO UPDATE SET state_json = excluded.state_json,
            updated_at = excluded.updated_at`,
-      ).run(hubs[0], JSON.stringify(seatState(rows)), new Date().toISOString());
+        hubs[0], JSON.stringify(seatState(rows)), new Date().toISOString());
       // No `crdt_provenance` rows: provenance names the signed activity a
       // delta was derived from, and this migration derives from a table, not
       // from the record. A migrated seat therefore does not itself sync —
