@@ -1201,6 +1201,30 @@ async function main(): Promise<void> {
       break;
     }
 
+    // ADR-0039 Decision 4: the four hub acts, as a signed client of the
+    // running instance. Same plumbing as `task` and `show` — no store, no
+    // minting — because `serve` holds the one writer and this is meant to be
+    // run while it does.
+    //   afp hub follow|unfollow <hub> | enroll|unenroll <agent> <hub> | list
+    case "hub": {
+      const config = loadConfig();
+      const { parseHubArgs, runHubCli } = await import("./ports/hubCli.ts");
+      let result: Awaited<ReturnType<typeof runHubCli>>;
+      try {
+        result = await runHubCli(config, parseHubArgs(process.argv.slice(3)));
+      } catch (error) {
+        console.error(`\nrefused: ${(error as Error).message}\n`);
+        process.exit(2);
+      }
+      console.log(JSON.stringify(result.body, null, 2));
+      const refused = result.status !== 200 || (typeof result.body === "object" && result.body !== null && "reply" in result.body);
+      if (refused) {
+        console.error(`\n${result.url} answered ${result.status} as ${result.controller} — the polite reply means the instance declined; see README § Taking a seat at a hub`);
+        process.exit(1);
+      }
+      break;
+    }
+
     case "serve": {
       const config = loadConfig();
       const instance = new AfpInstance(config, agentCollection(config));
@@ -1377,7 +1401,7 @@ async function main(): Promise<void> {
     }
 
     default:
-      console.error(`unknown command: ${command}\nusage: cli.ts [demo|p2|p3|p3:llm|p4|p5|p5:llm|p6|p6:llm|p7|p7:llm|p8|p8:llm|export|keys|serve|task|show|config|backup|restore]`);
+      console.error(`unknown command: ${command}\nusage: cli.ts [demo|p2|p3|p3:llm|p4|p5|p5:llm|p6|p6:llm|p7|p7:llm|p8|p8:llm|export|keys|serve|task|show|hub|config|backup|restore]`);
       process.exit(1);
   }
 }

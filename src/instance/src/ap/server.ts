@@ -465,6 +465,15 @@ export function createHttpServer(instance: AfpInstance, options: ServerOptions =
           return send(200, instance.policyDocument() as unknown as JsonValue);
         }
 
+        // ADR-0039 Decision 4: the hubs this instance seeks a seat at, derived
+        // from its own Follow/Undo trail. Unauthenticated for the reason the
+        // trail itself is: `followHub` publishes at `public` visibility, so
+        // this route discloses nothing the outbox does not already serve — it
+        // saves a reader replaying the trail themselves.
+        if (path === "/afp/following") {
+          return send(200, { following: instance.followingIds() } as unknown as JsonValue);
+        }
+
         // ADR-0017 Decision 5: FEP-f1d5 NodeInfo — the discovery link and the
         // version document it points at, both unauthenticated like every
         // other bootstrap route.

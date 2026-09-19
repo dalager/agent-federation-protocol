@@ -17,6 +17,7 @@
     "keys": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env src/cli.ts keys",
     "task": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env src/cli.ts task",
     "show": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env src/cli.ts show",
+    "hub": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env src/cli.ts hub",
     "backup": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env src/cli.ts backup",
     "restore": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env src/cli.ts restore",
     "config:check": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env src/cli.ts config check",

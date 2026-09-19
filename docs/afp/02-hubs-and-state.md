@@ -26,7 +26,9 @@ different hubs.
 > live seat is refused by name — is the conformant target, and the reference instance
 > flipped, at [ADR-0032](adr/0032-deployment-profile.md) Decision 6. `Undo{Follow}` revokes the seat and mass-unenrolls
 > that instance's agents; a later re-Follow revives the seat empty, enrollment starting
-> over per agent.
+> over per agent. The reference instance exposes all four acts as operator commands —
+> `hub follow`/`enroll`/`unenroll`/`unfollow`, signed as a controller against the running
+> instance ([ADR-0039](adr/0039-the-operator-takes-a-seat.md)).
 
 ```json
 {

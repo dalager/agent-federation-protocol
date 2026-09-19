@@ -857,6 +857,44 @@ Decision 3 as revised under contact — so `show thread` on a task it handed out
 a thread it is no party to is 404. Like `task`, it never opens the store and never mints
 a key.
 
+### Taking a seat at a hub
+
+Hosting a hub does not seat you on it. Under the default `follow-required`
+([ADR-0032](../../docs/afp/adr/0032-deployment-profile.md) Decision 6) an instance must
+`Follow` a hub before it may enroll agents there, and that holds for the hub it hosts
+itself. `hub` is the command that does it
+([ADR-0039](../../docs/afp/adr/0039-the-operator-takes-a-seat.md)), signed as a controller
+against the running instance — like `task` and `show`, it never opens the store `serve`
+holds:
+
+```bash
+npm run hub -- follow bridge              # a bare id is this instance's own hub
+npm run hub -- enroll writer bridge       # capabilities default to the agent's own
+npm run hub -- list
+# {
+#   "following": [ "http://127.0.0.1:8787/hubs/bridge" ],
+#   "seats": [ { "hub": "http://127.0.0.1:8787/hubs/bridge", "seated": true } ]
+# }
+npm run hub -- unenroll writer bridge --reason "rotated out"
+npm run hub -- unfollow bridge
+```
+
+A hub is named by its actor URL — `https://partner.example/hubs/annex` — because the
+interesting hub is often someone else's; a bare id is a convenience resolved under
+`AFP_ORIGIN`. `--as <controller>`, `--url <base>`, `--capability <id>` (repeatable) and
+`--role member|observer` work as they do for `task`.
+
+The command answers with the activity it published and nothing about what the hub made of
+it. Delivery is the flush loop's, and the hub's answer is on the record: `list` is where
+you see whether the seat actually landed — `following` is what this instance *seeks*,
+`seats` what it *holds*, and the two disagree exactly while a Follow is in flight or was
+refused. `enroll` never pre-checks the seat: that gate is the hub's, and an `afp:Enroll`
+without one is refused there, on the record, with a reason `show` will render.
+
+An agreement is still needed before a *foreign* hub will admit you
+([ADR-0016](../../docs/afp/adr/0016-p5-transport.md) Decision 2), and no command concludes
+one yet. Your own hub needs none — an instance is not a stranger to its own server.
+
 ### Wiring two instances together
 
 Each operator sets an origin and a port, then serves:

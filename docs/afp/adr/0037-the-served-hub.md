@@ -227,7 +227,11 @@ Notes on what was built versus what the ADR wrote:
   `activeAgreementsWith` requires both parties' `Create`s, and the CLI offers no way to
   reach that state — so a served instance can be Followed by its own operator (G2) but not
   yet by a stranger without an embedding program. ADR-0016's T7 covers the foreign path
-  in-process. A gap in the operator's commands, recorded rather than widened into here.
+  in-process. A gap in the operator's commands, recorded rather than widened into here —
+  and answered the same day by [ADR-0039](0039-the-operator-takes-a-seat.md), which gives
+  the operator `hub follow`/`enroll`/`unenroll`/`unfollow` over a command port of the
+  instance actor's own. The agreement a *foreign* hub's operator must hold is still
+  concluded outside the CLI; the operator's own hub, which needs none, works.
 - **G2 runs a real `serve`** — the first gate in this repository to spawn the command
   rather than reproduce its wiring, which is the only way to prove WP-2, since what WP-2
   changes *is* `cli.ts`. Its activities are built by an in-process instance on the same

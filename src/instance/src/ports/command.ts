@@ -27,6 +27,7 @@ import { isAuthorizedController, parseCommand, politeReply, type Command } from 
 import type { ActionPolicy } from "../ap/pins.ts";
 import type { JsonValue } from "../crypto/jcs.ts";
 import { ApprovalRefused, approveThroughPort, type ApprovalPort } from "./approval.ts";
+import { executeHubCommand, parseHubCommand } from "./hubCommand.ts";
 
 export interface CommandRouteContext {
   path: string;
@@ -264,6 +265,11 @@ function executeTask(instance: AfpInstance, options: ExecuteCommandOptions, brie
  * asked. The rate limiter bounds the asking; nothing records it.
  */
 export async function commandRoute(instance: AfpInstance, read: ReadOptions, ctx: CommandRouteContext): Promise<boolean> {
+  // ADR-0039 Decision 1: the instance actor's own command port, addressed
+  // where the acting actor is. Same authorization, same polite refusal; a
+  // typed body instead of the grammar (Decision 2).
+  if (ctx.path === "/actor/command") return actorCommandRoute(instance, read, ctx);
+
   const match = ctx.path.match(/^\/agents\/([\w-]+)\/command$/);
   if (!match) return false;
   const name = match[1];
@@ -352,7 +358,57 @@ export async function commandRoute(instance: AfpInstance, read: ReadOptions, ctx
 
 /** `true` for a `POST` on `/agents/:name/command` — `ap/server.ts`'s one-line dispatch check, mirrored on `matchWebhookRoute`'s shape. */
 export function matchCommandRoute(method: string, path: string): boolean {
-  return method === "POST" && /^\/agents\/[\w-]+\/command$/.test(path);
+  return method === "POST" && (path === "/actor/command" || /^\/agents\/[\w-]+\/command$/.test(path));
+}
+
+/**
+ * ADR-0039 Decisions 1–3: `POST /actor/command`. Authorization is the
+ * agent-scoped route's, to the letter — a verifying signature through the
+ * read gate, whose actor is on the policy's `afp:controllers` — and the
+ * refusal is the same `politeReply`. What differs is below it: a typed body,
+ * validated whole before anything is published, and four verbs that act on
+ * the instance rather than on an agent.
+ */
+async function actorCommandRoute(instance: AfpInstance, read: ReadOptions, ctx: CommandRouteContext): Promise<boolean> {
+  const refuse = (actor: string, reason: string): void => {
+    if (actor) instance.inbox.dropDelivery("polite-reply", "", actor, reason);
+    ctx.send(200, polite());
+  };
+
+  if (!read) {
+    refuse("", "no read gate configured — every command request is anonymous");
+    return true;
+  }
+  const auth = await authorizeRead(read, { path: ctx.path, headers: ctx.headers, method: "POST", body: ctx.body });
+  const requester = auth.requester;
+  if (!requester) {
+    refuse("", "no verifying signature — anonymous");
+    return true;
+  }
+  if (!isAuthorizedController(requester.agent, { controllers: instance.policy.controllers ?? [] })) {
+    refuse(requester.agent, `${requester.agent} is not an authorized controller`);
+    return true;
+  }
+
+  let body: unknown;
+  try {
+    body = JSON.parse(ctx.body || "{}");
+  } catch {
+    body = null;
+  }
+  const parsed = parseHubCommand(body);
+  if ("refuse" in parsed) {
+    refuse(requester.agent, parsed.refuse);
+    return true;
+  }
+
+  const result = executeHubCommand(instance, parsed.command);
+  if ("refuse" in result) {
+    refuse(requester.agent, result.refuse);
+    return true;
+  }
+  ctx.send(200, result);
+  return true;
 }
 
 /**
