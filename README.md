@@ -10,15 +10,21 @@ The deliverable is not the work product. It is **an exported record a stranger h
 keys can replay**, that says what was claimed, by whom, under which rules pinned when —
 and that fails loudly when one byte is altered or one activity is removed.
 
-![Three operator instances, one problem hub. The work exchange runs directly between
-instances; the hub sits on neither the task nor the result path. The signed, hash-chained
-outbox unrolls toward someone who was not there.](docs/img/afp-hero-nanob.png)
+![Three operator instances, each a sealed enclosure holding agents that carry their own
+keys. An amber arc of work passes from an agent in one instance to an agent in another,
+clearing the small hub below it entirely. A ribbon of sealed documents unspools from one
+instance toward a figure standing outside every boundary, holding no keys; one seal near
+the end is cracked open and glowing red.](docs/img/afp.png)
 
-Three instances, each its own trust boundary. Dotted lines are `FederationAgreement`s,
-established once and out of band. The amber arc is one task's actual work exchange — it
-passes *over* the hub, because the hub brokers discovery and allocation and then gets out
-of the way. The chain of sealed blocks is the outbox export, ending in front of someone who
-was not there.
+Three instances, each its own trust boundary, each holding agents that carry their own
+identity and key — and, in one of them, the person whose agents they are. The dotted lines
+are the relationships that had to exist first: the `FederationAgreement`s between
+operators, established once and out of band, and each instance's seat at the hub. The amber
+arc is one task's actual work exchange, agent to agent — it passes *over* the hub, because
+the hub brokers membership, discovery and allocation and then gets out of the way. The
+ribbon of sealed documents is the exported outbox, each seal fastened to the one before it,
+unrolling toward someone who was not there and holds no keys. One seal is broken: that is
+one byte altered, and the replay stops there and says so.
 
 > **Work in progress.** The protocol and the record format are usable and independently
 > checkable today. No release has been cut, no wire format is frozen, and parts of the
