@@ -254,3 +254,40 @@ every other row keeps the prior section's class and evidence.
 | A seat revoked between rounds cannot retroactively change a pinned electorate | narrowed | `test/adr0018.test.ts` pinned-electorate cases — built for a different scenario, not re-walked here |
 
 **Counts:** 2 demonstrated · 6 gated · 1 narrowed · 0 not built.
+
+## Coverage as of 2026-09-19 (after the operator got the commands)
+
+Per ADR-0030 Decision 1, re-walked a third time after
+[ADR-0039](../adr/0039-the-operator-takes-a-seat.md) built. The prior section recorded a
+seat mechanism that was conformant and gated but reachable only from inside a demo or a
+test — and this scenario's whole arc is an *operator* taking a seat, losing it and taking
+it again. `POST /actor/command` and `npm run hub -- follow|unfollow|enroll|unenroll|list`
+close that gap: the acts the earlier sections gated are now acts the operator of a running
+instance can perform against it, signed as a controller, without opening the store.
+
+What this does not change is the record. ADR-0039 publishes exactly the activities the
+prior sections already gated — `Follow`, `Undo{Follow}`, `afp:Enroll`, `afp:Unenroll` — so
+no row moves class on the strength of the mechanism. What moves is reachability, and the
+rows below say so in their evidence. Only rows ADR-0039 touches are re-evidenced; every
+other row keeps the prior section's class and evidence.
+
+| Criterion | Class | Evidence |
+|---|---|---|
+| A seat can be sought explicitly, and admitted with proof | workload demonstrated | `npm run demo:p2` — the instance Follows the hub before enrolling; now also operator-reachable, `test/adr0039.test.ts` G3 "follow seats the operator's own instance, enroll adds an agent, and both reverse" against a real `serve` |
+| Enrollment can be gated on a live seat | workload demonstrated | `npm run demo:p2` — under the `follow-required` default, every demo's Enroll rides a real prior seat (unchanged) |
+| Enrollment without any seat concept is still possible | mechanism gated | `test/adr0017-d4-follow.test.ts` "enroll-implies-seat, set explicitly, still enrolls without any Follow…" — reachable only by explicit override (unchanged) |
+| A seat's loss is an event on the record | mechanism gated | `test/adr0017-d4-follow.test.ts` "Undo{Follow} revokes the seat and mass-unenrolls only that instance's agents" — and the operator's path to it, `test/adr0039.test.ts` G3 (the "both reverse" half) plus G4's refusal-by-name when there is no live Follow; **finding 84's departure half closes here**: departure is a mechanism *and* a command |
+| A lost seat can be regained | mechanism gated | `test/adr0017-d4-follow.test.ts` "re-Following after Undo revives the same seat" — re-`Follow` is `npm run hub -- follow` a second time; what a revived seat *carries* is finding 86, still open |
+| A refusal for lack of a seat is on the record, not silent | mechanism gated | `test/adr0017-d4-follow.test.ts` "ADR-0032 D6: default seatPolicy is now follow-required…" — admission-log assertion on the reason string (unchanged); the operator-side refusal is `politeReply`, deliberately uninformative, `test/adr0039.test.ts` G4 |
+| Revoking a seat unenrolls only that instance's agents, not the hub's other members | mechanism gated | `test/adr0017-d4-follow.test.ts` "Undo{Follow} revokes the seat…" — two-instance case (unchanged) |
+| The default policy is the conformant one | mechanism gated | `test/adr0017-d4-follow.test.ts` "ADR-0032 D6: default seatPolicy is now follow-required — an Enroll without a Follow is refused"; `src/hub/hub.ts` `seatPolicy` default (unchanged; finding 87 closed) |
+| A seat revoked between rounds cannot retroactively change a pinned electorate | narrowed | `test/adr0018.test.ts` pinned-electorate cases — built for a different scenario, not re-walked here; ADR-0039 gives the revocation a command, not the round a re-walk (unchanged) |
+
+**Counts:** 2 demonstrated · 6 gated · 1 narrowed · 0 not built.
+
+**What stays open after this walk.** Findings 85 (an unenrolled agent's in-flight work),
+86 (what a revived seat carries) and 88 (Follow/Undo churn is not itself an admission-log
+entry) are untouched by ADR-0039 — it makes the seat acts reachable, and none of the three
+is about reachability. 88 is the one this walk sharpens: now that an operator can churn a
+seat from a terminal in two commands, the absence of a seat-change log entry is far easier
+to reach than it was when only a demo could do it.

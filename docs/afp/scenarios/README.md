@@ -34,8 +34,8 @@ protocol does; that review tested whether the build order still matched it.
 
 Every scenario above was written to *break* something, and each one did. This table is the
 answer to the question the walkthroughs deliberately do not answer: **what holds today, and
-how can you see it.** Of the ninety-five findings raised across eleven campaigns, the
-first seventy-four are closed — finding 32's remainder last among the first eight
+how can you see it.** Of the hundred findings raised across twelve campaigns, eighty-eight
+are closed — finding 32's remainder last among the first eight
 (2026-08-22), when building this index caught that campaign 6 had been recording it as
 resolved while its own prose said otherwise; campaign 9's last three on 2026-08-23 with
 [ADR-0021](../adr/0021-conviction-to-consequence.md)'s remaining decisions; and campaign 10
@@ -46,7 +46,16 @@ walked before any P7 stack ADR existed, triaged into
 the [ADR-0030](../adr/0030-scenario-re-walks-and-the-coverage-index.md) Decision 2 re-walk
 of 01, 02, 06 and 09 against ADR-0027/28/29 (nine), plus Decision 3's two new scenarios,
 [14](14-the-seat-migration.md) and [16](16-the-hostile-edge.md), opened the same day
-(twelve) — are open.
+(twelve) — and campaign 12's five from [15](15-the-production-tuesday.md) carry the
+twelve that remain open, all of them campaign 11's and each one named in
+[what is still owed](#what-is-still-owed) below. Campaign 12's five all closed, attached
+or were accepted by 2026-09-19. Two of campaign 11's rows were moved by mechanism rather than by the sentence
+their candidate proposed — **75** ([ADR-0038](../adr/0038-the-operators-own-work.md)
+Decision 2 added the kickoff verb, Decision 3 kept it off the mention carrier: narrowed,
+not closed) and **84**, whose departure half closed
+([ADR-0032](../adr/0032-deployment-profile.md) Decision 6, now built, plus
+[ADR-0039](../adr/0039-the-operator-takes-a-seat.md) Decision 3's `unfollow`) with its
+remainder carried by 85 and 86.
 
 A scenario's own text is never rewritten when its findings land — a scenario records what
 was true when it was walked, which is what makes it evidence. So read a walkthrough as
@@ -55,7 +64,7 @@ demo shows the *resolved* world and the walkthrough shows what it cost to get th
 
 | Scenario | Findings | Resolved by | See it run | Gated by | Coverage |
 |---|---|---|---|---|---|
-| [01](01-client-due-diligence.md) | 4 · closed + 2 · open | spec v3.4 ([07](../07-visibility-and-artifacts.md), [03](../03-coordination.md)) | `npm run demo:offline` | `gate.test.ts`, `adr0029.test.ts` | [1·3·3·0](01-client-due-diligence.md#coverage-as-of-2026-09-13-re-walk) |
+| [01](01-client-due-diligence.md) | 4 · closed + 2 · open (75 narrowed) | spec v3.4 ([07](../07-visibility-and-artifacts.md), [03](../03-coordination.md)) | `npm run demo:offline` | `gate.test.ts`, `adr0029.test.ts`, `adr0038.test.ts` | [1·3·3·0](01-client-due-diligence.md#coverage-as-of-2026-09-19-after-task-joined-the-grammar) |
 | [02](02-observability-fix-pipeline.md) | 3 · closed + 2 · open | spec v3.4 | `npm run demo:offline` · `npm run demo:p8` | `gate.test.ts`, `adr0028.test.ts`, `adr0029.test.ts` | [5·1·1·1](02-observability-fix-pipeline.md#coverage-as-of-2026-09-13-re-walk) |
 | [03](03-co-staffed-project.md) | 4 + 2 · closed | spec v3.4, [ADR-0005](../adr/0005-operators-are-equal.md) | `npm run demo:p2` | `hub.test.ts`, `adr0005.test.ts` | [0·9·1·0](03-co-staffed-project.md#coverage-as-of-2026-09-13) |
 | [04](04-federated-estimation.md) | 6 · closed | spec v3.5 ([03](../03-coordination.md), [04](../04-operations.md)) | `npm run demo:p3` · `demo:p3:llm` | `allocation.test.ts` | [8·2·0·0](04-federated-estimation.md#coverage-as-of-2026-09-13) |
@@ -68,7 +77,7 @@ demo shows the *resolved* world and the walkthrough shows what it cost to get th
 | [11](11-the-snow-day.md) | 8 · closed | [ADR-0018](../adr/0018-the-round-as-a-commitment.md), [ADR-0019](../adr/0019-acting-on-a-decision.md) | `npm run demo:p5:llm` | `adr0018.test.ts`, `adr0019.test.ts` | [0·11·2·0](11-the-snow-day.md#coverage-as-of-2026-09-13) |
 | [12](12-the-parametric-trigger.md) | 8 · closed | [ADR-0020](../adr/0020-p6-hardened-round-stack.md) (58, 60, 61, 62) · [ADR-0005 amendment](../adr/0005-operators-are-equal.md) (63) · [ADR-0021](../adr/0021-conviction-to-consequence.md) (59, 64, 65) | `npm run demo:p6` · `demo:p6:llm` | `adr0020.test.ts`, `adr0005.test.ts`, `adr0021.test.ts` | [11·3·0·0](12-the-parametric-trigger.md#coverage-as-of-2026-09-13) |
 | [13](13-the-quarterly-split.md) | 9 · closed | [ADR-0022](../adr/0022-the-summary-declares-its-frame.md) (66-73) + its [ADR-0017](../adr/0017-standards-conformance.md) amendment (74) | `npm run demo:p7` · `demo:p7:llm` | `adr0022.test.ts` | [8·2·0·0](13-the-quarterly-split.md#coverage-as-of-2026-09-13) |
-| [14](14-the-seat-migration.md) | 1 · closed + 5 · open | [ADR-0032](../adr/0032-deployment-profile.md) Decision 6 (closes finding 87) | `npm run demo:p2` | `adr0017-d4-follow.test.ts` | [2·6·1·0](14-the-seat-migration.md#coverage-as-of-2026-09-13-after-the-default-flip) |
+| [14](14-the-seat-migration.md) | 2 · closed + 4 · open | [ADR-0032](../adr/0032-deployment-profile.md) Decision 6 (closes 87) · [ADR-0039](../adr/0039-the-operator-takes-a-seat.md) Decision 3 (closes 84's departure half) | `npm run demo:p2` | `adr0017-d4-follow.test.ts`, `adr0039.test.ts` | [2·6·1·0](14-the-seat-migration.md#coverage-as-of-2026-09-19-after-the-operator-got-the-commands) |
 | [15](15-the-production-tuesday.md) | 5 · open | — | `npm run demo:p8` | `adr0031.test.ts`, `adr0032.test.ts`, `adr0033.test.ts`, `adr0034.test.ts`, `adr0026.test.ts`, `adr0037.test.ts` | [2·10·2·1](15-the-production-tuesday.md#coverage-as-of-2026-09-15) |
 | [16](16-the-hostile-edge.md) | 6 · open | — | — | `adr0025.test.ts`, `adr0027.test.ts`, `adr0028.test.ts`, `adr0029.test.ts`, `adr0013.test.ts` | [0·10·1·1](16-the-hostile-edge.md#coverage-as-of-2026-09-13) |
 
@@ -112,6 +121,34 @@ Three ADRs are **not** scenario-driven and appear nowhere above:
 [ADR-0016](../adr/0016-p5-transport.md) (the roadmap's P5 row) and
 [ADR-0017](../adr/0017-standards-conformance.md) (a standards-deviation critique). Scenarios
 are one source of pressure on this spec, not the only one.
+
+## What is still owed
+
+The twelve open findings, as of 2026-09-19. **Kind** is the triage class each campaign
+gave it: a *mechanism* wants something built, *spec precision* wants a sentence in an ADR
+or a spec chapter that the built surface already behaves consistently with, and
+*operational* names a duty a deployment owes that the protocol does not. **Home** is the
+candidate the ledger named, not a commitment — none of these is scheduled.
+
+| # | From | Kind | What is owed | Home |
+|---|---|---|---|---|
+| 75 · rem. | [01](01-client-due-diligence.md) | spec precision | The carrier split, stated: the grammar has a kickoff verb (`task`) and the mention carrier deliberately refuses it, so a case-opening mention has no counterpart by decision rather than by omission | [ADR-0029](../adr/0029-the-human-window-and-the-activitypub-premise.md) § Command, amended by [ADR-0038](../adr/0038-the-operators-own-work.md) D3 |
+| 77 | [01](01-client-due-diligence.md) | operational | A rendering served to an auditor SHOULD be preceded by a fresh verifier run in the same session — the `verdict` string is read back from `VERDICT.json`, never recomputed by the read path | Beside ADR-0029's existing build note on the read-back behaviour |
+| 79 | [02](02-observability-fix-pipeline.md) | mechanism | `pause` has no `resume` and no duration; 02's own `mute checkout-latency 2h` assumes both | A future amendment to [ADR-0029](../adr/0029-the-human-window-and-the-activitypub-premise.md) Decision 2 |
+| 81 | [06](06-issue-triage-loop.md) | mechanism | A reason on `Reject` distinguishing an operator-imposed pause from a brain's own decline — on the record they are the same shape | Alongside 79, in the same ADR |
+| 82 · rem. | [09](09-the-screening-sidecar.md) | mechanism | A template-digest presence check for a declared-regulated capability. ADR-0033 D3 closed the half that holds `afp:producedBy` to the policy's `afp:brains` list; "prove what produced this" for every capability under a statutory duty is the half left | Wants its own decision, not a sentence |
+| 85 | [14](14-the-seat-migration.md) | mechanism | What becomes of an unenrolled agent's in-flight work when `Undo{Follow}` mass-unenrolls — the terminal-outcome discipline finding 28 gave agreement expiry, applied to seat revocation | No ADR home yet |
+| 86 | [14](14-the-seat-migration.md) | spec precision | The empty-revival rule for a seat regained after `Undo{Follow}`, stated outright rather than left inferable from test names | [02 — Hubs and state](../02-hubs-and-state.md) |
+| 88 | [14](14-the-seat-migration.md) | mechanism | A seat-change log entry parallel to the existing Enroll admission log — Follow/Undo churn is logged only through its downstream Enroll effects. Sharpened by [ADR-0039](../adr/0039-the-operator-takes-a-seat.md): an operator can now churn a seat in two commands | No ADR home yet |
+| 90 | [16](16-the-hostile-edge.md) | spec precision | State ADR-0013 D5's "refusals are not logged" reasoning at the scope it actually operates — every refusal, not only reads | [ADR-0013](../adr/0013-authorized-fetch.md) Decision 5 |
+| 91 | [16](16-the-hostile-edge.md) | mechanism | A provenance marker on a Result produced while reasoning over quarantined evidence — quarantine bounds what a poisoned attachment makes an agent *do*, not what it makes an agent *argue for* | No ADR home yet |
+| 92 | [16](16-the-hostile-edge.md) | operational | A load-shaped test beneath the token bucket, or an explicit deferral: the per-address limiter is proven, the resources shared beneath it are not | [ADR-0032](../adr/0032-deployment-profile.md)'s production checklist |
+| 94 | [16](16-the-hostile-edge.md) | spec precision | Extend the refusal-logging rule's stated reasoning to every refusal, or log the refusals that carry no leakage risk | With 90 |
+
+**Read with the table above, not instead of it.** A finding is a strain on the *spec*;
+the coverage cells are the state of the *build*. A scenario can carry an open finding and
+still have every acceptance criterion gated — 16 does — because what is owed there is a
+sentence, not a mechanism.
 
 ## Findings ledger
 
@@ -586,7 +623,7 @@ to.
 
 | # | Finding | Candidate |
 |---|---|---|
-| 75 | The command grammar has no kickoff verb — `ports/command.ts`'s three forms are `status`, `pause`, `approve`, none of which opens a case; scenario 01's Mastodon-mention kickoff has no counterpart on the human-window surface | Spec precision: state in ADR-0029 § Command that the grammar is deliberately control-only, and that initiation is a port/webhook concern (`ports/webhook.ts`'s own shape), not a command form |
+| 75 | The command grammar has no kickoff verb — `ports/command.ts`'s three forms are `status`, `pause`, `approve`, none of which opens a case; scenario 01's Mastodon-mention kickoff has no counterpart on the human-window surface | **Narrowed → partly closed (ADR-0038, built 2026-09-18):** the candidate proposed a sentence saying the grammar is control-only; Decision 2 went the other way and added the verb — `task` is the fourth form, delegated from the controller's held actor (`test/adr0038.test.ts`, `test/adr0038-cli.test.ts`). But Decision 3 refuses `task` on the mention carrier by a named branch: the one form that carries free text has exactly one door, the HTTP route signed by the controller's own held key. So the grammar has its kickoff verb and scenario 01's *Mastodon-mention* kickoff still does not, now by decision rather than by omission. The remainder is the sentence the candidate asked for, narrowed to the carrier |
 | 76 | An approval's actor on the record is a generic port agent (`actuatorName`); the approving human is carried only as `by`/`externalRef` on the reconciliation, never as their own rostered actor | **Closed (ADR-0033):** ADR-0033's Decisions prose now states this is deliberate — the record shows that an authorized controller decided, not who the controller was as a protocol-level identity |
 | 77 | A rendering's `verdict` field is read back from a stored `VERDICT.json`, never recomputed by the read path itself — honest only if a verifier run already happened in the same session | Operational guidance: a rendering served to an auditor SHOULD be preceded by a fresh verifier run in the same session, named next to the ADR-0029 build note that already documents the read-back behavior |
 | 78 | `instance.actuate` never consults the hub's role registry; an actuator's hub enrollment is the record's own account of who acted, not what admitted the act | Accepted — not a protocol's to answer, per [ADR-0030 § Consequences](../adr/0030-scenario-re-walks-and-the-coverage-index.md#consequences) "Accepted": ADR-0028's own build notes already state this design choice plainly (a P1-level call, not hub-mediated) |
@@ -598,7 +635,7 @@ to.
 
 **Triage.** 79 and 81 are genuine mechanism gaps with a natural ADR home — a future
 amendment to ADR-0029 (79, the grammar itself) and a small addition alongside it (81, a
-`Reject` reason). 75, 76 and 77 are spec-precision sentences: each names a place the built
+`Reject` reason). 75, 76 and 77 were read as spec-precision sentences: each names a place the built
 surface already behaves consistently and asks the relevant ADR (0029, 0033, 0029 again) to
 say so in prose rather than leave a reader to infer it. 82 is the one candidate that wants
 its own decision rather than a sentence, because "prove what produced this" is exactly the
@@ -607,6 +644,20 @@ accepted as narrowed, each citing [ADR-0030 § Consequences](../adr/0030-scenari
 "Accepted" and each pointing at a build note or README section that already made the
 narrowing a deliberate choice rather than an oversight — the pattern ADR-0030 itself
 predicted: "some narrowed rows will stay narrowed after the re-walk."
+
+**Re-triage (2026-09-19).** 75 did not stay a sentence, and did not close either.
+ADR-0038 Decision 2 added `task` as the fourth form — the kickoff verb 75 said was
+missing — so the candidate's premise ("the grammar is deliberately control-only") is now
+false. But Decision 3 kept `task` off the mention carrier deliberately, because a Note is
+the one inbound shape a stock fediverse account can author and under instance custody it
+arrives signed by the sender's operator. Scenario 01's specific promise is a kickoff
+*from a normal client app*, which is exactly the carrier the build closed. So 75 narrows
+rather than closes: the grammar gained the verb, the mention did not, and the sentence
+the candidate wanted is still owed — now about the carrier split rather than about the
+grammar's scope. Worth recording as the pattern: a spec-precision candidate is a
+*reading* of where the build stopped, and a later build is free to move the stop
+somewhere the finding did not anticipate. 77, 79, 81 and 82's remainder are unchanged and
+open.
 
 ### Campaign 11, continued → the two new scenarios (ADR-0030 Decision 3)
 
@@ -620,7 +671,7 @@ itself, and is walked below as campaign 12. Twelve findings, continuing the numb
 
 | # | Finding | Candidate |
 |---|---|---|
-| 84 | Under the shipped default (`enroll-implies-seat`), an instance's departure from a hub is not a mechanism — no `Undo` of anything, so a lapsed retainer and a quiet quarter are the same shape on replay | Resolved in name by ADR-0032 Decision 6 (the default flip), not yet built |
+| 84 | Under the shipped default (`enroll-implies-seat`), an instance's departure from a hub is not a mechanism — no `Undo` of anything, so a lapsed retainer and a quiet quarter are the same shape on replay | **Narrowed → partly closed:** ADR-0032 Decision 6 built (WP-4, gated by `test/adr0017-d4-follow.test.ts`), so departure *is* a mechanism — `Undo{Follow}` revokes the seat, and [ADR-0039](../adr/0039-the-operator-takes-a-seat.md) Decision 3 makes it a command an operator can run (`npm run hub -- unfollow`, which refuses by name when there is no live Follow). The remainder stays open as findings 85 and 86: what becomes of in-flight work, and what a revived seat carries |
 | 85 | `Undo{Follow}`'s mass-unenroll has no stated rule for an unenrolled agent's in-flight work | Mechanism: the terminal-outcome discipline finding 28 gave agreement expiry, applied to seat revocation |
 | 86 | A revived seat (`Follow` after `Undo{Follow}`, then re-`Follow`) carries no stated continuity claim — 02 says it revives "empty" but does not rule on it | Spec precision: state the empty-revival rule explicitly in 02 rather than leave it inferable from test names |
 | 87 | The conformant seat policy (`follow-required`) is not the shipped default | **Closed (ADR-0032 D6)** — the default flipped, every shipped demo Follows before it Enrolls |
@@ -636,6 +687,10 @@ itself, and is walked below as campaign 12. Twelve findings, continuing the numb
 **Triage.** 84 and 87 were the same fact from two sides and share one resolution:
 ADR-0032 Decision 6, which closes 87 outright; 84 (the in-flight-work and continuity
 half of "leaving") stays open — the default flip alone does not answer findings 85/86.
+**Re-triaged 2026-09-19:** Decision 6 has since built (WP-4), and
+[ADR-0039](../adr/0039-the-operator-takes-a-seat.md) Decision 3 put `unfollow` in the
+operator's hands, so 84's departure half is closed and its remainder is exactly 85 and 86,
+which carry it from here.
 85, 88, 90, 91 and 94 are mechanism or spec-precision
 candidates with no ADR home yet. 86 is spec precision only. 89 and 95 are accepted as
 narrowed, each pointing at the ADR that already answers the deeper question. 92 and 93 are

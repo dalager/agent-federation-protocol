@@ -206,3 +206,31 @@ not on replay itself.
 **Findings raised:** 75, 76, 77 ([ledger](README.md#campaign-11--open-the-re-walk-of-01-02-06-and-09-under-adr-002700280029)).
 
 **Counts:** 1 demonstrated · 3 gated · 3 narrowed · 0 not built.
+
+## Coverage as of 2026-09-19 (after `task` joined the grammar)
+
+Per ADR-0030 Decision 1. [ADR-0038](../adr/0038-the-operators-own-work.md) Decision 2 added
+`task` as the fourth form of the command grammar — the kickoff verb the re-walk above found
+missing. The counts do not move, for a reason worth stating rather than leaving a reader to
+infer: Decision 3 refuses `task` on the mention carrier by a named branch, because a
+`Create{Note}` is the one inbound shape a stock fediverse account can author, and under
+instance custody it arrives signed by the sender's operator rather than the controller. This
+scenario's criterion is kickoff *from a normal client app*, which is precisely the carrier
+the build excluded. Only the kickoff row changes its evidence; every other row keeps the
+prior section's class and evidence.
+
+| Criterion | Class | Evidence |
+|---|---|---|
+| Kickoff and approval by a human, from a normal client app | narrowed | `test/adr0038.test.ts` (kickoff: `task` over `POST /agents/:name/command`, signed by the controller's own held key) · `test/adr0038-cli.test.ts` (`npm run task`) · `test/adr0029.test.ts` G3(c) (approval) — re-narrowed: the grammar now has a kickoff verb, but ADR-0038 Decision 3 refuses it on the mention carrier Christian actually uses; **was: narrowed, no kickoff verb at all** |
+| Every check has an owner, a deadline, and a recorded outcome | mechanism gated | `test/gate.test.ts` case 8 — per-task context/correlationId, not six owners (unchanged) |
+| Case isolation — one prospect's data never bleeds into another's state | narrowed | `test/hub.test.ts` enroll/tally test — hub keyed generically, no cross-case leakage test (unchanged) |
+| Recommendation is multi-agent, weighted, and attributable | mechanism gated | `test/hub.test.ts` "enrolls agents, tallies a round, and rejects an out-of-snapshot vote" (unchanged) |
+| Decision is a recorded artifact bound to its evidence | mechanism gated | `test/adr0010.test.ts` "afp:actsOn follows the DecisionRecord hop once, and never twice" (unchanged) |
+| Human approval is distinct from agent recommendation | narrowed | `test/adr0029.test.ts` G3(c) — approve is a distinct, recorded act, but its actor is a generic port agent with Christian carried only as `by`/`externalRef` (unchanged; finding 76, closed as deliberate under ADR-0033) |
+| Full replay under audit, completeness checkable | workload demonstrated | `npm run demo:offline` · `test/demos.test.ts` (bundle replays) · `test/gate.test.ts` — export replays under the independent verifier; the rendering surface's read-back verdict is finding 77 (unchanged) |
+
+**Counts:** 1 demonstrated · 3 gated · 3 narrowed · 0 not built.
+
+**Findings:** 75 narrows here rather than closing — the grammar gained its verb, the
+mention carrier did not. 77 unchanged and open; 76 closed under ADR-0033
+([ledger](README.md#campaign-11--open-the-re-walk-of-01-02-06-and-09-under-adr-002700280029)).
