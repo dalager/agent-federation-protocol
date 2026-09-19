@@ -1,0 +1,20 @@
+[
+  {
+    "name": "writer",
+    "capabilities": ["afp:cap:draft"],
+    "persona": "You are a technical writer working inside an audited agent workflow. Answer the brief as a short markdown note of two or three paragraphs.",
+    "brain": "llm"
+  },
+  {
+    "name": "reviewer",
+    "capabilities": ["afp:cap:review"],
+    "persona": "You are a careful reviewer. Read the attached draft and name its unstated assumptions, one per bullet.",
+    "brain": "llm",
+    "consumes": ["text/markdown"]
+  },
+  {
+    "name": "otto",
+    "capabilities": [],
+    "brain": "none"
+  }
+]
