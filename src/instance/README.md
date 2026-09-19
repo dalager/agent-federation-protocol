@@ -1025,6 +1025,42 @@ component — `AFP_LOG_LEVEL` (`debug`/`info`/`warn`/`error`, default `info`;
 operational shadow of a served instance; the boundary log in SQLite stays the
 *record* — hash-chained, exportable — exactly as before.
 
+### Seeing it run, end to end
+
+`npm run demo:served` is the only demo in this repository that drives a *process* rather
+than a library. It boots `src/cli.ts serve` as a real child on a real port, lets the
+scheduler's own timers fire, and then does nothing but talk to it over HTTP:
+
+```
+seeded:   one task due 02:00 (thread tuesday), one delivery addressed to the partner
+serve:    listening on http://127.0.0.1:37461 — pid 2503582, sweep 250ms / flush 250ms
+/healthz: 200 — the process is alive, which is all /healthz ever claims
+/readyz:  503 {"ok":false,"reason":"scheduler-not-ticked"} — the line that failed, by name
+          200 {"ok":true} — store, signer, self-check, scheduler, in that order
+nodeinfo: version 0.9.0, spec revision 3.36
+lock:     store at data-served/afp.db is locked by pid 2503582 — a resident process
+          already holds it (ADR-0031 Decision 4)
+sweep:    afp_sweep_overdue_total 1 after 1 ticks — the deadline passed and the instance
+          said so, with no script running
+          three more ticks, afp_sweep_overdue_total still 1
+flush:    the partner refused attempt 1 with 503 Retry-After: 1; attempt 2 landed
+shutdown: SIGTERM -> "draining" -> "drained" -> exit 0
+record:   the store holds one afp:Error — afp:err:deadline-missed, signed like anything else
+export:   6 activities -> ./export-served
+```
+
+The intervals are pressed down to 250ms so a Tuesday fits in ten seconds — configuration
+an operator has, not a test seam. The partner is a fake: thirty lines of `node:http` that
+refuses the first delivery and accepts the second, because the subject is *this*
+instance's retry discipline (`demo:p4` is where two real instances federate). The bundle
+is scoped to the Tuesday's thread, so that partner hop ships as a declared stub rather
+than as a federation this demo never concluded.
+
+It is [scenario 15](../../docs/afp/scenarios/15-the-production-tuesday.md)'s walkthrough,
+run: eight of its fifteen acceptance criteria are workload-demonstrated by this script,
+and `test/demos.test.ts` replays the bundle it leaves behind through the Python verifier
+on every commit.
+
 ## Defining the agent collection
 
 `src/profiles.ts` is the recipe: **one `AgentProfile` per agent, from which

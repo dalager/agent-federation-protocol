@@ -13,7 +13,7 @@
 |---|---|
 | Findings raised | 5 |
 | Resolved by | 96, 97 → [ADR-0037](../adr/0037-the-served-hub.md) (**built 2026-09-19**); 98 → [ADR-0035](../adr/0035-remote-custody-and-the-asynchronous-port.md) (**Decisions 2, 3, 5 built 2026-09-18**; Decision 4 costed, unscheduled); 99 → [ADR-0036](../adr/0036-the-hosted-profile.md) (**WP-1–3 built 2026-09-19**, WP-4/5 partly; no `actor` adapter yet); 100 → operational, a production-checklist line |
-| See it run | `npm run demo:p8` — the served surface itself has no demo; the gate boots it |
+| See it run | `npm run demo:served` — a real `serve` child process, swept, retried, drained and exported (added 2026-09-19) · `npm run demo:p8` for the policy half |
 | Gated by | `adr0031.test.ts`, `adr0032.test.ts`, `adr0033.test.ts`, `adr0034.test.ts`, `adr0026.test.ts`, `adr0035.test.ts`, `adr0037.test.ts` |
 | Succeeds | [the operator's Tuesday](the-operators-tuesday.md) — the 2026-08 baseline, kept unedited |
 
@@ -400,6 +400,54 @@ through the Python verifier.
 | The declared retention horizon is acted on | narrowed | `test/adr0033.test.ts` "fills the manifest's retentionDuty/anchors from the policy when extras names none" — the declaration travels and is checked at replay; nothing in the runtime reads the horizon — finding 100 |
 
 **Counts:** 2 demonstrated · 10 gated · 3 narrowed · 0 not built.
+
+## Coverage as of 2026-09-19 (after the served surface got a demo)
+
+Per ADR-0030 Decision 1. The section above stands as the 2026-09-15 reading and is not
+edited; this one supersedes it. What changed is not the build but what runs the build:
+`npm run demo:served` boots `src/cli.ts serve` as a real child process on a real port,
+takes the store's real lock, lets the scheduler's own timers fire, sends the process a
+real `SIGTERM`, and exports the store the drained process left behind for the Python
+verifier. Six rows move — five from *mechanism gated*, and the drain from *narrowed*,
+because the sentence that narrowed it ("the drain is driven in-process; no gate sends a
+real `SIGTERM`") is no longer true.
+
+Two honest limits on that demo, stated here rather than discovered later. The partner in
+beat 4 is a fake peer — thirty lines of `node:http` that refuses the first delivery with
+`503 Retry-After` and accepts the second — so the beat demonstrates *this* instance's
+retry discipline, not a second instance's inbox; `demo:p4` is where two real instances
+federate. And the exported bundle is scoped to the Tuesday's thread (ADR-0009 Decision 4),
+so that partner hop ships as a declared stub: no co-signed `afp:FederationAgreement` names
+a peer that holds no key, and a bundle claiming otherwise would be claiming a relationship
+the demo never concluded.
+
+| Criterion | Class | Evidence |
+|---|---|---|
+| The deployed version is identifiable from outside, by a counterparty | workload demonstrated | `npm run demo:served` — fetches `/nodeinfo/2.1` off the served process and reads `software.version` and `metadata["afp:specRevision"]` back; `test/demos.test.ts` asserts the version is the shipped one |
+| The gate runs before anything ships, on every commit | mechanism gated | `test/adr0034.test.ts` "gate.yml names at least one run: step per job", "conformance/run.py exits 0 against afp_verify.py" |
+| A misconfigured origin fails at startup, by name | mechanism gated | `test/adr0032.test.ts` "AFP_ORIGIN not https: outside dev mode is named", "a mismatched self-check id FAILs that line only", "several misconfigurations at once are ALL named in one call" |
+| An overdue task becomes a recorded error with no script running | workload demonstrated | `npm run demo:served` — a task seeded with yesterday's deadline becomes one `afp:Error` `afp:err:deadline-missed` on a tick nobody triggered; three further ticks leave `afp_sweep_overdue_total` at 1 |
+| A peer briefly down is retried with backoff, and its `Retry-After` is honoured | workload demonstrated | `npm run demo:served` — the peer refuses attempt 1 with `503 Retry-After: 1`, attempt 2 lands, `afp_queue_depth{state="pending"}` rises and falls, `afp_dead_letters_total` stays 0 |
+| Two processes cannot share the store | workload demonstrated | `npm run demo:served` — a second `openDb` against the live data directory throws `StoreLocked`, naming the serving process's pid |
+| The instance says why it is not ready | workload demonstrated | `npm run demo:served` — `/readyz` asked before the first tick answers `503 {"ok":false,"reason":"scheduler-not-ticked"}`, then `200 {"ok":true}` once the scheduler has run |
+| A backup cannot corrupt a live store, and a restore explains itself | mechanism gated | `test/adr0032.test.ts` G3 (backup/restore round-trip, byte-identical replay) and the `restore_points` primitives block |
+| A restart drains rather than drops | workload demonstrated | `npm run demo:served` — a real `SIGTERM` to a real `serve` child: `"msg":"draining"` then `"drained"` in its journal, exit 0, and the lock free enough for the next process to open the store. The unit file's `TimeoutStopSec` is still outside the checkout (finding 99) |
+| Keys sit behind a port, encrypted at rest, rotatable without a running instance | mechanism gated | `test/adr0026.test.ts` "PEMs are written 0600", "with AFP_KEY_PASSPHRASE_FILE set, PEMs are encrypted at rest and still load", "key operations do not need a bootable instance…" |
+| The operator's obligations are published, signed, and the record is held to them | workload demonstrated | `npm run demo:p8` — `test/adr0033.test.ts` G6 "every shipped bundle replays unchanged… now carrying policy.jsonld"; G2 "a Result whose afp:producedBy names an unlisted brain fails by name" |
+| A counterparty verifies the export with nothing but Python | workload demonstrated | `npm run demo:served` — the bundle the drained process left behind is replayed by `afp_verify.py` in `test/demos.test.ts`; `test/adr0034.test.ts` "build the archive, install into a clean venv, run afp-verify over a real fixture" |
+| A hub the practice hosts converges while it sleeps | mechanism gated | `test/adr0037.test.ts` G2 — a real `serve` builds the hubs `afp:hostedHubs` names, serves them and hands them to the converge loop; G4 converges seats with the membership they authorize — finding 96 closed |
+| Key custody survives the host being taken | narrowed | `test/adr0035.test.ts` G1 "rotation with a remote root calls /sign exactly once…", G3 "a delegated key signing outside its declared interval fails keys: by name at replay", G5 "signer unreachable at rotation time — the current key keeps signing" — the window is bounded; the key is still in host memory for its lifetime, which is ADR-0035 Decision 4, unscheduled — finding 98 |
+| The declared retention horizon is acted on | narrowed | `test/adr0033.test.ts` "fills the manifest's retentionDuty/anchors from the policy when extras names none" — the declaration travels and is checked at replay; nothing in the runtime reads the horizon — finding 100 |
+
+**Counts:** 8 demonstrated · 5 gated · 2 narrowed · 0 not built.
+
+**What the demo does not cover, and why the rows stay where they are.** `config check`'s
+misconfiguration matrix and the backup/restore round-trip both need a *second*
+configuration or a *second* store, and a demo that misconfigured itself to show the
+failure would be running a gate with narration. The release gate is CI's own job. Hub
+convergence needs a second replica, which is `test/adr0037.test.ts` G4's two-instance
+setup rather than one served process. Those four are gated, and gated is the right class
+for them.
 
 ## Postscript: the Tuesday that has no host
 

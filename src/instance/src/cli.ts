@@ -918,6 +918,16 @@ async function main(): Promise<void> {
       break;
     }
 
+    case "served": {
+      const { runServedDemo } = await import("./demoServed.ts");
+      console.log("\nscenario 15's production Tuesday, on the thing an operator deploys: a real");
+      console.log("`serve` child process, a real port, a real store lock, a real SIGTERM.\n");
+      const demo = await runServedDemo({ fresh: true, config: { dataDir: "./data-served", exportDir: "./export-served" } });
+      for (const line of demo.narration) console.log(line);
+      console.log(`\nverify it:  python3 ../verifier/afp_verify.py ${demo.exported.dir} --thread ${demo.thread} --verbose\n`);
+      break;
+    }
+
     case "p8:llm": {
       const config = loadConfig();
       const { runP8Experiment } = await import("./experimentP8.ts");
@@ -1415,7 +1425,7 @@ async function main(): Promise<void> {
     }
 
     default:
-      console.error(`unknown command: ${command}\nusage: cli.ts [demo|p2|p3|p3:llm|p4|p5|p5:llm|p6|p6:llm|p7|p7:llm|p8|p8:llm|export|keys|serve|task|show|hub|config|backup|restore]`);
+      console.error(`unknown command: ${command}\nusage: cli.ts [demo|p2|p3|p3:llm|p4|p5|p5:llm|p6|p6:llm|p7|p7:llm|p8|p8:llm|served|export|keys|serve|task|show|hub|config|backup|restore]`);
       process.exit(1);
   }
 }

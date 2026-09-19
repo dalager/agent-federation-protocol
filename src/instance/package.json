@@ -35,6 +35,7 @@
     "demo:p7": "node --disable-warning=ExperimentalWarning src/cli.ts p7",
     "demo:p7:llm": "node --disable-warning=ExperimentalWarning src/cli.ts p7:llm",
     "demo:p8": "node --disable-warning=ExperimentalWarning src/cli.ts p8",
+    "demo:served": "node --disable-warning=ExperimentalWarning src/cli.ts served",
     "demo:p8:llm": "node --disable-warning=ExperimentalWarning src/cli.ts p8:llm",
     "demo:p6:llm": "node --disable-warning=ExperimentalWarning src/cli.ts p6:llm"
   }
