@@ -34,7 +34,7 @@ protocol does; that review tested whether the build order still matched it.
 
 Every scenario above was written to *break* something, and each one did. This table is the
 answer to the question the walkthroughs deliberately do not answer: **what holds today, and
-how can you see it.** Of the hundred findings raised across twelve campaigns, eighty-eight
+how can you see it.** Of the hundred findings raised across twelve campaigns, ninety-four
 are closed — finding 32's remainder last among the first eight
 (2026-08-22), when building this index caught that campaign 6 had been recording it as
 resolved while its own prose said otherwise; campaign 9's last three on 2026-08-23 with
@@ -47,9 +47,10 @@ the [ADR-0030](../adr/0030-scenario-re-walks-and-the-coverage-index.md) Decision
 of 01, 02, 06 and 09 against ADR-0027/28/29 (nine), plus Decision 3's two new scenarios,
 [14](14-the-seat-migration.md) and [16](16-the-hostile-edge.md), opened the same day
 (twelve) — and campaign 12's five from [15](15-the-production-tuesday.md) carry the
-twelve that remain open, all of them campaign 11's and each one named in
-[what is still owed](#what-is-still-owed) below. Campaign 12's five all closed, attached
-or were accepted by 2026-09-19. Two of campaign 11's rows were moved by mechanism rather than by the sentence
+twelve that were still open on the morning of 2026-09-19 — six of which closed that day,
+and six of which are costed in [ADR-0040](../adr/0040-the-six-that-want-mechanism.md);
+[what is still owed](#what-is-still-owed) below has the row-by-row state. Campaign 12's
+five all closed, attached or were accepted by 2026-09-19. Two of campaign 11's rows were moved by mechanism rather than by the sentence
 their candidate proposed — **75** ([ADR-0038](../adr/0038-the-operators-own-work.md)
 Decision 2 added the kickoff verb, Decision 3 kept it off the mention carrier: narrowed,
 not closed) and **84**, whose departure half closed
@@ -124,31 +125,49 @@ are one source of pressure on this spec, not the only one.
 
 ## What is still owed
 
-The twelve open findings, as of 2026-09-19. **Kind** is the triage class each campaign
-gave it: a *mechanism* wants something built, *spec precision* wants a sentence in an ADR
-or a spec chapter that the built surface already behaves consistently with, and
-*operational* names a duty a deployment owes that the protocol does not. **Home** is the
-candidate the ledger named, not a commitment — none of these is scheduled.
+The twelve that were open on the morning of 2026-09-19, and where each stands by the
+evening. **Six closed that day** — five with the sentence their candidate asked for, and
+one (77) with a mechanism, because writing the sentence found that the thing it described
+did not exist. **Six want something built**, and all six now have a costed design in
+[ADR-0040](../adr/0040-the-six-that-want-mechanism.md) instead of the "no ADR home yet"
+they carried for six weeks. None of the six is scheduled: ADR-0040 is a plan, and a
+costed menu is not an order.
+
+**Kind** is the triage class each campaign gave it: a *mechanism* wants something built,
+*spec precision* wants a sentence in an ADR or a spec chapter that the built surface
+already behaves consistently with, and *operational* names a duty a deployment owes that
+the protocol does not.
 
 | # | From | Kind | What is owed | Home |
 |---|---|---|---|---|
-| 75 · rem. | [01](01-client-due-diligence.md) | spec precision | The carrier split, stated: the grammar has a kickoff verb (`task`) and the mention carrier deliberately refuses it, so a case-opening mention has no counterpart by decision rather than by omission | [ADR-0029](../adr/0029-the-human-window-and-the-activitypub-premise.md) § Command, amended by [ADR-0038](../adr/0038-the-operators-own-work.md) D3 |
-| 77 | [01](01-client-due-diligence.md) | operational | A rendering served to an auditor SHOULD be preceded by a fresh verifier run in the same session — the `verdict` string is read back from `VERDICT.json`, never recomputed by the read path | Beside ADR-0029's existing build note on the read-back behaviour |
-| 79 | [02](02-observability-fix-pipeline.md) | mechanism | `pause` has no `resume` and no duration; 02's own `mute checkout-latency 2h` assumes both | A future amendment to [ADR-0029](../adr/0029-the-human-window-and-the-activitypub-premise.md) Decision 2 |
-| 81 | [06](06-issue-triage-loop.md) | mechanism | A reason on `Reject` distinguishing an operator-imposed pause from a brain's own decline — on the record they are the same shape | Alongside 79, in the same ADR |
-| 82 · rem. | [09](09-the-screening-sidecar.md) | mechanism | A template-digest presence check for a declared-regulated capability. ADR-0033 D3 closed the half that holds `afp:producedBy` to the policy's `afp:brains` list; "prove what produced this" for every capability under a statutory duty is the half left | Wants its own decision, not a sentence |
-| 85 | [14](14-the-seat-migration.md) | mechanism | What becomes of an unenrolled agent's in-flight work when `Undo{Follow}` mass-unenrolls — the terminal-outcome discipline finding 28 gave agreement expiry, applied to seat revocation | No ADR home yet |
-| 86 | [14](14-the-seat-migration.md) | spec precision | The empty-revival rule for a seat regained after `Undo{Follow}`, stated outright rather than left inferable from test names | [02 — Hubs and state](../02-hubs-and-state.md) |
-| 88 | [14](14-the-seat-migration.md) | mechanism | A seat-change log entry parallel to the existing Enroll admission log — Follow/Undo churn is logged only through its downstream Enroll effects. Sharpened by [ADR-0039](../adr/0039-the-operator-takes-a-seat.md): an operator can now churn a seat in two commands | No ADR home yet |
-| 90 | [16](16-the-hostile-edge.md) | spec precision | State ADR-0013 D5's "refusals are not logged" reasoning at the scope it actually operates — every refusal, not only reads | [ADR-0013](../adr/0013-authorized-fetch.md) Decision 5 |
-| 91 | [16](16-the-hostile-edge.md) | mechanism | A provenance marker on a Result produced while reasoning over quarantined evidence — quarantine bounds what a poisoned attachment makes an agent *do*, not what it makes an agent *argue for* | No ADR home yet |
-| 92 | [16](16-the-hostile-edge.md) | operational | A load-shaped test beneath the token bucket, or an explicit deferral: the per-address limiter is proven, the resources shared beneath it are not | [ADR-0032](../adr/0032-deployment-profile.md)'s production checklist |
-| 94 | [16](16-the-hostile-edge.md) | spec precision | Extend the refusal-logging rule's stated reasoning to every refusal, or log the refusals that carry no leakage risk | With 90 |
+| 75 · rem. | [01](01-client-due-diligence.md) | spec precision | **Closed 2026-09-19** — [ADR-0029](../adr/0029-the-human-window-and-the-activitypub-premise.md) Decision 2 now states the carrier split: the grammar has four forms, the mention carrier runs the three that carry no free text, and the reason is custody | — |
+| 77 | [01](01-client-due-diligence.md) | operational → mechanism | **Closed 2026-09-19** — writing it up found that *nothing wrote `VERDICT.json`*, so every rendering said `unverified`. `afp_verify --verdict-out` now writes it bound to the manifest digest it read, and `bundleInfoFor` refuses a verdict bound to another manifest. Gated in `test/adr0029.test.ts` G2 | — |
+| 79 | [02](02-observability-fix-pipeline.md) | mechanism | `pause` has no `resume` and no duration; 02's own `mute checkout-latency 2h` assumes both | [ADR-0040](../adr/0040-the-six-that-want-mechanism.md) Decision 1 — costed |
+| 81 | [06](06-issue-triage-loop.md) | mechanism | A reason on `Reject` distinguishing an operator-imposed pause from a brain's own decline | [ADR-0040](../adr/0040-the-six-that-want-mechanism.md) Decision 1 — costed |
+| 82 · rem. | [09](09-the-screening-sidecar.md) | mechanism | A template-digest presence check for a declared-regulated capability — ADR-0033 D3 closed the half holding `afp:producedBy` to the policy's declared brains | [ADR-0040](../adr/0040-the-six-that-want-mechanism.md) Decision 3 — costed |
+| 85 | [14](14-the-seat-migration.md) | mechanism | A terminal outcome for work in flight when `Undo{Follow}` mass-unenrolls, so a thread ends in an outcome rather than in silence | [ADR-0040](../adr/0040-the-six-that-want-mechanism.md) Decision 2 — costed, one open call |
+| 86 | [14](14-the-seat-migration.md) | spec precision | **Closed 2026-09-19** — [02 — Hubs and state](../02-hubs-and-state.md) now states normatively what a revived seat carries: no enrollment, no accrued standing, and nothing erased | — |
+| 88 | [14](14-the-seat-migration.md) | mechanism | A seat-change admission-log entry — Follow/Undo churn is logged only through its downstream Enroll effects | [ADR-0040](../adr/0040-the-six-that-want-mechanism.md) Decision 2 — costed |
+| 90 | [16](16-the-hostile-edge.md) | spec precision | **Closed 2026-09-19** — [ADR-0013](../adr/0013-authorized-fetch.md) Decision 5 amended: the test is what the refused party spent and whether the record can name them, not whether it was a read | — |
+| 91 | [16](16-the-hostile-edge.md) | mechanism | A provenance marker on a Result reasoned over quarantined evidence, and a rule for how far it travels | [ADR-0040](../adr/0040-the-six-that-want-mechanism.md) Decision 3 — **design not settled** |
+| 92 | [16](16-the-hostile-edge.md) | operational | **Closed 2026-09-19** — the instance README's production checklist now carries the proxy-side connection cap and `LimitNOFILE` line, and names the load-test deferral as deliberate | — |
+| 94 | [16](16-the-hostile-edge.md) | spec precision | **Closed 2026-09-19** — with 90, in the same ADR-0013 amendment; it also names the counted-not-described telemetry gap as unfinished plumbing | — |
 
 **Read with the table above, not instead of it.** A finding is a strain on the *spec*;
 the coverage cells are the state of the *build*. A scenario can carry an open finding and
 still have every acceptance criterion gated — 16 does — because what is owed there is a
 sentence, not a mechanism.
+
+**What the sweep taught, worth keeping.** Two of the six "just a sentence" rows were not.
+Finding 77 asked for operational guidance — "run the verifier in the same session" — and
+writing it revealed that no command in this repository wrote the `VERDICT.json` the
+rendering reads, so every rendering ever served said `unverified` and the guidance had
+nothing to describe. Finding 94's sentence turned out to be accurate about the protocol
+and wrong about the build: refusals are *counted* in metrics and never *described* in the
+log stream ADR-0031 built for exactly that, which is unfinished plumbing rather than the
+deliberate silence ADR-0013 Decision 5 describes, and is now named as such. The lesson is
+the one ADR-0030 keeps teaching in new forms: a candidate is a reading of the build, and
+writing the sentence is how you find out whether the reading was right.
 
 ## Findings ledger
 

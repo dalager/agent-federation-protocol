@@ -1529,9 +1529,34 @@ is a command or a file, and the list is this README's, not the ADR's, so it can 
   # /etc/cron.d/afp-export — weekly, into the retention store the policy's anchors name
   0 4 * * 1 afp cd /opt/afp/src/instance && AFP_EXPORT_DIR=/retention/afp-$(date -I) npm run export >> /var/log/afp-export.log 2>&1
   ```
+- [ ] **A rendering shown to an auditor is preceded by a verifier run in the same
+  session.** `GET /threads/:id/rendering` reports its `verdict` by reading the
+  `VERDICT.json` stored beside the export's manifest — this instance runs no in-process
+  verifier, so the string is as fresh as the last run that wrote it, not as fresh as the
+  request ([ADR-0029](../../docs/afp/adr/0029-the-human-window-and-the-activitypub-premise.md)
+  build note; [scenario 01](../../docs/afp/scenarios/01-client-due-diligence.md) finding
+  77). Export, verify with `--verdict-out`, then serve — and prefer handing over the
+  export so the auditor verifies it themselves, which is what the grant is for:
+  ```bash
+  AFP_EXPORT_DIR=/tmp/audit npm run export
+  python3 ../verifier/afp_verify.py /tmp/audit --verdict-out   # writes VERDICT.json
+  ```
+  A stale pass cannot survive this: `--verdict-out` binds the verdict to the
+  `MANIFEST.json` digest it read, and a rendering whose manifest does not match reports
+  `unverified` rather than the old answer. Nothing writes the file for you — before the
+  flag existed, no tool in this repo did, so every rendering said `unverified`.
 - [ ] **`/readyz` is probed** by the proxy or the orchestrator, and a failing check is
   acted on — it names the failing line (`store`/`signer`/`self-check`/`scheduler`), not
   just "unhealthy".
+- [ ] **The proxy caps what the token bucket does not.** ADR-0025's per-address rate
+  limiter is proven per address (`test/adr0025.test.ts`); the resources shared *beneath*
+  it — connections, file descriptors, the accept queue — are not, and one address that
+  stays under the bucket can still exhaust them
+  ([scenario 16](../../docs/afp/scenarios/16-the-hostile-edge.md) finding 92). This is the
+  proxy's job, not the process's: set a concurrent-connection cap and a request timeout
+  per peer there, and raise the unit's `LimitNOFILE` above the cap so the ceiling that
+  bites is the one you chose. No load-shaped test in this repo asserts the limit; the
+  deferral is deliberate and named here rather than left to be discovered.
 - [ ] **[ADR-0033](../../docs/afp/adr/0033-operator-obligations.md)'s policy document is
   published:**
   ```bash

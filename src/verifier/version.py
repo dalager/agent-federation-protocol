@@ -5,4 +5,4 @@ release only has one place to bump.
 """
 
 VERSION = "0.9.0"
-SPEC_REVISION = "3.35"
+SPEC_REVISION = "3.36"

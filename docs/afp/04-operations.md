@@ -125,6 +125,12 @@ convention as code, over the same gate as every other read: `GET /threads/:id/re
 and `GET /agents/:name/timeline`. The verdict field is honest about its own limits — this
 instance runs no in-process verifier, so it reads a stored `VERDICT.json` back rather than
 computing one, and says `"unverified"` when nothing was stored, never a fabricated pass.
+A stored verdict MUST name the `MANIFEST.json` digest the verifier read to produce it, and
+a reader MUST treat a verdict naming a different manifest as no verdict at all — otherwise
+a pass earned by an earlier export sits beside a later one and asserts a freshness it does
+not have. The reference verifier writes the file, so bound, under `--verdict-out`; the
+reference instance applies the comparison
+([scenario 01](scenarios/01-client-due-diligence.md) finding 77).
 
 This generalizes a rule the spec already has in one place: dissent "SHOULD travel with the
 answer all the way to any human notification, not be summarized away en route". That is

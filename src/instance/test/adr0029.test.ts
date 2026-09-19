@@ -11,7 +11,7 @@
 import assert from "node:assert/strict";
 import { after, describe, it } from "node:test";
 import { createServer as createProbe } from "node:net";
-import { readFileSync } from "node:fs";
+import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 
@@ -226,6 +226,28 @@ describe("ADR-0029 gate — the human window and the ActivityPub premise", () =>
       const manifestBytes = readFileSync(join(instance.config.exportDir, "MANIFEST.json"), "utf8");
       const expectedDigest = `sha256:${createHash("sha256").update(manifestBytes).digest("hex")}`;
       assert.equal(afterExport["afp:bundle"]["afp:manifestDigest"], expectedDigest);
+
+      // finding 77: a verdict is about one manifest. A VERDICT.json bound to
+      // the manifest being served is reported; one bound to a different
+      // manifest is a stale pass and is refused back to "unverified"; one with
+      // no binding at all predates `afp_verify --verdict-out` and is taken at
+      // its word, which is the behaviour this gate had before the flag existed.
+      const verdictPath = join(instance.config.exportDir, "VERDICT.json");
+      const readVerdict = async () =>
+        ((await (await fetch(`${origin}/threads/t-public/rendering`)).json()) as {
+          "afp:bundle": { "afp:verdict": string };
+        })["afp:bundle"]["afp:verdict"];
+
+      writeFileSync(verdictPath, JSON.stringify({ verdict: "passed", "afp:manifestDigest": expectedDigest }));
+      assert.equal(await readVerdict(), "passed", "bound to this manifest — reported");
+
+      writeFileSync(verdictPath, JSON.stringify({ verdict: "passed", "afp:manifestDigest": "sha256:0000" }));
+      assert.equal(await readVerdict(), "unverified", "bound to another manifest — a stale pass is not a verdict");
+
+      writeFileSync(verdictPath, JSON.stringify({ verdict: "passed" }));
+      assert.equal(await readVerdict(), "passed", "unbound — pre-flag shape, taken at its word");
+
+      rmSync(verdictPath);
 
       // a party fetching the parties thread sees no `content` text
       const headers = signRequest("GET", "/threads/t-parties/rendering", new URL(origin).host, "", fileSigner(instance.key("party")), clock.now());

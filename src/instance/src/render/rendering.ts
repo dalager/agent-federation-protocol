@@ -171,8 +171,18 @@ export function bundleInfoFor(exportDir: string, thread: string): BundleInfo | n
   const verdictPath = join(exportDir, "VERDICT.json");
   if (existsSync(verdictPath)) {
     try {
-      const stored = JSON.parse(readFileSync(verdictPath, "utf8")) as { verdict?: unknown };
-      if (typeof stored.verdict === "string" && stored.verdict.length > 0) verdict = stored.verdict;
+      const stored = JSON.parse(readFileSync(verdictPath, "utf8")) as {
+        verdict?: unknown;
+        "afp:manifestDigest"?: unknown;
+      };
+      // A verdict is about one manifest. `afp_verify --verdict-out` names the
+      // digest it read, and a file naming a different one is a verdict for a
+      // record this export has moved on from — a stale pass, which is worse
+      // than no answer (scenario 01 finding 77). A file with no digest at all
+      // predates the flag and is taken at its word, as before.
+      const boundTo = stored["afp:manifestDigest"];
+      const stale = typeof boundTo === "string" && boundTo !== manifestDigest;
+      if (!stale && typeof stored.verdict === "string" && stored.verdict.length > 0) verdict = stored.verdict;
     } catch {
       // an unparseable VERDICT.json is not a verdict — stay "unverified"
     }

@@ -237,6 +237,53 @@ by the grant's scope and period, and the sensitivity is the point rather than a 
 "the audit itself is auditable" is a promise 07 already makes, and this is where it is
 kept.
 
+**Amended 2026-09-19 — the rule is about every refusal, not only reads**
+([scenario 16](../scenarios/16-the-hostile-edge.md) findings 90 and 94). As written above,
+the reasoning is scoped to the read gate and its confirmation-leakage risk. The *practice*
+is already wider: an unsigned inbox delivery, a command from an actor no policy lists, a
+`Follow` the hub declines, an `afp:Enroll` from an instance with no seat refused before
+admission — none of these reaches `logRejection` either. The hostile-edge walk found the
+gap between the two and was right to: a reader who takes the stated reasoning at face
+value would conclude the silence elsewhere is an oversight, and "fix" it.
+
+It is not an oversight, and the test that decides it is not "is this a read" but **what
+did the refused party spend, and can the record name them.**
+
+- **Logged.** A refusal of an activity that arrived *signed, under a live agreement or a
+  live seat* — the sender spent a signed activity, the record can name them, and the
+  volume is bounded by the set of peers who got that far. `logRejection` hash-chains
+  these, and they are evidence: "your Enroll was refused, here is the reason" is a fact a
+  counterparty may need at replay.
+- **Not logged.** A refusal of anything unsigned, unagreed, unseated or anonymous — the
+  stranger spent nothing, the record cannot name them, and the volume is bounded only by
+  the attacker's patience. Logging these hands any stranger a pen that writes into your
+  record: a denial of service against your own log, and a permanent transcript of what
+  strangers guessed. The reasoning above generalises exactly, and this is the general
+  statement of it.
+
+**Where a refused stranger belongs is the operator's telemetry, not the record.** These
+are two different artifacts with two different jobs, and the scenarios have been treating
+them as one. The record is append-only evidence, bound into exports and replayed by
+counterparties; telemetry is operational, rotated, never exported, and nobody's evidence.
+A flood, a forged authority claim and a probe for a thread that does not exist all belong
+in the second. Correlating them into a pattern is intrusion detection, which
+[scenario 16](../scenarios/16-the-hostile-edge.md) finding 93 accepted as not the
+protocol's to answer; this amendment only rules on which artifact the material lands in,
+and why an implementer must not promote it to the first.
+
+**What the build actually offers today, stated exactly, because "belongs in telemetry"
+is not the same as "is in telemetry".** Refusals are *counted*, not described:
+`afp_inbox_refusals_total{class}` and `afp_ratelimit_refusals_total{scope}`
+(`runtime/metrics.ts`) move when a delivery is rejected or a bucket refuses. The
+structured log stream ADR-0031 Decision 3 built (`runtime/log.ts`, JSON lines to stderr)
+is the natural home for the *event* — which address, which claimed actor, which route —
+and no refusal path calls it. So an operator can see that refusals are happening and how
+fast, and cannot see what was refused. That is a real gap and it is an operational one,
+not a protocol one: it is closed by calling the existing logger from the existing refusal
+paths, needs no wire change, no ADR of its own, and no counterparty ever sees the
+difference. It is named here so the next implementer reads it as unfinished plumbing
+rather than as the deliberate silence the rest of this decision describes.
+
 ### 6. Non-public responses are not cacheable by anything shared
 
 07 permits fronting artifact endpoints with object storage or a CDN "provided the gate

@@ -29,6 +29,7 @@ import argparse
 import hashlib
 import json
 import sys
+from datetime import datetime, timezone
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -1488,6 +1489,38 @@ class PrefixedReport:
         return self._report.record(f"[{self._prefix}] {name}", ok, detail)
 
 
+def write_verdict(export: Path, verdict: str, failures: int, total: int) -> None:
+    """Record this run's verdict beside the bundle it verified.
+
+    ADR-0029's rendering reads the `verdict` string back rather than
+    recomputing it — this instance runs no in-process verifier. The hazard
+    that creates is a stale pass: a VERDICT.json from an earlier export
+    sitting beside a newer MANIFEST.json, asserting a verdict for a record
+    that has moved on. So the file names the manifest digest this run
+    actually read, and the reader compares it against the manifest it is
+    serving; a mismatch is not a verdict (scenario 01 finding 77).
+    """
+    manifest = export / "MANIFEST.json"
+    if not manifest.is_file():
+        return
+    digest = hashlib.sha256(manifest.read_bytes()).hexdigest()
+    (export / "VERDICT.json").write_text(
+        json.dumps(
+            {
+                "verdict": verdict,
+                "afp:manifestDigest": f"sha256:{digest}",
+                "verifiedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+                "afp:verifier": f"afp-verify {VERSION}",
+                "checks": total,
+                "failures": failures,
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     # ADR-0034 Decision 4: accepting an explicit argv (default: read sys.argv,
     # argparse's own default) is what lets the installed console script
@@ -1497,6 +1530,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("exports", type=Path, nargs="+", help="export director(y|ies) — several run the federated joint replay")
     parser.add_argument("--thread", help="only replay this context (default: every thread found)")
     parser.add_argument("-v", "--verbose", action="store_true", help="show passing checks too")
+    parser.add_argument(
+        "--verdict-out",
+        action="store_true",
+        help=(
+            "write VERDICT.json into each export directory, bound to the MANIFEST.json "
+            "digest this run verified (ADR-0029's rendering reads it back)"
+        ),
+    )
     parser.add_argument(
         "--version",
         action="version",
@@ -1558,6 +1599,10 @@ def main(argv: list[str] | None = None) -> int:
     report.census()
     failures = report.failures
     total = len(report.checks)
+
+    if args.verdict_out:
+        for export in args.exports:
+            write_verdict(export, "failed" if failures else "passed", len(failures), total)
 
     print()
     if failures:

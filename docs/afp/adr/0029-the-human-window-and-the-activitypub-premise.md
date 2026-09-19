@@ -73,6 +73,26 @@ moves to the optional profile of Decision 3.
   reply for everything else. Mastodon mentions become one carrier for the same grammar
   (Decision 3), never the only one.
 
+  **Amended by [ADR-0038](0038-the-operators-own-work.md) (2026-09-18), and the amendment
+  splits the carriers.** The grammar is four forms now, not three: `task` opens work,
+  which the three older forms — `status`, `pause`, `approve` — deliberately could not do.
+  But ADR-0038 Decision 3 refuses `task` on the mention carrier by a named branch, so the
+  two carriers no longer run the same grammar. The HTTP route runs all four; a mention
+  runs the three that carry no free text. The reason is custody, not caution: a
+  `Create{Note}` is the one inbound shape a stock fediverse account can author, and under
+  instance custody it arrives at the boundary signed by the *sender's* operator on the
+  controller's behalf (`afp:actingAs`) — so a brief carried by a mention would reach a
+  brain on the strength of another operator's key. One grammar, two carriers, and the one
+  form that carries content has exactly one door.
+
+  What this costs is worth naming rather than leaving a reader to discover: a human who
+  lives in a normal fediverse client can watch, approve, pause and query from it, and
+  cannot start work from it. Opening a case from a client app is a port concern
+  (`ports/webhook.ts`'s shape) or a signed call from the controller's own key
+  (`npm run task`), never a mention. This closes the substance of
+  [scenario 01](../scenarios/01-client-due-diligence.md)'s finding 75 — the grammar's
+  missing kickoff verb — and states the narrowing that replaced it.
+
 ### 3. The Mastodon projection is an optional profile, off by default
 
 `AFP_FEDIVERSE_WINDOW=1` enables dual-publish: every event 04 lists as operator-visible
@@ -148,6 +168,34 @@ Notes on what was built versus what the ADR wrote:
   reports its `verdict` string verbatim, or the literal `"unverified"` when nothing was
   stored — this instance runs no in-process verifier (that is the Python tool), so a
   rendering never fabricates a pass.
+
+  **Amended 2026-09-19 — the verdict is bound to a manifest**
+  ([scenario 01](../scenarios/01-client-due-diligence.md) finding 77). Writing this up
+  found something the finding had not: *nothing in the repository wrote `VERDICT.json`*.
+  The verifier had no flag for it and no script produced one, so the read-back path read
+  a file only a human could have written by hand, and every rendering this build has ever
+  served said `"unverified"`. The finding asked for operational guidance — "run the
+  verifier in the same session" — but there was no command to run.
+
+  So two small changes, and the duty they leave behind:
+
+  - `afp_verify --verdict-out` writes `VERDICT.json` into each export directory it
+    verified, carrying the verdict (`passed`/`failed`), the check and failure counts, the
+    verifier version, and **the sha256 of the `MANIFEST.json` it actually read**.
+  - `bundleInfoFor` compares that digest against the manifest it is serving. A verdict
+    bound to a different manifest is a verdict for a record this export has moved on
+    from, and is refused back to `"unverified"`. A file carrying no digest predates the
+    flag and is still taken at its word.
+
+  This turns the finding's discipline into a mechanism: a stale pass is no longer
+  something an operator must remember not to cause, because the read path will not report
+  one. What remains genuinely operational is *producing* a fresh verdict at all — the
+  instance runs no in-process verifier (that is the Python tool, deliberately), so an
+  operator who wants a rendering to say `passed` must export, verify with the flag, then
+  serve. The production checklist carries that line, and the stronger answer is still to
+  hand the auditor the export so they verify it themselves, which is what the grant is
+  for. Gated in `test/adr0029.test.ts` G2: bound-and-matching is reported, bound-and-stale
+  is refused, unbound is honoured.
 - **`afp:chainHeads` are heads among *admitted* entries,** not an actor's true chain head.
   `render/rendering.ts`'s `chainHeadsOf` takes the last entry it sees per actor in the
   entries the read gate already filtered — for a reader whose grant or membership does not

@@ -48,6 +48,22 @@ different hubs.
 `afp:Unenroll` removes one agent from the hub's membership OR-Set; `Undo{Follow}` at
 instance level mass-unenrolls everything that instance put into the hub.
 
+**What a revived seat carries, normatively.** A seat regained by re-`Follow` after an
+`Undo{Follow}` is the *same instance* and a *new seat*. It MUST carry no enrollment: every
+agent enrolls again, with capabilities and roles re-declared, because the OR-Set removals
+the `Undo` performed are not undone by a later `Follow` — they are separate tags, and a
+merge that resurrected them would make departure unobservable on a replica that saw the
+two activities in the other order. It MUST NOT carry any accrued governance standing:
+weight is computed per round over the live seated members (below), never accumulated, so
+there is nothing for a seat to bring back. And it does not erase anything: the record is
+append-only, so Results, settlements and obligations the instance's agents recorded before
+departure stand exactly as they were, and remain replayable by anyone whose visibility
+admitted them at the time. A hub that wants continuity across a gap — the same agent, the
+same capability list, the same role — MUST re-declare it in the new `afp:Enroll`s; a hub
+implementation MUST NOT infer it from the earlier trail. What happens to work still
+in flight at the moment of revocation is not settled by this revision
+([scenario 14](scenarios/14-the-seat-migration.md) finding 85).
+
 **Enrollment carries a role** (`afp:role`, default `member` — ADR-0004): not everyone on
 a hub is there to decide. A **`requester`** may announce tasks and publish Results on its
 own threads (an ask, and later the observed actuals that settle it) but never bids,
