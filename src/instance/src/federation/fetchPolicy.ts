@@ -16,6 +16,10 @@
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 
+import { logger } from "../runtime/log.ts";
+
+const log = logger("fetch-policy");
+
 export type FetchKind = "document" | "inbox" | "artifact";
 
 export class FetchRefusal extends Error {
@@ -31,7 +35,29 @@ export interface FetchPolicyDeps {
   devMode: boolean;
   /** Decision 2's escape hatch outside dev mode: named private ranges, e.g. a hub on a VPN. */
   trustedNets?: readonly string[];
+  /**
+   * ADR-0036 Decision 5: how a hostname becomes an address to judge.
+   * Defaults to `nodeResolver` — `node:dns`, the behaviour ADR-0025 D2 built.
+   * A platform actor has no resolver and needs none, because its egress
+   * cannot reach a private range at all; its adapter answers
+   * `platform-enforced`, and the delegation is logged so an operator can see
+   * that this instance did not judge the address rather than inferring that
+   * it judged it and approved.
+   */
+  resolve?: HostResolver;
 }
+
+/**
+ * ADR-0036 Decision 5. `address` is "here is what it resolves to, judge it";
+ * `platform-enforced` is "nothing here can reach a private range, and that
+ * is the platform's guarantee rather than this code's check".
+ */
+export type Resolution = { kind: "address"; address: string } | { kind: "platform-enforced" };
+
+export type HostResolver = (hostname: string) => Promise<Resolution>;
+
+/** The self-hosted resolver: `node:dns`, exactly as ADR-0025 Decision 2 wrote it. */
+export const nodeResolver: HostResolver = async (hostname) => ({ kind: "address", address: (await lookup(hostname)).address });
 
 const TIMEOUTS: Record<FetchKind, { connectMs: number; totalMs: number }> = {
   document: { connectMs: 5_000, totalMs: 15_000 },
@@ -121,14 +147,32 @@ async function checkAddress(hostname: string, deps: FetchPolicyDeps): Promise<vo
     throw new FetchRefusal("ssrf", `literal IP host "${hostname}" is refused outside development mode`);
   }
 
-  let resolved: string;
+  let resolution: Resolution;
   try {
-    const result = await lookup(hostname);
-    resolved = result.address;
+    resolution = await (deps.resolve ?? nodeResolver)(hostname);
   } catch (error) {
     throw new FetchRefusal("dns", `could not resolve "${hostname}": ${(error as Error).message}`);
   }
 
+  // ADR-0036 Decision 5: the platform's egress is the check. Recorded rather
+  // than skipped — ADR-0031 Decision 1 wants every scheduled act to be an
+  // activity or a log line, and "we did not look" must not read the same as
+  // "we looked and it was fine".
+  //
+  // The decision reads `platform-enforced`, not Decision 5's word
+  // `refused-by-platform`: nothing has been refused here. This instance
+  // allowed the fetch and delegated the private-range question to an egress
+  // it cannot inspect. Logging a refusal on the *allow* path would put the
+  // word "refused" beside every successful hosted fetch, which is worse than
+  // the silence the decision was trying to avoid. When the platform does
+  // refuse, that is a failed fetch and it is logged where every other failed
+  // fetch is.
+  if (resolution.kind === "platform-enforced") {
+    log.debug("address check delegated to platform egress", { host: hostname, decision: "platform-enforced" });
+    return;
+  }
+
+  const resolved = resolution.address;
   if (isPrivateAddress(resolved)) {
     if (deps.trustedNets && cidrAllows(resolved, deps.trustedNets)) return;
     throw new FetchRefusal("ssrf", `"${hostname}" resolves to ${resolved}, a private/loopback/link-local address`);

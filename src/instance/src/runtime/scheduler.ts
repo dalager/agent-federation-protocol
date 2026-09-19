@@ -28,11 +28,12 @@ import type { Hub } from "../hub/hub.ts";
 import type { Federation } from "../federation/federation.ts";
 import { createBoundaryDigest } from "../ap/activities.ts";
 import { logger } from "./log.ts";
+import { Schedule, type Jitter, type LoopName, type LoopSpec } from "./schedule.ts";
 import { metrics } from "./metrics.ts";
 
 const log = logger("scheduler");
 
-export type LoopName = "sweep" | "flush" | "converge" | "heartbeat";
+export { type LoopName } from "./schedule.ts";
 
 export interface HubReplica {
   readonly hub: Hub;
@@ -95,13 +96,49 @@ export class Scheduler {
     this.installUrgentHooks();
   }
 
+  /**
+   * The four loops as data (ADR-0036 Decision 4). The node driver arms a
+   * timer per entry below; a hosted driver folds them into one alarm through
+   * `schedule()`. A `heartbeatMs` of `0` is off, and `Schedule` drops it for
+   * the same reason `start` never armed it.
+   */
+  private specs(): readonly LoopSpec[] {
+    const { config } = this.deps;
+    return [
+      { name: "sweep", intervalMs: config.sweepMs, jitterMs: config.jitterMs },
+      { name: "flush", intervalMs: config.flushMs, jitterMs: config.jitterMs },
+      { name: "converge", intervalMs: config.convergeMs, jitterMs: config.jitterMs },
+      { name: "heartbeat", intervalMs: config.heartbeatMs, jitterMs: config.jitterMs },
+    ];
+  }
+
+  /**
+   * A `Schedule` over this scheduler's loops, starting now — what a hosted
+   * driver arms its single alarm from. The node driver does not use it: its
+   * timers *are* its schedule, and giving it two would be two answers to
+   * "when does flush run".
+   */
+  schedule(startedAtMs = this.deps.instance.clock.now().getTime(), jitter?: Jitter): Schedule {
+    return new Schedule(this.specs(), startedAtMs, jitter);
+  }
+
+  /**
+   * Run every loop due at `nowMs` and report which ran — the hosted
+   * profile's tick. Sequential on purpose: the loops share one store and one
+   * writer (ADR-0031 Decision 4), and `tick` already swallows and logs a
+   * failure, so one bad loop cannot stop the others.
+   */
+  async runDue(schedule: Schedule, nowMs: number): Promise<readonly LoopName[]> {
+    const ran = schedule.due(nowMs);
+    for (const name of ran) await this.tick(name);
+    return ran;
+  }
+
   /** Arm every enabled loop's real timer. Each `unref()`s so a lone scheduler never keeps the process alive. */
   start(): void {
-    const { config } = this.deps;
-    this.arm("sweep", config.sweepMs, config.jitterMs);
-    this.arm("flush", config.flushMs, config.jitterMs);
-    this.arm("converge", config.convergeMs, config.jitterMs);
-    if (config.heartbeatMs > 0) this.arm("heartbeat", config.heartbeatMs, config.jitterMs);
+    for (const spec of this.specs()) {
+      if (spec.intervalMs > 0) this.arm(spec.name, spec.intervalMs, spec.jitterMs);
+    }
   }
 
   stop(): void {

@@ -22,6 +22,8 @@ import { createHandler } from "../src/ap/server.ts";
 import { serveHandler } from "../src/runtime/adapters/node.ts";
 import { jsonResponse, readCappedBody, TOO_LARGE, type Handler } from "../src/runtime/httpPort.ts";
 import { connect } from "node:net";
+import { Schedule } from "../src/runtime/schedule.ts";
+import { policedFetch } from "../src/federation/fetchPolicy.ts";
 import { workspace } from "./helpers.ts";
 
 /** A row with its prototype normalised — see the port's note on row shape. */
@@ -285,5 +287,86 @@ describe("ADR-0036 WP-2 — the request port's contract", () => {
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()));
     }
+  });
+});
+
+// ------------------------------------------ WP-3, the schedule and the resolver
+
+describe("ADR-0036 WP-3 — one alarm's worth of schedule", () => {
+  const specs = [
+    { name: "sweep" as const, intervalMs: 30_000, jitterMs: 0 },
+    { name: "flush" as const, intervalMs: 10_000, jitterMs: 0 },
+    { name: "converge" as const, intervalMs: 60_000, jitterMs: 0 },
+    { name: "heartbeat" as const, intervalMs: 0, jitterMs: 0 },
+  ];
+
+  it("G12: a loop with interval 0 is off, and never becomes due", () => {
+    const schedule = new Schedule(specs, 0);
+    // Asserted through the only two methods a driver has, rather than by
+    // reading the schedule's own state: heartbeat is configured at 0 and
+    // never appears among the due loops, however far the clock is pushed.
+    assert.deepEqual([...schedule.due(10_000_000)], ["sweep", "flush", "converge"], "heartbeat absent, as `start` never armed it");
+    assert.deepEqual([...schedule.due(10_000_000_000)], ["sweep", "flush", "converge"], "and still absent much later");
+  });
+
+  it("G13: the alarm is the earliest next-due, and waking runs only what is due", () => {
+    const schedule = new Schedule(specs, 0);
+    assert.equal(schedule.dueAt(), 10_000, "flush is soonest at its 10s default");
+
+    assert.deepEqual([...schedule.due(10_000)], ["flush"], "only flush at 10s");
+    assert.equal(schedule.dueAt(), 20_000, "re-armed; flush is soonest again");
+
+    assert.deepEqual([...schedule.due(20_000)], ["flush"]);
+    assert.deepEqual([...schedule.due(30_000)], ["sweep", "flush"], "both, in declaration order");
+    assert.deepEqual([...schedule.due(60_000)], ["sweep", "flush", "converge"], "all three coincide at a minute");
+  });
+
+  it("G14: a slept-through actor runs each due loop once, not once per interval missed", () => {
+    // Eviction is normal under the hosted profile (Decision 4), so waking an
+    // hour late must not mean 360 flushes. The loops are idempotent, so the
+    // backlog lives in the work they find, not in the count of calls.
+    const schedule = new Schedule(specs, 0);
+    assert.deepEqual([...schedule.due(3_600_000)], ["sweep", "flush", "converge"], "one of each");
+    // Re-armed from the wake, not from the missed slot: nothing is due one
+    // millisecond short of a fresh flush interval after it.
+    assert.deepEqual([...schedule.due(3_609_999)], [], "no catch-up backlog queued behind the wake");
+    assert.deepEqual([...schedule.due(3_610_000)], ["flush"], "the next flush is one interval after waking");
+  });
+
+  it("G15: jitter is drawn once per loop and the period is kept, exactly as setInterval does", () => {
+    const drawn: number[] = [];
+    let n = 0;
+    const jitter = (ms: number) => {
+      const value = ms === 0 ? 0 : (n += 100);
+      drawn.push(value);
+      return value;
+    };
+    const schedule = new Schedule([{ name: "flush", intervalMs: 1_000, jitterMs: 500 }], 0, jitter);
+    assert.deepEqual([...schedule.due(1_099)], [], "the draw pushed it past the bare interval");
+    assert.deepEqual([...schedule.due(1_100)], ["flush"], "due at interval plus the draw");
+    // The same period again, not a fresh draw: 1_100 + 1_100, because
+    // `setInterval(fn, interval + jitter)` draws once and repeats.
+    assert.deepEqual([...schedule.due(2_199)], [], "not yet");
+    assert.deepEqual([...schedule.due(2_200)], ["flush"], "one period later, the same period");
+    assert.deepEqual(drawn, [100], "exactly one draw, at construction — the node driver's rule");
+  });
+
+  it("G16: the resolver is a seam — the platform-enforced answer is honoured, not silently skipped", async () => {
+    // ADR-0025 D2's own case still refuses: a hostname resolving into a
+    // private range is an SSRF refusal under the node resolver.
+    await assert.rejects(
+      () => policedFetch("https://private.test/doc", { kind: "document" }, { devMode: false, resolve: async () => ({ kind: "address", address: "127.0.0.1" }) }),
+      /private\/loopback\/link-local/,
+      "the check still runs and still refuses",
+    );
+
+    // The hosted answer: no resolution to judge, because the platform's
+    // egress cannot reach one. The address check passes and the fetch fails
+    // later, on the network — not here, and not silently.
+    await assert.rejects(
+      () => policedFetch("https://unreachable.invalid/doc", { kind: "document" }, { devMode: false, resolve: async () => ({ kind: "platform-enforced" }) }),
+      (error: Error) => !/private\/loopback\/link-local/.test(error.message),
+      "platform-enforced skips the address judgement, and fails for some other reason instead",
+    );
   });
 });

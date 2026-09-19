@@ -2,8 +2,9 @@
 
 - **Status:** Proposed (2026-09-15); **WP-1 built (2026-09-19)** — the store port and its
   `node` adapter, and **WP-2 built (2026-09-19)** — the request port and its `node`
-  adapter, both landed as refactors with the suite green, per the build order below.
-  WP-3 to WP-5 unbuilt, and no `actor` adapter exists. Extends program claim **C8** of
+  adapter, and **WP-3 built (2026-09-19)** — the alarm schedule and the resolver seam.
+  All three landed as refactors with the suite green, per the build order below.
+  WP-4 and WP-5 unbuilt, and no `actor` adapter exists. Extends program claim **C8** of
   [ADR-0024](0024-the-road-to-production.md) with a second hosting profile; group:
   **Operations**
 - **Date:** 2026-09-15
@@ -445,6 +446,98 @@ accepting on, so the request port says nothing about shutdown and a second
 adapter leaves that file alone. What remains outside the port is the signer's
 own HTTP surface (`tools/signer/server.ts`, ADR-0026's tool, not this
 instance's public door) and the P4–P7 demos, which stand up their own servers.
+
+### WP-3 · the alarm schedule and the resolver seam — built 2026-09-19
+
+`runtime/schedule.ts` holds the fold Decision 4 asks for: the four loops as
+data, with `dueAt()` for "when to set the single alarm" and `due(now)` for
+"which loops to run on waking", each re-arming as it fires. `Scheduler` gains
+`specs()`, `schedule()` and `runDue()`, and `start()` now iterates the same
+specs rather than naming the four loops a second time.
+
+What that sharing is worth is narrower than it first looks, and the review
+was right to say so. The two drivers cannot *race*: a deployment runs node
+or actor, never both against one instance, so two independently jittered
+timers could not fight over when `flush` fires even if they wanted to. What
+one spec table prevents is **config drift** — someone changing `flushMs` in
+one list and not the other, and the two profiles quietly running different
+intervals. That is a duller risk than a race and a much likelier one.
+The node driver keeps its timers; nothing about the resident process changed,
+and 611 pass with no test case edited.
+
+Three things the fold made explicit that four `setInterval` calls had left
+implicit:
+
+- **A slept-through actor runs each due loop once, not once per missed
+  interval.** Eviction is normal under the hosted profile, so waking an hour
+  late must not mean 360 flushes. `due` re-arms from the wake rather than
+  from the missed slot, which is safe precisely because ADR-0031 Decision 1
+  made the loops idempotent: the backlog lives in the work they find, not in
+  the number of times they are called. G14.
+- **A `heartbeatMs` of `0` is off, and stays off.** `start()` special-cased
+  it; `Schedule` drops it at construction, so a zero-interval loop cannot
+  become due by any path. G12.
+- **Jitter is drawn once per loop, and the period is kept.** This was
+  written the other way first — re-drawing on every arming — and the claim
+  that it "keeps what `arm` did" was wrong. `arm` passes
+  `interval + jitter` to `setInterval`, which draws **once** and then repeats
+  that same period forever, so a per-arming redraw was a new rule wearing a
+  refactor's clothes, with a gate written to bless it. ADR-0031 Decision 1's
+  purpose is served either way — a fixed offset separates two instances
+  permanently — so the tie goes to the rule the resident process already
+  runs. Not because the two could collide — they cannot, per above — but
+  because the same instance moved from the self-hosted profile to the hosted
+  one would have quietly changed how it spaces its loops, and nobody would
+  have chosen that. G15 now pins one draw at construction.
+
+Decision 5 is a seam rather than a behaviour change. `FetchPolicyDeps.resolve`
+is a `HostResolver` defaulting to `nodeResolver` — `node:dns`, exactly what
+ADR-0025 Decision 2 built — and a resolution is either an `address` to judge
+or `platform-enforced`. The delegation is logged rather than falling through
+silently, because "we did not look" must not read like "we looked and it was
+fine". G16 holds both halves: a stub resolver returning a loopback address is
+still refused as SSRF, and `platform-enforced` skips that judgement without
+skipping the log.
+
+**What the hosted profile costs an operator, stated where they will look for
+it.** `trustedNets` — ADR-0025 Decision 2's escape hatch for a hub on a VPN
+— cannot apply under `platform-enforced`, because there is no resolved
+address to test against it. That is not the check being skipped at the wrong
+depth; there is genuinely nothing to check, and Decision 5 above already
+rules that "a platform that *can* reach private ranges does not qualify for
+the profile." The consequence for an operator is the part worth spelling
+out: a hosted instance cannot reach a private-range peer at all, so an
+operator who needs one is choosing the self-hosted profile, and this is one
+of the things that choice is for.
+
+**Decision 5's own word does not survive the build, and the decision text
+above is wrong to keep it.** It says to record the decision as
+`refused-by-platform`. Written out, that line fires on the *allow* path —
+this instance permitted the fetch and handed the private-range question to an
+egress it cannot inspect. Nothing was refused. Logging a refusal there would
+put the word beside every successful hosted fetch, which is a worse reading
+than the silence the decision was trying to prevent, and an operator grepping
+their logs for refusals would find nothing but successes. The built name is
+`platform-enforced` in the type and in the log line, one word for one thing.
+When the platform genuinely refuses, that is a failed fetch and it surfaces
+where every other failed fetch does.
+
+**An unresolved question WP-3 surfaced and did not answer.** A `Schedule`
+holds its next-due times in memory, and under the hosted profile memory does
+not survive eviction — the actor is unloaded when idle and rebuilt on the
+next alarm. So a hosted driver cannot simply construct a `Schedule` at
+startup and trust it; it has to persist next-due, or rebuild it from the
+`lastTick` values the scheduler already keeps. ADR-0004 H5's "rehydrates from
+its store" is the shape of the answer, and this ADR's Decision 4 asserts
+eviction is free without saying which. That belongs to whichever work
+package builds the actual alarm driver, and naming it here is cheaper than
+rediscovering it there.
+
+What WP-3 does not do: nothing calls `schedule()` or `runDue()` yet, because
+no actor adapter exists to call them. They are gated rather than left
+untested for the reason WP-1's `transaction` was — an unused verb that ships
+untested is the part of a port most likely to be wrong when its first real
+caller arrives.
 
 ## References
 
