@@ -34,7 +34,6 @@ import { MIGRATION_001 } from "../src/store/migrations/001-baseline.ts";
 import { AfpInstance } from "../src/instance.ts";
 import { exportBundle } from "../src/export.ts";
 import { Hub } from "../src/hub/hub.ts";
-import { hasSeat } from "../src/hub/store.ts";
 import { enroll } from "../src/hub/activities.ts";
 import { loadOrCreateHubKeyPair } from "../src/crypto/keys.ts";
 import { jumpClock } from "../src/demoP3.ts";
@@ -401,7 +400,7 @@ describe("ADR-0032 gate — G4: the seat-default flip", () => {
     assert.match(result.output, /PASSED/);
   });
 
-  it("a replica converges membership from carried activities under the default, without ever seeing a Follow (ADR-0016 D2)", async () => {
+  it("a replica converges membership AND the seat behind it from carried activities (ADR-0016 D2, ADR-0037 D3)", async () => {
     const leaderConfig = loadConfig({ ...workspace(), origin: "https://leader-g4.test" });
     const replicaConfig = loadConfig({ ...workspace(), origin: "https://replica-g4.test" });
     const clock = jumpClock();
@@ -439,8 +438,11 @@ describe("ADR-0032 gate — G4: the seat-default flip", () => {
     await hubLeader.receive(enrollEntry.activity);
     assert.equal(hubLeader.members().length, 1, "the leader enrolled lead under the default");
 
-    // The replica: never Followed by anyone, never sees a seat of its own —
-    // seat state does not sync (ADR-0016 D2, ADR-0032 D6's build note).
+    // The replica: never Followed by anyone directly. Until ADR-0037 that
+    // meant it held no seat and admitted the synced Enroll only because
+    // `relayed` skipped the gate; seats are CRDT state now, so the Follow
+    // itself is carried in the delta and the replica admits the Enroll
+    // against a real seat.
     const hubReplica = new Hub({
       origin: replicaConfig.origin,
       hubId: "g4-bridge",
@@ -455,13 +457,16 @@ describe("ADR-0032 gate — G4: the seat-default flip", () => {
     });
     docs.set(hubReplica.actorId, hubReplica.actorDocument());
     assert.equal(hubReplica.members().length, 0, "the replica starts empty");
-    assert.equal(hasSeat(replicaInstance.db, leaderInstance.instanceDocument().id as string), false, "the replica never received a Follow");
+    assert.equal(hubReplica.hasSeat(leaderInstance.instanceDocument().id as string), false, "the replica has not received the Follow yet");
 
     await hubReplica.receive(hubLeader.pushSync(hubReplica.actorId).activity);
 
     assert.equal(hubReplica.members().length, 1, "the replica converged membership from the carried Enroll alone");
     assert.deepEqual(hubReplica.members(), hubLeader.members());
-    assert.equal(hasSeat(replicaInstance.db, leaderInstance.instanceDocument().id as string), false, "no seat was created by the relay — only membership was re-derived");
+    // ADR-0037 Decision 3: the seat converged with the membership it
+    // authorizes, so `followers` is one answer across both replicas.
+    assert.equal(hubReplica.hasSeat(leaderInstance.instanceDocument().id as string), true, "the carried Follow seated the leader on the replica");
+    assert.deepEqual(hubReplica.followers(), hubLeader.followers(), "followers is byte-equal across replicas");
 
     leaderInstance.close();
     replicaInstance.close();

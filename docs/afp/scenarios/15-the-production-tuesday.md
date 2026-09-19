@@ -12,7 +12,7 @@
 | **Support status** | **Supported — findings 96–100** |
 |---|---|
 | Findings raised | 5 |
-| Resolved by | 96, 97 → [ADR-0037](../adr/0037-the-served-hub.md) (proposed); 98 → [ADR-0035](../adr/0035-remote-custody-and-the-asynchronous-port.md) (proposed); 99 → [ADR-0036](../adr/0036-the-hosted-profile.md) (proposed); 100 → operational, a production-checklist line |
+| Resolved by | 96, 97 → [ADR-0037](../adr/0037-the-served-hub.md) (**built 2026-09-19**); 98 → [ADR-0035](../adr/0035-remote-custody-and-the-asynchronous-port.md) (proposed); 99 → [ADR-0036](../adr/0036-the-hosted-profile.md) (proposed); 100 → operational, a production-checklist line |
 | See it run | `npm run demo:p8` — the served surface itself has no demo; the gate boots it |
 | Gated by | `adr0031.test.ts`, `adr0032.test.ts`, `adr0033.test.ts`, `adr0034.test.ts`, `adr0026.test.ts` |
 | Succeeds | [the operator's Tuesday](the-operators-tuesday.md) — the 2026-08 baseline, kept unedited |
@@ -302,7 +302,7 @@ proposed and costed, unbuilt.
 | Keys sit behind a port, encrypted at rest, rotatable without a running instance | signer port; `0600` PEMs under `AFP_KEY_PASSPHRASE_FILE`; `keys rotate`/`revoke` | Yes (16:45) |
 | The operator's obligations are published, signed, and the record is held to them | `/afp/policy`, `policy.jsonld` in every export, verifier `check_policy` | Yes (15:00) |
 | A counterparty verifies the export with nothing but Python | `pip install afp-verify`; the archive; the conformance kit | Yes (15:00) |
-| A hub the practice hosts converges while it sleeps | converge loop — but `serve` hosts no replica | **No — finding 96** |
+| A hub the practice hosts converges while it sleeps | converge loop; `serve` builds the hubs `afp:hostedHubs` names | Yes — **closed 2026-09-19 by [ADR-0037](../adr/0037-the-served-hub.md)**, finding 96 |
 | Key custody survives the host being taken | `remote` signer adapter | **No — ADR-0035 proposed; finding 98** |
 | The declared retention horizon is acted on | `afp:retentionDuty` in policy and manifest | **Declared, checked at replay, not acted on — finding 100** |
 
@@ -325,14 +325,22 @@ custody mode that would change the sentence is not.
   a program hands it. But the baseline's "cron drives a library" shape, which ADR-0031
   set out to retire, survives for exactly the case where it costs most: an operator who
   *hosts* a hub. Candidate: `serve` builds the hubs the policy document says this instance
-  hosts, and hands them to the scheduler as replicas.
+  hosts, and hands them to the scheduler as replicas. **Closed 2026-09-19:**
+  [ADR-0037](../adr/0037-the-served-hub.md) Decisions 1–2 are built — `afp:hostedHubs` on the
+  policy document, `serve` constructing and serving each one and handing it to the
+  converge loop, gated end-to-end against a real `serve` (`test/adr0037.test.ts` G2).
 - **Finding 97 — seat state does not converge across replicas.** ADR-0032's own build
   status records it: a relayed `Enroll` is re-derived by a replica rather than
   re-admitted, because `hub_seats` is not CRDT-tracked and a replica that never saw the
   `Follow` would otherwise refuse every synced `Enroll` under the new default. The
   walkthrough did not hit it — the practice holds one seat at one hub — and it will the
   day the partner's hub is replicated. Narrowed: recorded, gated by the case that caught
-  it, not fixed.
+  it, not fixed. **Closed 2026-09-19:** [ADR-0037](../adr/0037-the-served-hub.md)
+  Decision 3 makes seats an OR-Set in `crdt_state` tagged by the `Follow`, drops
+  `hub_seats`, and narrows `relayed` from "skip the seat gate" to "the seat-moving
+  activities in a delta are applied first" — so an `Enroll` whose seat never arrives is
+  refused and logged rather than admitted (`test/adr0037.test.ts` G4: `followers`
+  byte-equal across replicas within two converge ticks).
 - **Finding 98 — custody improved by one word.** File custody with a passphrase on the
   same disk is better than file custody, and is still the thing the baseline called
   uncomfortable. ADR-0035 is the answer and is proposed.
@@ -374,11 +382,11 @@ through the Python verifier.
 | Keys sit behind a port, encrypted at rest, rotatable without a running instance | mechanism gated | `test/adr0026.test.ts` "PEMs are written 0600", "with AFP_KEY_PASSPHRASE_FILE set, PEMs are encrypted at rest and still load", "key operations do not need a bootable instance…" |
 | The operator's obligations are published, signed, and the record is held to them | workload demonstrated | `npm run demo:p8` — `test/adr0033.test.ts` G6 "every shipped bundle replays unchanged… now carrying policy.jsonld"; G2 "a Result whose afp:producedBy names an unlisted brain fails by name" |
 | A counterparty verifies the export with nothing but Python | workload demonstrated | `npm run demo:p8` — every demo's bundle is replayed by `afp_verify.py` in `test/demos.test.ts`; `test/adr0034.test.ts` "build the archive, install into a clean venv, run afp-verify over a real fixture" |
-| A hub the practice hosts converges while it sleeps | edge not built | `serve` builds no hub replica; the loop is gated only for replicas an embedding program supplies (`test/adr0031.test.ts` G3) — finding 96 |
+| A hub the practice hosts converges while it sleeps | mechanism gated | `test/adr0037.test.ts` G2 — a real `serve` builds the hubs `afp:hostedHubs` names, serves them and hands them to the converge loop; G4 converges seats with the membership they authorize — finding 96 closed |
 | Key custody survives the host being taken | edge not built | [ADR-0035](../adr/0035-remote-custody-and-the-asynchronous-port.md) — proposed, unbuilt; finding 98 |
 | The declared retention horizon is acted on | narrowed | `test/adr0033.test.ts` "fills the manifest's retentionDuty/anchors from the policy when extras names none" — the declaration travels and is checked at replay; nothing in the runtime reads the horizon — finding 100 |
 
-**Counts:** 2 demonstrated · 9 gated · 2 narrowed · 2 not built.
+**Counts:** 2 demonstrated · 10 gated · 2 narrowed · 1 not built.
 
 ## Postscript: the Tuesday that has no host
 

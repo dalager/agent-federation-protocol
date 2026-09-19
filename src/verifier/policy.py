@@ -136,10 +136,54 @@ def check_policy(
             "" if equal else "manifest afp:anchors and the policy's afp:anchors disagree (ADR-0033)",
         )
 
+    _check_hosted_hubs(report, export, policy, instance_actor)
     _check_brains(report, policy, all_activities)
     _check_controllers(report, policy, all_activities)
     _check_seat_policy(report, export, policy, all_activities)
     _check_governance_subject(report, policy, all_activities)
+
+
+def _check_hosted_hubs(report, export: Path, policy: dict, instance_actor: str | None) -> None:
+    """ADR-0037 Decision 1. Every `afp:Hub` actor document in the bundle whose
+    `afp:operatedBy` is this bundle's instance actor must be named in the
+    policy's `afp:hostedHubs`. `afp:operatedBy` is the hinge rather than "which
+    activities this instance emitted", because a hub signs its own
+    activities with its own key: the actor document is where the record
+    already says whose server hosts it (ADR-0016).
+
+    An absent `afp:hostedHubs` is "not declared" and records ok, the same answer
+    `afp:brains` gives — the honest statement for the instance that hosts no
+    hub, and for every bundle shipped before this property existed. A
+    declared list is held to exactly: a hosted hub struck from it fails by
+    name."""
+    hubs = policy.get("afp:hostedHubs")
+    if not isinstance(hubs, list):
+        report.record("policy: afp:hostedHubs not declared — hosted hubs not held to a list", True, "")
+        return
+
+    declared = {
+        entry.get("afp:hubId") for entry in hubs if isinstance(entry, dict)
+    }
+    actors_dir = export / "actors"
+    if not actors_dir.exists():
+        return
+    for actor_path in sorted(actors_dir.glob("*.jsonld")):
+        doc = _load_json(actor_path)
+        types = doc.get("type")
+        types = types if isinstance(types, list) else [types]
+        if "afp:Hub" not in types:
+            continue
+        if doc.get("afp:operatedBy") != instance_actor:
+            continue
+        hub_id = doc.get("name") or doc.get("preferredUsername")
+        ok = hub_id in declared
+        report.record(
+            f"policy: hosted hub {doc.get('id')!r} is named in afp:hostedHubs",
+            ok,
+            "" if ok else
+            f"{doc.get('id')!r} is operated by this instance but {hub_id!r} is not among the policy's "
+            f"afp:hostedHubs {sorted(d for d in declared if isinstance(d, str))!r} (ADR-0037)",
+        )
 
 
 def _brain_matches(produced_by: str, model, endpoint) -> bool:

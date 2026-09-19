@@ -17,7 +17,7 @@ holding no keys.
 
 ## The spec
 
-**[docs/afp/](docs/afp/README.md)** — Revision 3.34, in seven parts, with scenario tests
+**[docs/afp/](docs/afp/README.md)** — Revision 3.35, in seven parts, with scenario tests
 and ADRs.
 
 Thirteen **spec-test scenarios** walk real workloads end to end and record what strained;
@@ -157,7 +157,7 @@ can do on its own; it has to be turned on separately by whoever administers the 
 ## Releases
 
 Two version lines, one stated relationship ([ADR-0034](docs/afp/adr/0034-release-conformance-and-disclosure.md)
-Decision 1): the spec keeps its own revision (currently `3.34`), and the instance and the
+Decision 1): the spec keeps its own revision (currently `3.35`), and the instance and the
 verifier each carry a semantic version (currently `0.9.0`) that names the spec revision it
 implements — in `src/instance/package.json`'s `afp.specRevision`, in the verifier's
 `--version`, and in NodeInfo's `metadata.specRevision`, which counterparties already
@@ -225,7 +225,7 @@ Two documents carry the consequence, both proposed:
 | [ADR-0023](docs/afp/adr/0023-loose-ends-triaged.md) | **The loose ends, triaged** — 31 subtasks from an audit of every ADR, each linked to its origin section, with one disposition: build, decide, reconcile, or park behind a named trigger |
 | [ADR-0024](docs/afp/adr/0024-the-road-to-production.md) | **The road to production** — ten claims and the ten ADRs (0025–0034) that make each checkable: transport hardening, key custody and a signer port, the port as a security boundary, port agents, the human window, scenario re-walks, the resident process, the deployment profile, operator obligations, release engineering. Its definition of done is a scenario — the production Tuesday — not a checklist |
 
-The spec is at Revision 3.34. Nothing in the program changes what a replay proves; all of
+The spec is at Revision 3.35. Nothing in the program changes what a replay proves; all of
 it changes whether anyone could run the thing that produces the replay.
 
 ## Why integrity is in phase one

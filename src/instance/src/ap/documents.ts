@@ -146,6 +146,14 @@ export function hubActor(
   operatedBy?: string,
   /** ADR-0017 Decision 4 (R1): HTTP-signature key, published under `authentication`. */
   transportKey?: KeyPair,
+  /**
+   * ADR-0037 Decision 1: the origin hub's actor, when this document is a
+   * replica of it. `src/verifier/policy.py`'s seat-policy check has read this
+   * property since ADR-0033 — a replica relays Enrolls it never admitted, so
+   * its bundle is not the one to hold to a Follow trail — and until now
+   * nothing emitted it, because no served instance could host a replica.
+   */
+  replicaOf?: string,
 ): { [key: string]: JsonValue } {
   const id = hubActorId(origin, hubId);
   return {
@@ -165,6 +173,7 @@ export function hubActor(
     // transport traffic (the anti-entropy exchange) cross a boundary gate
     // that judges operators.
     ...(operatedBy ? { "afp:operatedBy": operatedBy } : {}),
+    ...(replicaOf ? { "afp:replicaOf": replicaOf } : {}),
     assertionMethod: [multikey(key)],
     ...(transportKey ? { authentication: [multikey(transportKey)] } : {}),
   };

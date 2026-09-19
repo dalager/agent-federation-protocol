@@ -87,6 +87,19 @@ function jsonOf(spec: PolicySpec): { [key: string]: JsonValue } {
   if (spec.disclosure !== undefined) {
     wire["afp:disclosure"] = { "afp:contact": spec.disclosure.contact };
   }
+  // ADR-0037 Decision 1: which hubs this instance hosts — a fact
+  // counterparties federate against, so it belongs on the signed document
+  // rather than in an env var alone. A verifier that does not know the
+  // property reads a valid policy; one that does gains the check that every
+  // hub actor operated by this instance is named here.
+  if (spec.hubs !== undefined) {
+    wire["afp:hostedHubs"] = spec.hubs.map((hub) => ({
+      "afp:hubId": hub.id,
+      ...(hub.seatPolicy !== undefined ? { "afp:seatPolicy": hub.seatPolicy } : {}),
+      ...(hub.replicaOf !== undefined ? { "afp:replicaOf": hub.replicaOf } : {}),
+      ...(hub.peers !== undefined ? { "afp:peers": [...hub.peers] } : {}),
+    }));
+  }
   return wire;
 }
 

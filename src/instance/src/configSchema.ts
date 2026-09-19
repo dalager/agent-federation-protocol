@@ -54,6 +54,7 @@ export const CONFIG_SCHEMA: readonly ConfigEntry[] = [
   { env: "AFP_REPLAY_CACHE_TTL_MS", key: "replayCacheTtlMs", kind: "int", default: 5 * 60 * 1000, doc: "" },
   { env: "AFP_KEY_PASSPHRASE_FILE", key: "keyPassphraseFile", kind: "file", default: "", secret: true, doc: "File holding the passphrase the file signer adapter encrypts PEMs with at rest (ADR-0026)" },
   { env: "AFP_CONTROLLERS", key: "controllers", kind: "list", default: [], doc: "Comma-separated actor URLs authorized to approve — a convenience that populates afp:controllers on the policy file when it names none (ADR-0028 Decision 4; ADR-0033 Decision 1 makes the policy file the source of record)" },
+  { env: "AFP_HUBS", key: "hubs", kind: "list", default: [], doc: "Comma-separated hub ids this instance hosts — a convenience that populates afp:hostedHubs on the policy file when it names none (ADR-0037 Decision 1). serve builds one Hub per entry, serves it at /hubs/:id and hands it to the scheduler's converge loop; peers and replicaOf are policy-file-only" },
   { env: "AFP_POLICY_FILE", key: "policyFile", kind: "file", default: "", doc: "A JSON file in the PolicySpec shape (ap/policy.ts) — the operator's signed obligations (ADR-0033 Decision 1). Merged over instance-derived defaults; absent means the defaults alone" },
   {
     env: "AFP_AGENTS_FILE",

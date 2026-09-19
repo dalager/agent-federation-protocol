@@ -61,5 +61,5 @@ what it does not.
 
 ## Supported versions
 
-The `0.9.x` line, at spec revision `3.34`, is supported. No release has been
+The `0.9.x` line, at spec revision `3.35`, is supported. No release has been
 cut yet — see the root [README § Releases](README.md#releases).

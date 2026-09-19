@@ -155,15 +155,16 @@ built in its ADR.
 | C4 | 0028 | built, less the human-approval port's own scenario re-walk — that is C6's job in [ADR-0030](0030-scenario-re-walks-and-the-coverage-index.md) |
 | C5 | 0029 | built — the human-approval controller binding now reads the signed policy document's `afp:controllers`, [ADR-0033](0033-operator-obligations.md)'s job |
 | C6 | 0030 | built — [scenario 15](../scenarios/15-the-production-tuesday.md) written 2026-09-15, verdict held, findings 96–100 triaged |
-| C7 | 0031, 0037 | built, less a hub hosted by `serve` itself for the converge loop to advance — proposed as [ADR-0037](0037-the-served-hub.md) (scenario 15 findings 96–97), unbuilt |
+| C7 | 0031, 0037, 0038 | built — [ADR-0037](0037-the-served-hub.md) landed 2026-09-19: `serve` builds the hubs its policy names, hands them to the converge loop, and seat state converges across replicas (scenario 15 findings 96–97, both closed) |
 | C8 | 0032 | built |
 | C9 | 0033 | built |
 | C10 | 0034 | built |
 
 Every claim is now built or built-less-a-named-remainder, and scenario 15 is written.
-What stands between the program and "closed" (as of 2026-09-18) is two remainders: a hub
-hosted by `serve` itself ([ADR-0037](0037-the-served-hub.md), proposed), and the first
-green CI run and first signed release (ADR-0034, mechanism built, never exercised).
+What stands between the program and "closed" (as of 2026-09-19) is one remainder: the
+first green CI run and first signed release (ADR-0034, mechanism built, never exercised).
+[ADR-0037](0037-the-served-hub.md) closed the other on 2026-09-19 — `serve` hosts the
+hubs its policy names, and seats converge across replicas.
 [ADR-0038](0038-the-operators-own-work.md) — the agent collection from a file and the
 `task` command — is not a claim of this program, but is what makes a served instance
 usable by the operator who runs it, which scenario 15's postscript could not name.

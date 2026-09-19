@@ -184,55 +184,26 @@ export function departuresFor(db: Db, roundId: string): { actor: string; digest:
   ).map((row) => ({ actor: String(row.actor), digest: String(row.departure_digest) }));
 }
 
-// ------------------------------------------------------------------ hub seats (ADR-0017 D4)
+// ------------------------------------------------------------------ hub seats (ADR-0017 D4, ADR-0037 D3)
 
-/** Record a live seat for `actor` (its own Follow's activity id). Revives a revoked row on re-Follow. */
-export function saveSeat(db: Db, actor: string, followActivityId: string, at: string): void {
-  db.prepare(
-    `INSERT INTO hub_seats (instance_actor, follow_activity, followed_at, revoked_at)
-       VALUES (?, ?, ?, NULL)
-     ON CONFLICT (instance_actor) DO UPDATE SET
-       follow_activity = excluded.follow_activity,
-       followed_at = excluded.followed_at,
-       revoked_at = NULL`,
-  ).run(actor, followActivityId, at);
-}
-
-/** Mark `actor`'s seat revoked (Undo{Follow}). No-op if it holds no seat. */
-export function revokeSeat(db: Db, actor: string, at: string): void {
-  db.prepare("UPDATE hub_seats SET revoked_at = ? WHERE instance_actor = ?").run(at, actor);
-}
-
-/** Instance actor ids with a live (unrevoked) seat. */
-export function liveSeats(db: Db): string[] {
-  return (
-    db.prepare("SELECT instance_actor FROM hub_seats WHERE revoked_at IS NULL").all() as { instance_actor: string }[]
-  ).map((row) => String(row.instance_actor));
-}
-
-/** Whether `actor` currently holds a live seat. */
-export function hasSeat(db: Db, actor: string): boolean {
-  const row = db.prepare("SELECT revoked_at FROM hub_seats WHERE instance_actor = ?").get(actor) as
-    | { revoked_at: string | null }
-    | undefined;
-  return !!row && row.revoked_at === null;
-}
-
-/** The Follow activity id backing `actor`'s seat row (live or revoked), or null. */
-export function seatFollowActivity(db: Db, actor: string): string | null {
-  const row = db.prepare("SELECT follow_activity FROM hub_seats WHERE instance_actor = ?").get(actor) as
-    | { follow_activity: string }
-    | undefined;
-  return row ? String(row.follow_activity) : null;
-}
-
-/** The instance actor whose live seat's Follow carries this activity id, or null. */
-export function seatByFollowActivity(db: Db, followActivityId: string): string | null {
-  const row = db
-    .prepare("SELECT instance_actor FROM hub_seats WHERE follow_activity = ? AND revoked_at IS NULL")
-    .get(followActivityId) as { instance_actor: string } | undefined;
-  return row ? String(row.instance_actor) : null;
-}
+/**
+ * Seats are CRDT state (ADR-0037 Decision 3), not a table: an OR-Set keyed by
+ * instance actor with the `Follow` activity id as the tag, living in
+ * `crdt_state` under `(hub_id, "seats")` like every other replicated store.
+ * `Hub` owns the in-memory view and the deltas; nothing here reads
+ * `hub_seats` any more.
+ *
+ * What that buys, and why the table could not: `hub_seats` had no `hub_id`
+ * column and no provenance, so it was per-database rather than per-hub, and
+ * no seat it held ever reached a peer. Two replicas of one hub answered
+ * `GET /hubs/:id/followers` from whatever each had happened to see, and a
+ * round's electorate pinned on one could name an instance the other did not
+ * know held a seat (ADR-0032's recorded follow-up; scenario 15 finding 97).
+ *
+ * The functions that read the old table are gone rather than kept as
+ * shims — `migrations/003-seats-as-crdt.ts` moves the rows, and a shim
+ * would have left a second reader of state that now has exactly one.
+ */
 
 // ------------------------------------------------------------------ convictions (ADR-0020 W1/W4)
 

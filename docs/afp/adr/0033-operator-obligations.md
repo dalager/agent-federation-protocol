@@ -52,6 +52,7 @@ schema and every one a stated obligation once present:
 | `afp:terms` | a URL and digest of the consortium terms this instance federates under — collusion, undeclared common control, dispute venue — which the protocol leaves to contract |
 | `afp:deviations` | any accepted deviation from the spec this deployment runs with, by section, in ADR-0017 Decision 6's form |
 | `afp:disclosure` | a contact for security reports ([ADR-0034](0034-release-conformance-and-disclosure.md)) |
+| `afp:hostedHubs` | the hubs this instance hosts — `{ afp:hubId, afp:seatPolicy?, afp:replicaOf?, afp:peers? }` per entry ([ADR-0037](0037-the-served-hub.md) Decision 1, added 2026-09-19). `serve` builds exactly these; the verifier holds every hub actor in a bundle whose `afp:operatedBy` is this instance to being named here |
 
 ### 2. The export manifest names the policy it was produced under
 

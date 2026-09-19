@@ -168,7 +168,10 @@ axis, orthogonal to it, is *hosting* — where an instance runs — and it has t
 
 **Self-hosted** ([ADR-0032](adr/0032-deployment-profile.md)): one Node process from a
 clean checkout, one SQLite file, one writer held by a lock beside the file, ADR-0031's
-scheduler ticking in-process, TLS terminated by a proxy the operator runs. This is the
+scheduler ticking in-process, TLS terminated by a proxy the operator runs. The same
+process hosts the hubs its policy's `afp:hostedHubs` names, on the same store and the
+same scheduler ([ADR-0037](adr/0037-the-served-hub.md)) — hosting a hub is a deployment
+fact, not a second deployment. This is the
 reference profile: it runs with no account anywhere, and a claim it cannot honour is a
 claim the program does not make.
 

@@ -925,8 +925,18 @@ safe alongside inbox traffic:
 |---|---|---|---|
 | **sweep** | `AFP_SWEEP_MS` | `30000` | an overdue task becomes a recorded `afp:Error` (`deadline-missed`) |
 | **flush** | `AFP_FLUSH_MS` | `10000` | retries the delivery queue with a real clock, `Retry-After` honoured per peer, dead-letters past the configured attempts |
-| **converge** | `AFP_CONVERGE_MS` | `60000` | one `Offer{afp:Digest}` per hub replica this process runs (`serve` hosts none of its own unless an embedding program supplies them); an urgent `Enroll`/`Unenroll`/proof pushes immediately instead of waiting for the tick |
+| **converge** | `AFP_CONVERGE_MS` | `60000` | one `Offer{afp:Digest}` per hub replica this process runs — the hubs `afp:hostedHubs` names on the policy document, built and served by `serve` itself ([ADR-0037](../../docs/afp/adr/0037-the-served-hub.md)); an urgent `Enroll`/`Unenroll`/proof pushes immediately instead of waiting for the tick |
 | **heartbeat** | `AFP_HEARTBEAT_MS` | `0` (off) | the optional `afp:BoundaryDigest` activity, published on an interval when enabled |
+
+**Hosting a hub.** `AFP_HUBS=bridge,annex` (or, with more to say than an id,
+`afp:hostedHubs` in `AFP_POLICY_FILE`) makes `serve` build one `Hub` per entry on this
+instance's own store, serve it at `GET /hubs/:id`, `/hubs/:id/followers` and
+`POST /hubs/:id/inbox`, and hand it to the converge loop. A policy-file entry takes
+`{ "id": "bridge", "seatPolicy"?, "replicaOf"?, "peers"? }` — `replicaOf` names the
+origin hub when this entry is a replica and is read as an implicit peer, `peers` lists
+the other replicas' actor URLs. The property is optional; absent, this instance hosts no
+hub, which is what `config check`'s `hubs` line says out loud. A hub named there that
+fails to construct is a named startup error, not a server listening with a hole in it.
 
 `AFP_JITTER_MS` (default `0`) adds a uniform random spread to every interval so
 concurrent instances do not tick in lockstep.

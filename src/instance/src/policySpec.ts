@@ -69,6 +69,22 @@ export interface DisclosureSpec {
   contact: string;
 }
 
+/**
+ * ADR-0037 Decision 1: one hub this instance hosts. `id` is the path segment
+ * under `/hubs/`; `seatPolicy` overrides the document's own for that hub
+ * alone; `replicaOf` names the origin hub's actor when this entry is a
+ * replica, and is read as an implicit peer (`serve` converges toward it
+ * without the operator repeating it in `peers`); `peers` lists the other
+ * replicas' actor URLs — ADR-0002's peer set, stated where a counterparty
+ * can read it.
+ */
+export interface HubSpec {
+  id: string;
+  seatPolicy?: SeatPolicy;
+  replicaOf?: string;
+  peers?: readonly string[];
+}
+
 /** ADR-0033 Decision 1's table, mirrored one property at a time — every property optional. */
 export interface PolicySpec {
   seatPolicy?: SeatPolicy;
@@ -83,7 +99,12 @@ export interface PolicySpec {
   terms?: TermsSpec;
   deviations?: readonly DeviationSpec[];
   disclosure?: DisclosureSpec;
+  /** ADR-0037 Decision 1: the hubs this instance hosts. Absent means it hosts none. */
+  hubs?: readonly HubSpec[];
 }
+
+/** The path segment a hub id may be: what `ap/server.ts`'s `/hubs/([\w-]+)` routes will actually match. */
+const HUB_ID = /^[\w-]+$/;
 
 const VISIBILITY_CLASSES = new Set(["public", "hub", "parties", "internal"]);
 const SEAT_POLICIES = new Set<SeatPolicy>(["follow-required", "enroll-implies-seat"]);
@@ -205,6 +226,28 @@ export function validatePolicySpec(spec: PolicySpec): string[] {
 
   if (spec.disclosure !== undefined && !isNonEmptyString(spec.disclosure.contact)) {
     push("disclosure.contact", "must be a non-empty string");
+  }
+
+  // ADR-0037 Decision 1. A bad id is worth naming rather than leaving to a
+  // 404 no route ever reaches: `/hubs/:id` matches `[\w-]+` and nothing else.
+  const seenHubIds = new Set<string>();
+  for (const [index, hub] of (spec.hubs ?? []).entries()) {
+    if (!isNonEmptyString(hub.id) || !HUB_ID.test(hub.id)) {
+      push(`hubs[${index}].id`, `must be a non-empty [A-Za-z0-9_-] path segment, got ${JSON.stringify(hub.id)}`);
+    } else if (seenHubIds.has(hub.id)) {
+      push(`hubs[${index}].id`, `"${hub.id}" is named twice — one entry per hub`);
+    } else {
+      seenHubIds.add(hub.id);
+    }
+    if (hub.seatPolicy !== undefined && !SEAT_POLICIES.has(hub.seatPolicy)) {
+      push(`hubs[${index}].seatPolicy`, `must be "follow-required" or "enroll-implies-seat", got ${JSON.stringify(hub.seatPolicy)}`);
+    }
+    if (hub.replicaOf !== undefined && !isAbsoluteUrl(hub.replicaOf)) {
+      push(`hubs[${index}].replicaOf`, `"${hub.replicaOf}" is not an absolute URL`);
+    }
+    for (const peer of hub.peers ?? []) {
+      if (!isAbsoluteUrl(peer)) push(`hubs[${index}].peers`, `"${peer}" is not an absolute URL`);
+    }
   }
 
   return problems;

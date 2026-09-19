@@ -143,7 +143,14 @@ receipts, assets — are moved by their governing activities (`afp:Enroll`,
 `Create{afp:Vote}`, `Update{afp:Asset}`, …), from which each replica derives its own deltas
 locally; those deltas never travel on their own. CRDT merges are commutative, associative,
 idempotent — receivers apply deltas on arrival with no ordering requirement, and duplicates
-are free. This eliminates reordering as a concern for this entire state class; task
+are free, with one exception a replicated hub has to honour: under `follow-required` an
+`afp:Enroll` is admitted only against a live seat, so the seat-moving activities carried
+in one exchange (`Follow`, `Undo{Follow}`) are applied before the `afp:Enroll`s in it
+([ADR-0037](adr/0037-the-served-hub.md) Decision 3). That is an admission order, not a
+merge order: the seat store is itself an OR-Set keyed by instance actor with the `Follow`
+activity id as the tag, so a `Follow` after an `Undo` on one replica and the reverse
+order on another still converge to the same answer. This eliminates reordering as a
+concern for this entire state class; task
 execution, which has real side effects, uses causal ordering instead (below).
 
 ### Application-defined stores

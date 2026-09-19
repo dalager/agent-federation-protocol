@@ -26,6 +26,7 @@ import type { Federation } from "./federation.ts";
 import { policedFetch, type FetchPolicyDeps } from "./fetchPolicy.ts";
 import { devModeFromEnv } from "../config.ts";
 import { metrics } from "../runtime/metrics.ts";
+import { instanceActorId } from "../ap/documents.ts";
 
 export interface InboxDeps {
   federation: Federation;
@@ -214,9 +215,28 @@ export async function handleInboxPost(
     return { status: 202, body: { accepted: true } };
   }
 
+  // ADR-0037, the write half of ADR-0038's finding. `serve` hosts a hub now,
+  // and the hub's inbox is the only door to it — there is no in-process path
+  // a served instance can take, the way every demo's embedding program did.
+  // So the operator's own instance, seating itself on its own hub, arrived
+  // at its own boundary and was refused at the agreement stage: an instance
+  // holds no agreement with itself, and there is no self-agreement to model
+  // (ADR-0013's read gate had exactly this hole, resolved there the same
+  // way). A self-operated sender therefore waives the agreement stage and
+  // nothing else — the signature was already verified above, the denylist
+  // still applies, and `admitWrite` (the seat and enrollment gate, which is
+  // what actually authorizes a hub write) still runs below. Compared as an
+  // actor id, never as an origin prefix.
+  const selfOperated = operatedBy !== null && operatedBy === instanceActorId(deps.selfOrigin);
+  if (selfOperated && deps.federation.isDenylisted(operatedBy)) {
+    return { status: 403, body: { error: "refused" } };
+  }
+
   // 4 — the two-tier gate. A refusal is logged (hash-chained) and opaque:
   // the response says no more than the visibility design allows.
-  const outcome = deps.federation.gate(activity, operatedBy);
+  const outcome = selfOperated
+    ? ({ admitted: true } as ReturnType<typeof deps.federation.gate>)
+    : deps.federation.gate(activity, operatedBy);
   if (!outcome.admitted) {
     // Decision 4's late-outcome path: a Result/Error on a correlation whose
     // Accept predates the agreement's expiry remains deliverable until the

@@ -5,6 +5,7 @@
  */
 
 import { loadConfig } from "./config.ts";
+import type { JsonValue } from "./crypto/jcs.ts";
 import { endpointOf, runDemo } from "./demo.ts";
 import { AfpInstance } from "./instance.ts";
 // ADR-0038 Decision 1: `AFP_AGENTS_FILE`'s collection when set, the demo's otherwise.
@@ -1212,14 +1213,27 @@ async function main(): Promise<void> {
       const { fetchActorDocument: fetchActorDocumentRaw } = await import("./federation/inbox.ts");
       const { httpTransport } = await import("./federation/transport.ts");
       const { Scheduler } = await import("./runtime/scheduler.ts");
+      const { Hub } = await import("./hub/hub.ts");
       const { installShutdown } = await import("./runtime/shutdown.ts");
       const actorId = String(instance.instanceDocument().id);
       const federation = new Federation(instance.db, actorId, () => instance.clock.now());
       // ADR-0025: this instance's own policy — not the env-inferred default
       // every demo relies on — since `serve` is the one command allowed to
       // run in production mode.
-      const fetchActorDocument = (url: string) =>
-        fetchActorDocumentRaw(url, { devMode: config.devMode, trustedNets: config.trustedNets });
+      // ADR-0037 Decision 2: a hosted `Hub` resolves actor documents
+      // synchronously (`HubDeps.fetchActor`) — deliberately, so it verifies a
+      // key only against a document already resolved, never by reaching out
+      // mid-dispatch. The demos hand it a prepopulated map; a served instance
+      // fills one on the way past, because `handleInboxPost` awaits
+      // `fetchDocument(actor)` to check the HTTP Signature before anything is
+      // dispatched to the hub (`federation/inbox.ts`). So by the time a hub
+      // sees an activity, its author's document is in here.
+      const fetchedActorCache = new Map<string, { [key: string]: JsonValue }>();
+      const fetchActorDocument = async (url: string) => {
+        const doc = await fetchActorDocumentRaw(url, { devMode: config.devMode, trustedNets: config.trustedNets });
+        if (doc) fetchedActorCache.set(url, doc);
+        return doc;
+      };
 
       // ADR-0031 Decision 2: `/readyz`'s self-check reuses `serve`'s own
       // fetch policy (dev mode fetches loopback directly) — the same
@@ -1235,21 +1249,85 @@ async function main(): Promise<void> {
       // would serve `public` and 404 everything else to everyone — the
       // mechanism would exist and be reachable by nobody, which is the
       // "specified but not built" failure one layer down.
+      // ADR-0037 Decision 2: the hubs this instance hosts, built from the
+      // policy document that says it hosts them (`config.policy.hubs` — the
+      // policy file merged over `AFP_HUBS`). Construction rehydrates each
+      // hub's membership, roles, seats and registry from its own tables
+      // (ADR-0004 H5), so this is a `SELECT`, not a replay; a hub that fails
+      // to construct throws here, named, before the port is bound.
+      const hostedHubs = (config.policy.hubs ?? []).map((spec) => {
+        try {
+          return new Hub({
+            origin: config.origin,
+            hubId: spec.id,
+            db: instance.db,
+            keyDir: config.keyDir,
+            instanceActorId: actorId,
+            maxDeliveryAttempts: config.maxDeliveryAttempts,
+            backoffBaseMs: config.backoffBaseMs,
+            fetchActor: (id) => fetchedActorCache.get(id) ?? null,
+            now: () => instance.clock.now(),
+            resolveActivity: (activityId) =>
+              instance.outbox.get(activityId)?.activity ??
+              federation.receivedActivities().find((r) => String(r.activity.id) === activityId)?.activity ??
+              null,
+            ...(spec.replicaOf ? { replicaOf: spec.replicaOf } : {}),
+            // Decision 1: the entry's own seat policy overrides the
+            // document's for that hub alone.
+            seatPolicy: spec.seatPolicy ?? config.policy.seatPolicy ?? "follow-required",
+            ...(config.policy.governance ? { governance: config.policy.governance } : {}),
+          });
+        } catch (error) {
+          throw new Error(`afp:hostedHubs names "${spec.id}", which failed to construct: ${(error as Error).message}`);
+        }
+      });
+      if (hostedHubs.length > 0) {
+        log.info("hosting hubs", { hubs: hostedHubs.map((hub) => hub.actorId) });
+      }
+
       const server = createHttpServer(instance, {
         inbox: {
           federation,
           receive: (activity) => instance.receiveAdmitted(activity),
           fetchDocument: fetchActorDocument,
         },
+        // ADR-0037 Decision 2: each hosted hub, with one step in front of its
+        // inbox. `Hub.fetchActor` is synchronous on purpose — a hub resolves
+        // a key only from a document already in hand, never by reaching out
+        // mid-dispatch — and `handleInboxPost` warms the cache only for the
+        // actor that signed the request. An `afp:Enroll` names a second
+        // actor: the agent being enrolled, whose document is where
+        // `afp:operatedBy` lives (ADR-0005 Decision 2). Without this the hub
+        // would refuse every foreign Enroll as "names no afp:operatedBy",
+        // which is how the G2 gate found it. So the actors an activity names
+        // are resolved here, at the boundary, before the hub sees it.
+        hubs: hostedHubs.map((hub) => ({
+          hubId: hub.hubId,
+          actorDocument: () => hub.actorDocument(),
+          followers: () => hub.followers(),
+          writeAdmitted: (actor: string, activity: { [key: string]: JsonValue }) => hub.writeAdmitted(actor, activity),
+          receive: async (activity: { [key: string]: JsonValue }) => {
+            for (const field of ["actor", "object", "target"] as const) {
+              const named = activity[field];
+              if (typeof named === "string" && /^https?:/.test(named) && !fetchedActorCache.has(named)) {
+                await fetchActorDocument(named).catch(() => null);
+              }
+            }
+            return hub.receive(activity);
+          },
+        })),
         read: {
           selfActor: actorId,
           fetchDocument: fetchActorDocument,
           isDenylisted: (who) => federation.isDenylisted(who),
           activeAgreementsWith: (counterparty, at) => federation.activeAgreementsWith(counterparty, at),
           // Enrollment is answerable only for hubs this instance hosts
-          // (ADR-0013 Decision 3). `serve` runs no hub, so no `hub`-class
-          // activity is admitted here — a stricter answer than a wrong one.
-          roleOf: () => null,
+          // (ADR-0013 Decision 3) — and since ADR-0037 Decision 2 it hosts
+          // the ones its policy names, so the set this consults is that one
+          // rather than the empty list that made every `hub`-class read a
+          // 404.
+          roleOf: (hubActorId, agent) =>
+            hostedHubs.find((hub) => hub.actorId === hubActorId)?.roleOf(agent) ?? null,
           grants: () => [],
           now: () => instance.clock.now(),
         },
@@ -1265,14 +1343,19 @@ async function main(): Promise<void> {
         local: instance.localTransport(),
       });
 
-      // `serve` hosts no hub of its own, so `converge` has no replicas
-      // unless a future embedding program supplies them (WP-1's scope: the
-      // scheduler generalizes ADR-0025's real-time loop; wiring a resident
-      // hub into `serve` is not this ADR's claim).
+      // ADR-0037 Decision 2: the converge loop has something to converge —
+      // ADR-0031 built it for replicas "an embedding program supplies", and
+      // the served instance is now such a program. `replicaOf` is read as an
+      // implicit peer: an operator who names the origin hub should not have
+      // to repeat it under `peers` to converge toward it.
       const scheduler = new Scheduler({
         instance,
         transport,
-        hubReplicas: [],
+        hubReplicas: hostedHubs.map((hub, index) => {
+          const spec = (config.policy.hubs ?? [])[index];
+          const peers = [...(spec.peers ?? []), ...(spec.replicaOf ? [spec.replicaOf] : [])];
+          return { hub, peers: [...new Set(peers)] };
+        }),
         federation,
         config: config.scheduler,
       });

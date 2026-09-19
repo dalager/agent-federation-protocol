@@ -74,6 +74,22 @@ export async function runConfigCheck(config: Config, options: RunConfigCheckOpti
   const agents = agentsCheck(config);
   lines.push({ name: "agents", ok: agents.ok, reason: agents.reason });
 
+  // ADR-0037 Decision 2: the hubs `serve` would build. `validatePolicySpec`
+  // has already named any malformed entry among the `problems` above; this
+  // line says what the operator gets — which is the fact worth reading back,
+  // since "hosts no hub" is a perfectly good answer that looks identical to
+  // a misspelled AFP_HUBS until someone says it out loud.
+  const hosted = config.policy.hubs ?? [];
+  lines.push({
+    name: "hubs",
+    ok: true,
+    reason: hosted.length === 0
+      ? "hosts no hub"
+      : hosted
+          .map((hub) => `${config.origin}/hubs/${hub.id}` + (hub.replicaOf ? ` (replica of ${hub.replicaOf})` : ""))
+          .join(", "),
+  });
+
   // Store: opens (and immediately closes) the store path — a running
   // instance holding the lock is reported as `store-locked` with its pid,
   // not as a failure, since the whole point is to check config *while*

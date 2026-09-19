@@ -13,7 +13,7 @@ python3 afp_verify.py ../instance/export-p7/* -v # several bundles: one joint re
 Exit status is `0` only if every check passes. Requires Python 3.11+ and
 `cryptography`; everything else is standard library.
 
-Version: `0.9.0`, implementing spec revision `3.34` (`afp_verify.py --version`
+Version: `0.9.0`, implementing spec revision `3.35` (`afp_verify.py --version`
 prints both; ADR-0034 Decision 1).
 
 ## Installing

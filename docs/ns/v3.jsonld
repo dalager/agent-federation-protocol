@@ -64,6 +64,9 @@
     "afp:verificationMethod": { "@type": "@id" },
     "afp:summary": { "@type": "@id" },
     "afp:hubs": { "@type": "@id" },
+    "afp:replicaOf": { "@type": "@id" },
+    "afp:peers": { "@type": "@id" },
+    "afp:rootKey": { "@type": "@id" },
     "afp:since": { "@type": "xsd:dateTime" },
     "afp:observedAt": { "@type": "xsd:dateTime" },
 

@@ -13,6 +13,7 @@
 import type { Db } from "../db.ts";
 import { MIGRATION_001 } from "./001-baseline.ts";
 import { MIGRATION_002 } from "./002-restore-points.ts";
+import { MIGRATION_003 } from "./003-seats-as-crdt.ts";
 
 export interface Migration {
   readonly version: number;
@@ -21,7 +22,7 @@ export interface Migration {
 }
 
 /** The binary's known migrations, in shipping order. Never reorder or edit a shipped entry — add a new one. */
-export const MIGRATIONS: readonly Migration[] = [MIGRATION_001, MIGRATION_002];
+export const MIGRATIONS: readonly Migration[] = [MIGRATION_001, MIGRATION_002, MIGRATION_003];
 
 export class StoreNewerThanBinary extends Error {
   constructor(storeVersion: number, binaryVersion: number) {

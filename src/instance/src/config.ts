@@ -106,6 +106,16 @@ export interface Config {
   readonly controllers: readonly string[];
 
   /**
+   * ADR-0037 Decision 1: hub ids this instance hosts, from `AFP_HUBS`. A
+   * convenience on the same terms as `controllers`: it populates
+   * `afp:hostedHubs` on the policy document only when the policy file names no
+   * hubs, because which hubs an instance hosts is a fact counterparties
+   * federate against and the policy file is its source of record. Empty by
+   * default — an instance hosts no hub until an operator says so.
+   */
+  readonly hubs: readonly string[];
+
+  /**
    * ADR-0032 Decision 3: the ADR-0028 webhook initiator's shared secret, as a
    * file path — never a value in the environment. Absent means the webhook
    * route's secret is configured some other way (a demo's own literal, today).
@@ -247,6 +257,7 @@ export function loadConfig(overrides: Partial<Config> = {}): Config {
   const policyFile = String(readEntry(entry("AFP_POLICY_FILE")));
   const agentsFile = String(readEntry(entry("AFP_AGENTS_FILE")));
   const controllersFromEnv = readEntry(entry("AFP_CONTROLLERS")) as string[];
+  const hubsFromEnv = readEntry(entry("AFP_HUBS")) as string[];
 
   const base: Config = {
     origin,
@@ -285,6 +296,7 @@ export function loadConfig(overrides: Partial<Config> = {}): Config {
     ...(agentsFile ? { agentsFile } : {}),
     issuedKeyLifetimeMs: readEntry(entry("AFP_ISSUED_KEY_LIFETIME_MS")) as number,
     controllers: controllersFromEnv,
+    hubs: hubsFromEnv,
     fediverseWindow: readEntry(entry("AFP_FEDIVERSE_WINDOW")) as boolean,
     scheduler: {
       sweepMs: readEntry(entry("AFP_SWEEP_MS")) as number,
@@ -311,6 +323,7 @@ export function loadConfig(overrides: Partial<Config> = {}): Config {
       llmModel: merged.llmModel,
       llmBaseUrl: merged.llmBaseUrl,
       controllers: merged.controllers,
+      hubs: merged.hubs,
       agentsFile: merged.agentsFile,
     }),
   };
@@ -326,7 +339,7 @@ export function loadConfig(overrides: Partial<Config> = {}): Config {
  */
 function assemblePolicy(
   policyFile: string,
-  derived: { brain: "stub" | "llm"; llmModel: string; llmBaseUrl: string; controllers: readonly string[]; agentsFile?: string },
+  derived: { brain: "stub" | "llm"; llmModel: string; llmBaseUrl: string; controllers: readonly string[]; hubs?: readonly string[]; agentsFile?: string },
 ): PolicySpec {
   const fromFile = readPolicyFile(policyFile);
   // ADR-0038: with an agents file the brains are per agent, so the published
@@ -342,6 +355,11 @@ function assemblePolicy(
     // ADR-0032 Decision 6's flipped default.
     seatPolicy: "follow-required",
     controllers: [...derived.controllers],
+    // ADR-0037 Decision 1: `AFP_HUBS` is ids only — `peers` and `replicaOf`
+    // are policy-file-only, because a replica set is not a thing to spell in
+    // an env var. No env var and no file property means the property is
+    // absent, which means what it means today: this instance hosts no hub.
+    ...((derived.hubs ?? []).length > 0 ? { hubs: (derived.hubs ?? []).map((id) => ({ id })) } : {}),
     // What the old ad-hoc `/afp/policy` body said (ap/server.ts, pre-ADR-0033).
     defaultVisibility: "internal",
     custody: { instance: "file" },
@@ -363,6 +381,7 @@ function assemblePolicy(
     ...defaults,
     ...fromFile,
     controllers: fromFile.controllers && fromFile.controllers.length > 0 ? fromFile.controllers : defaults.controllers,
+    hubs: fromFile.hubs && fromFile.hubs.length > 0 ? fromFile.hubs : defaults.hubs,
     custody: fromFile.custody ? { ...defaults.custody, ...fromFile.custody } : defaults.custody,
     brains: fromFile.brains ?? defaults.brains,
     governance: fromFile.governance ?? defaults.governance,
@@ -474,6 +493,14 @@ export function validate(config: Config, options: ValidateOptions = {}): ConfigP
   for (const controller of config.controllers) {
     if (!/^https?:/.test(controller)) {
       push("controllers", "AFP_CONTROLLERS", `"${controller}" is not an http(s) URL`);
+    }
+  }
+
+  // ADR-0037 Decision 1: the env convenience gets the same check the policy
+  // property gets in `validatePolicySpec` — the two spellings, one answer.
+  for (const hub of config.hubs) {
+    if (!/^[\w-]+$/.test(hub)) {
+      push("hubs", "AFP_HUBS", `"${hub}" is not a [A-Za-z0-9_-] path segment`);
     }
   }
 

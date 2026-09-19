@@ -202,6 +202,12 @@ the explicit-compat proof ("enroll-implies-seat, set explicitly, still enrolls")
   in the sync set) is the recorded follow-up, not built here. `test/adr0032.test.ts` G4
   carries the gate case; `test/adr0016.test.ts` T7 and `test/adr0031.test.ts` G3
   (pre-existing replica-convergence gates) are what caught the gap.
+  **Answered 2026-09-19 by [ADR-0037](0037-the-served-hub.md) Decision 3:** seats are an
+  OR-Set in `crdt_state` keyed by instance actor and tagged by the `Follow`, `hub_seats`
+  is gone (migration 003), and `relayed` no longer skips the seat gate — it means
+  ordering, and an `Enroll` whose seat never arrives is refused and logged rather than
+  admitted. G4 here was rewritten to the new truth: the carried `Follow` seats the
+  leader on the replica, and `followers` is byte-equal on both.
 - **Three things the review changed after the build.** `restoreStore` decided whether the
   target store was live by *opening* it — which ran the target's pending migrations as a
   side effect of asking, before the `--force` refusal was even reached; it now reads the

@@ -51,9 +51,7 @@ import {
   convictionByProof,
   convictionsFor,
   countedVoteTuple,
-  hasSeat,
   isConvicted,
-  liveSeats,
   loadRound,
   recordConviction,
   recordRestoration,
@@ -204,6 +202,9 @@ export class Hub {
   private readonly fetchActor: HubDeps["fetchActor"];
   private readonly resolveActivity: (activityId: string) => { [key: string]: JsonValue } | null;
   private readonly now: () => Date;
+  /** ADR-0037 Decision 1: the origin hub this one replicates, published on the actor document. */
+  private readonly replicaOf?: string;
+
   /** The hub actor sync traffic names: `replicaOf` when set, else self. */
   private readonly hubIdentity: string;
   private readonly seatPolicy: "follow-required" | "enroll-implies-seat";
@@ -218,6 +219,15 @@ export class Hub {
   private readonly crdt: CRDTStore;
 
   private readonly membership = new ORSet<string>();
+
+  /**
+   * ADR-0037 Decision 3: seats, replicated. An OR-Set of instance actors
+   * tagged by the `Follow` activity that seated each one — add-wins, so a
+   * `Follow` after an `Undo` on one replica and the reverse order on another
+   * converge to the same answer, which an LWW register over a timestamp
+   * would not.
+   */
+  private readonly seats = new ORSet<string>();
   private readonly capabilities = new ORMap<string, string>();
   private readonly liveness = new Map<string, LWWRegister<LivenessValue>>();
   /**
@@ -285,6 +295,10 @@ export class Hub {
     this.now = deps.now ?? (() => new Date());
     this.actorId = hubActorId(deps.origin, deps.hubId);
     this.hubIdentity = deps.replicaOf ?? this.actorId;
+    // ADR-0037 Decision 1: published on the actor document too, so a replica's
+    // bundle says so to a stranger — `src/verifier/policy.py` has read
+    // `afp:replicaOf` since ADR-0033 and nothing emitted it until now.
+    this.replicaOf = deps.replicaOf;
     // ADR-0032 Decision 6: the default flips to "follow-required".
     this.seatPolicy = deps.seatPolicy ?? "follow-required";
     this.governance = deps.governance ?? DEFAULT_GOVERNANCE;
@@ -332,6 +346,8 @@ export class Hub {
 
       if (crdtId === "membership" && crdtType === "OR_SET") {
         this.membership.restore(state as ORSetState);
+      } else if (crdtId === "seats" && crdtType === "OR_SET") {
+        this.seats.restore(state as ORSetState);
       } else if (crdtId === "capabilities" && crdtType === "OR_MAP") {
         this.capabilities.restore(state as ORMapState);
       } else if (crdtId === "assets" && crdtType === "OR_MAP") {
@@ -374,7 +390,7 @@ export class Hub {
   }
 
   actorDocument(): ActorDocument {
-    return hubActor(this.origin, this.hubId, this.key, this.instanceActorId, this.transportKey);
+    return hubActor(this.origin, this.hubId, this.key, this.instanceActorId, this.transportKey, this.replicaOf);
   }
 
   /**
@@ -602,7 +618,7 @@ export class Hub {
 
     // ADR-0017 Decision 4 (R3): Follow/Undo, dispatched before the allocator's
     // own Accept fallthrough — the same class as Enroll/Unenroll above.
-    if (type === "Follow") return this.onFollow(activity);
+    if (type === "Follow") return this.onFollow(activity, relayed);
     if (type === "Undo") return this.onUndoFollow(activity);
     if (type === "afp:Enroll") return this.onEnroll(activity, relayed);
     if (type === "afp:Unenroll") return this.onUnenroll(activity);
@@ -702,21 +718,27 @@ export class Hub {
 
     // ADR-0017 Decision 4 (R2): under `follow-required`, an Enroll from an
     // instance holding no live seat is refused — the seat, not the Enroll
-    // alone, is what admits new membership. ADR-0016 Decision 2 / ADR-0032
-    // Decision 6: a `relayed` Enroll (carried inside a replica's
-    // Accept{afp:StateDeltas}/pushSync) was already admitted under the
-    // origin hub's own seat state — seat state itself does not converge
-    // across replicas (`hub_seats` is not CRDT-tracked), so the replica
-    // re-derives this Enroll under the origin's authority rather than
-    // re-admitting it against seat state it never received.
-    if (this.seatPolicy === "follow-required" && !relayed && !hasSeat(this.db, origin)) {
+    // alone, is what admits new membership.
+    //
+    // ADR-0037 Decision 3 narrowed `relayed` to its honest job. It used to
+    // skip this gate outright, because seat state did not converge and a
+    // replica that never saw the `Follow` would have refused every synced
+    // `Enroll`. Seats converge now, so the gate runs on relayed activities
+    // too — a replica holds a real seat to check against. What `relayed`
+    // still means is ordering: `onStateDeltas` applies the seat-moving
+    // activities in a delta before the `Enroll`s in it, so "the Follow is in
+    // this same batch, later in it" is not a refusal. An `Enroll` whose seat
+    // never arrives is refused here and logged as such, which is what the
+    // skip used to hide.
+    if (this.seatPolicy === "follow-required" && !this.hasSeat(origin)) {
       logAdmission(
         this.db,
         this.now().toISOString(),
         agent,
         origin,
         "rejected",
-        `no seat: instance ${origin} has not Followed this hub (ADR-0017 D4)`,
+        `no seat: instance ${origin} has not Followed this hub (ADR-0017 D4)` +
+          (relayed ? " — relayed, and its Follow did not arrive in the same delta (ADR-0037 D3)" : ""),
       );
       return;
     }
@@ -1008,18 +1030,23 @@ export class Hub {
     return {
       db: this.db,
       actorId: this.actorId,
+      hubIdentity: this.hubIdentity,
       fetchActor: this.fetchActor,
       now: this.now,
       emit: (to, thread, visibility, build) => this.emit(to, thread, visibility, build),
       members: () => this.members(),
       instanceOf: (agent) => this.instanceOf(agent),
       removeAgent: (agent, byActor, activityId) => this.removeAgent(agent, byActor, activityId),
+      hasSeat: (actor) => this.hasSeat(actor),
+      seatTags: (actor) => this.seatTags(actor),
+      seatFollow: (actor, followActivityId) => this.seatFollow(actor, followActivityId),
+      seatRevoke: (actor, undoActivityId) => this.seatRevoke(actor, undoActivityId),
     };
   }
 
   /** `Follow{object: this hub}` (ADR-0017 Decision 4, R3) — see `hub/seats.ts`. */
-  private onFollow(activity: { [key: string]: JsonValue }): void {
-    onFollow(this.seatDeps(), activity);
+  private onFollow(activity: { [key: string]: JsonValue }, relayed = false): void {
+    onFollow(this.seatDeps(), activity, relayed);
   }
 
   /** `Undo{Follow}` (ADR-0017 Decision 4, R3) — see `hub/seats.ts`. */
@@ -1488,12 +1515,36 @@ export class Hub {
     const object = activity.object as { [key: string]: JsonValue };
     if (String(object["afp:hub"] ?? "") !== this.hubIdentity) return;
     const carried = Array.isArray(object["afp:activities"]) ? (object["afp:activities"] as JsonValue[]) : [];
-    for (const entry of carried) {
-      if (entry && typeof entry === "object" && !Array.isArray(entry)) {
-        // ADR-0016 Decision 2 / ADR-0032 Decision 6: `relayed: true` — the
-        // origin hub already admitted this activity; this hub re-derives it.
-        await this.receive(entry as { [key: string]: JsonValue }, { relayed: true });
-      }
+    const activities = carried.filter(
+      (entry): entry is { [key: string]: JsonValue } =>
+        !!entry && typeof entry === "object" && !Array.isArray(entry),
+    );
+    // ADR-0037 Decision 3's ordering rule, which is the whole of what
+    // `relayed` narrowed to. `activitiesBehind` already emits in the sending
+    // replica's own provenance order, so a `Follow` admitted there before an
+    // `Enroll` arrives before it; this hoist covers the case that order does
+    // not — a delta assembled from a digest whose counts left the seat
+    // behind, or an `Enroll` this replica is catching up on from one peer
+    // while the `Follow` came from another. "Its Follow is later in the same
+    // batch" is never read as "it holds no seat".
+    //
+    // Only the seat-moving activities are hoisted, and everything else keeps
+    // the order it arrived in. The first draft partitioned on `afp:Enroll`
+    // instead — non-Enrolls first — which put an `Update{afp:CRDTDelta}`
+    // ahead of the `Enroll` that makes its author a member, so `onCrdtDelta`
+    // read a role of `null` and dropped it. ADR-0016's T7 caught exactly
+    // that: the application store stopped converging. Provenance order is
+    // already causal for everything but the seat gate, so the seat gate is
+    // the only thing worth reordering for.
+    const seatMoving = (entry: { [key: string]: JsonValue }): boolean => {
+      const type = String(entry.type ?? "");
+      return type === "Follow" || type === "Undo";
+    };
+    const seatsFirst = [...activities.filter(seatMoving), ...activities.filter((entry) => !seatMoving(entry))];
+    for (const entry of seatsFirst) {
+      // ADR-0016 Decision 2: `relayed: true` — the origin hub already
+      // admitted this activity; this hub re-derives it.
+      await this.receive(entry, { relayed: true });
     }
   }
 
@@ -2053,7 +2104,61 @@ export class Hub {
 
   /** Instance actors with a live seat (ADR-0017 Decision 4, R5) — this hub's public `followers`. */
   followers(): string[] {
-    return liveSeats(this.db);
+    return [...this.seats.getState()].sort();
+  }
+
+  /** Whether `actor` holds a live seat — the `follow-required` gate's question (ADR-0017 D4). */
+  hasSeat(actor: string): boolean {
+    return this.seats.has(actor);
+  }
+
+  /** The live `Follow` tags backing `actor`'s seat — what an `Undo{Follow}` must name and tombstone. */
+  seatTags(actor: string): string[] {
+    return this.seats.tagsFor(actor);
+  }
+
+  /**
+   * ADR-0037 Decision 3: seat `actor`, tagged by its own `Follow`. Written
+   * through to `CRDTStore` with the Follow as provenance and the follower as
+   * the delta's origin, so the exchange carries the `Follow` itself to every
+   * peer — that is what makes `followers()` one answer across replicas
+   * instead of whatever each happened to see.
+   */
+  seatFollow(actor: string, followActivityId: string): void {
+    this.seats.apply({ op: "add", value: actor, tag: followActivityId });
+    this.crdt.apply(
+      {
+        hub: this.hubId,
+        crdtId: "seats",
+        crdtType: "OR_SET",
+        delta: { adds: [{ element: actor, tag: followActivityId }], removes: [] },
+      },
+      actor,
+      this.now(),
+      followActivityId,
+    );
+  }
+
+  /**
+   * Revoke `actor`'s seat by tombstoning every live `Follow` tag it holds —
+   * add-wins, so a later re-`Follow` with a fresh tag seats it again, and the
+   * order two replicas saw the pair in stops mattering.
+   */
+  seatRevoke(actor: string, undoActivityId: string): void {
+    const tags = this.seats.tagsFor(actor);
+    if (tags.length === 0) return;
+    for (const tag of tags) this.seats.apply({ op: "remove", value: actor, tag });
+    this.crdt.apply(
+      {
+        hub: this.hubId,
+        crdtId: "seats",
+        crdtType: "OR_SET",
+        delta: { adds: [], removes: [{ element: actor, tombstoneTags: tags }] },
+      },
+      actor,
+      this.now(),
+      undoActivityId,
+    );
   }
 
   async run(transport: Transport): Promise<void> {

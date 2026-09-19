@@ -372,6 +372,19 @@ self-operated requester neither named nor author is refused; the author is admit
 `test/adr0029.test.ts` passes with no assertion changed; ADR-0038's G8(b) is the end-to-end
 case over HTTP.
 
+**The same hole on the write side, recorded here for symmetry (2026-09-19,
+[ADR-0037](0037-the-served-hub.md)).** `serve` hosts a hub now, and a hub's inbox is the
+only door to it — there is no in-process path a served instance can take, the way every
+demo's embedding program did. So the operator's own instance, seating itself on its own
+hub, arrived at its own boundary and was refused at exactly the stage above:
+`Federation.gate` looks for an agreement with the sender's operator, and there is none to
+find. `federation/inbox.ts` now waives that stage for a sender whose operator is this
+instance's own actor id — compared as an actor id, never as an origin prefix, the same
+rule as above — and waives nothing else: the HTTP signature is verified before it, the
+deny-list still applies, and `admitWrite` (the hub's seat and enrollment gate, which is
+what actually authorizes a hub write) still runs after it. ADR-0037's G2 is the
+end-to-end case.
+
 A verifier task is conspicuously absent, and that absence is Decision 5 in executable
 form: reads leave no record, so there is nothing for replay to check. The single exception
 — the grant-admitted fetch of A5 — becomes an ordinary recorded activity and replays like
