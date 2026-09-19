@@ -123,6 +123,28 @@ quotes them.
 
 ## Build status
 
+**The first CI run, 2026-09-19 — red, and worth the entry.** Run
+[35440209742](https://github.com/dalager/agent-federation-protocol/actions/runs/35440209742)
+on `7dc2bbb`: `conformance`, `package` and `verifier` green, `gate` red on exactly one
+case — ADR-0037 G6 — with `cannot reach http://localhost:13305/api/v1/chat/completions`.
+That endpoint is a model server on the *author's laptop*. The case had been passing for
+four days on the strength of a process nobody else runs.
+
+The cause was a call-shape mistake, not a brain choice. `runDemo` takes
+`{ fresh?, config?, clock? }`; the test passed its `Config` positionally, so
+`options.config` was `undefined` and the demo ran `loadConfig()` over the ambient
+environment instead — the default data directory rather than the test's temp workspace,
+a live clock rather than the fixed one, and `AFP_BRAIN`'s default `llm` rather than the
+`brain: "stub"` the line above it asked for. Three isolation properties lost to one
+missing object literal, and the only one that showed was the one CI could see.
+
+Two fixes, at two depths. The case now calls `runDemo({ fresh: true, config, clock })`
+and exports through the instance the demo hands back, rather than opening a second one
+on the same store. And `npm run gate` now pins `AFP_LLM_BASE_URL` to a closed port, so
+**the gate cannot reach a model server even when one is running** — the local run and the
+CI run no longer differ on the one environment fact that hid this. Any future test that
+needs a live brain must now stand up its own, which the `llm`-brain cases already do.
+
 **Built, 2026-09-13.** `cd src/instance && npm test` (`npm run gate`): 549 cases, 547
 passing, 0 failing, 2 recorded skips — both in `test/adr0034.test.ts` G1, both the same
 environment fact rather than a gap in what shipped (below). The conformance

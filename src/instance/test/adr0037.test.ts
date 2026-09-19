@@ -38,6 +38,7 @@ import { Scheduler } from "../src/runtime/scheduler.ts";
 import { jumpClock } from "../src/demoP3.ts";
 import type { JsonValue } from "../src/crypto/jcs.ts";
 import { workspace } from "./helpers.ts";
+import { fixedClock } from "../src/demo.ts";
 import { freePort, INSTANCE_DIR, spawnServe, VERIFIER } from "./adr0038-harness.ts";
 
 const HUB = "bridge";
@@ -426,10 +427,21 @@ describe("ADR-0037 G6 — the verifier holds a bundle to the hubs it says it hos
     const { runDemo } = await import("../src/demo.ts");
     const paths = workspace();
     const config = loadConfig({ ...paths, hubs: [HUB], brain: "stub" });
-    await runDemo(config);
+    // `runDemo` takes an options object, not a Config. Passing the Config
+    // positionally left `options.config` undefined, so the demo silently ran
+    // `loadConfig()` with the ambient environment instead: the default data
+    // directory rather than this test's workspace, a live clock rather than
+    // the fixed one, and `AFP_BRAIN`'s default `llm` rather than the stub
+    // asked for one line above. It passed anywhere a model server happened
+    // to answer on the configured endpoint, and only there.
+    // The demo's own instance is the one that exports: it holds the store's
+    // single writer lock (ADR-0031 Decision 4) and the agent registrations
+    // the roster is checked against, so a second `new AfpInstance(config, [])`
+    // would both contend for the lock and export a bundle whose rostered
+    // agents contribute no outbox.
+    const { instance } = await runDemo({ fresh: true, config, clock: fixedClock() });
 
     const { exportBundle } = await import("../src/export.ts");
-    const instance = new AfpInstance(config, []);
     let exported = "";
     try {
       // A hub this instance operates, on the record the bundle carries.

@@ -21,7 +21,7 @@
     "backup": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env src/cli.ts backup",
     "restore": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env src/cli.ts restore",
     "config:check": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env src/cli.ts config check",
-    "gate": "node --disable-warning=ExperimentalWarning --test \"test/*.test.ts\"",
+    "gate": "AFP_LLM_BASE_URL=http://127.0.0.1:9/api/v1 node --disable-warning=ExperimentalWarning --test \"test/*.test.ts\"",
     "gate:demos": "node --disable-warning=ExperimentalWarning --test test/demos.test.ts",
     "test": "npm run gate",
     "demo:offline": "AFP_BRAIN=stub node --disable-warning=ExperimentalWarning src/cli.ts demo",
