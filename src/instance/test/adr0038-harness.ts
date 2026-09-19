@@ -8,7 +8,7 @@
 
 import assert from "node:assert/strict";
 import { createServer as createProbe } from "node:net";
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { promisify } from "node:util";
 import { cpSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -189,4 +189,67 @@ export async function showServe(options: { globalBrain?: "stub" | "llm" } = {}) 
 
 export function heads(instance: AfpInstance, names: readonly string[]): string[] {
   return names.map((name) => instance.outbox.headDigest(instance.actorId(name)) ?? "");
+}
+
+// --------------------------------------------------------- spawning `serve`
+
+/**
+ * `freePort` above is a TOCTOU bet: it binds port 0, reads the number the OS
+ * chose, closes, and hands it back. An in-process test rebinds within
+ * microseconds and the bet always pays. A test that *spawns* `serve` does
+ * not — it mints keys, writes files and boots a child first, and under `npm
+ * test`'s parallel load something else takes the port in the meantime. That
+ * is `EADDRINUSE`, and it failed roughly one full run in three.
+ *
+ * The port cannot simply be held until the child wants it (only one process
+ * may listen), and it cannot be left to the OS with `AFP_PORT=0` either,
+ * because `AFP_ORIGIN` has to be known before boot — actor ids embed it. So
+ * the bet is re-taken instead: prepare, spawn, and on `EADDRINUSE` throw the
+ * whole attempt away — workspace and all — and try again on a fresh port.
+ *
+ * `prepare` returns the child's environment and whatever the caller needs to
+ * carry out of that attempt; it is re-run per attempt, because everything it
+ * builds is bound to the origin and the origin is bound to the port.
+ */
+export async function spawnServe<T>(
+  t: { after: (fn: () => void) => void },
+  prepare: (port: number, origin: string) => Promise<{ env: NodeJS.ProcessEnv; extra: T }>,
+  attempts = 4,
+): Promise<{ port: number; origin: string; log: () => string; extra: T }> {
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    const port = await freePort();
+    const origin = `http://127.0.0.1:${port}`;
+    const { env, extra } = await prepare(port, origin);
+
+    const child = spawn(process.execPath, ["--disable-warning=ExperimentalWarning", "src/cli.ts", "serve"], {
+      cwd: INSTANCE_DIR,
+      env,
+    });
+    let output = "";
+    child.stdout.on("data", (chunk) => (output += String(chunk)));
+    child.stderr.on("data", (chunk) => (output += String(chunk)));
+
+    const status = await serveStatus(origin, () => output);
+    if (status === "addrinuse") {
+      child.kill("SIGTERM");
+      continue;
+    }
+    t.after(() => child.kill("SIGTERM"));
+    return { port, origin, log: () => output, extra };
+  }
+  throw new Error(`serve could not bind a free port in ${attempts} attempts`);
+}
+
+/** Ready, or lost the port — anything else is a real failure and throws with what the child printed. */
+async function serveStatus(origin: string, log: () => string): Promise<"ready" | "addrinuse"> {
+  for (let poll = 0; poll < 150; poll++) {
+    if (/EADDRINUSE/.test(log())) return "addrinuse";
+    try {
+      if ((await fetch(`${origin}/healthz`)).ok) return "ready";
+    } catch {
+      // not listening yet
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error(`serve never became ready:\n${log()}`);
 }

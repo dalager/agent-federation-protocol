@@ -14,7 +14,7 @@
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { execFile, spawn } from "node:child_process";
+import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { cpSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -24,7 +24,7 @@ import { loadConfig } from "../src/config.ts";
 import { parseHubCommand } from "../src/ports/hubCommand.ts";
 import { hubActorUrl, parseHubArgs } from "../src/ports/hubCli.ts";
 import { workspace } from "./helpers.ts";
-import { freePort, INSTANCE_DIR } from "./adr0038-harness.ts";
+import { INSTANCE_DIR, spawnServe } from "./adr0038-harness.ts";
 
 const HUB = "bridge";
 
@@ -110,20 +110,6 @@ describe("ADR-0039 G2 — the argument shape", () => {
 
 // ------------------------------------------------------------------ G3 / G4
 
-/** Poll `/healthz` until the spawned `serve` answers, or give up with what it printed. */
-async function awaitServe(origin: string, log: () => string): Promise<void> {
-  for (let attempt = 0; attempt < 100; attempt++) {
-    try {
-      const response = await fetch(`${origin}/healthz`);
-      if (response.ok) return;
-    } catch {
-      // not listening yet
-    }
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  }
-  throw new Error(`serve never became ready:\n${log()}`);
-}
-
 /**
  * A served instance hosting its own hub, with the `hub` CLI run against it
  * from a *separate* data directory holding a copy of the keys and no store —
@@ -131,53 +117,51 @@ async function awaitServe(origin: string, log: () => string): Promise<void> {
  * rather than inferred (ADR-0038's `showServe` discipline).
  */
 async function hubServe(t: { after: (fn: () => void) => void }) {
-  const port = await freePort();
-  const origin = `http://127.0.0.1:${port}`;
-  const paths = workspace();
-  const root = dirname(paths.dataDir);
-  mkdirSync(root, { recursive: true });
-  const agentsFile = join(root, "agents.json");
-  writeFileSync(
-    agentsFile,
-    JSON.stringify([
-      { name: "operator", capabilities: [], brain: "none" },
-      { name: "writer", capabilities: ["afp:cap:draft"], brain: "stub" },
-    ]),
-  );
-  const controllers = [`${origin}/agents/operator`];
+  const served = await spawnServe(t, async (port, origin) => {
+    const paths = workspace();
+    const root = dirname(paths.dataDir);
+    mkdirSync(root, { recursive: true });
+    const agentsFile = join(root, "agents.json");
+    writeFileSync(
+      agentsFile,
+      JSON.stringify([
+        { name: "operator", capabilities: [], brain: "none" },
+        { name: "writer", capabilities: ["afp:cap:draft"], brain: "stub" },
+      ]),
+    );
+    const controllers = [`${origin}/agents/operator`];
 
-  // Mint the keys and the roster before `serve` takes the lock, so the CLI's
-  // key directory copy below has the controller key in it.
-  const config = loadConfig({ ...paths, origin, agentsFile, controllers, devMode: true, brain: "stub", hubs: [HUB] });
-  const { agentCollection } = await import("../src/agents.ts");
-  new AfpInstance(config, agentCollection(config)).close();
+    // Mint the keys and the roster before `serve` takes the lock, so the
+    // CLI's key directory copy below has the controller key in it.
+    const config = loadConfig({ ...paths, origin, agentsFile, controllers, devMode: true, brain: "stub", hubs: [HUB] });
+    const { agentCollection } = await import("../src/agents.ts");
+    new AfpInstance(config, agentCollection(config)).close();
 
-  const child = spawn(process.execPath, ["--disable-warning=ExperimentalWarning", "src/cli.ts", "serve"], {
-    cwd: INSTANCE_DIR,
-    env: {
-      ...process.env,
-      AFP_DATA_DIR: paths.dataDir,
-      AFP_EXPORT_DIR: paths.exportDir,
-      AFP_ORIGIN: origin,
-      AFP_PORT: String(port),
-      AFP_HUBS: HUB,
-      AFP_AGENTS_FILE: agentsFile,
-      AFP_CONTROLLERS: controllers.join(","),
-      AFP_BRAIN: "stub",
-      AFP_DEV: "1",
-      AFP_RATE_LIMIT_PER_ADDRESS: "1000",
-      AFP_FLUSH_MS: "300",
-    },
+    const clientData = join(root, "cli-data");
+    mkdirSync(clientData, { recursive: true });
+    cpSync(config.keyDir, join(clientData, "keys"), { recursive: true });
+
+    return {
+      env: {
+        ...process.env,
+        AFP_DATA_DIR: paths.dataDir,
+        AFP_EXPORT_DIR: paths.exportDir,
+        AFP_ORIGIN: origin,
+        AFP_PORT: String(port),
+        AFP_HUBS: HUB,
+        AFP_AGENTS_FILE: agentsFile,
+        AFP_CONTROLLERS: controllers.join(","),
+        AFP_BRAIN: "stub",
+        AFP_DEV: "1",
+        AFP_RATE_LIMIT_PER_ADDRESS: "1000",
+        AFP_FLUSH_MS: "300",
+      },
+      extra: { clientData, agentsFile, controllers },
+    };
   });
-  let output = "";
-  child.stdout.on("data", (chunk) => (output += String(chunk)));
-  child.stderr.on("data", (chunk) => (output += String(chunk)));
-  t.after(() => child.kill("SIGTERM"));
-  await awaitServe(origin, () => output);
 
-  const clientData = join(root, "cli-data");
-  mkdirSync(clientData, { recursive: true });
-  cpSync(config.keyDir, join(clientData, "keys"), { recursive: true });
+  const { origin, log } = served;
+  const { clientData, agentsFile, controllers } = served.extra;
   const env = {
     ...process.env,
     AFP_DATA_DIR: clientData,
@@ -210,7 +194,7 @@ async function hubServe(t: { after: (fn: () => void) => void }) {
     assert.equal(existsSync(join(clientData, "afp.db.lock")), false, "the CLI took no lock");
   };
   const settle = () => new Promise((resolve) => setTimeout(resolve, 900));
-  return { origin, hub, followers, noStoreOpened, settle, selfActor: `${origin}/actor`, log: () => output };
+  return { origin, hub, followers, noStoreOpened, settle, selfActor: `${origin}/actor`, log };
 }
 
 describe("ADR-0039 G3 — the four acts against a real serve", () => {

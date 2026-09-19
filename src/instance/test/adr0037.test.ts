@@ -16,7 +16,7 @@
 
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { execFile, spawn } from "node:child_process";
+import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -38,7 +38,7 @@ import { Scheduler } from "../src/runtime/scheduler.ts";
 import { jumpClock } from "../src/demoP3.ts";
 import type { JsonValue } from "../src/crypto/jcs.ts";
 import { workspace } from "./helpers.ts";
-import { freePort, INSTANCE_DIR, VERIFIER } from "./adr0038-harness.ts";
+import { freePort, INSTANCE_DIR, spawnServe, VERIFIER } from "./adr0038-harness.ts";
 
 const HUB = "bridge";
 
@@ -125,75 +125,60 @@ describe("ADR-0037 G1 — afp:hostedHubs: the policy names the hubs this instanc
 
 // ------------------------------------------------------------------ G2
 
-/** Poll `/healthz` until the spawned `serve` answers, or give up with what it printed. */
-async function awaitServe(origin: string, log: () => string): Promise<void> {
-  for (let attempt = 0; attempt < 100; attempt++) {
-    try {
-      const response = await fetch(`${origin}/healthz`);
-      if (response.ok) return;
-    } catch {
-      // not listening yet
-    }
-    await new Promise((resolve) => setTimeout(resolve, 100));
-  }
-  throw new Error(`serve never became ready:\n${log()}`);
-}
-
 describe("ADR-0037 G2 — serve hosts the hub its policy names", () => {
   it("GET /hubs/:id, /followers and WebFinger are live, and the operator's own signed Follow then Enroll are admitted through the real inbox", async (t) => {
-    const port = await freePort();
-    const origin = `http://127.0.0.1:${port}`;
-    const paths = workspace();
-    const hubActorId = `${origin}/hubs/${HUB}`;
+    // `spawnServe` re-runs this whole block on a lost port (the harness's own
+    // note): everything below is bound to the origin, and the origin to the
+    // port, so the preparation cannot be hoisted out of the retry.
+    const served = await spawnServe(t, async (port, origin) => {
+      const paths = workspace();
+      const hubActorId = `${origin}/hubs/${HUB}`;
 
-    // The activities are built before `serve` takes the store lock, by an
-    // in-process instance on the very data directory `serve` will boot from —
-    // the operator's own instance, seating itself on the hub it hosts, which
-    // is scenario 15's Tuesday and the operator this ADR is written for. A
-    // *foreign* follower would need an agreement with a `hub` grant first
-    // (ADR-0016 Decision 2), and there is no command for an operator to
-    // conclude one yet; T7 covers that path in-process.
-    const config = loadConfig({ ...paths, origin, hubs: [HUB], devMode: true, brain: "stub" });
-    const setup = new AfpInstance(config, [
-      {
-        spec: { name: "probe", capabilities: ["afp:cap:g2"], keyCustody: "instance", since: "2026-09-01T00:00:00Z" },
-        brain: { name: "probe", capabilities: ["afp:cap:g2"], handle: async () => ({ ok: true as const, content: "n/a" }) },
-      },
-    ]);
-    const selfActor = String(setup.instanceDocument().id);
-    const followActivity = setup.followHub(hubActorId).activity;
-    const hubKey = loadOrCreateHubKeyPair(config.keyDir, "probe", setup.actorId("probe"), HUB);
-    const enrollActivity = setup.publishAsInstance([hubActorId], `${origin}/threads/g2`, "hub", (envelope) =>
-      enroll(envelope, { agent: setup.actorId("probe"), hub: hubActorId, capabilities: ["afp:cap:g2"], hubKey: hubKey.keyId }),
-    ).activity;
-    const instanceKey = setup.key("@instance");
-    setup.close();
+      // The activities are built before `serve` takes the store lock, by an
+      // in-process instance on the very data directory `serve` will boot
+      // from — the operator's own instance, seating itself on the hub it
+      // hosts, which is scenario 15's Tuesday and the operator this ADR is
+      // written for. A *foreign* follower would need an agreement with a
+      // `hub` grant first (ADR-0016 Decision 2), and there is no command for
+      // an operator to conclude one yet; T7 covers that path in-process.
+      const config = loadConfig({ ...paths, origin, hubs: [HUB], devMode: true, brain: "stub" });
+      const setup = new AfpInstance(config, [
+        {
+          spec: { name: "probe", capabilities: ["afp:cap:g2"], keyCustody: "instance", since: "2026-09-01T00:00:00Z" },
+          brain: { name: "probe", capabilities: ["afp:cap:g2"], handle: async () => ({ ok: true as const, content: "n/a" }) },
+        },
+      ]);
+      const selfActor = String(setup.instanceDocument().id);
+      const followActivity = setup.followHub(hubActorId).activity;
+      const hubKey = loadOrCreateHubKeyPair(config.keyDir, "probe", setup.actorId("probe"), HUB);
+      const enrollActivity = setup.publishAsInstance([hubActorId], `${origin}/threads/g2`, "hub", (envelope) =>
+        enroll(envelope, { agent: setup.actorId("probe"), hub: hubActorId, capabilities: ["afp:cap:g2"], hubKey: hubKey.keyId }),
+      ).activity;
+      const instanceKey = setup.key("@instance");
+      setup.close();
 
-    const child = spawn(process.execPath, ["--disable-warning=ExperimentalWarning", "src/cli.ts", "serve"], {
-      cwd: INSTANCE_DIR,
-      env: {
-        ...process.env,
-        AFP_DATA_DIR: paths.dataDir,
-        AFP_EXPORT_DIR: paths.exportDir,
-        AFP_ORIGIN: origin,
-        AFP_PORT: String(port),
-        AFP_HUBS: HUB,
-        AFP_BRAIN: "stub",
-        AFP_DEV: "1",
-        // The readiness poll and this test's own burst share one address;
-        // the default 20/s bucket answers the burst 429 (ADR-0025 D5).
-        AFP_RATE_LIMIT_PER_ADDRESS: "1000",
-      },
+      return {
+        env: {
+          ...process.env,
+          AFP_DATA_DIR: paths.dataDir,
+          AFP_EXPORT_DIR: paths.exportDir,
+          AFP_ORIGIN: origin,
+          AFP_PORT: String(port),
+          AFP_HUBS: HUB,
+          AFP_BRAIN: "stub",
+          AFP_DEV: "1",
+          // The readiness poll and this test's own burst share one address;
+          // the default 20/s bucket answers the burst 429 (ADR-0025 D5).
+          AFP_RATE_LIMIT_PER_ADDRESS: "1000",
+        },
+        extra: { hubActorId, selfActor, followActivity, enrollActivity, instanceKey },
+      };
     });
-    let output = "";
-    child.stdout.on("data", (chunk) => (output += String(chunk)));
-    child.stderr.on("data", (chunk) => (output += String(chunk)));
-    t.after(() => child.kill("SIGTERM"));
-
-    await awaitServe(origin, () => output);
+    const { origin, port, log } = served;
+    const { hubActorId, selfActor, followActivity, enrollActivity, instanceKey } = served.extra;
 
     const actorResponse = await fetch(hubActorId, { headers: { accept: "application/activity+json" } });
-    assert.equal(actorResponse.status, 200, `GET /hubs/:id is live on a served instance:\n${output}`);
+    assert.equal(actorResponse.status, 200, `GET /hubs/:id is live on a served instance:\n${log()}`);
     const hubDoc = (await actorResponse.json()) as { [key: string]: JsonValue };
     assert.deepEqual(hubDoc.type, ["Group", "afp:Hub"]);
     assert.equal(hubDoc.id, hubActorId);
@@ -220,7 +205,7 @@ describe("ADR-0037 G2 — serve hosts the hub its policy names", () => {
 
     // Follow first: the default seat policy is `follow-required` (ADR-0032 D6).
     const followed = await postToHub(followActivity);
-    assert.equal(followed.status, 202, `the Follow is admitted: ${JSON.stringify(followed.body)}\n${output}`);
+    assert.equal(followed.status, 202, `the Follow is admitted: ${JSON.stringify(followed.body)}\n${log()}`);
 
     const seated = await fetch(`${hubActorId}/followers`, { headers: { accept: "application/activity+json" } });
     assert.deepEqual(
@@ -230,7 +215,7 @@ describe("ADR-0037 G2 — serve hosts the hub its policy names", () => {
     );
 
     const enrolled = await postToHub(enrollActivity);
-    assert.equal(enrolled.status, 202, `the Enroll is admitted: ${JSON.stringify(enrolled.body)}\n${output}`);
+    assert.equal(enrolled.status, 202, `the Enroll is admitted: ${JSON.stringify(enrolled.body)}\n${log()}`);
 
     // Read the membership back the way a counterparty would — off the hub's
     // own route, from a served process, which is the whole of finding 96.
@@ -241,7 +226,7 @@ describe("ADR-0037 G2 — serve hosts the hub its policy names", () => {
     };
     const roster = await signedGet(`/hubs/${HUB}`);
     assert.equal(roster.status, 200);
-    assert.match(output, /hosting hubs/, `serve said what it hosts:\n${output}`);
+    assert.match(log(), /hosting hubs/, `serve said what it hosts:\n${log()}`);
   });
 });
 
