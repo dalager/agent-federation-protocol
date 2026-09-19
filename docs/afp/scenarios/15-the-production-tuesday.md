@@ -12,9 +12,9 @@
 | **Support status** | **Supported — findings 96–100** |
 |---|---|
 | Findings raised | 5 |
-| Resolved by | 96, 97 → [ADR-0037](../adr/0037-the-served-hub.md) (**built 2026-09-19**); 98 → [ADR-0035](../adr/0035-remote-custody-and-the-asynchronous-port.md) (proposed); 99 → [ADR-0036](../adr/0036-the-hosted-profile.md) (proposed); 100 → operational, a production-checklist line |
+| Resolved by | 96, 97 → [ADR-0037](../adr/0037-the-served-hub.md) (**built 2026-09-19**); 98 → [ADR-0035](../adr/0035-remote-custody-and-the-asynchronous-port.md) (**Decisions 2, 3, 5 built 2026-09-18**; Decision 4 costed, unscheduled); 99 → [ADR-0036](../adr/0036-the-hosted-profile.md) (**WP-1–3 built 2026-09-19**, WP-4/5 partly; no `actor` adapter yet); 100 → operational, a production-checklist line |
 | See it run | `npm run demo:p8` — the served surface itself has no demo; the gate boots it |
-| Gated by | `adr0031.test.ts`, `adr0032.test.ts`, `adr0033.test.ts`, `adr0034.test.ts`, `adr0026.test.ts` |
+| Gated by | `adr0031.test.ts`, `adr0032.test.ts`, `adr0033.test.ts`, `adr0034.test.ts`, `adr0026.test.ts`, `adr0035.test.ts`, `adr0037.test.ts` |
 | Succeeds | [the operator's Tuesday](the-operators-tuesday.md) — the 2026-08 baseline, kept unedited |
 
 **Read the walkthrough below as history**: what ran on 2026-09-15, against the build that
@@ -259,8 +259,13 @@ policy document says `custody.instance: "file"` because that is the only signer 
 built, and the passphrase file lives on the same host as the files it protects. The
 honest security statement is now "a directory permission, a passphrase, and a careful
 operator" — one word longer than August's. The `remote` adapter that would change the
-sentence is [ADR-0035](../adr/0035-remote-custody-and-the-asynchronous-port.md),
-proposed and costed, unbuilt.
+sentence is [ADR-0035](../adr/0035-remote-custody-and-the-asynchronous-port.md), and
+since 2026-09-18 it is half of one: `remote-issued` custody is built — the root key lives
+in the KMS, signs one `afp:KeyDelegation` per rotation, and the short-lived successor it
+introduces signs everything else, so a stolen host signs for a configured hour rather than
+forever. What is still unbuilt is Decision 4, the `remote` mode in which the private key
+provably never enters host memory; it is costed — ~300 call sites and a `Signer.sign` that
+returns a promise — and deliberately unscheduled.
 
 ## The warts, because a Tuesday without them is fiction
 
@@ -276,7 +281,9 @@ proposed and costed, unbuilt.
   is a command or a file, and they are still four things a solo practitioner has to own
   before the first federation. Finding 99.
 - **Keys are files, with a passphrase.** Said above; repeated here because it belongs on
-  this list until ADR-0035 builds. Finding 98.
+  this list until ADR-0035 Decision 4 builds. `remote-issued` (Decision 2, built) shortens
+  the window the passphrase has to survive; it does not move the key out of host memory.
+  Finding 98.
 - **The retention horizon is declared, not acted on.** `afp:retentionDuty` travels in the
   policy and the manifest and the verifier turns checks on for it; nothing in the runtime
   reads the horizon. Exports under `AFP_EXPORT_DIR` are the operator's own, and
@@ -303,7 +310,7 @@ proposed and costed, unbuilt.
 | The operator's obligations are published, signed, and the record is held to them | `/afp/policy`, `policy.jsonld` in every export, verifier `check_policy` | Yes (15:00) |
 | A counterparty verifies the export with nothing but Python | `pip install afp-verify`; the archive; the conformance kit | Yes (15:00) |
 | A hub the practice hosts converges while it sleeps | converge loop; `serve` builds the hubs `afp:hostedHubs` names | Yes — **closed 2026-09-19 by [ADR-0037](../adr/0037-the-served-hub.md)**, finding 96 |
-| Key custody survives the host being taken | `remote` signer adapter | **No — ADR-0035 proposed; finding 98** |
+| Key custody survives the host being taken | `remote-issued` custody: KMS root, `afp:KeyDelegation`, short-lived successor; the `remote` adapter for the full property | **Narrowed (16:45) — the compromise window is bounded, not eliminated; ADR-0035 D4 unscheduled; finding 98** |
 | The declared retention horizon is acted on | `afp:retentionDuty` in policy and manifest | **Declared, checked at replay, not acted on — finding 100** |
 
 ## Spec verdict
@@ -343,13 +350,19 @@ custody mode that would change the sentence is not.
   byte-equal across replicas within two converge ticks).
 - **Finding 98 — custody improved by one word.** File custody with a passphrase on the
   same disk is better than file custody, and is still the thing the baseline called
-  uncomfortable. ADR-0035 is the answer and is proposed.
+  uncomfortable. ADR-0035 is the answer and is now built in part: `remote-issued` custody
+  bounds the window a stolen host can sign in (Decisions 2, 3, 5, built 2026-09-18), and
+  the `remote` mode that would take the key out of host memory altogether is Decision 4 —
+  costed and unscheduled. The finding stays open at the width of that decision.
 - **Finding 99 — the profile needs four things that are not in the checkout.** The
   self-hosted profile is honest about them and a solo practitioner still has to own a
   proxy, a unit, a cron and a key runbook before their first federation.
   [ADR-0036](../adr/0036-the-hosted-profile.md) proposes the profile in which all four
-  are the platform's; it is proposed, and this scenario is what it would be re-walked
-  against.
+  are the platform's, and it has begun to build: WP-1 (the store port and its `node`
+  adapter), WP-2 (the request port) and WP-3 (the alarm schedule and the resolver seam)
+  landed 2026-09-19 as refactors with the suite green, WP-4 and WP-5 in part. No `actor`
+  adapter exists, so no operator has yet been spared any of the four things; this scenario
+  is what the profile is re-walked against when one does.
 - **Finding 100 — retention is declared and checked, never acted on.** The policy states
   a horizon, the manifest carries it, the verifier turns checks on for it, and the
   runtime has no loop that reads it. Whether the runtime *should* — an export schedule,
@@ -383,19 +396,20 @@ through the Python verifier.
 | The operator's obligations are published, signed, and the record is held to them | workload demonstrated | `npm run demo:p8` — `test/adr0033.test.ts` G6 "every shipped bundle replays unchanged… now carrying policy.jsonld"; G2 "a Result whose afp:producedBy names an unlisted brain fails by name" |
 | A counterparty verifies the export with nothing but Python | workload demonstrated | `npm run demo:p8` — every demo's bundle is replayed by `afp_verify.py` in `test/demos.test.ts`; `test/adr0034.test.ts` "build the archive, install into a clean venv, run afp-verify over a real fixture" |
 | A hub the practice hosts converges while it sleeps | mechanism gated | `test/adr0037.test.ts` G2 — a real `serve` builds the hubs `afp:hostedHubs` names, serves them and hands them to the converge loop; G4 converges seats with the membership they authorize — finding 96 closed |
-| Key custody survives the host being taken | edge not built | [ADR-0035](../adr/0035-remote-custody-and-the-asynchronous-port.md) — proposed, unbuilt; finding 98 |
+| Key custody survives the host being taken | narrowed | `test/adr0035.test.ts` G1 "rotation with a remote root calls /sign exactly once…", G3 "a delegated key signing outside its declared interval fails keys: by name at replay", G5 "signer unreachable at rotation time — the current key keeps signing" — the window is bounded; the key is still in host memory for its lifetime, which is ADR-0035 Decision 4, unscheduled — finding 98 |
 | The declared retention horizon is acted on | narrowed | `test/adr0033.test.ts` "fills the manifest's retentionDuty/anchors from the policy when extras names none" — the declaration travels and is checked at replay; nothing in the runtime reads the horizon — finding 100 |
 
-**Counts:** 2 demonstrated · 10 gated · 2 narrowed · 1 not built.
+**Counts:** 2 demonstrated · 10 gated · 3 narrowed · 0 not built.
 
 ## Postscript: the Tuesday that has no host
 
 The four things outside the checkout are the whole difference between this Tuesday and
 one a solo practitioner could have. [ADR-0036](../adr/0036-the-hosted-profile.md) — proposed
-the same day this was written — notices that ADR-0032's invariants (one store, one writer,
+the same day this was written, and building since 2026-09-19 — notices that ADR-0032's invariants (one store, one writer,
 one clock, one origin, a proxy that terminates TLS) describe a platform actor with attached
 storage, and proposes a store port and a request port so the Node runtime becomes one
-adapter and the actor another. If it builds, this scenario is re-walked with the same
-beats and different nouns: no unit, no Caddy, no cron, no key directory — and the test is
+adapter and the actor another. Three work packages in, the ports exist and the `node`
+adapter is one of them; the `actor` adapter that would make the second noun real is not
+written. When it is, this scenario is re-walked with the same beats and different nouns: no unit, no Caddy, no cron, no key directory — and the test is
 the same as the baseline's, whether *that* Tuesday can be written with every noun
 pointing at a file.

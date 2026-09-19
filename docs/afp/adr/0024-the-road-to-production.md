@@ -161,10 +161,21 @@ built in its ADR.
 | C10 | 0034 | built |
 
 Every claim is now built or built-less-a-named-remainder, and scenario 15 is written.
-What stands between the program and "closed" (as of 2026-09-19) is one remainder: the
-first green CI run and first signed release (ADR-0034, mechanism built, never exercised).
-[ADR-0037](0037-the-served-hub.md) closed the other on 2026-09-19 — `serve` hosts the
-hubs its policy names, and seats converge across replicas.
+What stands between the program and "closed" (as of 2026-09-19) is **one act, not a
+build: the first signed release.** `scripts/release.sh` refuses unless every gate is
+green and a signing key is configured; both halves of that precondition are satisfiable
+today and the script has never been run. There is no tag in this repository, and
+`src/instance/package.json` still reads `0.9.0` at spec revision 3.36.
+
+The two remainders this paragraph used to carry are gone.
+[ADR-0037](0037-the-served-hub.md) closed the first on 2026-09-19 — `serve` hosts the
+hubs its policy names, and seats converge across replicas. The second was the green CI
+run ([ADR-0034](0034-release-conformance-and-disclosure.md)'s gate, built but never
+exercised): it first ran green on **2026-09-13** and is green on today's tip, 617 tests
+over 148 suites, with the four jobs `gate.yml` names — the suite, every shipped fixture
+verified by the Python verifier, the conformance kit, and the release archive installed
+into a clean virtualenv — each having passed on `main`. The mechanism is exercised; what
+is unexercised is the release it gates.
 [ADR-0038](0038-the-operators-own-work.md) — the agent collection from a file and the
 `task` command — is not a claim of this program, but is what makes a served instance
 usable by the operator who runs it, which scenario 15's postscript could not name.
