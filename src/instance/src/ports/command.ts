@@ -19,7 +19,7 @@
  */
 
 import { createHash } from "node:crypto";
-import type { IncomingMessage, ServerResponse } from "node:http";
+import { jsonResponse, readCappedBody, TOO_LARGE } from "../runtime/httpPort.ts";
 import type { AfpInstance } from "../instance.ts";
 import { authorizeRead, type ReadGateDeps } from "../federation/readGate.ts";
 import type { RequestAuthHeaders } from "../federation/httpSig.ts";
@@ -419,46 +419,37 @@ async function actorCommandRoute(instance: AfpInstance, read: ReadOptions, ctx: 
  * read gate inside it) ever sees them. Kept out of `ap/server.ts` to hold
  * that file under its line ceiling.
  */
-export function handleCommandPost(instance: AfpInstance, read: ReadOptions, req: IncomingMessage, res: ServerResponse, path: string): void {
-  const cap = instance.config.maxInboxBodyBytes;
-  const chunks: Buffer[] = [];
-  let received = 0;
-  let overCap = false;
-  req.on("data", (chunk: Buffer) => {
-    if (overCap) return;
-    received += chunk.length;
-    if (received > cap) {
-      overCap = true;
-      res.writeHead(413, { "content-type": "application/json" });
-      res.end(JSON.stringify({ error: "payload too large" }));
-      req.destroy();
-      return;
-    }
-    chunks.push(chunk);
-  });
-  req.on("end", () => {
-    if (overCap) return;
-    const body = Buffer.concat(chunks).toString("utf8");
-    const send = (status: number, respBody: unknown): void => {
-      res.writeHead(status, { "content-type": "application/json" });
-      res.end(JSON.stringify(respBody, null, 2));
-    };
-    commandRoute(instance, read, {
+export async function handleCommandPost(instance: AfpInstance, read: ReadOptions, request: Request, path: string): Promise<Response> {
+  const raw = await readCappedBody(request, instance.config.maxInboxBodyBytes);
+  if (raw === TOO_LARGE) return jsonResponse(413, { error: "payload too large" });
+  const body = new TextDecoder().decode(raw);
+
+  // `commandRoute` answers through a `send` callback rather than by
+  // returning, because it decides mid-flight whether it handled the path at
+  // all. Capturing what it sent keeps that contract and still hands one
+  // Response back to the port.
+  let answer: Response | null = null;
+  const send = (status: number, respBody: unknown): void => {
+    answer = jsonResponse(status, JSON.stringify(respBody, null, 2));
+  };
+
+  try {
+    const handled = await commandRoute(instance, read, {
       path,
       headers: {
-        host: String(req.headers.host ?? ""),
-        date: String(req.headers.date ?? ""),
-        digest: String(req.headers.digest ?? "") || undefined,
-        "content-digest": String(req.headers["content-digest"] ?? "") || undefined,
-        "signature-input": String(req.headers["signature-input"] ?? "") || undefined,
-        signature: String(req.headers.signature ?? ""),
+        host: request.headers.get("host") ?? "",
+        date: request.headers.get("date") ?? "",
+        digest: request.headers.get("digest") ?? undefined,
+        "content-digest": request.headers.get("content-digest") ?? undefined,
+        "signature-input": request.headers.get("signature-input") ?? undefined,
+        signature: request.headers.get("signature") ?? "",
       },
       body,
       send,
-    })
-      .then((handled) => {
-        if (!handled) send(404, { error: "not found" });
-      })
-      .catch(() => send(500, { error: "internal" }));
-  });
+    });
+    if (!handled) return jsonResponse(404, { error: "not found" });
+  } catch {
+    return jsonResponse(500, { error: "internal" });
+  }
+  return answer ?? jsonResponse(500, { error: "internal" });
 }

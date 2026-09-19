@@ -16,6 +16,10 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { openNodeStore } from "../src/store/adapters/node.ts";
 import type { Store } from "../src/store/port.ts";
+import { AfpInstance } from "../src/instance.ts";
+import { loadConfig } from "../src/config.ts";
+import { createHandler } from "../src/ap/server.ts";
+import { workspace } from "./helpers.ts";
 
 /** A row with its prototype normalised — see the port's note on row shape. */
 function plain(row: unknown): unknown {
@@ -142,5 +146,94 @@ describe("ADR-0036 WP-1 — the store port's contract", () => {
       assert.equal(typeof (value as { prepare?: unknown })?.prepare, "undefined", "no statement-bearing handle crosses the port");
     }
     db.close();
+  });
+});
+
+// ------------------------------------------------- WP-2, the request port
+
+describe("ADR-0036 WP-2 — the request port's contract", () => {
+  it("G8: the handler answers a standard Request with a standard Response, no server involved", async () => {
+    const paths = workspace();
+    const instance = new AfpInstance(loadConfig({ ...paths }), []);
+    try {
+      const handler = createHandler(instance);
+      const response = await handler(new Request(`${instance.config.origin}/actor`), { address: "203.0.113.7" });
+
+      assert.ok(response instanceof Response, "a Response, not a written socket");
+      assert.equal(response.status, 200);
+      assert.match(response.headers.get("content-type") ?? "", /activity\+json/);
+      const actor = (await response.json()) as { id: string };
+      assert.equal(actor.id, String(instance.instanceDocument().id));
+    } finally {
+      instance.close();
+    }
+  });
+
+  it("G9: the peer address is a parameter, not a header — a client cannot forge its own bucket", async () => {
+    const paths = workspace();
+    // A limit of one, so the second request from the same peer is refused.
+    const instance = new AfpInstance(loadConfig({ ...paths, rateLimitPerAddress: 1, rateLimitPerAddressWindowMs: 60_000 }), []);
+    try {
+      const handler = createHandler(instance);
+      const get = (address: string, headers: HeadersInit = {}) =>
+        handler(new Request(`${instance.config.origin}/actor`, { headers }), { address });
+
+      assert.equal((await get("198.51.100.1")).status, 200, "first from this peer");
+      assert.equal((await get("198.51.100.1")).status, 429, "second from the same peer is bucketed");
+
+      // The same peer, now claiming to be someone else in every header a
+      // proxy-trusting implementation would have believed. The bucket is
+      // keyed on the adapter's parameter, so none of it moves the answer.
+      const forged = await get("198.51.100.1", {
+        "x-forwarded-for": "203.0.113.9",
+        "x-real-ip": "203.0.113.9",
+        forwarded: "for=203.0.113.9",
+      });
+      assert.equal(forged.status, 429, "headers cannot buy a fresh bucket");
+
+      assert.equal((await get("198.51.100.2")).status, 200, "a genuinely different peer has its own");
+    } finally {
+      instance.close();
+    }
+  });
+
+  it("G10: an oversized body is refused before it is buffered, and the stream is left unread", async () => {
+    const paths = workspace();
+    const cap = 512;
+    const instance = new AfpInstance(loadConfig({ ...paths, maxInboxBodyBytes: cap }), []);
+    try {
+      const handler = createHandler(instance, { inbox: { verify: async () => null } as never });
+
+      let produced = 0;
+      const body = new ReadableStream<Uint8Array>({
+        pull(controller) {
+          produced += 1;
+          // Far past the cap in total; the reader should stop asking long
+          // before this runs enough times to hold it all in memory.
+          if (produced > 100) {
+            controller.close();
+            return;
+          }
+          controller.enqueue(new Uint8Array(256));
+        },
+      });
+
+      const response = await handler(
+        new Request(`${instance.config.origin}/actor/inbox`, {
+          method: "POST",
+          body,
+          headers: { host: "alpha.operator.local" },
+          // @ts-expect-error — Node requires this for a streamed request body
+          duplex: "half",
+        }),
+        { address: "203.0.113.20" },
+      );
+
+      assert.equal(response.status, 413);
+      assert.deepEqual(await response.json(), { error: "payload too large" });
+      assert.ok(produced < 100, `the producer was stopped early, at ${produced} chunks — refused, not buffered`);
+    } finally {
+      instance.close();
+    }
   });
 });

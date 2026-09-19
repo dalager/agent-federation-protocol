@@ -10,7 +10,7 @@
  */
 
 import { createHmac, timingSafeEqual } from "node:crypto";
-import type { IncomingMessage, ServerResponse } from "node:http";
+import { jsonResponse, readCappedBody, TOO_LARGE } from "../runtime/httpPort.ts";
 import type { AfpInstance } from "../instance.ts";
 import type { TaskPins } from "../ap/pins.ts";
 import type { Visibility } from "../ap/activities.ts";
@@ -71,80 +71,46 @@ export function verifyWebhookSignature(secret: string, body: Uint8Array, header:
  * route's own URL. A redelivered webhook — dropped at P1 dedupe — is still a
  * 202 from the sender's view (G1): initiated and duplicate both answer 202.
  */
-export function handleWebhook(
-  instance: AfpInstance,
-  route: WebhookRoute,
-  req: IncomingMessage,
-  res: ServerResponse,
-): void {
-  const cap = instance.config.maxInboxBodyBytes;
-  const chunks: Buffer[] = [];
-  let received = 0;
-  let overCap = false;
-  req.on("data", (chunk: Buffer) => {
-    if (overCap) return;
-    received += chunk.length;
-    if (received > cap) {
-      overCap = true;
-      res.writeHead(413, { "content-type": "application/json" });
-      res.end(JSON.stringify({ error: "payload too large" }));
-      req.destroy();
-      return;
-    }
-    chunks.push(chunk);
-  });
-  req.on("end", () => {
-    if (overCap) return;
-    const body = Buffer.concat(chunks);
-    const signature = String(req.headers["x-afp-signature"] ?? "") || undefined;
-    if (!verifyWebhookSignature(route.secret, body, signature)) {
-      res.writeHead(401, { "content-type": "application/json" });
-      res.end(JSON.stringify({ error: "bad signature" }));
-      return;
-    }
+export async function handleWebhook(instance: AfpInstance, route: WebhookRoute, request: Request): Promise<Response> {
+  const body = await readCappedBody(request, instance.config.maxInboxBodyBytes);
+  if (body === TOO_LARGE) return jsonResponse(413, { error: "payload too large" });
 
-    const externalId = String(req.headers["x-afp-external-id"] ?? "");
-    if (!externalId) {
-      res.writeHead(400, { "content-type": "application/json" });
-      res.end(JSON.stringify({ error: "missing x-afp-external-id" }));
-      return;
+  const signature = request.headers.get("x-afp-signature") ?? undefined;
+  if (!verifyWebhookSignature(route.secret, body, signature)) {
+    return jsonResponse(401, { error: "bad signature" });
+  }
+
+  const externalId = request.headers.get("x-afp-external-id") ?? "";
+  if (!externalId) return jsonResponse(400, { error: "missing x-afp-external-id" });
+
+  const sourceUrl = request.headers.get("x-afp-source-url") || `${instance.config.origin}/ports/${route.name}/webhook`;
+  const mediaType = request.headers.get("content-type") || "application/octet-stream";
+
+  const event: ExternalEvent = {
+    externalId,
+    payload: body,
+    mediaType,
+    sourceUrl,
+    receivedAt: instance.clock.now().toISOString(),
+  };
+
+  try {
+    const result = instance.initiate(route.initiator, event, {
+      to: route.to,
+      thread: route.thread,
+      pins: route.pins,
+      visibility: route.visibility,
+    });
+    return jsonResponse(202, { status: result.status, correlationId: result.correlationId });
+  } catch (error) {
+    if (error instanceof IngestionRefused) {
+      return jsonResponse(422, { error: "ingestion refused", reason: error.message });
     }
-
-    const sourceUrl =
-      String(req.headers["x-afp-source-url"] ?? "") || `${instance.config.origin}/ports/${route.name}/webhook`;
-    const mediaType = String(req.headers["content-type"] ?? "") || "application/octet-stream";
-
-    const event: ExternalEvent = {
-      externalId,
-      payload: new Uint8Array(body),
-      mediaType,
-      sourceUrl,
-      receivedAt: instance.clock.now().toISOString(),
-    };
-
-    try {
-      const result = instance.initiate(route.initiator, event, {
-        to: route.to,
-        thread: route.thread,
-        pins: route.pins,
-        visibility: route.visibility,
-      });
-      res.writeHead(202, { "content-type": "application/json" });
-      res.end(JSON.stringify({ status: result.status, correlationId: result.correlationId }));
-    } catch (error) {
-      if (error instanceof IngestionRefused) {
-        res.writeHead(422, { "content-type": "application/json" });
-        res.end(JSON.stringify({ error: "ingestion refused", reason: error.message }));
-        return;
-      }
-      // Anything else is the instance's own fault (an initiator naming no
-      // registered agent, say). A throw here would escape the request's
-      // event handler as an uncaught exception and take the process down —
-      // the answer is a 500 with no detail, and the record untouched.
-      res.writeHead(500, { "content-type": "application/json" });
-      res.end(JSON.stringify({ error: "internal error" }));
-    }
-  });
+    // Anything else is the instance's own fault (an initiator naming no
+    // registered agent, say). The answer is a 500 with no detail, and the
+    // record untouched.
+    return jsonResponse(500, { error: "internal error" });
+  }
 }
 
 /**

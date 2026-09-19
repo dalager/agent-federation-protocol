@@ -6,6 +6,13 @@
  * close the instance (which releases the store lock, ADR-0031 Decision 4),
  * and exit 0. A second signal during drain exits 1 immediately — a stuck
  * drain must still yield to an operator who asks twice.
+ *
+ * ADR-0036 Decision 3: this is the `node` profile's concern alone, and stays
+ * a `node:http` `Server` on purpose. A hosted actor has no process to drain,
+ * no signals to trap and no listening socket to stop accepting on — its
+ * platform ends a request by returning from the fetch method. The request
+ * port (`runtime/httpPort.ts`) therefore says nothing about shutdown, and a
+ * second adapter is expected to leave this file entirely alone.
  */
 
 import type { Server } from "node:http";

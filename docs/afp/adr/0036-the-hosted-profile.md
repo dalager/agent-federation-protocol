@@ -1,8 +1,9 @@
 # ADR-0036 — The hosted profile: one operator, one object
 
 - **Status:** Proposed (2026-09-15); **WP-1 built (2026-09-19)** — the store port and its
-  `node` adapter, landed as a refactor with the suite green, per the build order below.
-  WP-2 to WP-5 unbuilt, and no `actor` adapter exists. Extends program claim **C8** of
+  `node` adapter, and **WP-2 built (2026-09-19)** — the request port and its `node`
+  adapter, both landed as refactors with the suite green, per the build order below.
+  WP-3 to WP-5 unbuilt, and no `actor` adapter exists. Extends program claim **C8** of
   [ADR-0024](0024-the-road-to-production.md) with a second hosting profile; group:
   **Operations**
 - **Date:** 2026-09-15
@@ -336,6 +337,61 @@ tracking note for it.**
 `migrate` call in `db.ts` — all of them node-profile concerns sitting above a
 profile-neutral port. Splitting that into an adapter-owned opener is WP-5's business, not
 a refactor's, and naming it here is cheaper than rediscovering it.
+
+### WP-2 · the request port — built 2026-09-19
+
+`runtime/httpPort.ts` states it: `Handler`, plus the two helpers every door
+needs (`jsonResponse`, `readCappedBody`). `runtime/adapters/node.ts` holds
+`createServer` and is now the only thing in the request path that knows
+`node:http` exists — it converts an `IncomingMessage` into a `Request`, calls
+the handler, and writes the `Response` back. `ap/server.ts` exports
+`createHandler(instance, options)` and keeps `createHttpServer` at its old
+name and signature as a two-line wrapper over the adapter, because
+twenty-three call sites and every demo say it. `ports/command.ts` and
+`ports/webhook.ts` take a `Request` and return a `Response`.
+
+**This time the gate held literally: 605 passing, no test case changed.** The
+three new cases are additions, not edits. Two things made it cheap. First,
+`healthRoute` and `renderingRoute` already answered through a `send` callback
+rather than a `ServerResponse`, so the routes that were hardest to move had
+been half-ported for two ADRs without anyone calling it that. Second, the
+headers the old code set on the response object before writing it
+(`Cache-Control`, `Vary`, the WebFinger `Access-Control-Allow-Origin`) could
+be accumulated and applied at send time, which is observably the same thing —
+nothing could read them before the write either.
+
+**The port takes two parameters, and Decision 3 above says one.** Decision 3
+writes it as `(request: Request) => Promise<Response>`. It cannot quite be:
+ADR-0025 Decision 5's rate limiter buckets by source address, and a standard
+`Request` has no such field, because the address is a transport fact known to
+whatever accepted the connection and to nothing above it. The alternatives
+were a header the adapter injects or a parameter. A header is the worse one:
+`x-forwarded-for`-shaped smuggling is a real attack, the adapter would have to
+strip a client-supplied copy before setting its own, and a reader of the
+handler could not tell a trustworthy header from a forged one. A parameter
+cannot be spoofed by anyone who is not the adapter. So the port is
+`(request, peer)`, `test/adr0036.test.ts` G9 proves a client cannot buy itself
+a fresh bucket with `x-forwarded-for`, `x-real-ip` or `forwarded`, and this
+paragraph amends Decision 3 rather than quietly differing from it.
+
+**The body cap needed care, because it is the one place the old imperative
+shape was load-bearing.** ADR-0025 Decision 4 says a hostile body is "capped
+and refused before parsing, not after buffering", and the old code held that
+by counting bytes in a `data` handler and destroying the socket mid-flight.
+`request.arrayBuffer()` would have quietly inverted it — buffer first, measure
+second — so `readCappedBody` reads the stream itself and cancels past the cap,
+and a declared `content-length` over the cap is refused before a byte is read.
+G10 proves the producer is stopped early rather than drained. The socket close
+that used to sit beside the 413 is now the node adapter's, on seeing that
+status: the sender may still be sending, and closing is still the only way to
+stop it.
+
+`runtime/shutdown.ts` stays node-only and now says why in its header — a
+hosted actor has no process to drain, no signals to trap and no socket to stop
+accepting on, so the request port says nothing about shutdown and a second
+adapter leaves that file alone. What remains outside the port is the signer's
+own HTTP surface (`tools/signer/server.ts`, ADR-0026's tool, not this
+instance's public door) and the P4–P7 demos, which stand up their own servers.
 
 ## References
 
